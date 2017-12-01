@@ -1,0 +1,9 @@
+[package]
+name = "btree"
+version = "0.1.0"
+authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+
+[dependencies]
+arrayvec = "0.4"
+smallvec = "0.5"
+rand = "0.3"
