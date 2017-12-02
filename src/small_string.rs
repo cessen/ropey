@@ -8,7 +8,7 @@ use std::iter::{FromIterator, IntoIterator};
 use smallvec;
 use smallvec::{Array, SmallVec};
 
-// TODO: FromIterator without having to allocate a String
+
 #[derive(Clone, Default)]
 pub struct SmallString<B: Array<Item = u8>> {
     buffer: SmallVec<B>,
