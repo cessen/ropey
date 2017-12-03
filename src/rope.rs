@@ -4,10 +4,12 @@ use std;
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
+use unicode_segmentation::UnicodeSegmentation;
 
 use smallvec::Array;
 use small_string::SmallString;
-use small_string_utils::{insert_at_char, split_string_near_byte};
+use small_string_utils::{insert_at_char, split_string_near_byte, is_line_ending, char_count,
+                         newline_count};
 
 
 // Internal node min/max values.
@@ -112,9 +114,9 @@ impl TextInfo {
     fn from_str(text: &str) -> TextInfo {
         TextInfo {
             bytes: text.len() as Count,
-            chars: text.chars().count() as Count,
-            graphemes: 0, // TODO
-            newlines: 0, // TODO
+            chars: char_count(text) as Count,
+            graphemes: text.graphemes(true).count() as Count,
+            newlines: newline_count(text) as Count,
         }
     }
 

@@ -3,6 +3,62 @@
 use smallvec::Array;
 use small_string::SmallString;
 
+pub fn is_line_ending(text: &str) -> bool {
+    match text {
+        "\u{000D}\u{000A}" |
+        "\u{000A}" |
+        "\u{000B}" |
+        "\u{000C}" |
+        "\u{000D}" |
+        "\u{0085}" |
+        "\u{2028}" |
+        "\u{2029}" => true,
+        _ => false,
+    }
+}
+
+pub fn char_count(text: &str) -> usize {
+    let mut count = 0;
+    for byte in text.bytes() {
+        if (byte & 0xC0) != 0x80 {
+            count += 1;
+        }
+    }
+    count
+}
+
+pub fn newline_count(text: &str) -> usize {
+    let mut count = 0;
+    let mut last_was_d = false;
+    let mut itr = text.bytes();
+    while let Some(byte) = itr.next() {
+        match byte {
+            0x0B | 0x0C | 0x85 => {
+                count += 1;
+            }
+            0x0D => {
+                count += 1;
+                last_was_d = true;
+                continue;
+            }
+            0x0A => {
+                if !last_was_d {
+                    count += 1;
+                }
+            }
+            0x20 => {
+                match itr.next() {
+                    Some(0x28) => count += 1,
+                    Some(0x29) => count += 1,
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+        last_was_d = false;
+    }
+    count
+}
 
 pub fn char_pos_to_byte_pos(text: &str, pos: usize) -> usize {
     if let Some((offset, _)) = text.char_indices().nth(pos) {

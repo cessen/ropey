@@ -1,6 +1,7 @@
 extern crate arrayvec;
-extern crate smallvec;
 extern crate rand;
+extern crate smallvec;
+extern crate unicode_segmentation;
 
 mod rope;
 mod iter;
