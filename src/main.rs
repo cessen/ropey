@@ -16,19 +16,20 @@ fn main() {
     let mut tree = Rope::new();
 
     for _ in 0..32 {
+        use rope::Count;
         let len = tree.char_count().max(1);
-        tree.insert(rng.gen::<u32>() % len, "Hello ");
-        tree.insert(rng.gen::<u32>() % len, "world! ");
-        tree.insert(rng.gen::<u32>() % len, "How are ");
-        tree.insert(rng.gen::<u32>() % len, "you ");
-        tree.insert(rng.gen::<u32>() % len, "doing? ");
-        tree.insert(rng.gen::<u32>() % len, "Let's ");
-        tree.insert(rng.gen::<u32>() % len, "keep ");
-        tree.insert(rng.gen::<u32>() % len, "inserting ");
-        tree.insert(rng.gen::<u32>() % len, "more ");
-        tree.insert(rng.gen::<u32>() % len, "items. ");
-        tree.insert(rng.gen::<u32>() % len, "こんいちは、");
-        tree.insert(rng.gen::<u32>() % len, "みんなさん！");
+        tree.insert(rng.gen::<Count>() % len, "Hello ");
+        tree.insert(rng.gen::<Count>() % len, "world! ");
+        tree.insert(rng.gen::<Count>() % len, "How are ");
+        tree.insert(rng.gen::<Count>() % len, "you ");
+        tree.insert(rng.gen::<Count>() % len, "doing? ");
+        tree.insert(rng.gen::<Count>() % len, "Let's ");
+        tree.insert(rng.gen::<Count>() % len, "keep ");
+        tree.insert(rng.gen::<Count>() % len, "inserting ");
+        tree.insert(rng.gen::<Count>() % len, "more ");
+        tree.insert(rng.gen::<Count>() % len, "items. ");
+        tree.insert(rng.gen::<Count>() % len, "こんいちは、");
+        tree.insert(rng.gen::<Count>() % len, "みんなさん！");
     }
 
     println!("{:#?}", tree);

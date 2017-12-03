@@ -15,7 +15,7 @@ const MAX_CHILDREN: usize = 16;
 const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
 
 // Leaf node min/max values.
-const MAX_BYTES: usize = 320;
+const MAX_BYTES: usize = 384;
 const MIN_BYTES: usize = MAX_BYTES / 2;
 
 #[derive(Copy, Clone)]
@@ -35,7 +35,7 @@ unsafe impl Array for BackingArray {
 
 // Type alias used for char count, grapheme count, line count, etc. storage
 // in nodes.
-type Count = u32;
+pub(crate) type Count = u32;
 
 //-------------------------------------------------------------
 
@@ -49,6 +49,10 @@ impl Rope {
         use std::mem::size_of;
         println!("Node size: {:?}", size_of::<Node>());
         Rope { root: Arc::new(Node::new()) }
+    }
+
+    pub fn len(&self) -> usize {
+        self.root.text_info().bytes as usize
     }
 
     pub fn char_count(&self) -> Count {
@@ -89,6 +93,7 @@ impl Rope {
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct TextInfo {
+    pub(crate) bytes: Count,
     pub(crate) chars: Count,
     pub(crate) graphemes: Count,
     pub(crate) newlines: Count,
@@ -97,6 +102,7 @@ pub(crate) struct TextInfo {
 impl TextInfo {
     fn new() -> TextInfo {
         TextInfo {
+            bytes: 0,
             chars: 0,
             graphemes: 0,
             newlines: 0,
@@ -105,6 +111,7 @@ impl TextInfo {
 
     fn from_str(text: &str) -> TextInfo {
         TextInfo {
+            bytes: text.len() as Count,
             chars: text.chars().count() as Count,
             graphemes: 0, // TODO
             newlines: 0, // TODO
@@ -113,6 +120,7 @@ impl TextInfo {
 
     fn combine(&self, other: &TextInfo) -> TextInfo {
         TextInfo {
+            bytes: self.bytes + other.bytes,
             chars: self.chars + other.chars,
             graphemes: self.graphemes + other.graphemes,
             newlines: self.newlines + other.newlines,
