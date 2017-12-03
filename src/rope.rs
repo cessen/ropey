@@ -19,7 +19,7 @@ const MAX_BYTES: usize = 320;
 const MIN_BYTES: usize = MAX_BYTES / 2;
 
 #[derive(Copy, Clone)]
-struct BackingArray([u8; MAX_BYTES]);
+pub(crate) struct BackingArray([u8; MAX_BYTES]);
 unsafe impl Array for BackingArray {
     type Item = u8;
     fn size() -> usize {
@@ -41,7 +41,7 @@ type Count = u32;
 
 #[derive(Debug, Clone)]
 pub struct Rope {
-    root: Arc<Node>,
+    pub(crate) root: Arc<Node>,
 }
 
 impl Rope {
@@ -53,6 +53,15 @@ impl Rope {
 
     pub fn char_count(&self) -> Count {
         self.root.text_info().chars
+    }
+
+    pub fn to_string(&self) -> String {
+        use iter::RopeChunkIter;
+        let mut text = String::new();
+        for chunk in RopeChunkIter::new(self) {
+            text.push_str(chunk);
+        }
+        text
     }
 
     pub fn insert(&mut self, char_pos: Count, text: &str) {
@@ -79,10 +88,10 @@ impl Rope {
 //-------------------------------------------------------------
 
 #[derive(Debug, Copy, Clone)]
-struct TextInfo {
-    chars: Count,
-    graphemes: Count,
-    newlines: Count,
+pub(crate) struct TextInfo {
+    pub(crate) chars: Count,
+    pub(crate) graphemes: Count,
+    pub(crate) newlines: Count,
 }
 
 impl TextInfo {
@@ -114,7 +123,7 @@ impl TextInfo {
 //-------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-enum Node {
+pub(crate) enum Node {
     Empty,
     Leaf(SmallString<BackingArray>),
     Internal {
@@ -160,11 +169,15 @@ impl Node {
                 if cur_text.len() <= MAX_BYTES {
                     return None;
                 } else {
-                    let split_pos = cur_text.len() / 2;
+                    let split_pos = cur_text.len() - (cur_text.len() / 2);
                     let right_text = split_string_near_byte(cur_text, split_pos);
-                    cur_text.shrink_to_fit();
-
-                    return Some(Node::Leaf(right_text));
+                    if right_text.len() > 0 {
+                        cur_text.shrink_to_fit();
+                        return Some(Node::Leaf(right_text));
+                    } else {
+                        // Leaf couldn't be validly split, so leave it oversized
+                        return None;
+                    }
                 }
             }
 

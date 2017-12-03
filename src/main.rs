@@ -3,6 +3,7 @@ extern crate smallvec;
 extern crate rand;
 
 mod rope;
+mod iter;
 mod small_string;
 mod small_string_utils;
 
@@ -31,4 +32,53 @@ fn main() {
     }
 
     println!("{:#?}", tree);
+}
+
+
+#[cfg(test)]
+mod tests {
+    use rope::Rope;
+    use iter::RopeChunkIter;
+
+    #[test]
+    fn insert_01() {
+        let mut r = Rope::new();
+        r.insert(0, "Hello world!");
+        r.insert(3, "zopter");
+
+        assert_eq!("Helzopterlo world!", &r.to_string());
+    }
+
+    #[test]
+    fn insert_02() {
+        let mut r = Rope::new();
+        r.insert(0, "Hello world!");
+        r.insert(0, "zopter");
+
+        assert_eq!("zopterHello world!", &r.to_string());
+    }
+
+    #[test]
+    fn insert_03() {
+        let mut r = Rope::new();
+        r.insert(0, "Hello world!");
+        r.insert(12, "zopter");
+
+        assert_eq!("Hello world!zopter", &r.to_string());
+    }
+
+    #[test]
+    fn insert_04() {
+        let mut r = Rope::new();
+        r.insert(0, "He");
+        r.insert(2, "l");
+        r.insert(3, "l");
+        r.insert(4, "o w");
+        r.insert(7, "o");
+        r.insert(8, "rl");
+        r.insert(10, "d!");
+        r.insert(3, "zopter");
+
+        assert_eq!("Helzopterlo world!", &r.to_string());
+    }
 }
