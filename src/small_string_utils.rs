@@ -1,58 +1,11 @@
 #![allow(dead_code)]
 
+use std;
+
 use unicode_segmentation::GraphemeCursor;
 
 use smallvec::Array;
 use small_string::SmallString;
-
-
-pub fn is_line_ending(text: &str) -> bool {
-    match text {
-        "\u{000D}\u{000A}" |
-        "\u{000A}" |
-        "\u{000B}" |
-        "\u{000C}" |
-        "\u{000D}" |
-        "\u{0085}" |
-        "\u{2028}" |
-        "\u{2029}" => true,
-        _ => false,
-    }
-}
-
-
-pub fn newline_count(text: &str) -> usize {
-    let mut count = 0;
-    let mut last_was_d = false;
-    let mut itr = text.bytes();
-    while let Some(byte) = itr.next() {
-        match byte {
-            0x0B | 0x0C | 0x85 => {
-                count += 1;
-            }
-            0x0D => {
-                count += 1;
-                last_was_d = true;
-                continue;
-            }
-            0x0A => {
-                if !last_was_d {
-                    count += 1;
-                }
-            }
-            0x20 => {
-                match itr.next() {
-                    Some(0x28) => count += 1,
-                    Some(0x29) => count += 1,
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-        last_was_d = false;
-    }
-    count
-}
 
 
 pub fn char_pos_to_byte_pos(text: &str, pos: usize) -> usize {
@@ -177,6 +130,75 @@ pub fn split_string_near_byte<B: Array<Item = u8>>(
     }
 }
 
+//----------------------------------------------------------------------
+
+/// An iterator that yields the byte indices of line breaks in a string.
+/// A line break in this case is the point immediately *after* a newline
+/// character.
+///
+/// The following unicode sequences are considered newlines by this function:
+/// - u{000A} (LF)
+/// - u{000B}
+/// - u{000C}
+/// - u{000D} (CR)
+/// - u{000D}u{000A} (CRLF)
+/// - u{0085}
+/// - u{2028}
+/// - u{2029}
+pub(crate) struct LineBreakIter<'a> {
+    byte_itr: std::str::Bytes<'a>,
+    byte_idx: usize,
+}
+
+impl<'a> LineBreakIter<'a> {
+    pub fn new<'b>(text: &'b str) -> LineBreakIter<'b> {
+        LineBreakIter {
+            byte_itr: text.bytes(),
+            byte_idx: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for LineBreakIter<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        while let Some(byte) = self.byte_itr.next() {
+            self.byte_idx += 1;
+            match byte {
+                0x0A | 0x0B | 0x0C | 0x85 => {
+                    return Some(self.byte_idx);
+                }
+                0x0D => {
+                    // We're basically "peeking" here.
+                    if let Some(0x0A) = self.byte_itr.clone().next() {
+                        self.byte_itr.next();
+                        self.byte_idx += 1;
+                    }
+                    return Some(self.byte_idx);
+                }
+                0xE2 => {
+                    self.byte_idx += 1;
+                    if let Some(0x80) = self.byte_itr.next() {
+                        self.byte_idx += 1;
+                        match self.byte_itr.next() {
+                            Some(0xA8) | Some(0xA9) => {
+                                return Some(self.byte_idx);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        return None;
+    }
+}
+
+
+//----------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -246,5 +268,22 @@ mod tests {
         let s2 = split_string_near_byte(&mut s1, 1);
         assert_eq!("\r\n", s1);
         assert_eq!("", s2);
+    }
+
+    #[test]
+    fn line_breaks_iter_01() {
+        let text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
+                    There\u{2028}is something.\u{2029}";
+        let mut itr = LineBreakIter::new(text);
+        assert_eq!(48, text.len());
+        assert_eq!(Some(1), itr.next());
+        assert_eq!(Some(8), itr.next());
+        assert_eq!(Some(9), itr.next());
+        assert_eq!(Some(13), itr.next());
+        assert_eq!(Some(17), itr.next());
+        assert_eq!(Some(22), itr.next());
+        assert_eq!(Some(32), itr.next());
+        assert_eq!(Some(48), itr.next());
+        assert_eq!(None, itr.next());
     }
 }

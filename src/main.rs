@@ -16,14 +16,14 @@ fn main() {
 
     let mut tree = Rope::new();
 
-    for _ in 0..32 {
+    for _ in 0..16 {
         use rope::Count;
         let len = tree.char_count().max(1);
         tree.insert(rng.gen::<Count>() % len, "Hello ");
         tree.insert(rng.gen::<Count>() % len, "world! ");
         tree.insert(rng.gen::<Count>() % len, "How are ");
         tree.insert(rng.gen::<Count>() % len, "you ");
-        tree.insert(rng.gen::<Count>() % len, "doing? ");
+        tree.insert(rng.gen::<Count>() % len, "doing?\n");
         tree.insert(rng.gen::<Count>() % len, "Let's ");
         tree.insert(rng.gen::<Count>() % len, "keep ");
         tree.insert(rng.gen::<Count>() % len, "inserting ");
@@ -33,7 +33,8 @@ fn main() {
         tree.insert(rng.gen::<Count>() % len, "みんなさん！");
     }
 
-    println!("{:#?}", tree);
+    // println!("{:#?}", tree);
+    println!("{}", tree.to_string());
 }
 
 

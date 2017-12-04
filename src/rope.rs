@@ -7,7 +7,7 @@ use arrayvec::ArrayVec;
 
 use smallvec::Array;
 use small_string::SmallString;
-use small_string_utils::{insert_at_char, split_string_near_byte, newline_count};
+use small_string_utils::{insert_at_char, split_string_near_byte, LineBreakIter};
 
 
 // Internal node min/max values.
@@ -111,7 +111,7 @@ impl TextInfo {
         TextInfo {
             bytes: text.len() as Count,
             chars: text.chars().count() as Count,
-            newlines: newline_count(text) as Count,
+            newlines: LineBreakIter::new(text).count() as Count,
         }
     }
 
