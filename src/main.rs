@@ -40,7 +40,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use rope::Rope;
-    use iter::RopeChunkIter;
 
     #[test]
     fn insert_01() {

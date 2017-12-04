@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
+use unicode_segmentation::GraphemeCursor;
+
 use smallvec::Array;
 use small_string::SmallString;
+
 
 pub fn is_line_ending(text: &str) -> bool {
     match text {
@@ -17,15 +20,6 @@ pub fn is_line_ending(text: &str) -> bool {
     }
 }
 
-pub fn char_count(text: &str) -> usize {
-    let mut count = 0;
-    for byte in text.bytes() {
-        if (byte & 0xC0) != 0x80 {
-            count += 1;
-        }
-    }
-    count
-}
 
 pub fn newline_count(text: &str) -> usize {
     let mut count = 0;
@@ -59,6 +53,7 @@ pub fn newline_count(text: &str) -> usize {
     }
     count
 }
+
 
 pub fn char_pos_to_byte_pos(text: &str, pos: usize) -> usize {
     if let Some((offset, _)) = text.char_indices().nth(pos) {
@@ -128,24 +123,128 @@ pub fn split_string_at_char<B: Array<Item = u8>>(
 }
 
 
-/// Splits a string at the byte index given, or the at the nearest codepoint
-/// boundary after it if it is not a codepoint boundary itself.  The left part
-/// of the split remains in the given string, and the right part is returned as
-/// a new string.
+/// Splits a string at the byte index given, or if the byte given is not at a
+/// grapheme boundary, then at the closest grapheme boundary that isn't the
+/// start or end of the string.  The left part of the split remains in the
+/// given string, and the right part is returned as a new string.
 ///
-/// Note that because this only splits at code points, it is not guaranteed to
-/// split at the exact byte given.  Indeed, depending on the string and byte
-/// index given, it may not split at all.  Be aware of this!
-///
-/// TODO: make this only split on grapheme boundaries, too.
+/// Note that because this only splits at grapheme boundaries, it is not
+/// guaranteed to split at the exact byte given.  Indeed, depending on the
+/// string and byte index given, it may not split at all.  Be aware of this!
 pub fn split_string_near_byte<B: Array<Item = u8>>(
-    s1: &mut SmallString<B>,
+    s: &mut SmallString<B>,
     pos: usize,
 ) -> SmallString<B> {
+    // Handle some corner-cases ahead of time, to simplify the logic below
+    if pos == s.len() || s.len() == 0 {
+        return SmallString::new();
+    }
+    if pos == 0 {
+        return s.split_off(0);
+    }
+
+    // Find codepoint boundary
     let mut split_pos = pos;
-    while !s1.is_char_boundary(split_pos) {
+    while !s.is_char_boundary(split_pos) {
         split_pos += 1;
     }
 
-    s1.split_off(split_pos)
+    // Check if it's a grapheme boundary, and split there if it is
+    if let Ok(true) = GraphemeCursor::new(split_pos, s.len(), true).is_boundary(s, 0) {
+        return s.split_off(split_pos);
+    }
+
+    // Otherwise, find prev and next grapheme boundaries
+    let next = GraphemeCursor::new(split_pos, s.len(), true)
+        .next_boundary(s, 0)
+        .unwrap_or(None)
+        .unwrap_or(s.len());
+    let prev = GraphemeCursor::new(split_pos, s.len(), true)
+        .prev_boundary(s, 0)
+        .unwrap_or(None)
+        .unwrap_or(0);
+
+    // Split on the closest of prev and next that isn't the start or
+    // end of the string
+    if prev == 0 {
+        return s.split_off(next);
+    } else if next == s.len() {
+        return s.split_off(prev);
+    } else if (pos - prev) >= (next - pos) {
+        return s.split_off(next);
+    } else {
+        return s.split_off(prev);
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use small_string::SmallString;
+    use rope::BackingArray;
+    use super::*;
+
+    #[test]
+    fn split_near_byte_01() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!");
+        let s2 = split_string_near_byte(&mut s1, 0);
+        assert_eq!("", s1);
+        assert_eq!("Hello world!", s2);
+    }
+
+    #[test]
+    fn split_near_byte_02() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!");
+        let s2 = split_string_near_byte(&mut s1, 12);
+        assert_eq!("Hello world!", s1);
+        assert_eq!("", s2);
+    }
+
+    #[test]
+    fn split_near_byte_03() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!");
+        let s2 = split_string_near_byte(&mut s1, 6);
+        assert_eq!("Hello ", s1);
+        assert_eq!("world!", s2);
+    }
+
+    #[test]
+    fn split_near_byte_04() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello\r\n world!");
+        let s2 = split_string_near_byte(&mut s1, 5);
+        assert_eq!("Hello", s1);
+        assert_eq!("\r\n world!", s2);
+    }
+
+    #[test]
+    fn split_near_byte_05() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello\r\n world!");
+        let s2 = split_string_near_byte(&mut s1, 6);
+        assert_eq!("Hello\r\n", s1);
+        assert_eq!(" world!", s2);
+    }
+
+    #[test]
+    fn split_near_byte_06() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello\r\n world!");
+        let s2 = split_string_near_byte(&mut s1, 7);
+        assert_eq!("Hello\r\n", s1);
+        assert_eq!(" world!", s2);
+    }
+
+    #[test]
+    fn split_near_byte_07() {
+        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!\r\n");
+        let s2 = split_string_near_byte(&mut s1, 13);
+        assert_eq!("Hello world!", s1);
+        assert_eq!("\r\n", s2);
+    }
+
+    #[test]
+    fn split_near_byte_08() {
+        let mut s1 = SmallString::<BackingArray>::from_str("\r\n");
+        let s2 = split_string_near_byte(&mut s1, 1);
+        assert_eq!("\r\n", s1);
+        assert_eq!("", s2);
+    }
 }

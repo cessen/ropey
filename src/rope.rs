@@ -4,12 +4,10 @@ use std;
 use std::sync::Arc;
 
 use arrayvec::ArrayVec;
-use unicode_segmentation::UnicodeSegmentation;
 
 use smallvec::Array;
 use small_string::SmallString;
-use small_string_utils::{insert_at_char, split_string_near_byte, is_line_ending, char_count,
-                         newline_count};
+use small_string_utils::{insert_at_char, split_string_near_byte, newline_count};
 
 
 // Internal node min/max values.
@@ -17,7 +15,7 @@ const MAX_CHILDREN: usize = 16;
 const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
 
 // Leaf node min/max values.
-const MAX_BYTES: usize = 384;
+const MAX_BYTES: usize = 334;
 const MIN_BYTES: usize = MAX_BYTES / 2;
 
 #[derive(Copy, Clone)]
@@ -97,7 +95,6 @@ impl Rope {
 pub(crate) struct TextInfo {
     pub(crate) bytes: Count,
     pub(crate) chars: Count,
-    pub(crate) graphemes: Count,
     pub(crate) newlines: Count,
 }
 
@@ -106,7 +103,6 @@ impl TextInfo {
         TextInfo {
             bytes: 0,
             chars: 0,
-            graphemes: 0,
             newlines: 0,
         }
     }
@@ -114,8 +110,7 @@ impl TextInfo {
     fn from_str(text: &str) -> TextInfo {
         TextInfo {
             bytes: text.len() as Count,
-            chars: char_count(text) as Count,
-            graphemes: text.graphemes(true).count() as Count,
+            chars: text.chars().count() as Count,
             newlines: newline_count(text) as Count,
         }
     }
@@ -124,7 +119,6 @@ impl TextInfo {
         TextInfo {
             bytes: self.bytes + other.bytes,
             chars: self.chars + other.chars,
-            graphemes: self.graphemes + other.graphemes,
             newlines: self.newlines + other.newlines,
         }
     }
