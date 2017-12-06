@@ -11,6 +11,8 @@ mod small_string_utils;
 use rope::Rope;
 use rand::Rng;
 
+const DO_RAND: bool = false;
+
 fn main() {
     let mut rng = rand::thread_rng();
 
@@ -18,19 +20,28 @@ fn main() {
 
     for _ in 0..16 {
         use rope::Count;
-        let len = tree.char_count().max(1);
-        tree.insert(rng.gen::<Count>() % len, "Hello ");
-        tree.insert(rng.gen::<Count>() % len, "world! ");
-        tree.insert(rng.gen::<Count>() % len, "How are ");
-        tree.insert(rng.gen::<Count>() % len, "you ");
-        tree.insert(rng.gen::<Count>() % len, "doing?\n");
-        tree.insert(rng.gen::<Count>() % len, "Let's ");
-        tree.insert(rng.gen::<Count>() % len, "keep ");
-        tree.insert(rng.gen::<Count>() % len, "inserting ");
-        tree.insert(rng.gen::<Count>() % len, "more ");
-        tree.insert(rng.gen::<Count>() % len, "items. ");
-        tree.insert(rng.gen::<Count>() % len, "こんいちは、");
-        tree.insert(rng.gen::<Count>() % len, "みんなさん！");
+        if DO_RAND {
+            let len = tree.char_count().max(1);
+            tree.insert(rng.gen::<Count>() % len, "Hello ");
+            tree.insert(rng.gen::<Count>() % len, "world! ");
+            tree.insert(rng.gen::<Count>() % len, "How are ");
+            tree.insert(rng.gen::<Count>() % len, "you ");
+            tree.insert(rng.gen::<Count>() % len, "doing?\r\n");
+            tree.insert(rng.gen::<Count>() % len, "Let's ");
+            tree.insert(rng.gen::<Count>() % len, "keep ");
+            tree.insert(rng.gen::<Count>() % len, "inserting ");
+            tree.insert(rng.gen::<Count>() % len, "more ");
+            tree.insert(rng.gen::<Count>() % len, "items.\r\n");
+            tree.insert(rng.gen::<Count>() % len, "こんいちは、");
+            tree.insert(rng.gen::<Count>() % len, "みんなさん！");
+        } else {
+            let len = tree.char_count().max(1);
+            tree.insert(1298809 % len, "Hello world! How are you doing?\r\n");
+            let len = tree.char_count().max(1);
+            tree.insert(1298809 % len, "Let's keep inserting more items.\r\n");
+            let len = tree.char_count().max(1);
+            tree.insert(1298809 % len, "こんいちは、みんなさん！");
+        }
     }
 
     // println!("{:#?}", tree);
