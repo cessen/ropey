@@ -19,11 +19,16 @@ impl<B: Array<Item = u8>> SmallString<B> {
         SmallString { buffer: SmallVec::new() }
     }
 
+    pub fn with_capacity(capacity: usize) -> Self {
+        SmallString { buffer: SmallVec::with_capacity(capacity) }
+    }
+
     pub fn from_str(s: &str) -> Self {
         SmallString { buffer: s.as_bytes().into_iter().cloned().collect() }
     }
 
     unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
+        debug_assert!(idx <= self.len());
         let len = self.len();
         let amt = bytes.len();
         self.buffer.reserve(amt);
@@ -41,12 +46,34 @@ impl<B: Array<Item = u8>> SmallString<B> {
         self.buffer.set_len(len + amt);
     }
 
+    unsafe fn remove_bytes(&mut self, start: usize, end: usize) {
+        debug_assert!(end >= start);
+        debug_assert!(start > 0);
+        debug_assert!(end <= self.len());
+        let len = self.len();
+        let amt = end - start;
+        ptr::copy(
+            self.buffer.as_ptr().offset(end as isize),
+            self.buffer.as_mut_ptr().offset(start as isize),
+            len - end,
+        );
+        self.buffer.set_len(len - amt);
+    }
+
     #[inline]
     pub fn insert_str(&mut self, idx: usize, string: &str) {
         assert!(self.is_char_boundary(idx));
 
         unsafe {
             self.insert_bytes(idx, string.as_bytes());
+        }
+    }
+
+    #[inline]
+    pub fn push_str(&mut self, string: &str) {
+        let len = self.len();
+        unsafe {
+            self.insert_bytes(len, string.as_bytes());
         }
     }
 
@@ -59,7 +86,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
     pub fn split_off(&mut self, at: usize) -> SmallString<B> {
         assert!(self.is_char_boundary(at));
         let len = self.len();
-        let mut other = SmallString::new();
+        let mut other = SmallString::with_capacity(len - at);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.buffer.as_ptr().offset(at as isize),
@@ -70,6 +97,20 @@ impl<B: Array<Item = u8>> SmallString<B> {
             other.buffer.set_len(len - at);
         }
         other
+    }
+
+    #[inline]
+    pub fn truncate(&mut self, size: usize) {
+        assert!(self.is_char_boundary(size));
+        self.buffer.truncate(size);
+    }
+
+    #[inline]
+    pub fn truncate_front(&mut self, size: usize) {
+        assert!(self.is_char_boundary(size));
+        unsafe {
+            self.remove_bytes(0, size);
+        }
     }
 
     #[inline]
@@ -228,5 +269,23 @@ impl<B: Array<Item = u8>> From<String> for SmallString<B> {
 impl<B: Array<Item = u8>> From<SmallString<B>> for String {
     fn from(s: SmallString<B>) -> String {
         unsafe { String::from_utf8_unchecked(s.buffer.into_vec()) }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rope::BackingArray;
+    type SS = SmallString<BackingArray>;
+
+    #[test]
+    fn remove_bytes_01() {
+        let mut s = SS::new();
+        s.push_str("Hello there, everyone!  How's it going?");
+        unsafe {
+            s.remove_bytes(11, 21);
+        }
+        assert_eq!("Hello there!  How's it going?", s);
     }
 }
