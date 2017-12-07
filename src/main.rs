@@ -94,4 +94,31 @@ mod tests {
 
         assert_eq!("Helzopterlo world!", &r.to_string());
     }
+
+    #[test]
+    fn insert_05() {
+        let mut r = Rope::new();
+        r.insert(0, "こんいちは、みんなさん！");
+        r.insert(7, "zopter");
+        assert_eq!("こんいちは、みzopterんなさん！", &r.to_string());
+    }
+
+    #[test]
+    fn insert_06() {
+        let mut r = Rope::new();
+        r.insert(0, "こ");
+        r.insert(1, "ん");
+        r.insert(2, "い");
+        r.insert(3, "ち");
+        r.insert(4, "は");
+        r.insert(5, "、");
+        r.insert(6, "み");
+        r.insert(7, "ん");
+        r.insert(8, "な");
+        r.insert(9, "さ");
+        r.insert(10, "ん");
+        r.insert(11, "！");
+        r.insert(7, "zopter");
+        assert_eq!("こんいちは、みzopterんなさん！", &r.to_string());
+    }
 }

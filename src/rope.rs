@@ -7,7 +7,8 @@ use arrayvec::ArrayVec;
 
 use smallvec::Array;
 use small_string::SmallString;
-use small_string_utils::{insert_at_char, split_string_near_byte, LineBreakIter};
+use small_string_utils::{char_pos_to_byte_pos, split_string_near_byte, LineBreakIter,
+                         fix_grapheme_seam};
 
 
 // Internal node min/max values.
@@ -70,14 +71,20 @@ impl Rope {
 
     pub fn insert(&mut self, char_pos: Count, text: &str) {
         let root = Arc::make_mut(&mut self.root);
-        if let Some(r_node) = root.insert(char_pos, text) {
+
+        // Do the insertion
+        let (residual, seam) = root.insert(char_pos, text);
+
+        // Handle residual node, if any.
+        if let Some(r_node) = residual {
+            let mut l_node = Node::Empty;
+            std::mem::swap(&mut l_node, root);
+
             let mut info = ArrayVec::new();
-            info.push(root.text_info());
+            info.push(l_node.text_info());
             info.push(r_node.text_info());
 
             let mut children = ArrayVec::new();
-            let mut l_node = Node::Empty;
-            std::mem::swap(&mut l_node, root);
             children.push(Arc::new(l_node));
             children.push(Arc::new(r_node));
 
@@ -86,12 +93,25 @@ impl Rope {
                 children: children,
             };
         }
+
+        // Handle seam, if any.
+        if let Some(byte_pos) = seam {
+            root.fix_grapheme_seam(byte_pos);
+        }
+    }
+
+    //--------------
+
+    /// Debugging tool to make sure that all of the meta-data of the
+    /// tree is consistent with the actual data.
+    pub(crate) fn verify_integrity(&self) {
+        self.root.verify_integrity();
     }
 }
 
 //-------------------------------------------------------------
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct TextInfo {
     pub(crate) bytes: Count,
     pub(crate) chars: Count,
@@ -124,6 +144,29 @@ impl TextInfo {
     }
 }
 
+trait TextInfoArray {
+    fn combine(&self) -> TextInfo;
+    fn search_combine<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo);
+}
+
+impl TextInfoArray for [TextInfo] {
+    fn combine(&self) -> TextInfo {
+        self.iter().fold(TextInfo::new(), |a, b| a.combine(b))
+    }
+
+    fn search_combine<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo) {
+        let mut accum = TextInfo::new();
+        for (idx, inf) in self.iter().enumerate() {
+            if pred(&accum.combine(inf)) {
+                return (idx, accum);
+            } else {
+                accum = accum.combine(inf);
+            }
+        }
+        panic!("Predicate is mal-formed and never evaluated true.")
+    }
+}
+
 //-------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -151,36 +194,63 @@ impl Node {
         }
     }
 
+    fn char_index_to_byte_index(&self, char_pos: Count) -> Count {
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => char_pos_to_byte_pos(text, char_pos as usize) as Count,
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| char_pos <= inf.chars);
+
+                acc_info.bytes +
+                    children[child_i].char_index_to_byte_index(char_pos - acc_info.chars)
+            }
+        }
+    }
+
     /// Inserts the text at the given char index.
     ///
     /// Returns a right-side residual node if the insertion wouldn't fit
-    /// within this node.
+    /// within this node.  Also returns the byte position where there may
+    /// be a grapheme seam to fix, if any.
     ///
     /// TODO: handle the situation where what's being inserted is larger
     /// than MAX_BYTES.
-    fn insert(&mut self, char_pos: Count, text: &str) -> Option<Node> {
+    fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
         match self {
             // If it's empty, turn it into a leaf
             &mut Node::Empty => {
                 *self = Node::Leaf(text.into());
-                return None;
+                return (None, None);
             }
 
             // If it's a leaf
             &mut Node::Leaf(ref mut cur_text) => {
-                insert_at_char(cur_text, text, char_pos as usize);
+                let byte_pos = char_pos_to_byte_pos(cur_text, char_pos as usize);
+                let seam = if byte_pos == 0 {
+                    Some(0)
+                } else if byte_pos == cur_text.len() {
+                    let count = (cur_text.len() + text.len()) as Count;
+                    Some(count)
+                } else {
+                    None
+                };
+
+                cur_text.insert_str(byte_pos, text);
 
                 if cur_text.len() <= MAX_BYTES {
-                    return None;
+                    return (None, seam);
                 } else {
                     let split_pos = cur_text.len() - (cur_text.len() / 2);
                     let right_text = split_string_near_byte(cur_text, split_pos);
                     if right_text.len() > 0 {
                         cur_text.shrink_to_fit();
-                        return Some(Node::Leaf(right_text));
+                        return (Some(Node::Leaf(right_text)), seam);
                     } else {
                         // Leaf couldn't be validly split, so leave it oversized
-                        return None;
+                        return (None, seam);
                     }
                 }
             }
@@ -192,25 +262,16 @@ impl Node {
             } => {
                 // Find the child to traverse into along with its starting char
                 // offset.
-                let (child_i, start_char) = {
-                    let mut child_i = 0;
-                    let mut start_char = 0;
-                    for &TextInfo { chars: c, .. } in info.iter() {
-                        let tmp = start_char + c;
-                        if char_pos <= tmp {
-                            break;
-                        }
-
-                        start_char = tmp;
-                        child_i += 1;
-                    }
-                    (child_i.min(children.len() - 1), start_char)
-                };
+                let (child_i, start_info) = info.search_combine(|inf| char_pos <= inf.chars);
+                let start_char = start_info.chars;
 
                 // Navigate into the appropriate child
-                let residual =
+                let (residual, child_seam) =
                     Arc::make_mut(&mut children[child_i]).insert(char_pos - start_char, text);
                 info[child_i] = children[child_i].text_info();
+
+                // Calculate the seam offset relative to this node
+                let seam = child_seam.map(|byte_pos| byte_pos + start_info.bytes);
 
                 // Handle the new node, if any.
                 if let Some(r_node) = residual {
@@ -218,19 +279,19 @@ impl Node {
                     if children.len() < MAX_CHILDREN {
                         info.insert(child_i + 1, r_node.text_info());
                         children.insert(child_i + 1, Arc::new(r_node));
-                        return None;
+                        return (None, seam);
                     }
                     // The new node won't fit!  Must split.
                     else {
-                        let extra_info = info.try_insert(child_i + 1, r_node.text_info())
-                            .err()
-                            .unwrap()
-                            .element();
-                        let extra_child = children
-                            .try_insert(child_i + 1, Arc::new(r_node))
-                            .err()
-                            .unwrap()
-                            .element();
+                        let (extra_info, extra_child) = if child_i < (children.len() - 1) {
+                            let extra_info = info.pop().unwrap();
+                            let extra_child = children.pop().unwrap();
+                            info.insert(child_i + 1, r_node.text_info());
+                            children.insert(child_i + 1, Arc::new(r_node));
+                            (extra_info, extra_child)
+                        } else {
+                            (r_node.text_info(), Arc::new(r_node))
+                        };
 
                         let mut r_info = ArrayVec::new();
                         let mut r_children = ArrayVec::new();
@@ -245,15 +306,136 @@ impl Node {
                         r_info.push(extra_info);
                         r_children.push(extra_child);
 
-                        return Some(Node::Internal {
-                            info: r_info,
-                            children: r_children,
-                        });
+                        return (
+                            Some(Node::Internal {
+                                info: r_info,
+                                children: r_children,
+                            }),
+                            seam,
+                        );
                     }
                 } else {
                     // No new node.  Easy.
-                    return None;
+                    return (None, seam);
                 }
+            }
+        }
+    }
+
+    //-----------------------------------------
+
+    /// Debugging tool to make sure that all of the meta-data of the
+    /// tree is consistent with the actual data.
+    fn verify_integrity(&self) {
+        match self {
+            &Node::Empty => {}
+            &Node::Leaf(_) => {}
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                assert_eq!(info.len(), children.len());
+                for (inf, child) in info.iter().zip(children.iter()) {
+                    assert_eq!(*inf, child.text_info());
+                    child.verify_integrity();
+                }
+            }
+        }
+    }
+
+    /// Checks to make sure that a boundary between leaf nodes (given as a byte
+    /// position in the rope) doesn't split a grapheme, and fixes it if it does.
+    ///
+    /// Note: panics if the given byte position is not on the boundary between
+    /// two leaf nodes.
+    fn fix_grapheme_seam(&mut self, byte_pos: Count) -> Option<&mut SmallString<BackingArray>> {
+        match self {
+            &mut Node::Empty => return None,
+
+            &mut Node::Leaf(ref mut text) => {
+                if byte_pos == 0 || byte_pos == text.len() as Count {
+                    Some(text)
+                } else {
+                    panic!("Byte position given is not on a leaf boundary.")
+                }
+            }
+
+            &mut Node::Internal {
+                ref mut info,
+                ref mut children,
+            } => {
+                if byte_pos == 0 {
+                    // Special-case 1
+                    return Arc::make_mut(&mut children[0]).fix_grapheme_seam(byte_pos);
+                } else if byte_pos == info.combine().bytes {
+                    // Special-case 2
+                    return Arc::make_mut(children.last_mut().unwrap())
+                        .fix_grapheme_seam(info.last().unwrap().bytes);
+                } else {
+                    // Find the child to navigate into
+                    let (child_i, start_info) = info.search_combine(|inf| byte_pos <= inf.bytes);
+                    let start_byte = start_info.bytes;
+
+                    let pos_in_child = byte_pos - start_byte;
+                    let child_len = info[child_i].bytes;
+
+                    if pos_in_child == 0 || pos_in_child == child_len {
+                        // Left or right edge, get neighbor and fix seam
+                        let ((split_l, split_r), child_l_i) = if pos_in_child == 0 {
+                            (children.split_at_mut(child_i), child_i - 1)
+                        } else {
+                            (children.split_at_mut(child_i + 1), child_i)
+                        };
+                        let left_child = Arc::make_mut(split_l.last_mut().unwrap());
+                        let right_child = Arc::make_mut(split_r.first_mut().unwrap());
+                        fix_grapheme_seam(
+                            left_child.fix_grapheme_seam(info[child_l_i].bytes).unwrap(),
+                            right_child.fix_grapheme_seam(0).unwrap(),
+                        );
+                        left_child.fix_info_right();
+                        right_child.fix_info_left();
+                        info[child_l_i] = left_child.text_info();
+                        info[child_l_i + 1] = right_child.text_info();
+                        return None;
+                    } else {
+                        // Internal to child
+                        return Arc::make_mut(&mut children[child_i]).fix_grapheme_seam(
+                            pos_in_child,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Updates the tree meta-data down the left side of the tree.
+    fn fix_info_left(&mut self) {
+        match self {
+            &mut Node::Empty => {}
+            &mut Node::Leaf(_) => {}
+            &mut Node::Internal {
+                ref mut info,
+                ref mut children,
+            } => {
+                let left = Arc::make_mut(children.first_mut().unwrap());
+                left.fix_info_left();
+                *info.first_mut().unwrap() = left.text_info();
+            }
+        }
+    }
+
+    /// Updates the tree meta-data down the right side of the tree.
+    fn fix_info_right(&mut self) {
+        match self {
+            &mut Node::Empty => {}
+            &mut Node::Leaf(_) => {}
+            &mut Node::Internal {
+                ref mut info,
+                ref mut children,
+            } => {
+                let right = Arc::make_mut(children.last_mut().unwrap());
+                right.fix_info_right();
+                *info.last_mut().unwrap() = right.text_info();
             }
         }
     }

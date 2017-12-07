@@ -2,7 +2,7 @@
 
 use std;
 
-use unicode_segmentation::GraphemeCursor;
+use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 use smallvec::Array;
 use small_string::SmallString;
@@ -99,26 +99,22 @@ pub fn split_string_near_byte<B: Array<Item = u8>>(
     // Find codepoint boundary
     let mut split_pos = pos;
     while !s.is_char_boundary(split_pos) {
-        split_pos += 1;
+        split_pos -= 1;
     }
 
-    // Check if it's a grapheme boundary, and split there if it is
-    if let Ok(true) = GraphemeCursor::new(split_pos, s.len(), true).is_boundary(s, 0) {
+    // Find the two nearest grapheme boundaries
+    let mut gc = GraphemeCursor::new(split_pos, s.len(), true);
+    let next = gc.next_boundary(s, 0).unwrap().unwrap_or(s.len());
+    let prev = gc.prev_boundary(s, 0).unwrap().unwrap_or(0);
+
+    // Check if the specified split position is on a boundary, and split
+    // there if it is
+    if prev == pos {
         return s.split_off(split_pos);
     }
 
-    // Otherwise, find prev and next grapheme boundaries
-    let next = GraphemeCursor::new(split_pos, s.len(), true)
-        .next_boundary(s, 0)
-        .unwrap_or(None)
-        .unwrap_or(s.len());
-    let prev = GraphemeCursor::new(split_pos, s.len(), true)
-        .prev_boundary(s, 0)
-        .unwrap_or(None)
-        .unwrap_or(0);
-
-    // Split on the closest of prev and next that isn't the start or
-    // end of the string
+    // Otherwise, split on the closest of prev and next that isn't the
+    // start or end of the string
     if prev == 0 {
         return s.split_off(next);
     } else if next == s.len() {
@@ -127,6 +123,60 @@ pub fn split_string_near_byte<B: Array<Item = u8>>(
         return s.split_off(next);
     } else {
         return s.split_off(prev);
+    }
+}
+
+
+/// Takes two SmallStrings and mends the grapheme boundary between them, if any.
+///
+/// Note: this will leave one of the strings empty if the entire composite string
+/// is one big grapheme.
+pub fn fix_grapheme_seam<B: Array<Item = u8>>(l: &mut SmallString<B>, r: &mut SmallString<B>) {
+    let tot_len = l.len() + r.len();
+    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
+    let next = gc.next_boundary(r, l.len()).unwrap();
+    let prev = {
+        match gc.prev_boundary(r, l.len()) {
+            Ok(pos) => pos,
+            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
+            _ => unreachable!(),
+        }
+    };
+
+    // Find the new split position, if any.
+    let new_split_pos = if let (Some(a), Some(b)) = (prev, next) {
+        if a == l.len() {
+            // We're on a graphem boundary, don't need to do anything
+            return;
+        }
+        if a == 0 {
+            b
+        } else if b == tot_len {
+            a
+        } else if l.len() > r.len() {
+            a
+        } else {
+            b
+        }
+    } else if let Some(a) = prev {
+        if a == l.len() {
+            return;
+        }
+        a
+    } else if let Some(b) = next {
+        b
+    } else {
+        unreachable!()
+    };
+
+    // Move the bytes to create the new split
+    if new_split_pos < l.len() {
+        r.insert_str(0, &l[new_split_pos..]);
+        l.truncate(new_split_pos);
+    } else {
+        let pos = new_split_pos - l.len();
+        l.push_str(&r[..pos]);
+        r.truncate_front(pos);
     }
 }
 
