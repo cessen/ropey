@@ -1,4 +1,5 @@
 use rope::Node;
+use iter::{RopeBytes, RopeChars, RopeLines, RopeChunks};
 
 /// An immutable view into part of a Rope.
 pub struct RopeSlice<'a> {
@@ -55,22 +56,22 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates an iterator over the bytes of the RopeSlice.
-    pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
+    pub fn bytes(&self) -> RopeBytes<'a> {
         unimplemented!()
     }
 
     /// Creates an iterator over the chars of the RopeSlice.
-    pub fn chars<'a>(&'a self) -> RopeChars<'a> {
+    pub fn chars(&self) -> RopeChars<'a> {
         unimplemented!()
     }
 
     /// Creates an iterator over the lines of the RopeSlice.
-    pub fn lines<'a>(&'a self) -> RopeLines<'a> {
+    pub fn lines(&self) -> RopeLines<'a> {
         unimplemented!()
     }
 
     /// Creates an iterator over the chunks of the RopeSlice.
-    pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
+    pub fn chunks(&self) -> RopeChunks<'a> {
         unimplemented!()
     }
 }
