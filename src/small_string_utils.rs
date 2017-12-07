@@ -216,7 +216,7 @@ impl<'a> Iterator for LineBreakIter<'a> {
         while let Some(byte) = self.byte_itr.next() {
             self.byte_idx += 1;
             match byte {
-                0x0A | 0x0B | 0x0C | 0x85 => {
+                0x0A | 0x0B | 0x0C => {
                     return Some(self.byte_idx);
                 }
                 0x0D => {
@@ -226,6 +226,12 @@ impl<'a> Iterator for LineBreakIter<'a> {
                         self.byte_idx += 1;
                     }
                     return Some(self.byte_idx);
+                }
+                0xC2 => {
+                    if let Some(0x85) = self.byte_itr.next() {
+                        self.byte_idx += 1;
+                        return Some(self.byte_idx);
+                    }
                 }
                 0xE2 => {
                     self.byte_idx += 1;
