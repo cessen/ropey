@@ -7,7 +7,9 @@ use smallvec::Array;
 
 use slice::RopeSlice;
 use small_string::SmallString;
-use small_string_utils::{char_pos_to_byte_pos, split_string_near_byte, fix_grapheme_seam};
+use small_string_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
+                         char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
+                         split_string_near_byte, fix_grapheme_seam};
 use text_info::{TextInfo, TextInfoArray, Count};
 
 
@@ -52,34 +54,69 @@ impl Node {
 
     /// Returns the char index of the given byte.
     pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
-        let _ = byte_idx;
-        unimplemented!()
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| byte_idx as Count <= inf.bytes);
+
+                // Shortcuts
+                if byte_idx == 0 {
+                    return 0;
+                } else if byte_idx == acc_info.bytes as usize + info[child_i].bytes as usize {
+                    return acc_info.chars as usize + info[child_i].chars as usize;
+                }
+
+                acc_info.chars as usize +
+                    children[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
+            }
+        }
     }
 
     /// Returns the line index of the given byte.
     pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
-        let _ = byte_idx;
-        unimplemented!()
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| byte_idx as Count <= inf.bytes);
+
+                // Shortcuts
+                if byte_idx == 0 {
+                    return 0;
+                } else if byte_idx ==
+                           acc_info.line_breaks as usize + info[child_i].line_breaks as usize
+                {
+                    return acc_info.line_breaks as usize + info[child_i].line_breaks as usize;
+                }
+
+                acc_info.line_breaks as usize +
+                    children[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
+            }
+        }
     }
 
     /// Returns the byte index of the given char.
     pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
         match self {
             &Node::Empty => 0,
-            &Node::Leaf(ref text) => char_pos_to_byte_pos(text, char_idx),
+            &Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
             &Node::Internal {
                 ref info,
                 ref children,
             } => {
-                // Shortcut for zero
-                if char_idx == 0 {
-                    return 0;
-                }
-
                 let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
 
-                // Shortcut for being on a node boundary
-                if char_idx == acc_info.chars as usize + info[child_i].chars as usize {
+                // Shortcuts
+                if char_idx == 0 {
+                    return 0;
+                } else if char_idx == acc_info.chars as usize + info[child_i].chars as usize {
                     return acc_info.bytes as usize + info[child_i].bytes as usize;
                 }
 
@@ -91,20 +128,80 @@ impl Node {
 
     /// Returns the line index of the given char.
     pub(crate) fn char_to_line(&self, char_idx: usize) -> usize {
-        let _ = char_idx;
-        unimplemented!()
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
+
+                // Shortcuts
+                if char_idx == 0 {
+                    return 0;
+                } else if char_idx == acc_info.chars as usize + info[child_i].chars as usize {
+                    return acc_info.line_breaks as usize + info[child_i].line_breaks as usize;
+                }
+
+                acc_info.line_breaks as usize +
+                    children[child_i].char_to_line(char_idx - acc_info.chars as usize)
+            }
+        }
     }
 
     /// Returns the byte index of the start of the given line.
     pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
-        let _ = line_idx;
-        unimplemented!()
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) =
+                    info.search_combine(|inf| line_idx as Count <= inf.line_breaks);
+
+                // Shortcuts
+                if line_idx == 0 {
+                    return 0;
+                } else if line_idx ==
+                           acc_info.line_breaks as usize + info[child_i].line_breaks as usize
+                {
+                    return acc_info.bytes as usize + info[child_i].bytes as usize;
+                }
+
+                acc_info.bytes as usize +
+                    children[child_i].line_to_byte(line_idx - acc_info.line_breaks as usize)
+            }
+        }
     }
 
     /// Returns the char index of the start of the given line.
     pub(crate) fn line_to_char(&self, line_idx: usize) -> usize {
-        let _ = line_idx;
-        unimplemented!()
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) =
+                    info.search_combine(|inf| line_idx as Count <= inf.line_breaks);
+
+                // Shortcuts
+                if line_idx == 0 {
+                    return 0;
+                } else if line_idx ==
+                           acc_info.line_breaks as usize + info[child_i].line_breaks as usize
+                {
+                    return acc_info.chars as usize + info[child_i].chars as usize;
+                }
+
+                acc_info.chars as usize +
+                    children[child_i].line_to_char(line_idx - acc_info.line_breaks as usize)
+            }
+        }
     }
 
     /// Returns an immutable slice of the Rope in the char range `start..end`.
@@ -140,7 +237,7 @@ impl Node {
 
             // If it's a leaf
             &mut Node::Leaf(ref mut cur_text) => {
-                let byte_pos = char_pos_to_byte_pos(cur_text, char_pos as usize);
+                let byte_pos = char_idx_to_byte_idx(cur_text, char_pos as usize);
                 let seam = if byte_pos == 0 {
                     Some(0)
                 } else if byte_pos == cur_text.len() {
