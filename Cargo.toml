@@ -1,10 +1,12 @@
 [package]
-name = "btree"
+name = "btree_rope"
 version = "0.1.0"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 
 [dependencies]
 arrayvec = "0.4"
-rand = "0.3"
 smallvec = "0.5"
-unicode-segmentation = "1.2.0"
+unicode-segmentation = "1.2"
+
+[dev-dependencies]
+rand = "0.3"

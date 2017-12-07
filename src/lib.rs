@@ -1,52 +1,15 @@
 extern crate arrayvec;
-extern crate rand;
 extern crate smallvec;
 extern crate unicode_segmentation;
 
-mod iter;
 mod rope;
-mod slice;
 mod small_string;
 mod small_string_utils;
 
-use rope::Rope;
-use rand::Rng;
+pub mod slice;
+pub mod iter;
 
-const DO_RAND: bool = false;
-
-fn main() {
-    let mut rng = rand::thread_rng();
-
-    let mut tree = Rope::new();
-
-    for _ in 0..16 {
-        if DO_RAND {
-            let len = tree.char_count().max(1);
-            tree.insert(rng.gen::<usize>() % len, "Hello ");
-            tree.insert(rng.gen::<usize>() % len, "world! ");
-            tree.insert(rng.gen::<usize>() % len, "How are ");
-            tree.insert(rng.gen::<usize>() % len, "you ");
-            tree.insert(rng.gen::<usize>() % len, "doing?\r\n");
-            tree.insert(rng.gen::<usize>() % len, "Let's ");
-            tree.insert(rng.gen::<usize>() % len, "keep ");
-            tree.insert(rng.gen::<usize>() % len, "inserting ");
-            tree.insert(rng.gen::<usize>() % len, "more ");
-            tree.insert(rng.gen::<usize>() % len, "items.\r\n");
-            tree.insert(rng.gen::<usize>() % len, "こんいちは、");
-            tree.insert(rng.gen::<usize>() % len, "みんなさん！");
-        } else {
-            let len = tree.char_count().max(1);
-            tree.insert(1298809 % len, "Hello world! How are you doing?\r\n");
-            let len = tree.char_count().max(1);
-            tree.insert(1298809 % len, "Let's keep inserting more items.\r\n");
-            let len = tree.char_count().max(1);
-            tree.insert(1298809 % len, "こんいちは、みんなさん！");
-        }
-    }
-
-    // println!("{:#?}", tree);
-    println!("{}", tree.to_string());
-}
+pub use rope::Rope;
 
 
 #[cfg(test)]

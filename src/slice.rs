@@ -55,6 +55,8 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns an immutable slice of the RopeSlice in the char range `start..end`.
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice<'a> {
+        assert!(start <= end);
+        assert!(end < (self.end - self.start));
         RopeSlice::new_from_node(self.node, self.start + start, self.start + end)
     }
 }
