@@ -71,7 +71,17 @@ impl Node {
                 ref info,
                 ref children,
             } => {
+                // Shortcut for zero
+                if char_idx == 0 {
+                    return 0;
+                }
+
                 let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
+
+                // Shortcut for being on a node boundary
+                if char_idx == acc_info.chars as usize + info[child_i].chars as usize {
+                    return acc_info.bytes as usize + info[child_i].bytes as usize;
+                }
 
                 acc_info.bytes as usize +
                     children[child_i].char_to_byte(char_idx - acc_info.chars as usize)

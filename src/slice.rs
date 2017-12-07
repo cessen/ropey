@@ -4,8 +4,8 @@ use node::Node;
 /// An immutable view into part of a Rope.
 pub struct RopeSlice<'a> {
     node: &'a Node,
-    start: usize,
-    end: usize,
+    start_char: usize,
+    end_char: usize,
 }
 
 impl<'a> RopeSlice<'a> {
@@ -43,35 +43,35 @@ impl<'a> RopeSlice<'a> {
         // Create the slice
         RopeSlice {
             node: node,
-            start: n_start,
-            end: n_end,
+            start_char: n_start,
+            end_char: n_end,
         }
     }
 
     /// Returns an immutable slice of the RopeSlice in the char range `start..end`.
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice<'a> {
         assert!(start <= end);
-        assert!(end < (self.end - self.start));
-        RopeSlice::new_from_node(self.node, self.start + start, self.start + end)
+        assert!(end <= (self.end_char - self.start_char));
+        RopeSlice::new_from_node(self.node, self.start_char + start, self.start_char + end)
     }
 
     /// Creates an iterator over the bytes of the RopeSlice.
     pub fn bytes(&self) -> RopeBytes<'a> {
-        unimplemented!()
+        RopeBytes::new_with_range(self.node, self.start_char, self.end_char)
     }
 
     /// Creates an iterator over the chars of the RopeSlice.
     pub fn chars(&self) -> RopeChars<'a> {
-        unimplemented!()
+        RopeChars::new_with_range(self.node, self.start_char, self.end_char)
     }
 
     /// Creates an iterator over the lines of the RopeSlice.
     pub fn lines(&self) -> RopeLines<'a> {
-        unimplemented!()
+        RopeLines::new_with_range(self.node, self.start_char, self.end_char)
     }
 
     /// Creates an iterator over the chunks of the RopeSlice.
     pub fn chunks(&self) -> RopeChunks<'a> {
-        unimplemented!()
+        RopeChunks::new_with_range(self.node, self.start_char, self.end_char)
     }
 }
