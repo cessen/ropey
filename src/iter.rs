@@ -216,6 +216,7 @@ impl<'a> Iterator for RopeChunks<'a> {
                     } else {
                         self.end - self.idx
                     };
+                    self.idx += text.len();
                     return Some(&text[start_byte..end_byte]);
                 }
 

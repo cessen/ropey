@@ -253,7 +253,7 @@ impl<'a> Iterator for LineBreakIter<'a> {
 #[cfg(test)]
 mod tests {
     use small_string::SmallString;
-    use rope::BackingArray;
+    use node::BackingArray;
     use super::*;
 
     #[test]

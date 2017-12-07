@@ -36,7 +36,7 @@ impl Node {
     }
 
     /// Total number of bytes in the Rope.
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) fn byte_count(&self) -> usize {
         self.text_info().bytes as usize
     }
 
@@ -109,7 +109,7 @@ impl Node {
 
     /// Returns an immutable slice of the Rope in the char range `start..end`.
     pub(crate) fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
-        RopeSlice::new_from_node(self, start, end)
+        RopeSlice::new_with_range(self, start, end)
     }
 
     pub(crate) fn text_info(&self) -> TextInfo {

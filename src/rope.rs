@@ -25,17 +25,17 @@ impl Rope {
     }
 
     /// Total number of bytes in the Rope.
-    pub fn len(&self) -> usize {
-        self.root.len()
+    pub fn len_bytes(&self) -> usize {
+        self.root.byte_count()
     }
 
     /// Total number of chars in the Rope.
-    pub fn char_count(&self) -> usize {
+    pub fn len_chars(&self) -> usize {
         self.root.char_count()
     }
 
     /// Total number of lines in the Rope.
-    pub fn line_count(&self) -> usize {
+    pub fn len_lines(&self) -> usize {
         self.root.line_break_count() + 1
     }
 
@@ -111,7 +111,7 @@ impl Rope {
         // Do the insertion
         let (residual, seam) = root.insert(char_idx as Count, text);
 
-        // Handle residual node, if any.
+        // Handle root splitting, if any.
         if let Some(r_node) = residual {
             let mut l_node = Node::Empty;
             std::mem::swap(&mut l_node, root);

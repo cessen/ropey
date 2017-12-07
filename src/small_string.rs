@@ -278,7 +278,7 @@ impl<B: Array<Item = u8>> From<SmallString<B>> for String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rope::BackingArray;
+    use node::BackingArray;
     type SS = SmallString<BackingArray>;
 
     #[test]
