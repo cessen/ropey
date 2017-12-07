@@ -2,7 +2,7 @@
 
 use std::str::{Bytes, Chars};
 
-use rope::Node;
+use node::Node;
 use slice::RopeSlice;
 
 //==========================================================

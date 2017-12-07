@@ -2,12 +2,14 @@ extern crate arrayvec;
 extern crate smallvec;
 extern crate unicode_segmentation;
 
+mod node;
 mod rope;
 mod small_string;
 mod small_string_utils;
+mod text_info;
 
-pub mod slice;
 pub mod iter;
+pub mod slice;
 
 pub use rope::Rope;
 

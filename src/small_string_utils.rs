@@ -2,9 +2,9 @@
 
 use std;
 
+use smallvec::Array;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
-use smallvec::Array;
 use small_string::SmallString;
 
 

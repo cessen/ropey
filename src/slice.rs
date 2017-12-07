@@ -1,5 +1,5 @@
-use rope::Node;
 use iter::{RopeBytes, RopeChars, RopeLines, RopeChunks};
+use node::Node;
 
 /// An immutable view into part of a Rope.
 pub struct RopeSlice<'a> {

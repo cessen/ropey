@@ -1,10 +1,12 @@
 use std;
-use std::str;
-use std::ptr;
-use std::ffi::OsStr;
-use std::ops::Deref;
+
 use std::borrow::Borrow;
+use std::ffi::OsStr;
 use std::iter::{FromIterator, IntoIterator};
+use std::ops::Deref;
+use std::ptr;
+use std::str;
+
 use smallvec;
 use smallvec::{Array, SmallVec};
 
