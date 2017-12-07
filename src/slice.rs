@@ -1,20 +1,14 @@
-use std::sync::Arc;
-
 use rope::Node;
 
 /// An immutable view into part of a Rope.
 pub struct RopeSlice<'a> {
-    node: &'a Arc<Node>,
+    node: &'a Node,
     start: usize,
     end: usize,
 }
 
 impl<'a> RopeSlice<'a> {
-    pub(crate) fn new_from_node<'b>(
-        node: &'b Arc<Node>,
-        start: usize,
-        end: usize,
-    ) -> RopeSlice<'b> {
+    pub(crate) fn new_from_node<'b>(node: &'b Node, start: usize, end: usize) -> RopeSlice<'b> {
         assert!(start <= end);
         assert!(end < node.text_info().chars as usize);
 

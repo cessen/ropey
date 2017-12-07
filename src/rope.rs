@@ -7,6 +7,7 @@ use arrayvec::ArrayVec;
 
 use smallvec::Array;
 
+use iter::{RopeBytes, RopeChars, RopeLines, RopeChunks};
 use slice::RopeSlice;
 use small_string::SmallString;
 use small_string_utils::{char_pos_to_byte_pos, split_string_near_byte, LineBreakIter,
@@ -57,64 +58,79 @@ impl Rope {
 
     /// Total number of bytes in the Rope.
     pub fn len(&self) -> usize {
-        self.root.text_info().bytes as usize
+        self.root.len()
     }
 
     /// Total number of chars in the Rope.
     pub fn char_count(&self) -> usize {
-        self.root.text_info().chars as usize
+        self.root.char_count()
     }
 
     /// Total number of lines in the Rope.
     pub fn line_count(&self) -> usize {
-        self.root.text_info().line_breaks as usize + 1
+        self.root.line_break_count() + 1
     }
 
     /// Returns the char index of the given byte.
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        let _ = byte_idx;
-        unimplemented!()
+        self.root.byte_to_char(byte_idx)
     }
 
     /// Returns the line index of the given byte.
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
-        let _ = byte_idx;
-        unimplemented!()
+        self.root.byte_to_line(byte_idx)
     }
 
     /// Returns the byte index of the given char.
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        self.root.char_index_to_byte_index(char_idx as Count) as usize
+        self.root.char_to_byte(char_idx) as usize
     }
 
     /// Returns the line index of the given char.
     pub fn char_to_line(&self, char_idx: usize) -> usize {
-        let _ = char_idx;
-        unimplemented!()
+        self.root.char_to_line(char_idx)
     }
 
     /// Returns the byte index of the start of the given line.
     pub fn line_to_byte(&self, line_idx: usize) -> usize {
-        let _ = line_idx;
-        unimplemented!()
+        self.root.line_to_byte(line_idx)
     }
 
     /// Returns the char index of the start of the given line.
     pub fn line_to_char(&self, line_idx: usize) -> usize {
-        let _ = line_idx;
-        unimplemented!()
+        self.root.line_to_char(line_idx)
     }
 
     /// Returns an immutable slice of the Rope in the char range `start..end`.
     pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
-        RopeSlice::new_from_node(&self.root, start, end)
+        self.root.slice(start, end)
+    }
+
+    /// Creates an iterator over the bytes of the Rope.
+    pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
+        RopeBytes::new(&self.root)
+    }
+
+    /// Creates an iterator over the chars of the Rope.
+    pub fn chars<'a>(&'a self) -> RopeChars<'a> {
+        RopeChars::new(&self.root)
+    }
+
+    /// Creates an iterator over the lines of the Rope.
+    pub fn lines<'a>(&'a self) -> RopeLines<'a> {
+        RopeLines::new(&self.root)
+    }
+
+    /// Creates an iterator over the chunks of the Rope.
+    pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
+        RopeChunks::new(&self.root)
     }
 
     /// Returns the entire text of the Rope as a newly allocated String.
     pub fn to_string(&self) -> String {
-        use iter::RopeChunkIter;
+        use iter::RopeChunks;
         let mut text = String::new();
-        for chunk in RopeChunkIter::new(self) {
+        for chunk in RopeChunks::new(&self.root) {
             text.push_str(chunk);
         }
         text
@@ -257,28 +273,79 @@ impl Node {
         Node::Empty
     }
 
+    /// Total number of bytes in the Rope.
+    pub(crate) fn len(&self) -> usize {
+        self.text_info().bytes as usize
+    }
+
+    /// Total number of chars in the Rope.
+    pub(crate) fn char_count(&self) -> usize {
+        self.text_info().chars as usize
+    }
+
+    /// Total number of line breaks in the Rope.
+    pub(crate) fn line_break_count(&self) -> usize {
+        self.text_info().line_breaks as usize
+    }
+
+    /// Returns the char index of the given byte.
+    pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
+        let _ = byte_idx;
+        unimplemented!()
+    }
+
+    /// Returns the line index of the given byte.
+    pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
+        let _ = byte_idx;
+        unimplemented!()
+    }
+
+    /// Returns the byte index of the given char.
+    pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
+        match self {
+            &Node::Empty => 0,
+            &Node::Leaf(ref text) => char_pos_to_byte_pos(text, char_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
+
+                acc_info.bytes as usize +
+                    children[child_i].char_to_byte(char_idx - acc_info.chars as usize)
+            }
+        }
+    }
+
+    /// Returns the line index of the given char.
+    pub(crate) fn char_to_line(&self, char_idx: usize) -> usize {
+        let _ = char_idx;
+        unimplemented!()
+    }
+
+    /// Returns the byte index of the start of the given line.
+    pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
+        let _ = line_idx;
+        unimplemented!()
+    }
+
+    /// Returns the char index of the start of the given line.
+    pub(crate) fn line_to_char(&self, line_idx: usize) -> usize {
+        let _ = line_idx;
+        unimplemented!()
+    }
+
+    /// Returns an immutable slice of the Rope in the char range `start..end`.
+    pub(crate) fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
+        RopeSlice::new_from_node(self, start, end)
+    }
+
     pub(crate) fn text_info(&self) -> TextInfo {
         match self {
             &Node::Empty => TextInfo::new(),
             &Node::Leaf(ref text) => TextInfo::from_str(text),
             &Node::Internal { ref info, .. } => {
                 info.iter().fold(TextInfo::new(), |a, b| a.combine(b))
-            }
-        }
-    }
-
-    fn char_index_to_byte_index(&self, char_pos: Count) -> Count {
-        match self {
-            &Node::Empty => 0,
-            &Node::Leaf(ref text) => char_pos_to_byte_pos(text, char_pos as usize) as Count,
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| char_pos <= inf.chars);
-
-                acc_info.bytes +
-                    children[child_i].char_index_to_byte_index(char_pos - acc_info.chars)
             }
         }
     }
