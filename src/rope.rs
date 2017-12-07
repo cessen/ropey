@@ -36,9 +36,9 @@ unsafe impl Array for BackingArray {
 
 // Type alias used for char count, grapheme count, line count, etc. storage
 // in nodes.
-pub(crate) type Count = u32;
+pub type Count = u32;
 
-//-------------------------------------------------------------
+//=============================================================
 
 #[derive(Debug, Clone)]
 pub struct Rope {
@@ -46,20 +46,64 @@ pub struct Rope {
 }
 
 impl Rope {
+    /// Creates an empty Rope.
     pub fn new() -> Rope {
         use std::mem::size_of;
         println!("Node size: {:?}", size_of::<Node>());
         Rope { root: Arc::new(Node::new()) }
     }
 
+    /// Total number of bytes in the Rope.
     pub fn len(&self) -> usize {
         self.root.text_info().bytes as usize
     }
 
-    pub fn char_count(&self) -> Count {
-        self.root.text_info().chars
+    /// Total number of chars in the Rope.
+    pub fn char_count(&self) -> usize {
+        self.root.text_info().chars as usize
     }
 
+    /// Total number of lines in the Rope.
+    pub fn line_count(&self) -> usize {
+        self.root.text_info().line_breaks as usize + 1
+    }
+
+    /// Returns the char index of the given byte.
+    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+        let _ = byte_idx;
+        unimplemented!()
+    }
+
+    /// Returns the line index of the given byte.
+    pub fn byte_to_line(&self, byte_idx: usize) -> usize {
+        let _ = byte_idx;
+        unimplemented!()
+    }
+
+    /// Returns the byte index of the given char.
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        self.root.char_index_to_byte_index(char_idx as Count) as usize
+    }
+
+    /// Returns the line index of the given char.
+    pub fn char_to_line(&self, char_idx: usize) -> usize {
+        let _ = char_idx;
+        unimplemented!()
+    }
+
+    /// Returns the byte index of the start of the given line.
+    pub fn line_to_byte(&self, line_idx: usize) -> usize {
+        let _ = line_idx;
+        unimplemented!()
+    }
+
+    /// Returns the char index of the start of the given line.
+    pub fn line_to_char(&self, line_idx: usize) -> usize {
+        let _ = line_idx;
+        unimplemented!()
+    }
+
+    /// Returns the entire text of the Rope as a newly allocated String.
     pub fn to_string(&self) -> String {
         use iter::RopeChunkIter;
         let mut text = String::new();
@@ -69,11 +113,12 @@ impl Rope {
         text
     }
 
-    pub fn insert(&mut self, char_pos: Count, text: &str) {
+    /// Inserts the given text at char index `char_idx`.
+    pub fn insert(&mut self, char_idx: usize, text: &str) {
         let root = Arc::make_mut(&mut self.root);
 
         // Do the insertion
-        let (residual, seam) = root.insert(char_pos, text);
+        let (residual, seam) = root.insert(char_idx as Count, text);
 
         // Handle residual node, if any.
         if let Some(r_node) = residual {
@@ -100,6 +145,27 @@ impl Rope {
         }
     }
 
+    /// Removes the text in char range `start..end`.
+    pub fn remove(&mut self, start: usize, end: usize) {
+        let _ = (start, end);
+        unimplemented!()
+    }
+
+    /// Splits the Rope at char index `split_char_idx`.
+    ///
+    /// The left side of the split remians in this Rope, and
+    /// the right side is returned as a new Rope.
+    pub fn split(&mut self, split_char_idx: usize) -> Rope {
+        let _ = split_char_idx;
+        unimplemented!()
+    }
+
+    /// Appends a Rope to the end of this one, consuming the other Rope.
+    pub fn append(&mut self, other: Rope) {
+        let _ = other;
+        unimplemented!()
+    }
+
     //--------------
 
     /// Debugging tool to make sure that all of the meta-data of the
@@ -109,13 +175,13 @@ impl Rope {
     }
 }
 
-//-------------------------------------------------------------
+//=============================================================
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct TextInfo {
     pub(crate) bytes: Count,
     pub(crate) chars: Count,
-    pub(crate) newlines: Count,
+    pub(crate) line_breaks: Count,
 }
 
 impl TextInfo {
@@ -123,7 +189,7 @@ impl TextInfo {
         TextInfo {
             bytes: 0,
             chars: 0,
-            newlines: 0,
+            line_breaks: 0,
         }
     }
 
@@ -131,7 +197,7 @@ impl TextInfo {
         TextInfo {
             bytes: text.len() as Count,
             chars: text.chars().count() as Count,
-            newlines: LineBreakIter::new(text).count() as Count,
+            line_breaks: LineBreakIter::new(text).count() as Count,
         }
     }
 
@@ -139,7 +205,7 @@ impl TextInfo {
         TextInfo {
             bytes: self.bytes + other.bytes,
             chars: self.chars + other.chars,
-            newlines: self.newlines + other.newlines,
+            line_breaks: self.line_breaks + other.line_breaks,
         }
     }
 }
@@ -167,7 +233,7 @@ impl TextInfoArray for [TextInfo] {
     }
 }
 
-//-------------------------------------------------------------
+//=============================================================
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
