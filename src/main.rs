@@ -3,8 +3,9 @@ extern crate rand;
 extern crate smallvec;
 extern crate unicode_segmentation;
 
-mod rope;
 mod iter;
+mod rope;
+mod slice;
 mod small_string;
 mod small_string_utils;
 

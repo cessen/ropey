@@ -6,6 +6,8 @@ use std::sync::Arc;
 use arrayvec::ArrayVec;
 
 use smallvec::Array;
+
+use slice::RopeSlice;
 use small_string::SmallString;
 use small_string_utils::{char_pos_to_byte_pos, split_string_near_byte, LineBreakIter,
                          fix_grapheme_seam};
@@ -101,6 +103,11 @@ impl Rope {
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         let _ = line_idx;
         unimplemented!()
+    }
+
+    /// Returns an immutable slice of the Rope in the char range `start..end`.
+    pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
+        RopeSlice::new_from_node(&self.root, start, end)
     }
 
     /// Returns the entire text of the Rope as a newly allocated String.
@@ -250,7 +257,7 @@ impl Node {
         Node::Empty
     }
 
-    fn text_info(&self) -> TextInfo {
+    pub(crate) fn text_info(&self) -> TextInfo {
         match self {
             &Node::Empty => TextInfo::new(),
             &Node::Leaf(ref text) => TextInfo::from_str(text),
