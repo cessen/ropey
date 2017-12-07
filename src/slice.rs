@@ -53,4 +53,24 @@ impl<'a> RopeSlice<'a> {
         assert!(end < (self.end - self.start));
         RopeSlice::new_from_node(self.node, self.start + start, self.start + end)
     }
+
+    /// Creates an iterator over the bytes of the RopeSlice.
+    pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
+        unimplemented!()
+    }
+
+    /// Creates an iterator over the chars of the RopeSlice.
+    pub fn chars<'a>(&'a self) -> RopeChars<'a> {
+        unimplemented!()
+    }
+
+    /// Creates an iterator over the lines of the RopeSlice.
+    pub fn lines<'a>(&'a self) -> RopeLines<'a> {
+        unimplemented!()
+    }
+
+    /// Creates an iterator over the chunks of the RopeSlice.
+    pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
+        unimplemented!()
+    }
 }
