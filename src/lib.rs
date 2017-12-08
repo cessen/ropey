@@ -12,17 +12,11 @@
 //! - **Line-aware.**  Ropey maintains meta-data about line breaks, allowing
 //!   you to index into and iterate over lines of text.
 //! - **Grapheme-friendly.**  Ropey ensures that graphemes are never split in its
-//!   internal representation of text, and provides API's for iterating over
+//!   internal representation of text, and provides APIs for iterating over
 //!   graphemes and querying about grapheme boundaries.
-//!   grapheme bounda.  This means you can always get a complete
-//!   zero-copy `&str` slice of any grapheme in the text.
 //! - **Frequent edits of large texts.**  Ropey is intended to be used for text
 //!   editing and manipulation, including when the text is hundreds of megabytes
 //!   large and the edits are all over the place.
-//! - **Low-level access when needed.**  Although Ropey doesn't expose anything that
-//!   could lead to invalid text states, it does provide APIs for working with
-//!   the text as bytes, and for reading the rope's text as larger contiguous
-//!   chunks.
 //! - **Thread safety.** Data is shared between clones of Ropey-ropes, making
 //!   clones extremley cheap. This is entirely thread safe, and clones can be
 //!   freely sent between threads.  More memory is only taken up incrementally
