@@ -162,15 +162,6 @@ impl Node {
                 let (child_i, acc_info) =
                     info.search_combine(|inf| line_idx as Count <= inf.line_breaks);
 
-                // Shortcuts
-                if line_idx == 0 {
-                    return 0;
-                } else if line_idx ==
-                           acc_info.line_breaks as usize + info[child_i].line_breaks as usize
-                {
-                    return acc_info.bytes as usize + info[child_i].bytes as usize;
-                }
-
                 acc_info.bytes as usize +
                     children[child_i].line_to_byte(line_idx - acc_info.line_breaks as usize)
             }
@@ -188,15 +179,6 @@ impl Node {
             } => {
                 let (child_i, acc_info) =
                     info.search_combine(|inf| line_idx as Count <= inf.line_breaks);
-
-                // Shortcuts
-                if line_idx == 0 {
-                    return 0;
-                } else if line_idx ==
-                           acc_info.line_breaks as usize + info[child_i].line_breaks as usize
-                {
-                    return acc_info.chars as usize + info[child_i].chars as usize;
-                }
 
                 acc_info.chars as usize +
                     children[child_i].line_to_char(line_idx - acc_info.line_breaks as usize)
@@ -467,5 +449,47 @@ unsafe impl Array for BackingArray {
     }
     fn ptr_mut(&mut self) -> *mut u8 {
         &mut self.0[0]
+    }
+}
+
+//=======================================================
+
+#[cfg(test)]
+mod tests {
+    use rope::Rope;
+
+    const TEXT: &str = "\r\nHello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n";
+
+    #[test]
+    fn line_to_byte_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        assert_eq!(3, r.root.line_break_count());
+        assert_eq!(0, r.line_to_byte(0));
+        assert_eq!(2, r.line_to_byte(1));
+        assert_eq!(93, r.line_to_byte(2));
+        assert_eq!(209, r.line_to_byte(3));
+    }
+
+    #[test]
+    fn line_to_char_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        assert_eq!(3, r.root.line_break_count());
+        assert_eq!(0, r.line_to_char(0));
+        assert_eq!(2, r.line_to_char(1));
+        assert_eq!(93, r.line_to_char(2));
+        assert_eq!(133, r.line_to_char(3));
     }
 }

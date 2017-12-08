@@ -498,4 +498,36 @@ mod tests {
         assert_eq!(8, line_idx_to_char_idx(text, 1));
         assert_eq!(10, line_idx_to_char_idx(text, 2));
     }
+
+    #[test]
+    fn line_byte_round_trip() {
+        let text = "\nHere\nare\nsome\nwords\n";
+        assert_eq!(6, line_idx_to_byte_idx(text, byte_idx_to_line_idx(text, 6)));
+        assert_eq!(2, byte_idx_to_line_idx(text, line_idx_to_byte_idx(text, 2)));
+
+        assert_eq!(0, line_idx_to_byte_idx(text, byte_idx_to_line_idx(text, 0)));
+        assert_eq!(0, byte_idx_to_line_idx(text, line_idx_to_byte_idx(text, 0)));
+
+        assert_eq!(
+            21,
+            line_idx_to_byte_idx(text, byte_idx_to_line_idx(text, 21))
+        );
+        assert_eq!(5, byte_idx_to_line_idx(text, line_idx_to_byte_idx(text, 5)));
+    }
+
+    #[test]
+    fn line_char_round_trip() {
+        let text = "\nHere\nare\nsome\nwords\n";
+        assert_eq!(6, line_idx_to_char_idx(text, char_idx_to_line_idx(text, 6)));
+        assert_eq!(2, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 2)));
+
+        assert_eq!(0, line_idx_to_char_idx(text, char_idx_to_line_idx(text, 0)));
+        assert_eq!(0, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 0)));
+
+        assert_eq!(
+            21,
+            line_idx_to_char_idx(text, char_idx_to_line_idx(text, 21))
+        );
+        assert_eq!(5, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 5)));
+    }
 }

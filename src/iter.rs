@@ -143,7 +143,7 @@ impl<'a> Iterator for RopeLines<'a> {
             let a = self.node.line_to_char(self.line_idx).max(self.start_char);
 
             // Early out if we're past the specified end char
-            if a >= self.end_char {
+            if a > self.end_char {
                 self.line_idx = self.node.line_break_count() + 1;
                 return None;
             }
@@ -152,7 +152,7 @@ impl<'a> Iterator for RopeLines<'a> {
                 self.node.line_to_char(self.line_idx + 1)
             } else {
                 self.node.char_count()
-            };
+            }.min(self.end_char);
 
             self.line_idx += 1;
 
@@ -245,6 +245,256 @@ impl<'a> Iterator for RopeChunks<'a> {
                     return None;
                 }
             }
+        }
+    }
+}
+
+//===========================================================
+
+#[cfg(test)]
+mod tests {
+    use rope::Rope;
+    use slice::RopeSlice;
+
+    const TEXT: &str = "\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+Hello there!  How're you doing?  It's a fine day, \
+isn't it?  Aren't you glad we're alive?\r\n\
+こんにちは！元気ですか？日はいいですね。\
+私たちが生きだって嬉しいではないか？\r\n\
+";
+
+    #[test]
+    fn bytes_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        for (br, bt) in r.bytes().zip(TEXT.bytes()) {
+            assert_eq!(br, bt);
+        }
+    }
+
+    #[test]
+    fn chars_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        for (cr, ct) in r.chars().zip(TEXT.chars()) {
+            assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn lines_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        assert_eq!(34, r.lines().count());
+
+        let mut lines = r.lines();
+
+        assert_eq!("\r\n", &lines.next().unwrap().to_string());
+
+        for _ in 0..16 {
+            assert_eq!(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n",
+                &lines.next().unwrap().to_string()
+            );
+            assert_eq!(
+                "こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+                &lines.next().unwrap().to_string()
+            );
+        }
+
+        assert_eq!("", &lines.next().unwrap().to_string());
+        assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn lines_02() {
+        let text = "Hello there!\nHow goes it?";
+        let mut r = Rope::new();
+
+        for c in text.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        assert_eq!(2, r.lines().count());
+
+        let mut lines = r.lines();
+        assert_eq!("Hello there!\n", &lines.next().unwrap().to_string());
+        assert_eq!("How goes it?", &lines.next().unwrap().to_string());
+        assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn chunks_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let mut idx = 0;
+        for chunk in r.chunks() {
+            assert_eq!(chunk, &TEXT[idx..(idx + chunk.len())]);
+            idx += chunk.len();
+        }
+    }
+
+    #[test]
+    fn bytes_sliced_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start, s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        for (br, bt) in s1.bytes().zip(s2.bytes()) {
+            assert_eq!(br, bt);
+        }
+    }
+
+    #[test]
+    fn chars_sliced_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start, s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        for (cr, ct) in s1.chars().zip(s2.chars()) {
+            assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn lines_sliced_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start, s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        for (liner, linet) in s1.lines().zip(s2.lines()) {
+            assert_eq!(liner.to_string().trim_right(), linet);
+        }
+    }
+
+    #[test]
+    fn chunks_sliced_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start, s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        let mut idx = 0;
+        for chunk in s1.chunks() {
+            assert_eq!(chunk, &s2[idx..(idx + chunk.len())]);
+            idx += chunk.len();
         }
     }
 }
