@@ -101,7 +101,11 @@ impl<'a> Iterator for RopeChars<'a> {
 
 //==========================================================
 
-/// An iterator over a Rope's chars.
+/// An iterator over a Rope's lines.
+///
+/// The returned lines include the line break characters at the end if
+/// there are any in the text.  If the last line is blank, it is also
+/// returned (as an empty slice).
 pub struct RopeLines<'a> {
     node: &'a Node,
     start_char: usize,
@@ -163,7 +167,25 @@ impl<'a> Iterator for RopeLines<'a> {
 
 //==========================================================
 
-/// An iterator over a Rope's contiguous str chunks.
+/// An iterator over a Rope's contiguous `str` chunks.
+///
+/// Internally, `Rope` stores text as a segemented collection of utf8 strings.
+/// This iterator iterates over those chunks, returning `&str` slices into
+/// them.  This is primarily useful for efficiently saving text to disk,
+/// converting the Rope's contents into another type, or building your own
+/// iterators on top of `Rope`.
+///
+/// This iterator has the following API guarantees about the chunks it yields:
+///
+/// 1. They are in-order, non-overlapping, and complete (i.e. the entire
+///    text is iterated over in order).
+/// 2. Grapheme clusters are _never_ split between chunks.  (Grapheme clusters
+///    in this case are defined as the extended grapheme clusters in [Unicode
+///    Standard Annex #29](https://www.unicode.org/reports/tr29/))
+///
+/// There are no other API guarantees.  For example, chunks can theoretically be
+/// of any size (including empty), line breaks and chunk boundaries have no
+/// guaranteed relationship, etc.
 pub struct RopeChunks<'a> {
     node_stack: Vec<&'a Node>,
     start: usize,

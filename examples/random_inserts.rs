@@ -1,7 +1,7 @@
-extern crate btree_rope;
+extern crate ropey;
 extern crate rand;
 
-use btree_rope::Rope;
+use ropey::Rope;
 use rand::Rng;
 
 fn main() {

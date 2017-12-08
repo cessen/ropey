@@ -1,6 +1,6 @@
 [package]
-name = "btree_rope"
-version = "0.1.0"
+name = "ropey"
+version = "0.4.0"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 
 [dependencies]

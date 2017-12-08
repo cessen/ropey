@@ -1,6 +1,6 @@
-extern crate btree_rope;
+extern crate ropey;
 
-use btree_rope::Rope;
+use ropey::Rope;
 
 fn main() {
     let mut tree = Rope::new();

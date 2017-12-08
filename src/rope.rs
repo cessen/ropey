@@ -11,6 +11,7 @@ use slice::RopeSlice;
 use text_info::Count;
 
 
+/// A utf8 text rope.
 #[derive(Debug, Clone)]
 pub struct Rope {
     pub(crate) root: Arc<Node>,
@@ -19,8 +20,6 @@ pub struct Rope {
 impl Rope {
     /// Creates an empty Rope.
     pub fn new() -> Rope {
-        use std::mem::size_of;
-        println!("Node size: {:?}", size_of::<Node>());
         Rope { root: Arc::new(Node::new()) }
     }
 
