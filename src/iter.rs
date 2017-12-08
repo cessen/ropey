@@ -2,6 +2,8 @@
 
 use std::str::{Bytes, Chars};
 
+use unicode_segmentation::{Graphemes, UnicodeSegmentation};
+
 use node::Node;
 use slice::RopeSlice;
 
@@ -90,6 +92,57 @@ impl<'a> Iterator for RopeChars<'a> {
             } else {
                 if let Some(chunk) = self.chunk_iter.next() {
                     self.cur_chunk = chunk.chars();
+                    continue;
+                } else {
+                    return None;
+                }
+            }
+        }
+    }
+}
+
+//==========================================================
+
+/// An iterator over a Rope's grapheme clusters.
+pub struct RopeGraphemes<'a> {
+    chunk_iter: RopeChunks<'a>,
+    cur_chunk: Graphemes<'a>,
+    extended: bool,
+}
+
+impl<'a> RopeGraphemes<'a> {
+    pub(crate) fn new<'b>(node: &'b Node, extended: bool) -> RopeGraphemes<'b> {
+        RopeGraphemes {
+            chunk_iter: RopeChunks::new(node),
+            cur_chunk: UnicodeSegmentation::graphemes("", extended),
+            extended: extended,
+        }
+    }
+
+    pub(crate) fn new_with_range<'b>(
+        node: &'b Node,
+        extended: bool,
+        start_char: usize,
+        end_char: usize,
+    ) -> RopeGraphemes<'b> {
+        RopeGraphemes {
+            chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
+            cur_chunk: UnicodeSegmentation::graphemes("", extended),
+            extended: extended,
+        }
+    }
+}
+
+impl<'a> Iterator for RopeGraphemes<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<&'a str> {
+        loop {
+            if let Some(g) = self.cur_chunk.next() {
+                return Some(g);
+            } else {
+                if let Some(chunk) = self.chunk_iter.next() {
+                    self.cur_chunk = UnicodeSegmentation::graphemes(chunk, self.extended);
                     continue;
                 } else {
                     return None;
@@ -275,8 +328,8 @@ impl<'a> Iterator for RopeChunks<'a> {
 
 #[cfg(test)]
 mod tests {
+    use unicode_segmentation::UnicodeSegmentation;
     use rope::Rope;
-    use slice::RopeSlice;
 
     const TEXT: &str = "\r\n\
 Hello there!  How're you doing?  It's a fine day, \
@@ -368,6 +421,22 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
             assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn graphemes_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        for (gr, gt) in r.graphemes().zip(
+            UnicodeSegmentation::graphemes(TEXT, true),
+        )
+        {
+            assert_eq!(gr, gt);
         }
     }
 
@@ -473,6 +542,46 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
         for (cr, ct) in s1.chars().zip(s2.chars()) {
             assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn graphemes_sliced_01() {
+        let mut r = Rope::new();
+
+        for c in TEXT.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start, s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        for (gr, gt) in s1.graphemes().zip(UnicodeSegmentation::graphemes(s2, true)) {
+            assert_eq!(gr, gt);
+        }
+    }
+
+    #[test]
+    fn graphemes_sliced_02() {
+        let text = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n";
+        let mut r = Rope::new();
+
+        for c in text.chars().rev() {
+            r.insert(0, &c.to_string());
+        }
+
+        let s1 = r.slice(5, 11);
+        let s2 = &text[5..11];
+
+        assert_eq!(4, s1.graphemes().count());
+
+        for (gr, gt) in s1.graphemes().zip(UnicodeSegmentation::graphemes(s2, true)) {
+            assert_eq!(gr, gt);
         }
     }
 

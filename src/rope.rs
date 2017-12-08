@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use arrayvec::ArrayVec;
 
-use iter::{RopeBytes, RopeChars, RopeLines, RopeChunks};
+use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::Node;
 use slice::RopeSlice;
 use text_info::Count;
@@ -68,6 +68,13 @@ impl Rope {
         self.root.line_to_char(line_idx)
     }
 
+    /// Returns whether the given char index is a grapheme cluster
+    /// boundary or not.
+    pub fn is_grapheme_boundary(&self, char_idx: usize) -> usize {
+        let _ = char_idx;
+        unimplemented!()
+    }
+
     /// Returns an immutable slice of the Rope in the char range `start..end`.
     pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
         self.root.slice(start, end)
@@ -81,6 +88,11 @@ impl Rope {
     /// Creates an iterator over the chars of the Rope.
     pub fn chars<'a>(&'a self) -> RopeChars<'a> {
         RopeChars::new(&self.root)
+    }
+
+    /// Creates an iterator over the grapheme clusteres of the Rope.
+    pub fn graphemes<'a>(&'a self) -> RopeGraphemes<'a> {
+        RopeGraphemes::new(&self.root, true)
     }
 
     /// Creates an iterator over the lines of the Rope.

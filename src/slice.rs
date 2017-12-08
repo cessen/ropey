@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use iter::{RopeBytes, RopeChars, RopeLines, RopeChunks};
+use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::Node;
 
 /// An immutable view into part of a Rope.
@@ -88,6 +88,11 @@ impl<'a> RopeSlice<'a> {
     /// Creates an iterator over the chars of the RopeSlice.
     pub fn chars(&self) -> RopeChars<'a> {
         RopeChars::new_with_range(self.node, self.start_char, self.end_char)
+    }
+
+    /// Creates an iterator over the grapheme clusters of the RopeSlice.
+    pub fn graphemes(&self) -> RopeGraphemes<'a> {
+        RopeGraphemes::new_with_range(self.node, true, self.start_char, self.end_char)
     }
 
     /// Creates an iterator over the lines of the RopeSlice.
