@@ -23,6 +23,10 @@ impl Rope {
         Rope { root: Arc::new(Node::new()) }
     }
 
+    pub fn from_str(text: &str) -> Rope {
+        Rope { root: Arc::new(Node::from_str(text)) }
+    }
+
     /// Total number of bytes in the Rope.
     pub fn len_bytes(&self) -> usize {
         self.root.byte_count()

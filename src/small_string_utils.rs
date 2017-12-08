@@ -130,46 +130,57 @@ pub fn split_string_at_char<B: Array<Item = u8>>(
 /// string and byte index given, it may not split at all.  Be aware of this!
 pub fn split_string_near_byte<B: Array<Item = u8>>(
     s: &mut SmallString<B>,
-    pos: usize,
+    byte_idx: usize,
 ) -> SmallString<B> {
+    let split_idx = nearest_grapheme_boundary(s, byte_idx);
+    return s.split_off(split_idx);
+}
+
+/// Finds the nearest grapheme boundary near the given byte.
+///
+/// This avoids the left and right boundaries of the given text,
+/// unless the given bytes is exactly there already.
+pub fn nearest_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
+    // Bounds check
+    assert!(byte_idx <= text.len());
+
     // Handle some corner-cases ahead of time, to simplify the logic below
-    if pos == s.len() || s.len() == 0 {
-        return SmallString::new();
+    if byte_idx == text.len() || text.len() == 0 {
+        return text.len();
     }
-    if pos == 0 {
-        return s.split_off(0);
+    if byte_idx == 0 {
+        return 0;
     }
 
     // Find codepoint boundary
-    let mut split_pos = pos;
-    while !s.is_char_boundary(split_pos) {
-        split_pos -= 1;
+    let mut boundry_idx = byte_idx;
+    while !text.is_char_boundary(boundry_idx) {
+        boundry_idx -= 1;
     }
 
     // Find the two nearest grapheme boundaries
-    let mut gc = GraphemeCursor::new(split_pos, s.len(), true);
-    let next = gc.next_boundary(s, 0).unwrap().unwrap_or(s.len());
-    let prev = gc.prev_boundary(s, 0).unwrap().unwrap_or(0);
+    let mut gc = GraphemeCursor::new(boundry_idx, text.len(), true);
+    let next = gc.next_boundary(text, 0).unwrap().unwrap_or(text.len());
+    let prev = gc.prev_boundary(text, 0).unwrap().unwrap_or(0);
 
-    // Check if the specified split position is on a boundary, and split
-    // there if it is
-    if prev == pos {
-        return s.split_off(split_pos);
+    // Check if the specified position is on a boundary, and return it
+    // if it is
+    if prev == byte_idx {
+        return byte_idx;
     }
 
-    // Otherwise, split on the closest of prev and next that isn't the
+    // Otherwise, return the closest of prev and next that isn't the
     // start or end of the string
     if prev == 0 {
-        return s.split_off(next);
-    } else if next == s.len() {
-        return s.split_off(prev);
-    } else if (pos - prev) >= (next - pos) {
-        return s.split_off(next);
+        return next;
+    } else if next == text.len() {
+        return prev;
+    } else if (byte_idx - prev) >= (next - byte_idx) {
+        return next;
     } else {
-        return s.split_off(prev);
+        return prev;
     }
 }
-
 
 /// Takes two SmallStrings and mends the grapheme boundary between them, if any.
 ///

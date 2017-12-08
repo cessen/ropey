@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
+use std;
 use std::sync::Arc;
+use std::collections::VecDeque;
 
 use arrayvec::ArrayVec;
 use smallvec::Array;
@@ -9,7 +11,7 @@ use slice::RopeSlice;
 use small_string::SmallString;
 use small_string_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                          char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
-                         split_string_near_byte, fix_grapheme_seam};
+                         split_string_near_byte, nearest_grapheme_boundary, fix_grapheme_seam};
 use text_info::{TextInfo, TextInfoArray, Count};
 
 
@@ -35,6 +37,157 @@ pub(crate) enum Node {
 impl Node {
     pub(crate) fn new() -> Node {
         Node::Empty
+    }
+
+    pub(crate) fn from_str(text: &str) -> Node {
+        const CHUNK_SIZE: usize = (MAX_BYTES * 3) / 4;
+
+        // We keep a stack of the right-most nodes
+        // down the edge of the rope tree.  This allows
+        // us to process everything without recursion.
+        // Not actually sure if that's a gain or not,
+        // but it works!
+        let mut stack = VecDeque::with_capacity(32);
+        stack.push_back(Node::Empty);
+
+        // Loop over the text, splitting bits off the left and
+        // appending them to the rope as we go.
+        let mut text = text;
+        while text.len() > 0 {
+            // Calculate split point
+            let split_idx = if text.len() > (CHUNK_SIZE * 2) {
+                nearest_grapheme_boundary(text, CHUNK_SIZE)
+            } else if text.len() < MAX_BYTES {
+                text.len()
+            } else {
+                let tmp = text.len() / 2;
+                nearest_grapheme_boundary(text, tmp)
+            };
+
+            // Split text off of the left
+            let leaf_text = &text[..split_idx];
+            text = &text[split_idx..];
+
+            // Append the text as a leaf node, balancing the tree
+            // appropriately as we go.
+            let last = stack.pop_back().unwrap();
+            match last {
+                Node::Empty => {
+                    stack.push_back(Node::Leaf(SmallString::from_str(leaf_text)));
+                }
+
+                Node::Leaf(_) => {
+                    let right = Node::Leaf(SmallString::from_str(leaf_text));
+
+                    let mut info = ArrayVec::new();
+                    let mut children = ArrayVec::new();
+                    info.push(last.text_info());
+                    info.push(right.text_info());
+                    children.push(Arc::new(last));
+                    children.push(Arc::new(right));
+
+                    stack.push_back(Node::Internal {
+                        info: info,
+                        children: children,
+                    });
+                }
+
+                Node::Internal {
+                    mut info,
+                    mut children,
+                } => {
+                    if children.len() < (MAX_CHILDREN - 1) {
+                        let right = Node::Leaf(SmallString::from_str(leaf_text));
+                        info.push(right.text_info());
+                        children.push(Arc::new(right));
+                        stack.push_back(Node::Internal {
+                            info: info,
+                            children: children,
+                        });
+                    } else {
+                        let leaf = Node::Leaf(SmallString::from_str(leaf_text));
+                        let r_info = push_split_arrayvec(&mut info, leaf.text_info());
+                        let r_children = push_split_arrayvec(&mut children, Arc::new(leaf));
+                        stack.push_back(Node::Internal {
+                            info: r_info,
+                            children: r_children,
+                        });
+
+                        let mut left = Node::Internal {
+                            info: info,
+                            children: children,
+                        };
+                        let mut stack_idx = stack.len() - 1;
+                        loop {
+                            if stack_idx >= 1 {
+                                if stack[stack_idx - 1].child_count() < (MAX_CHILDREN - 1) {
+                                    if let Node::Internal {
+                                        ref mut info,
+                                        ref mut children,
+                                    } = stack[stack_idx - 1]
+                                    {
+                                        info.push(left.text_info());
+                                        children.push(Arc::new(left));
+                                        break;
+                                    } else {
+                                        unreachable!()
+                                    }
+                                } else {
+                                    let (r_info, r_children) = if let Node::Internal {
+                                        ref mut info,
+                                        ref mut children,
+                                    } = stack[stack_idx - 1]
+                                    {
+                                        let r_info = push_split_arrayvec(info, left.text_info());
+                                        let r_children =
+                                            push_split_arrayvec(children, Arc::new(left));
+                                        (r_info, r_children)
+                                    } else {
+                                        unreachable!()
+                                    };
+                                    left = Node::Internal {
+                                        info: r_info,
+                                        children: r_children,
+                                    };
+                                    std::mem::swap(&mut stack[stack_idx - 1], &mut left);
+                                    stack_idx -= 1;
+                                }
+                            } else {
+                                let mut info = ArrayVec::new();
+                                let mut children = ArrayVec::new();
+                                info.push(left.text_info());
+                                children.push(Arc::new(left));
+                                stack.push_front(Node::Internal {
+                                    info: info,
+                                    children: children,
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Zip up all the remaining nodes on the stack
+        let mut stack_idx = stack.len() - 1;
+        while stack_idx >= 1 {
+            let node = stack.pop_back().unwrap();
+            if let Node::Internal {
+                ref mut info,
+                ref mut children,
+            } = stack[stack_idx - 1]
+            {
+                info.push(node.text_info());
+                children.push(Arc::new(node));
+            } else {
+                unreachable!();
+            }
+            stack_idx -= 1;
+        }
+
+        // Return the root.
+        stack.pop_back().unwrap()
     }
 
     /// Total number of bytes in the Rope.
@@ -274,28 +427,9 @@ impl Node {
                     }
                     // The new node won't fit!  Must split.
                     else {
-                        let (extra_info, extra_child) = if child_i < (children.len() - 1) {
-                            let extra_info = info.pop().unwrap();
-                            let extra_child = children.pop().unwrap();
-                            info.insert(child_i + 1, r_node.text_info());
-                            children.insert(child_i + 1, Arc::new(r_node));
-                            (extra_info, extra_child)
-                        } else {
-                            (r_node.text_info(), Arc::new(r_node))
-                        };
-
-                        let mut r_info = ArrayVec::new();
-                        let mut r_children = ArrayVec::new();
-
-                        let r_count = (children.len() + 1) / 2;
-                        let l_count = (children.len() + 1) - r_count;
-
-                        for _ in l_count..children.len() {
-                            r_info.push(info.remove(l_count));
-                            r_children.push(children.remove(l_count));
-                        }
-                        r_info.push(extra_info);
-                        r_children.push(extra_child);
+                        let r_info = insert_split_arrayvec(info, r_node.text_info(), child_i + 1);
+                        let r_children =
+                            insert_split_arrayvec(children, Arc::new(r_node), child_i + 1);
 
                         return (
                             Some(Node::Internal {
@@ -314,6 +448,14 @@ impl Node {
     }
 
     //-----------------------------------------
+
+    fn child_count(&self) -> usize {
+        if let &Node::Internal { ref children, .. } = self {
+            children.len()
+        } else {
+            panic!()
+        }
+    }
 
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
@@ -433,6 +575,51 @@ impl Node {
             }
         }
     }
+}
+
+//=======================================================
+
+/// Pushes an element onto the end of an ArrayVec,
+/// and then splits it in half, returning the right
+/// half.
+///
+/// This works even when the given ArrayVec is full.
+pub fn push_split_arrayvec<T>(
+    v: &mut ArrayVec<[T; MAX_CHILDREN]>,
+    new_child: T,
+) -> ArrayVec<[T; MAX_CHILDREN]> {
+    let mut right = ArrayVec::new();
+
+    let r_count = (v.len() + 1) / 2;
+    let l_count = (v.len() + 1) - r_count;
+
+    for _ in l_count..v.len() {
+        right.push(v.remove(l_count));
+    }
+    right.push(new_child);
+
+    right
+}
+
+/// Inserts an element into an ArrayVec, and then splits
+/// it in half, returning the right half.
+///
+/// This works even when the given ArrayVec is full.
+pub fn insert_split_arrayvec<T>(
+    v: &mut ArrayVec<[T; MAX_CHILDREN]>,
+    new_child: T,
+    idx: usize,
+) -> ArrayVec<[T; MAX_CHILDREN]> {
+    assert!(v.len() > 0);
+    let extra = if idx < v.len() {
+        let extra = v.pop().unwrap();
+        v.insert(idx, new_child);
+        extra
+    } else {
+        new_child
+    };
+
+    push_split_arrayvec(v, extra)
 }
 
 //=======================================================
