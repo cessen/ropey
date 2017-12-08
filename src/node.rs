@@ -40,7 +40,7 @@ impl Node {
     }
 
     pub(crate) fn from_str(text: &str) -> Node {
-        const CHUNK_SIZE: usize = (MAX_BYTES * 3) / 4;
+        const CHUNK_SIZE: usize = (MAX_BYTES * 9) / 10;
 
         // We keep a stack of the right-most nodes
         // down the edge of the rope tree.  This allows
