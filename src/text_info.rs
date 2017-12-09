@@ -1,4 +1,4 @@
-use small_string_utils::LineBreakIter;
+use str_utils::LineBreakIter;
 
 pub(crate) type Count = u32;
 

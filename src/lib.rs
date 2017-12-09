@@ -31,7 +31,7 @@ extern crate unicode_segmentation;
 mod node;
 mod rope;
 mod small_string;
-mod small_string_utils;
+mod str_utils;
 mod text_info;
 
 pub mod iter;

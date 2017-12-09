@@ -6,13 +6,14 @@ use std::collections::VecDeque;
 
 use arrayvec::ArrayVec;
 use smallvec::Array;
+use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 use slice::RopeSlice;
 use small_string::SmallString;
-use small_string_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
-                         char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
-                         is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
-                         nearest_internal_grapheme_boundary, fix_grapheme_seam};
+use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
+                char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
+                is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
+                nearest_internal_grapheme_boundary};
 use text_info::{TextInfo, TextInfoArray, Count};
 
 
@@ -700,7 +701,7 @@ impl Node {
     }
 }
 
-//=======================================================
+//===========================================================================
 
 /// Pushes an element onto the end of an ArrayVec,
 /// and then splits it in half, returning the right
@@ -745,7 +746,118 @@ pub fn insert_split_arrayvec<T>(
     push_split_arrayvec(v, extra)
 }
 
-//=======================================================
+/// Inserts the given text into the given string at the given char index.
+pub fn insert_at_char<B: Array<Item = u8>>(s: &mut SmallString<B>, text: &str, pos: usize) {
+    let byte_pos = char_idx_to_byte_idx(s, pos);
+    s.insert_str(byte_pos, text);
+}
+
+
+/// Removes the text between the given char indices in the given string.
+pub fn remove_text_between_char_indices<B: Array<Item = u8>>(
+    s: &mut SmallString<B>,
+    pos_a: usize,
+    pos_b: usize,
+) {
+    // Bounds checks
+    assert!(
+        pos_a <= pos_b,
+        "remove_text_between_char_indices(): pos_a must be less than or equal to pos_b."
+    );
+
+    if pos_a == pos_b {
+        return;
+    }
+
+    // Find removal positions in bytes
+    // TODO: get both of these in a single pass
+    let byte_pos_a = char_idx_to_byte_idx(&s[..], pos_a);
+    let byte_pos_b = char_idx_to_byte_idx(&s[..], pos_b);
+
+    // Get byte vec of string
+    let byte_vec = unsafe { s.as_mut_smallvec() };
+
+    // Move bytes to fill in the gap left by the removed bytes
+    let mut from = byte_pos_b;
+    let mut to = byte_pos_a;
+    while from < byte_vec.len() {
+        byte_vec[to] = byte_vec[from];
+
+        from += 1;
+        to += 1;
+    }
+
+    // Remove data from the end
+    let final_text_size = byte_vec.len() + byte_pos_a - byte_pos_b;
+    byte_vec.truncate(final_text_size);
+}
+
+
+/// Splits a string into two strings at the char index given.
+/// The first section of the split is stored in the original string,
+/// while the second section of the split is returned as a new string.
+pub fn split_string_at_char<B: Array<Item = u8>>(
+    s1: &mut SmallString<B>,
+    pos: usize,
+) -> SmallString<B> {
+    let split_pos = char_idx_to_byte_idx(&s1[..], pos);
+    s1.split_off(split_pos)
+}
+
+/// Takes two SmallStrings and mends the grapheme boundary between them, if any.
+///
+/// Note: this will leave one of the strings empty if the entire composite string
+/// is one big grapheme.
+pub fn fix_grapheme_seam<B: Array<Item = u8>>(l: &mut SmallString<B>, r: &mut SmallString<B>) {
+    let tot_len = l.len() + r.len();
+    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
+    let next = gc.next_boundary(r, l.len()).unwrap();
+    let prev = {
+        match gc.prev_boundary(r, l.len()) {
+            Ok(pos) => pos,
+            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
+            _ => unreachable!(),
+        }
+    };
+
+    // Find the new split position, if any.
+    let new_split_pos = if let (Some(a), Some(b)) = (prev, next) {
+        if a == l.len() {
+            // We're on a graphem boundary, don't need to do anything
+            return;
+        }
+        if a == 0 {
+            b
+        } else if b == tot_len {
+            a
+        } else if l.len() > r.len() {
+            a
+        } else {
+            b
+        }
+    } else if let Some(a) = prev {
+        if a == l.len() {
+            return;
+        }
+        a
+    } else if let Some(b) = next {
+        b
+    } else {
+        unreachable!()
+    };
+
+    // Move the bytes to create the new split
+    if new_split_pos < l.len() {
+        r.insert_str(0, &l[new_split_pos..]);
+        l.truncate(new_split_pos);
+    } else {
+        let pos = new_split_pos - l.len();
+        l.push_str(&r[..pos]);
+        r.truncate_front(pos);
+    }
+}
+
+//===========================================================================
 
 #[derive(Copy, Clone)]
 pub(crate) struct BackingArray([u8; MAX_BYTES]);
@@ -762,7 +874,7 @@ unsafe impl Array for BackingArray {
     }
 }
 
-//=======================================================
+//===========================================================================
 
 #[cfg(test)]
 mod tests {
