@@ -776,11 +776,7 @@ mod tests {
 
     #[test]
     fn line_to_byte_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         assert_eq!(3, r.root.line_break_count());
         assert_eq!(0, r.line_to_byte(0));
@@ -791,11 +787,7 @@ mod tests {
 
     #[test]
     fn line_to_char_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         assert_eq!(3, r.root.line_break_count());
         assert_eq!(0, r.line_to_char(0));

@@ -123,13 +123,9 @@ mod tests {
 
     #[test]
     fn slice_01() {
-        let mut r = Rope::new();
         let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
                     Aren't you glad we're alive?";
-
-        for c in text.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(text);
 
         let s = r.slice(0, r.len_chars());
 
@@ -138,13 +134,9 @@ mod tests {
 
     #[test]
     fn slice_02() {
-        let mut r = Rope::new();
         let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
                     Aren't you glad we're alive?";
-
-        for c in text.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(text);
 
         let s = r.slice(5, 21);
 

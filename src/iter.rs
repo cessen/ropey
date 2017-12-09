@@ -400,12 +400,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn bytes_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
-
+        let r = Rope::from_str(TEXT);
         for (br, bt) in r.bytes().zip(TEXT.bytes()) {
             assert_eq!(br, bt);
         }
@@ -413,12 +408,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn chars_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
-
+        let r = Rope::from_str(TEXT);
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
             assert_eq!(cr, ct);
         }
@@ -426,12 +416,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn graphemes_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
-
+        let r = Rope::from_str(TEXT);
         for (gr, gt) in r.graphemes().zip(
             UnicodeSegmentation::graphemes(TEXT, true),
         )
@@ -442,11 +427,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn lines_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         assert_eq!(34, r.lines().count());
 
@@ -474,11 +455,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
     #[test]
     fn lines_02() {
         let text = "Hello there!\nHow goes it?";
-        let mut r = Rope::new();
-
-        for c in text.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(text);
 
         assert_eq!(2, r.lines().count());
 
@@ -490,11 +467,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn chunks_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         let mut idx = 0;
         for chunk in r.chunks() {
@@ -505,11 +478,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn bytes_sliced_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         let s_start = 116;
         let s_end = 331;
@@ -526,11 +495,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn chars_sliced_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         let s_start = 116;
         let s_end = 331;
@@ -547,11 +512,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn graphemes_sliced_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         let s_start = 116;
         let s_end = 331;
@@ -569,11 +530,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
     #[test]
     fn graphemes_sliced_02() {
         let text = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n";
-        let mut r = Rope::new();
-
-        for c in text.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(text);
 
         let s1 = r.slice(5, 11);
         let s2 = &text[5..11];
@@ -587,11 +544,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn lines_sliced_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         let s_start = 116;
         let s_end = 331;
@@ -608,11 +561,7 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
     #[test]
     fn chunks_sliced_01() {
-        let mut r = Rope::new();
-
-        for c in TEXT.chars().rev() {
-            r.insert(0, &c.to_string());
-        }
+        let r = Rope::from_str(TEXT);
 
         let s_start = 116;
         let s_end = 331;
