@@ -119,53 +119,107 @@ pub fn split_string_at_char<B: Array<Item = u8>>(
     s1.split_off(split_pos)
 }
 
-
-/// Splits a string at the byte index given, or if the byte given is not at a
-/// grapheme boundary, then at the closest grapheme boundary that isn't the
-/// start or end of the string.  The left part of the split remains in the
-/// given string, and the right part is returned as a new string.
-///
-/// Note that because this only splits at grapheme boundaries, it is not
-/// guaranteed to split at the exact byte given.  Indeed, depending on the
-/// string and byte index given, it may not split at all.  Be aware of this!
-pub fn split_string_near_byte<B: Array<Item = u8>>(
-    s: &mut SmallString<B>,
-    byte_idx: usize,
-) -> SmallString<B> {
-    let split_idx = nearest_grapheme_boundary(s, byte_idx);
-    return s.split_off(split_idx);
-}
-
-/// Finds the nearest grapheme boundary near the given byte.
-///
-/// This avoids the left and right boundaries of the given text,
-/// unless the given bytes is exactly there already.
-pub fn nearest_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
+/// Returns whether the given byte boundary in the text is a grapheme cluster
+/// boundary or not.
+pub fn is_grapheme_boundary(text: &str, byte_idx: usize) -> bool {
     // Bounds check
     assert!(byte_idx <= text.len());
 
-    // Handle some corner-cases ahead of time, to simplify the logic below
-    if byte_idx == text.len() || text.len() == 0 {
-        return text.len();
+    if byte_idx == 0 || byte_idx == text.len() {
+        // True if we're on the edge of the text
+        true
+    } else if !text.is_char_boundary(byte_idx) {
+        // False if we're not even on a codepoint boundary
+        false
+    } else {
+        // Full check
+        GraphemeCursor::new(byte_idx, text.len(), true)
+            .is_boundary(text, 0)
+            .unwrap()
     }
+}
+
+/// Returns the grapheme cluster boundary before (but not including) the given
+/// byte boundary.
+///
+/// This will return back the passed byte boundary if it is at the start of
+/// the string.
+pub fn prev_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
+    // Bounds check
+    assert!(byte_idx <= text.len());
+
+    // Early out
     if byte_idx == 0 {
-        return 0;
+        return byte_idx;
     }
 
     // Find codepoint boundary
-    let mut boundry_idx = byte_idx;
-    while !text.is_char_boundary(boundry_idx) {
-        boundry_idx -= 1;
+    let mut boundary_idx = byte_idx;
+    while !text.is_char_boundary(boundary_idx) {
+        boundary_idx -= 1;
+    }
+
+    // Find the next grapheme cluster boundary
+    let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
+    if boundary_idx < byte_idx && gc.is_boundary(text, 0).unwrap() {
+        return boundary_idx;
+    } else {
+        return gc.prev_boundary(text, 0).unwrap().unwrap();
+    }
+}
+
+/// Returns the grapheme cluster boundary after (but not including) the given
+/// byte boundary.
+///
+/// This will return back the passed byte boundary if it is at the end of
+/// the string.
+pub fn next_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
+    // Bounds check
+    assert!(byte_idx <= text.len());
+
+    // Early out
+    if byte_idx == text.len() {
+        return byte_idx;
+    }
+
+    // Find codepoint boundary
+    let mut boundary_idx = byte_idx;
+    while !text.is_char_boundary(boundary_idx) {
+        boundary_idx += 1;
+    }
+
+    // Find the next grapheme cluster boundary
+    let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
+    if byte_idx < boundary_idx && gc.is_boundary(text, 0).unwrap() {
+        return boundary_idx;
+    } else {
+        return gc.next_boundary(text, 0).unwrap().unwrap();
+    }
+}
+
+/// Finds the nearest grapheme boundary near the given byte that is
+/// not the left or right edge of the text.
+///
+/// There is only one circumstance where the left or right edge will
+/// be returned: if the entire text is a single grapheme cluster,
+/// then the right edge of the text is returned.
+pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
+    // Bounds check
+    assert!(byte_idx <= text.len());
+
+    // Find codepoint boundary
+    let mut boundary_idx = byte_idx;
+    while !text.is_char_boundary(boundary_idx) {
+        boundary_idx -= 1;
     }
 
     // Find the two nearest grapheme boundaries
-    let mut gc = GraphemeCursor::new(boundry_idx, text.len(), true);
+    let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
     let next = gc.next_boundary(text, 0).unwrap().unwrap_or(text.len());
     let prev = gc.prev_boundary(text, 0).unwrap().unwrap_or(0);
 
-    // Check if the specified position is on a boundary, and return it
-    // if it is
-    if prev == byte_idx {
+    // If the given byte was already on an internal grapheme boundary
+    if prev == byte_idx && byte_idx != 0 {
         return byte_idx;
     }
 
@@ -313,72 +367,51 @@ impl<'a> Iterator for LineBreakIter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use small_string::SmallString;
-    use node::BackingArray;
     use super::*;
 
     #[test]
-    fn split_near_byte_01() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!");
-        let s2 = split_string_near_byte(&mut s1, 0);
-        assert_eq!("", s1);
-        assert_eq!("Hello world!", s2);
+    fn nearest_internal_grapheme_boundary_01() {
+        let text = "Hello world!";
+        assert_eq!(1, nearest_internal_grapheme_boundary(text, 0));
+        assert_eq!(6, nearest_internal_grapheme_boundary(text, 6));
+        assert_eq!(11, nearest_internal_grapheme_boundary(text, 12));
     }
 
     #[test]
-    fn split_near_byte_02() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!");
-        let s2 = split_string_near_byte(&mut s1, 12);
-        assert_eq!("Hello world!", s1);
-        assert_eq!("", s2);
+    fn nearest_internal_grapheme_boundary_02() {
+        let text = "Hello\r\n world!";
+        assert_eq!(5, nearest_internal_grapheme_boundary(text, 5));
+        assert_eq!(7, nearest_internal_grapheme_boundary(text, 6));
+        assert_eq!(7, nearest_internal_grapheme_boundary(text, 7));
     }
 
     #[test]
-    fn split_near_byte_03() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!");
-        let s2 = split_string_near_byte(&mut s1, 6);
-        assert_eq!("Hello ", s1);
-        assert_eq!("world!", s2);
+    fn nearest_internal_grapheme_boundary_03() {
+        let text = "\r\nHello world!\r\n";
+        assert_eq!(2, nearest_internal_grapheme_boundary(text, 0));
+        assert_eq!(2, nearest_internal_grapheme_boundary(text, 1));
+        assert_eq!(2, nearest_internal_grapheme_boundary(text, 2));
+        assert_eq!(14, nearest_internal_grapheme_boundary(text, 14));
+        assert_eq!(14, nearest_internal_grapheme_boundary(text, 15));
+        assert_eq!(14, nearest_internal_grapheme_boundary(text, 16));
     }
 
     #[test]
-    fn split_near_byte_04() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello\r\n world!");
-        let s2 = split_string_near_byte(&mut s1, 5);
-        assert_eq!("Hello", s1);
-        assert_eq!("\r\n world!", s2);
+    fn nearest_internal_grapheme_boundary_04() {
+        let text = "\r\n";
+        assert_eq!(2, nearest_internal_grapheme_boundary(text, 0));
+        assert_eq!(2, nearest_internal_grapheme_boundary(text, 1));
+        assert_eq!(2, nearest_internal_grapheme_boundary(text, 2));
     }
 
     #[test]
-    fn split_near_byte_05() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello\r\n world!");
-        let s2 = split_string_near_byte(&mut s1, 6);
-        assert_eq!("Hello\r\n", s1);
-        assert_eq!(" world!", s2);
-    }
+    fn is_grapheme_boundary_01() {
+        let text = "\n\r\n\r\n\r\n\r\n\r\n\r";
 
-    #[test]
-    fn split_near_byte_06() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello\r\n world!");
-        let s2 = split_string_near_byte(&mut s1, 7);
-        assert_eq!("Hello\r\n", s1);
-        assert_eq!(" world!", s2);
-    }
-
-    #[test]
-    fn split_near_byte_07() {
-        let mut s1 = SmallString::<BackingArray>::from_str("Hello world!\r\n");
-        let s2 = split_string_near_byte(&mut s1, 13);
-        assert_eq!("Hello world!", s1);
-        assert_eq!("\r\n", s2);
-    }
-
-    #[test]
-    fn split_near_byte_08() {
-        let mut s1 = SmallString::<BackingArray>::from_str("\r\n");
-        let s2 = split_string_near_byte(&mut s1, 1);
-        assert_eq!("\r\n", s1);
-        assert_eq!("", s2);
+        assert!(is_grapheme_boundary(text, 0));
+        assert!(is_grapheme_boundary(text, 12));
+        assert!(is_grapheme_boundary(text, 3));
+        assert!(!is_grapheme_boundary(text, 6));
     }
 
     #[test]

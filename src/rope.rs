@@ -74,9 +74,25 @@ impl Rope {
 
     /// Returns whether the given char index is a grapheme cluster
     /// boundary or not.
-    pub fn is_grapheme_boundary(&self, char_idx: usize) -> usize {
-        let _ = char_idx;
-        unimplemented!()
+    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
+        self.root.is_grapheme_boundary(char_idx)
+    }
+
+    /// Returns the previous grapheme cluster boundary to the left of
+    /// the given char index (excluding the given char index itself).
+    ///
+    /// If `char_idx` is at the beginning of the rope, returns 0.
+    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
+        self.root.prev_grapheme_boundary(char_idx)
+    }
+
+    /// Returns the next grapheme cluster boundary to the right of
+    /// the given char index (excluding the given char index itself).
+    ///
+    /// If `char_idx` is at the end of the rope, returns the end
+    /// position.
+    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
+        self.root.next_grapheme_boundary(char_idx)
     }
 
     /// Returns an immutable slice of the Rope in the char range `start..end`.

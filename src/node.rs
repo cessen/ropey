@@ -11,17 +11,18 @@ use slice::RopeSlice;
 use small_string::SmallString;
 use small_string_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                          char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
-                         split_string_near_byte, nearest_grapheme_boundary, fix_grapheme_seam};
+                         is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
+                         nearest_internal_grapheme_boundary, fix_grapheme_seam};
 use text_info::{TextInfo, TextInfoArray, Count};
 
 
 // Internal node min/max values.
 const MAX_CHILDREN: usize = 16;
-const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
+const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 // Leaf node min/max values.
 const MAX_BYTES: usize = 334;
-const MIN_BYTES: usize = MAX_BYTES / 2;
+const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 
 #[derive(Debug, Clone)]
@@ -40,8 +41,6 @@ impl Node {
     }
 
     pub(crate) fn from_str(text: &str) -> Node {
-        const CHUNK_SIZE: usize = (MAX_BYTES * 9) / 10;
-
         // We keep a stack of the right-most nodes
         // down the edge of the rope tree.  This allows
         // us to process everything without recursion.
@@ -55,13 +54,16 @@ impl Node {
         let mut text = text;
         while text.len() > 0 {
             // Calculate split point
-            let split_idx = if text.len() > (CHUNK_SIZE * 2) {
-                nearest_grapheme_boundary(text, CHUNK_SIZE)
-            } else if text.len() < MAX_BYTES {
-                text.len()
+            let split_idx = if text.len() > MAX_BYTES {
+                if is_grapheme_boundary(text, MAX_BYTES) {
+                    MAX_BYTES
+                } else {
+                    let prev = prev_grapheme_boundary(text, MAX_BYTES);
+                    let next = next_grapheme_boundary(text, MAX_BYTES);
+                    if prev > 0 { prev } else { next }
+                }
             } else {
-                let tmp = text.len() / 2;
-                nearest_grapheme_boundary(text, tmp)
+                text.len()
             };
 
             // Split text off of the left
@@ -339,6 +341,76 @@ impl Node {
         }
     }
 
+    /// Returns whether the given char index is a grapheme cluster
+    /// boundary or not.
+    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
+        let (chunk, offset) = self.get_chunk_at_char(char_idx);
+        let byte_idx = char_idx_to_byte_idx(chunk, offset);
+
+        is_grapheme_boundary(chunk, byte_idx)
+    }
+
+    /// Returns the previous grapheme cluster boundary to the left of
+    /// the given char index (excluding the given char index itself).
+    ///
+    /// If `char_idx` is at the beginning of the rope, returns 0.
+    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
+        // Take care of special case
+        if char_idx == 0 {
+            return 0;
+        }
+
+        let (chunk, offset) = self.get_chunk_at_char(char_idx);
+        let byte_idx = char_idx_to_byte_idx(chunk, offset);
+        if byte_idx == 0 {
+            if char_idx == 1 {
+                // Weird special-case: if the previous chunk is only
+                // one char long and is also the first chunk of the
+                // rope.
+                return 0;
+            } else {
+                let (chunk, _) = self.get_chunk_at_char(char_idx - 1);
+                let prev_byte_idx = prev_grapheme_boundary(chunk, chunk.len());
+                return char_idx - (&chunk[prev_byte_idx..]).chars().count();
+            }
+        } else {
+            let prev_byte_idx = prev_grapheme_boundary(chunk, byte_idx);
+            return char_idx - (&chunk[prev_byte_idx..byte_idx]).chars().count();
+        }
+    }
+
+    /// Returns the next grapheme cluster boundary to the right of
+    /// the given char index (excluding the given char index itself).
+    ///
+    /// If `char_idx` is at the end of the rope, returns the end
+    /// position.
+    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
+        let end_char_idx = self.text_info().chars as usize;
+
+        // Take care of special case
+        if char_idx == end_char_idx {
+            return end_char_idx;
+        }
+
+        let (chunk, offset) = self.get_chunk_at_char(char_idx);
+        let byte_idx = char_idx_to_byte_idx(chunk, offset);
+        if byte_idx == chunk.len() {
+            if char_idx == end_char_idx - 1 {
+                // Weird special-case: if the next chunk is only
+                // one char long and is also the last chunk of the
+                // rope.
+                return end_char_idx;
+            } else {
+                let (chunk, _) = self.get_chunk_at_char(char_idx + 1);
+                let next_byte_idx = next_grapheme_boundary(chunk, 0);
+                return char_idx + (&chunk[..next_byte_idx]).chars().count();
+            }
+        } else {
+            let next_byte_idx = next_grapheme_boundary(chunk, byte_idx);
+            return char_idx + (&chunk[byte_idx..next_byte_idx]).chars().count();
+        };
+    }
+
     /// Returns an immutable slice of the Rope in the char range `start..end`.
     pub(crate) fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
         RopeSlice::new_with_range(self, start, end)
@@ -387,8 +459,11 @@ impl Node {
                 if cur_text.len() <= MAX_BYTES {
                     return (None, seam);
                 } else {
-                    let split_pos = cur_text.len() - (cur_text.len() / 2);
-                    let right_text = split_string_near_byte(cur_text, split_pos);
+                    let split_pos = {
+                        let pos = cur_text.len() - (cur_text.len() / 2);
+                        nearest_internal_grapheme_boundary(&cur_text, pos)
+                    };
+                    let right_text = cur_text.split_off(split_pos);
                     if right_text.len() > 0 {
                         cur_text.shrink_to_fit();
                         return (Some(Node::Leaf(right_text)), seam);
@@ -454,6 +529,38 @@ impl Node {
             children.len()
         } else {
             panic!()
+        }
+    }
+
+    /// Returns the chunk that contains the given byte, and the byte's
+    /// byte-offset within the chunk.
+    fn get_chunk_at_byte<'a>(&'a self, byte_idx: usize) -> (&'a str, usize) {
+        match self {
+            &Node::Empty => ("", 0),
+            &Node::Leaf(ref text) => (text, byte_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| byte_idx as Count <= inf.bytes);
+                children[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
+            }
+        }
+    }
+
+    /// Returns the chunk that contains the given char, and the chars's
+    /// char-offset within the chunk.
+    fn get_chunk_at_char<'a>(&'a self, char_idx: usize) -> (&'a str, usize) {
+        match self {
+            &Node::Empty => ("", 0),
+            &Node::Leaf(ref text) => (text, char_idx),
+            &Node::Internal {
+                ref info,
+                ref children,
+            } => {
+                let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
+                children[child_i].get_chunk_at_char(char_idx - acc_info.chars as usize)
+            }
         }
     }
 
@@ -661,6 +768,7 @@ unsafe impl Array for BackingArray {
 mod tests {
     use rope::Rope;
 
+    // 133 chars, 209 bytes
     const TEXT: &str = "\r\nHello there!  How're you doing?  It's a fine day, \
                         isn't it?  Aren't you glad we're alive?\r\n\
                         こんにちは！元気ですか？日はいいですね。\
@@ -694,5 +802,50 @@ mod tests {
         assert_eq!(2, r.line_to_char(1));
         assert_eq!(93, r.line_to_char(2));
         assert_eq!(133, r.line_to_char(3));
+    }
+
+    #[test]
+    fn is_grapheme_boundary_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert!(r.is_grapheme_boundary(0));
+        assert!(r.is_grapheme_boundary(133));
+        assert!(r.is_grapheme_boundary(91));
+        assert!(r.is_grapheme_boundary(93));
+        assert!(r.is_grapheme_boundary(125));
+
+        assert!(!r.is_grapheme_boundary(1));
+        assert!(!r.is_grapheme_boundary(132));
+        assert!(!r.is_grapheme_boundary(92));
+    }
+
+    #[test]
+    fn prev_grapheme_boundary_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(0, r.prev_grapheme_boundary(0));
+        assert_eq!(131, r.prev_grapheme_boundary(133));
+        assert_eq!(90, r.prev_grapheme_boundary(91));
+        assert_eq!(91, r.prev_grapheme_boundary(93));
+        assert_eq!(124, r.prev_grapheme_boundary(125));
+
+        assert_eq!(0, r.prev_grapheme_boundary(1));
+        assert_eq!(131, r.prev_grapheme_boundary(132));
+        assert_eq!(91, r.prev_grapheme_boundary(92));
+    }
+
+    #[test]
+    fn next_grapheme_boundary_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(2, r.next_grapheme_boundary(0));
+        assert_eq!(133, r.next_grapheme_boundary(133));
+        assert_eq!(93, r.next_grapheme_boundary(91));
+        assert_eq!(94, r.next_grapheme_boundary(93));
+        assert_eq!(126, r.next_grapheme_boundary(125));
+
+        assert_eq!(2, r.next_grapheme_boundary(1));
+        assert_eq!(133, r.next_grapheme_boundary(132));
+        assert_eq!(93, r.next_grapheme_boundary(92));
     }
 }
