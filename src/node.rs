@@ -476,6 +476,22 @@ impl Node {
         }
     }
 
+    /// Debugging tool to make sure that all branches of the tree are
+    /// at the same depth.
+    pub(crate) fn verify_balanced(&self) -> usize {
+        match self {
+            &Node::Empty => 1,
+            &Node::Leaf(_) => 1,
+            &Node::Internal { ref children, .. } => {
+                let first_depth = children[0].verify_balanced();
+                for child in &children[1..] {
+                    assert_eq!(child.verify_balanced(), first_depth);
+                }
+                first_depth + 1
+            }
+        }
+    }
+
     /// Checks to make sure that a boundary between leaf nodes (given as a byte
     /// position in the rope) doesn't split a grapheme, and fixes it if it does.
     ///
