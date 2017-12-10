@@ -93,27 +93,26 @@ impl Node {
                     let mut stack_idx = (stack.len() - 1) as isize;
                     loop {
                         if stack_idx < 0 {
+                            // We're above the root, so do a root split.
                             let mut children = ChildArray::new();
                             children.push((left.text_info(), Arc::new(left)));
                             stack.push_front(Node::Internal(children));
                             break;
                         } else if stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
-                            if let Node::Internal(ref mut children) = stack[stack_idx as usize] {
-                                children.push((left.text_info(), Arc::new(left)));
-                                break;
-                            } else {
-                                unreachable!()
-                            }
+                            // There's room to add a child, so do that.
+                            stack[stack_idx as usize].children().push((
+                                left.text_info(),
+                                Arc::new(left),
+                            ));
+                            break;
                         } else {
-                            let r_children = if let Node::Internal(ref mut children) =
-                                stack[stack_idx as usize]
-                            {
-                                children.push_split((left.text_info(), Arc::new(left)))
-                            } else {
-                                unreachable!()
-                            };
-                            left = Node::Internal(r_children);
-                            std::mem::swap(&mut stack[stack_idx as usize], &mut left);
+                            // Not enough room to fit a child, so split.
+                            left =
+                                Node::Internal(stack[stack_idx as usize].children().push_split((
+                                    left.text_info(),
+                                    Arc::new(left),
+                                )));
+                            std::mem::swap(&mut left, &mut stack[stack_idx as usize]);
                             stack_idx -= 1;
                         }
                     }
@@ -458,6 +457,13 @@ impl Node {
             children.len()
         } else {
             panic!()
+        }
+    }
+
+    fn children(&mut self) -> &mut ChildArray {
+        match self {
+            &mut Node::Internal(ref mut children) => children,
+            _ => panic!(),
         }
     }
 
