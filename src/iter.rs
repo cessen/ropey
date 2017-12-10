@@ -295,14 +295,11 @@ impl<'a> Iterator for RopeChunks<'a> {
                     return Some(&text[start_byte..end_byte]);
                 }
 
-                Some(&Node::Internal {
-                         ref info,
-                         ref children,
-                     }) => {
+                Some(&Node::Internal(ref children)) => {
                     // Find the first child that isn't before `self.start`,
                     // updating `self.idx` as we go.
                     let mut child_i = 0;
-                    for inf in info.iter() {
+                    for inf in children.info().iter() {
                         if (self.idx + inf.bytes as usize) > self.start {
                             break;
                         } else {
@@ -311,7 +308,7 @@ impl<'a> Iterator for RopeChunks<'a> {
                         }
                     }
                     // Push relevant children to the stack.
-                    for child in (&children[child_i..]).iter().rev() {
+                    for child in (&children.nodes()[child_i..]).iter().rev() {
                         self.node_stack.push(child);
                     }
                 }

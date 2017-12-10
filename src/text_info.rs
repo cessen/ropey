@@ -34,26 +34,3 @@ impl TextInfo {
         }
     }
 }
-
-pub(crate) trait TextInfoArray {
-    fn combine(&self) -> TextInfo;
-    fn search_combine<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo);
-}
-
-impl TextInfoArray for [TextInfo] {
-    fn combine(&self) -> TextInfo {
-        self.iter().fold(TextInfo::new(), |a, b| a.combine(b))
-    }
-
-    fn search_combine<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo) {
-        let mut accum = TextInfo::new();
-        for (idx, inf) in self.iter().enumerate() {
-            if pred(&accum.combine(inf)) {
-                return (idx, accum);
-            } else {
-                accum = accum.combine(inf);
-            }
-        }
-        panic!("Predicate is mal-formed and never evaluated true.")
-    }
-}

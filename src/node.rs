@@ -4,7 +4,7 @@ use std;
 use std::sync::Arc;
 use std::collections::VecDeque;
 
-use arrayvec::ArrayVec;
+use child_array::ChildArray;
 use smallvec::Array;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
@@ -14,15 +14,15 @@ use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx
                 char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
                 is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
                 nearest_internal_grapheme_boundary};
-use text_info::{TextInfo, TextInfoArray, Count};
+use text_info::{TextInfo, Count};
 
 
 // Internal node min/max values.
-const MAX_CHILDREN: usize = 16;
+pub(crate) const MAX_CHILDREN: usize = 17;
 const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 // Leaf node min/max values.
-const MAX_BYTES: usize = 334;
+const MAX_BYTES: usize = 335;
 const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 
@@ -30,10 +30,7 @@ const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 pub(crate) enum Node {
     Empty,
     Leaf(SmallString<BackingArray>),
-    Internal {
-        info: ArrayVec<[TextInfo; MAX_CHILDREN]>,
-        children: ArrayVec<[Arc<Node>; MAX_CHILDREN]>,
-    },
+    Internal(ChildArray),
 }
 
 impl Node {
@@ -71,6 +68,7 @@ impl Node {
             let leaf_text = &text[..split_idx];
             text = &text[split_idx..];
 
+
             // Append the text as a leaf node, balancing the tree
             // appropriately as we go.
             let last = stack.pop_back().unwrap();
@@ -82,88 +80,50 @@ impl Node {
                 Node::Leaf(_) => {
                     let right = Node::Leaf(SmallString::from_str(leaf_text));
 
-                    let mut info = ArrayVec::new();
-                    let mut children = ArrayVec::new();
-                    info.push(last.text_info());
-                    info.push(right.text_info());
-                    children.push(Arc::new(last));
-                    children.push(Arc::new(right));
+                    let mut children = ChildArray::new();
+                    children.push((last.text_info(), Arc::new(last)));
+                    children.push((right.text_info(), Arc::new(right)));
 
-                    stack.push_back(Node::Internal {
-                        info: info,
-                        children: children,
-                    });
+                    stack.push_back(Node::Internal(children));
                 }
 
-                Node::Internal {
-                    mut info,
-                    mut children,
-                } => {
+                Node::Internal(mut children) => {
                     if children.len() < (MAX_CHILDREN - 1) {
                         let right = Node::Leaf(SmallString::from_str(leaf_text));
-                        info.push(right.text_info());
-                        children.push(Arc::new(right));
-                        stack.push_back(Node::Internal {
-                            info: info,
-                            children: children,
-                        });
+                        children.push((right.text_info(), Arc::new(right)));
+                        stack.push_back(Node::Internal(children));
                     } else {
                         let leaf = Node::Leaf(SmallString::from_str(leaf_text));
-                        let r_info = push_split_arrayvec(&mut info, leaf.text_info());
-                        let r_children = push_split_arrayvec(&mut children, Arc::new(leaf));
-                        stack.push_back(Node::Internal {
-                            info: r_info,
-                            children: r_children,
-                        });
+                        let r_children = children.push_split((leaf.text_info(), Arc::new(leaf)));
+                        stack.push_back(Node::Internal(r_children));
 
-                        let mut left = Node::Internal {
-                            info: info,
-                            children: children,
-                        };
+                        let mut left = Node::Internal(children);
                         let mut stack_idx = stack.len() - 1;
                         loop {
                             if stack_idx >= 1 {
                                 if stack[stack_idx - 1].child_count() < (MAX_CHILDREN - 1) {
-                                    if let Node::Internal {
-                                        ref mut info,
-                                        ref mut children,
-                                    } = stack[stack_idx - 1]
-                                    {
-                                        info.push(left.text_info());
-                                        children.push(Arc::new(left));
+                                    if let Node::Internal(ref mut children) = stack[stack_idx - 1] {
+                                        children.push((left.text_info(), Arc::new(left)));
                                         break;
                                     } else {
                                         unreachable!()
                                     }
                                 } else {
-                                    let (r_info, r_children) = if let Node::Internal {
-                                        ref mut info,
-                                        ref mut children,
-                                    } = stack[stack_idx - 1]
+                                    let r_children = if let Node::Internal(ref mut children) =
+                                        stack[stack_idx - 1]
                                     {
-                                        let r_info = push_split_arrayvec(info, left.text_info());
-                                        let r_children =
-                                            push_split_arrayvec(children, Arc::new(left));
-                                        (r_info, r_children)
+                                        children.push_split((left.text_info(), Arc::new(left)))
                                     } else {
                                         unreachable!()
                                     };
-                                    left = Node::Internal {
-                                        info: r_info,
-                                        children: r_children,
-                                    };
+                                    left = Node::Internal(r_children);
                                     std::mem::swap(&mut stack[stack_idx - 1], &mut left);
                                     stack_idx -= 1;
                                 }
                             } else {
-                                let mut info = ArrayVec::new();
-                                let mut children = ArrayVec::new();
-                                info.push(left.text_info());
-                                children.push(Arc::new(left));
-                                stack.push_front(Node::Internal {
-                                    info: info,
-                                    children: children,
-                                });
+                                let mut children = ChildArray::new();
+                                children.push((left.text_info(), Arc::new(left)));
+                                stack.push_front(Node::Internal(children));
                                 break;
                             }
                         }
@@ -176,13 +136,8 @@ impl Node {
         let mut stack_idx = stack.len() - 1;
         while stack_idx >= 1 {
             let node = stack.pop_back().unwrap();
-            if let Node::Internal {
-                ref mut info,
-                ref mut children,
-            } = stack[stack_idx - 1]
-            {
-                info.push(node.text_info());
-                children.push(Arc::new(node));
+            if let Node::Internal(ref mut children) = stack[stack_idx - 1] {
+                children.push((node.text_info(), Arc::new(node)));
             } else {
                 unreachable!();
             }
@@ -213,21 +168,21 @@ impl Node {
         match self {
             &Node::Empty => 0,
             &Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| byte_idx as Count <= inf.bytes);
+            &Node::Internal(ref children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
 
                 // Shortcuts
                 if byte_idx == 0 {
                     return 0;
-                } else if byte_idx == acc_info.bytes as usize + info[child_i].bytes as usize {
-                    return acc_info.chars as usize + info[child_i].chars as usize;
+                } else if byte_idx ==
+                           acc_info.bytes as usize + children.info()[child_i].bytes as usize
+                {
+                    return acc_info.chars as usize + children.info()[child_i].chars as usize;
                 }
 
                 acc_info.chars as usize +
-                    children[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
+                    children.nodes()[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
             }
         }
     }
@@ -237,23 +192,22 @@ impl Node {
         match self {
             &Node::Empty => 0,
             &Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| byte_idx as Count <= inf.bytes);
+            &Node::Internal(ref children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
 
                 // Shortcuts
                 if byte_idx == 0 {
                     return 0;
                 } else if byte_idx ==
-                           acc_info.line_breaks as usize + info[child_i].line_breaks as usize
+                           acc_info.bytes as usize + children.info()[child_i].bytes as usize
                 {
-                    return acc_info.line_breaks as usize + info[child_i].line_breaks as usize;
+                    return acc_info.line_breaks as usize +
+                        children.info()[child_i].line_breaks as usize;
                 }
 
                 acc_info.line_breaks as usize +
-                    children[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
+                    children.nodes()[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
             }
         }
     }
@@ -263,21 +217,21 @@ impl Node {
         match self {
             &Node::Empty => 0,
             &Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
+            &Node::Internal(ref children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
 
                 // Shortcuts
                 if char_idx == 0 {
                     return 0;
-                } else if char_idx == acc_info.chars as usize + info[child_i].chars as usize {
-                    return acc_info.bytes as usize + info[child_i].bytes as usize;
+                } else if char_idx ==
+                           acc_info.chars as usize + children.info()[child_i].chars as usize
+                {
+                    return acc_info.bytes as usize + children.info()[child_i].bytes as usize;
                 }
 
                 acc_info.bytes as usize +
-                    children[child_i].char_to_byte(char_idx - acc_info.chars as usize)
+                    children.nodes()[child_i].char_to_byte(char_idx - acc_info.chars as usize)
             }
         }
     }
@@ -287,21 +241,22 @@ impl Node {
         match self {
             &Node::Empty => 0,
             &Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
+            &Node::Internal(ref children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
 
                 // Shortcuts
                 if char_idx == 0 {
                     return 0;
-                } else if char_idx == acc_info.chars as usize + info[child_i].chars as usize {
-                    return acc_info.line_breaks as usize + info[child_i].line_breaks as usize;
+                } else if char_idx ==
+                           acc_info.chars as usize + children.info()[child_i].chars as usize
+                {
+                    return acc_info.line_breaks as usize +
+                        children.info()[child_i].line_breaks as usize;
                 }
 
                 acc_info.line_breaks as usize +
-                    children[child_i].char_to_line(char_idx - acc_info.chars as usize)
+                    children.nodes()[child_i].char_to_line(char_idx - acc_info.chars as usize)
             }
         }
     }
@@ -311,15 +266,12 @@ impl Node {
         match self {
             &Node::Empty => 0,
             &Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
+            &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
-                    info.search_combine(|inf| line_idx as Count <= inf.line_breaks);
+                    children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
 
                 acc_info.bytes as usize +
-                    children[child_i].line_to_byte(line_idx - acc_info.line_breaks as usize)
+                    children.nodes()[child_i].line_to_byte(line_idx - acc_info.line_breaks as usize)
             }
         }
     }
@@ -329,15 +281,12 @@ impl Node {
         match self {
             &Node::Empty => 0,
             &Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
+            &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
-                    info.search_combine(|inf| line_idx as Count <= inf.line_breaks);
+                    children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
 
                 acc_info.chars as usize +
-                    children[child_i].line_to_char(line_idx - acc_info.line_breaks as usize)
+                    children.nodes()[child_i].line_to_char(line_idx - acc_info.line_breaks as usize)
             }
         }
     }
@@ -421,9 +370,7 @@ impl Node {
         match self {
             &Node::Empty => TextInfo::new(),
             &Node::Leaf(ref text) => TextInfo::from_str(text),
-            &Node::Internal { ref info, .. } => {
-                info.iter().fold(TextInfo::new(), |a, b| a.combine(b))
-            }
+            &Node::Internal(ref children) => children.combined_info(),
         }
     }
 
@@ -476,19 +423,17 @@ impl Node {
             }
 
             // If it's internal, things get a little more complicated
-            &mut Node::Internal {
-                ref mut info,
-                ref mut children,
-            } => {
+            &mut Node::Internal(ref mut children) => {
                 // Find the child to traverse into along with its starting char
                 // offset.
-                let (child_i, start_info) = info.search_combine(|inf| char_pos <= inf.chars);
+                let (child_i, start_info) =
+                    children.search_combine_info(|inf| char_pos <= inf.chars);
                 let start_char = start_info.chars;
 
                 // Navigate into the appropriate child
-                let (residual, child_seam) =
-                    Arc::make_mut(&mut children[child_i]).insert(char_pos - start_char, text);
-                info[child_i] = children[child_i].text_info();
+                let (residual, child_seam) = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                    .insert(char_pos - start_char, text);
+                children.info_mut()[child_i] = children.nodes()[child_i].text_info();
 
                 // Calculate the seam offset relative to this node
                 let seam = child_seam.map(|byte_pos| byte_pos + start_info.bytes);
@@ -497,23 +442,17 @@ impl Node {
                 if let Some(r_node) = residual {
                     // The new node will fit as a child of this node
                     if children.len() < MAX_CHILDREN {
-                        info.insert(child_i + 1, r_node.text_info());
-                        children.insert(child_i + 1, Arc::new(r_node));
+                        children.insert(child_i + 1, (r_node.text_info(), Arc::new(r_node)));
                         return (None, seam);
                     }
                     // The new node won't fit!  Must split.
                     else {
-                        let r_info = insert_split_arrayvec(info, r_node.text_info(), child_i + 1);
-                        let r_children =
-                            insert_split_arrayvec(children, Arc::new(r_node), child_i + 1);
-
-                        return (
-                            Some(Node::Internal {
-                                info: r_info,
-                                children: r_children,
-                            }),
-                            seam,
+                        let r_children = children.insert_split(
+                            child_i + 1,
+                            (r_node.text_info(), Arc::new(r_node)),
                         );
+
+                        return (Some(Node::Internal(r_children)), seam);
                     }
                 } else {
                     // No new node.  Easy.
@@ -526,7 +465,7 @@ impl Node {
     //-----------------------------------------
 
     fn child_count(&self) -> usize {
-        if let &Node::Internal { ref children, .. } = self {
+        if let &Node::Internal(ref children) = self {
             children.len()
         } else {
             panic!()
@@ -539,12 +478,10 @@ impl Node {
         match self {
             &Node::Empty => ("", 0),
             &Node::Leaf(ref text) => (text, byte_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| byte_idx as Count <= inf.bytes);
-                children[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
+            &Node::Internal(ref children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
+                children.nodes()[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
             }
         }
     }
@@ -555,12 +492,10 @@ impl Node {
         match self {
             &Node::Empty => ("", 0),
             &Node::Leaf(ref text) => (text, char_idx),
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                let (child_i, acc_info) = info.search_combine(|inf| char_idx as Count <= inf.chars);
-                children[child_i].get_chunk_at_char(char_idx - acc_info.chars as usize)
+            &Node::Internal(ref children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                children.nodes()[child_i].get_chunk_at_char(char_idx - acc_info.chars as usize)
             }
         }
     }
@@ -571,14 +506,10 @@ impl Node {
         match self {
             &Node::Empty => {}
             &Node::Leaf(_) => {}
-            &Node::Internal {
-                ref info,
-                ref children,
-            } => {
-                assert_eq!(info.len(), children.len());
-                for (inf, child) in info.iter().zip(children.iter()) {
-                    assert_eq!(*inf, child.text_info());
-                    child.verify_integrity();
+            &Node::Internal(ref children) => {
+                for (info, node) in children.iter() {
+                    assert_eq!(*info, node.text_info());
+                    node.verify_integrity();
                 }
             }
         }
@@ -590,10 +521,10 @@ impl Node {
         match self {
             &Node::Empty => 1,
             &Node::Leaf(_) => 1,
-            &Node::Internal { ref children, .. } => {
-                let first_depth = children[0].verify_balanced();
-                for child in &children[1..] {
-                    assert_eq!(child.verify_balanced(), first_depth);
+            &Node::Internal(ref children) => {
+                let first_depth = children.nodes()[0].verify_balanced();
+                for node in &children.nodes()[1..] {
+                    assert_eq!(node.verify_balanced(), first_depth);
                 }
                 first_depth + 1
             }
@@ -620,48 +551,54 @@ impl Node {
                 }
             }
 
-            &mut Node::Internal {
-                ref mut info,
-                ref mut children,
-            } => {
+            &mut Node::Internal(ref mut children) => {
                 if byte_pos == 0 {
                     // Special-case 1
-                    return Arc::make_mut(&mut children[0]).fix_grapheme_seam(byte_pos);
-                } else if byte_pos == info.combine().bytes {
+                    return Arc::make_mut(&mut children.nodes_mut()[0]).fix_grapheme_seam(byte_pos);
+                } else if byte_pos == children.combined_info().bytes {
                     // Special-case 2
-                    return Arc::make_mut(children.last_mut().unwrap())
-                        .fix_grapheme_seam(info.last().unwrap().bytes);
+                    let (info, nodes) = children.info_and_nodes_mut();
+                    return Arc::make_mut(nodes.last_mut().unwrap()).fix_grapheme_seam(
+                        info.last()
+                            .unwrap()
+                            .bytes,
+                    );
                 } else {
                     // Find the child to navigate into
-                    let (child_i, start_info) = info.search_combine(|inf| byte_pos <= inf.bytes);
+                    let (child_i, start_info) =
+                        children.search_combine_info(|inf| byte_pos <= inf.bytes);
                     let start_byte = start_info.bytes;
 
                     let pos_in_child = byte_pos - start_byte;
-                    let child_len = info[child_i].bytes;
+                    let child_len = children.info()[child_i].bytes;
 
                     if pos_in_child == 0 || pos_in_child == child_len {
                         // Left or right edge, get neighbor and fix seam
+                        let (info, nodes) = children.info_and_nodes_mut();
+
                         let ((split_l, split_r), child_l_i) = if pos_in_child == 0 {
-                            (children.split_at_mut(child_i), child_i - 1)
+                            (nodes.split_at_mut(child_i), child_i - 1)
                         } else {
-                            (children.split_at_mut(child_i + 1), child_i)
+                            (nodes.split_at_mut(child_i + 1), child_i)
                         };
+
                         let left_child = Arc::make_mut(split_l.last_mut().unwrap());
                         let right_child = Arc::make_mut(split_r.first_mut().unwrap());
                         fix_grapheme_seam(
                             left_child.fix_grapheme_seam(info[child_l_i].bytes).unwrap(),
                             right_child.fix_grapheme_seam(0).unwrap(),
                         );
+
                         left_child.fix_info_right();
                         right_child.fix_info_left();
                         info[child_l_i] = left_child.text_info();
                         info[child_l_i + 1] = right_child.text_info();
+
                         return None;
                     } else {
                         // Internal to child
-                        return Arc::make_mut(&mut children[child_i]).fix_grapheme_seam(
-                            pos_in_child,
-                        );
+                        return Arc::make_mut(&mut children.nodes_mut()[child_i])
+                            .fix_grapheme_seam(pos_in_child);
                     }
                 }
             }
@@ -673,13 +610,10 @@ impl Node {
         match self {
             &mut Node::Empty => {}
             &mut Node::Leaf(_) => {}
-            &mut Node::Internal {
-                ref mut info,
-                ref mut children,
-            } => {
-                let left = Arc::make_mut(children.first_mut().unwrap());
-                left.fix_info_left();
-                *info.first_mut().unwrap() = left.text_info();
+            &mut Node::Internal(ref mut children) => {
+                Arc::make_mut(children.nodes_mut().first_mut().unwrap()).fix_info_left();
+                *children.info_mut().first_mut().unwrap() =
+                    children.nodes().first().unwrap().text_info();
             }
         }
     }
@@ -689,62 +623,16 @@ impl Node {
         match self {
             &mut Node::Empty => {}
             &mut Node::Leaf(_) => {}
-            &mut Node::Internal {
-                ref mut info,
-                ref mut children,
-            } => {
-                let right = Arc::make_mut(children.last_mut().unwrap());
-                right.fix_info_right();
-                *info.last_mut().unwrap() = right.text_info();
+            &mut Node::Internal(ref mut children) => {
+                Arc::make_mut(children.nodes_mut().last_mut().unwrap()).fix_info_right();
+                *children.info_mut().last_mut().unwrap() =
+                    children.nodes().last().unwrap().text_info();
             }
         }
     }
 }
 
 //===========================================================================
-
-/// Pushes an element onto the end of an ArrayVec,
-/// and then splits it in half, returning the right
-/// half.
-///
-/// This works even when the given ArrayVec is full.
-pub fn push_split_arrayvec<T>(
-    v: &mut ArrayVec<[T; MAX_CHILDREN]>,
-    new_child: T,
-) -> ArrayVec<[T; MAX_CHILDREN]> {
-    let mut right = ArrayVec::new();
-
-    let r_count = (v.len() + 1) / 2;
-    let l_count = (v.len() + 1) - r_count;
-
-    for _ in l_count..v.len() {
-        right.push(v.remove(l_count));
-    }
-    right.push(new_child);
-
-    right
-}
-
-/// Inserts an element into an ArrayVec, and then splits
-/// it in half, returning the right half.
-///
-/// This works even when the given ArrayVec is full.
-pub fn insert_split_arrayvec<T>(
-    v: &mut ArrayVec<[T; MAX_CHILDREN]>,
-    new_child: T,
-    idx: usize,
-) -> ArrayVec<[T; MAX_CHILDREN]> {
-    assert!(v.len() > 0);
-    let extra = if idx < v.len() {
-        let extra = v.pop().unwrap();
-        v.insert(idx, new_child);
-        extra
-    } else {
-        new_child
-    };
-
-    push_split_arrayvec(v, extra)
-}
 
 /// Inserts the given text into the given string at the given char index.
 pub fn insert_at_char<B: Array<Item = u8>>(s: &mut SmallString<B>, text: &str, pos: usize) {

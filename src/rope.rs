@@ -3,7 +3,7 @@
 use std;
 use std::sync::Arc;
 
-use arrayvec::ArrayVec;
+use child_array::ChildArray;
 
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::Node;
@@ -147,18 +147,11 @@ impl Rope {
             let mut l_node = Node::Empty;
             std::mem::swap(&mut l_node, root);
 
-            let mut info = ArrayVec::new();
-            info.push(l_node.text_info());
-            info.push(r_node.text_info());
+            let mut children = ChildArray::new();
+            children.push((l_node.text_info(), Arc::new(l_node)));
+            children.push((r_node.text_info(), Arc::new(r_node)));
 
-            let mut children = ArrayVec::new();
-            children.push(Arc::new(l_node));
-            children.push(Arc::new(r_node));
-
-            *root = Node::Internal {
-                info: info,
-                children: children,
-            };
+            *root = Node::Internal(children);
         }
 
         // Handle seam, if any.

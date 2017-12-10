@@ -31,16 +31,13 @@ impl<'a> RopeSlice<'a> {
             match node as &Node {
                 &Node::Empty | &Node::Leaf(_) => break,
 
-                &Node::Internal {
-                    ref info,
-                    ref children,
-                } => {
+                &Node::Internal(ref children) => {
                     let mut start_char = 0;
-                    for (i, inf) in info.iter().enumerate() {
+                    for (i, inf) in children.info().iter().enumerate() {
                         if n_start >= start_char && n_end < (start_char + inf.chars as usize) {
                             n_start -= start_char;
                             n_end -= start_char;
-                            node = &children[i];
+                            node = &children.nodes()[i];
                             continue 'outer;
                         }
                         start_char += inf.chars as usize;

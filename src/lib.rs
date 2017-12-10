@@ -24,10 +24,10 @@
 //! - **Efficiency.**  All of the above is fast and minimizes memory usage.
 
 
-extern crate arrayvec;
 extern crate smallvec;
 extern crate unicode_segmentation;
 
+mod child_array;
 mod node;
 mod rope;
 mod small_string;
