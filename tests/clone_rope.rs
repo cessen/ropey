@@ -9,21 +9,32 @@ fn clone_rope() {
     let mut rope1 = Rope::from_str(TEXT);
     let mut rope2 = rope1.clone();
 
-    rope1.insert(54321, "Hello ");
+    // Do identical insertions into both ropes
+    rope1.insert(432, "Hello ");
     rope1.insert(2345, "world! ");
-    rope1.insert(96756, "How are ");
-    rope1.insert(206454, "you ");
-    rope1.insert(0, "doing?\r\n");
+    rope1.insert(5256, "How are ");
+    rope1.insert(53, "you ");
+    rope1.insert(768, "doing?\r\n");
 
-    rope2.insert(54321, "Hello ");
+    rope2.insert(432, "Hello ");
     rope2.insert(2345, "world! ");
-    rope2.insert(96756, "How are ");
-    rope2.insert(206454, "you ");
-    rope2.insert(0, "doing?\r\n");
+    rope2.insert(5256, "How are ");
+    rope2.insert(53, "you ");
+    rope2.insert(768, "doing?\r\n");
 
-    for (a, b) in Iterator::zip(rope1.chars(), rope2.chars()) {
-        assert_eq!(a, b);
-    }
+    // Make sure they match
+    let matches = Iterator::zip(rope1.chars(), rope2.chars())
+        .map(|(a, b)| a == b)
+        .fold(true, |acc, n| acc && n);
+    assert_eq!(matches, true);
+
+    // Insert something into the clone, and make sure they don't match
+    // afterwards.
+    rope2.insert(3891, "I'm doing fine, thanks!");
+    let matches = Iterator::zip(rope1.chars(), rope2.chars())
+        .map(|(a, b)| a == b)
+        .fold(true, |acc, n| acc && n);
+    assert_eq!(matches, false);
 }
 
 const TEXT: &str = "

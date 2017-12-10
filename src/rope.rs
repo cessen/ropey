@@ -211,6 +211,15 @@ impl Rope {
 
     /// Inserts the given text at char index `char_idx`.
     pub fn insert(&mut self, char_idx: usize, text: &str) {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        // Get root for mutation
         let root = Arc::make_mut(&mut self.root);
 
         // Do the insertion

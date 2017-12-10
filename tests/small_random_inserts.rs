@@ -10,7 +10,7 @@ fn small_random_inserts() {
     let mut tree = Rope::new();
 
     // Do a bunch of random incoherent inserts
-    for _ in 0..(1 << 12) {
+    for _ in 0..(1 << 10) {
         let len = tree.len_chars().max(1);
         tree.insert(rng.gen::<usize>() % len, "Hello ");
         tree.insert(rng.gen::<usize>() % len, "world! ");
