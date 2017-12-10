@@ -87,45 +87,34 @@ impl Node {
                     stack.push_back(Node::Internal(children));
                 }
 
-                Node::Internal(mut children) => {
-                    if children.len() < (MAX_CHILDREN - 1) {
-                        let right = Node::Leaf(SmallString::from_str(leaf_text));
-                        children.push((right.text_info(), Arc::new(right)));
-                        stack.push_back(Node::Internal(children));
-                    } else {
-                        let leaf = Node::Leaf(SmallString::from_str(leaf_text));
-                        let r_children = children.push_split((leaf.text_info(), Arc::new(leaf)));
-                        stack.push_back(Node::Internal(r_children));
-
-                        let mut left = Node::Internal(children);
-                        let mut stack_idx = stack.len() - 1;
-                        loop {
-                            if stack_idx >= 1 {
-                                if stack[stack_idx - 1].child_count() < (MAX_CHILDREN - 1) {
-                                    if let Node::Internal(ref mut children) = stack[stack_idx - 1] {
-                                        children.push((left.text_info(), Arc::new(left)));
-                                        break;
-                                    } else {
-                                        unreachable!()
-                                    }
-                                } else {
-                                    let r_children = if let Node::Internal(ref mut children) =
-                                        stack[stack_idx - 1]
-                                    {
-                                        children.push_split((left.text_info(), Arc::new(left)))
-                                    } else {
-                                        unreachable!()
-                                    };
-                                    left = Node::Internal(r_children);
-                                    std::mem::swap(&mut stack[stack_idx - 1], &mut left);
-                                    stack_idx -= 1;
-                                }
-                            } else {
-                                let mut children = ChildArray::new();
+                Node::Internal(children) => {
+                    stack.push_back(Node::Internal(children));
+                    let mut left = Node::Leaf(SmallString::from_str(leaf_text));
+                    let mut stack_idx = (stack.len() - 1) as isize;
+                    loop {
+                        if stack_idx < 0 {
+                            let mut children = ChildArray::new();
+                            children.push((left.text_info(), Arc::new(left)));
+                            stack.push_front(Node::Internal(children));
+                            break;
+                        } else if stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
+                            if let Node::Internal(ref mut children) = stack[stack_idx as usize] {
                                 children.push((left.text_info(), Arc::new(left)));
-                                stack.push_front(Node::Internal(children));
                                 break;
+                            } else {
+                                unreachable!()
                             }
+                        } else {
+                            let r_children = if let Node::Internal(ref mut children) =
+                                stack[stack_idx as usize]
+                            {
+                                children.push_split((left.text_info(), Arc::new(left)))
+                            } else {
+                                unreachable!()
+                            };
+                            left = Node::Internal(r_children);
+                            std::mem::swap(&mut stack[stack_idx as usize], &mut left);
+                            stack_idx -= 1;
                         }
                     }
                 }
