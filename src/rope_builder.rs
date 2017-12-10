@@ -33,7 +33,7 @@ impl RopeBuilder {
         RopeBuilder {
             stack: {
                 let mut stack = VecDeque::with_capacity(8);
-                stack.push_back(Node::Empty);
+                stack.push_back(Node::new());
                 stack
             },
             buffer: String::with_capacity(MAX_BYTES),
@@ -139,10 +139,6 @@ impl RopeBuilder {
     fn append_leaf_node(&mut self, leaf: Node) {
         let last = self.stack.pop_back().unwrap();
         match last {
-            Node::Empty => {
-                self.stack.push_back(leaf);
-            }
-
             Node::Leaf(_) => {
                 let mut children = ChildArray::new();
                 children.push((last.text_info(), Arc::new(last)));

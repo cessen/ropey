@@ -218,7 +218,7 @@ impl Rope {
 
         // Handle root splitting, if any.
         if let Some(r_node) = residual {
-            let mut l_node = Node::Empty;
+            let mut l_node = Node::new();
             std::mem::swap(&mut l_node, root);
 
             let mut children = ChildArray::new();
@@ -264,18 +264,16 @@ impl Rope {
         self.root.assert_integrity();
     }
 
-    /// Debugging tool to make sure that all branches of the tree are
-    /// at the same depth.
+    /// Debugging tool to make sure that all of the following invariants
+    /// hold true throughout the tree:
+    ///
+    /// - The tree is the same height everywhere.
+    /// - All internal nodes have the minimum number of children.
+    /// - All leaf nodes are non-empty.
+    /// - Graphemes are never split over chunk boundaries.
     #[doc(hidden)]
-    pub fn assert_balance(&self) {
-        self.root.assert_balance();
-    }
-
-    /// Debugging tool to make sure that graphemes aren't split across
-    /// chunks.
-    #[doc(hidden)]
-    pub fn assert_grapheme_seams(&self) {
-        self.root.assert_grapheme_seams();
+    pub fn assert_invariants(&self) {
+        self.root.assert_invariants(true);
     }
 }
 

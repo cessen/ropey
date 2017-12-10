@@ -26,14 +26,14 @@ const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
-    Empty,
     Leaf(SmallString<BackingArray>),
     Internal(ChildArray),
 }
 
 impl Node {
+    /// Creates an empty node.
     pub(crate) fn new() -> Node {
-        Node::Empty
+        Node::Leaf(SmallString::from_str(""))
     }
 
     /// Total number of bytes in the Rope.
@@ -54,7 +54,6 @@ impl Node {
     /// Returns the char index of the given byte.
     pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
         match self {
-            &Node::Empty => 0,
             &Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -78,7 +77,6 @@ impl Node {
     /// Returns the line index of the given byte.
     pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
         match self {
-            &Node::Empty => 0,
             &Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -103,7 +101,6 @@ impl Node {
     /// Returns the byte index of the given char.
     pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
         match self {
-            &Node::Empty => 0,
             &Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -127,7 +124,6 @@ impl Node {
     /// Returns the line index of the given char.
     pub(crate) fn char_to_line(&self, char_idx: usize) -> usize {
         match self {
-            &Node::Empty => 0,
             &Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -152,7 +148,6 @@ impl Node {
     /// Returns the byte index of the start of the given line.
     pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
         match self {
-            &Node::Empty => 0,
             &Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -167,7 +162,6 @@ impl Node {
     /// Returns the char index of the start of the given line.
     pub(crate) fn line_to_char(&self, line_idx: usize) -> usize {
         match self {
-            &Node::Empty => 0,
             &Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -256,7 +250,6 @@ impl Node {
 
     pub(crate) fn text_info(&self) -> TextInfo {
         match self {
-            &Node::Empty => TextInfo::new(),
             &Node::Leaf(ref text) => TextInfo::from_str(text),
             &Node::Internal(ref children) => children.combined_info(),
         }
@@ -272,12 +265,6 @@ impl Node {
     /// than MAX_BYTES.
     pub(crate) fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
         match self {
-            // If it's empty, turn it into a leaf
-            &mut Node::Empty => {
-                *self = Node::Leaf(text.into());
-                return (None, None);
-            }
-
             // If it's a leaf
             &mut Node::Leaf(ref mut cur_text) => {
                 let byte_pos = char_idx_to_byte_idx(cur_text, char_pos as usize);
@@ -371,7 +358,6 @@ impl Node {
     /// byte-offset within the chunk.
     fn get_chunk_at_byte<'a>(&'a self, byte_idx: usize) -> (&'a str, usize) {
         match self {
-            &Node::Empty => ("", 0),
             &Node::Leaf(ref text) => (text, byte_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -385,7 +371,6 @@ impl Node {
     /// char-offset within the chunk.
     fn get_chunk_at_char<'a>(&'a self, char_idx: usize) -> (&'a str, usize) {
         match self {
-            &Node::Empty => ("", 0),
             &Node::Leaf(ref text) => (text, char_idx),
             &Node::Internal(ref children) => {
                 let (child_i, acc_info) =
@@ -399,7 +384,6 @@ impl Node {
     /// tree is consistent with the actual data.
     pub(crate) fn assert_integrity(&self) {
         match self {
-            &Node::Empty => {}
             &Node::Leaf(_) => {}
             &Node::Internal(ref children) => {
                 for (info, node) in children.iter() {
@@ -410,11 +394,25 @@ impl Node {
         }
     }
 
-    /// Debugging tool to make sure that all branches of the tree are
-    /// at the same depth.
-    pub(crate) fn assert_balance(&self) -> usize {
+    /// Debugging tool to make sure that all of the following invariants
+    /// hold true throughout the tree:
+    ///
+    /// - The tree is the same height everywhere.
+    /// - All internal nodes have the minimum number of children.
+    /// - All leaf nodes are non-empty.
+    /// - Graphemes are never split over chunk boundaries.
+    pub(crate) fn assert_invariants(&self, is_root: bool) {
+        self.assert_balance();
+        self.assert_node_size(is_root);
+        if is_root {
+            self.assert_grapheme_seams();
+        }
+    }
+
+    /// Checks that the entire tree is the same height everywhere.
+    fn assert_balance(&self) -> usize {
+        // Depth, child count, and leaf node emptiness
         match self {
-            &Node::Empty => 1,
             &Node::Leaf(_) => 1,
             &Node::Internal(ref children) => {
                 let first_depth = children.nodes()[0].assert_balance();
@@ -426,9 +424,33 @@ impl Node {
         }
     }
 
-    /// Debugging tool to make sure that graphemes aren't split across
-    /// chunks.
-    pub(crate) fn assert_grapheme_seams(&self) {
+    /// Checks that all internal nodes have the minimum number of
+    /// children and all non-root leaf nodes are non-empty.
+    fn assert_node_size(&self, is_root: bool) {
+        match self {
+            &Node::Leaf(ref text) => {
+                // Leaf size
+                if !is_root {
+                    assert!(text.len() > 0);
+                }
+            }
+            &Node::Internal(ref children) => {
+                // Child count
+                if is_root {
+                    assert!(children.len() > 1);
+                } else {
+                    assert!(children.len() >= MIN_CHILDREN);
+                }
+
+                for node in children.nodes() {
+                    node.assert_node_size(false);
+                }
+            }
+        }
+    }
+
+    /// Checks that graphemes are never split over chunk boundaries.
+    fn assert_grapheme_seams(&self) {
         let slice = self.slice(0, self.text_info().chars as usize);
         if slice.chunks().count() > 0 {
             let mut itr = slice.chunks();
@@ -464,8 +486,6 @@ impl Node {
         byte_pos: Count,
     ) -> Option<&mut SmallString<BackingArray>> {
         match self {
-            &mut Node::Empty => return None,
-
             &mut Node::Leaf(ref mut text) => {
                 if byte_pos == 0 || byte_pos == text.len() as Count {
                     Some(text)
@@ -531,7 +551,6 @@ impl Node {
     /// Updates the tree meta-data down the left side of the tree.
     fn fix_info_left(&mut self) {
         match self {
-            &mut Node::Empty => {}
             &mut Node::Leaf(_) => {}
             &mut Node::Internal(ref mut children) => {
                 Arc::make_mut(children.nodes_mut().first_mut().unwrap()).fix_info_left();
@@ -544,7 +563,6 @@ impl Node {
     /// Updates the tree meta-data down the right side of the tree.
     fn fix_info_right(&mut self) {
         match self {
-            &mut Node::Empty => {}
             &mut Node::Leaf(_) => {}
             &mut Node::Internal(ref mut children) => {
                 Arc::make_mut(children.nodes_mut().last_mut().unwrap()).fix_info_right();

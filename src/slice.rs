@@ -29,7 +29,7 @@ impl<'a> RopeSlice<'a> {
         let mut node = node;
         'outer: loop {
             match node as &Node {
-                &Node::Empty | &Node::Leaf(_) => break,
+                &Node::Leaf(_) => break,
 
                 &Node::Internal(ref children) => {
                     let mut start_char = 0;
