@@ -1,28 +1,21 @@
 extern crate ropey;
 
-use std::iter::Iterator;
-
 use ropey::Rope;
 
 #[test]
-fn clone_rope() {
-    let mut rope1 = Rope::from_str(TEXT);
-    let mut rope2 = rope1.clone();
+fn from_str() {
+    // Build rope from file contents
+    let rope = Rope::from_str(TEXT);
 
-    rope1.insert(54321, "Hello ");
-    rope1.insert(2345, "world! ");
-    rope1.insert(96756, "How are ");
-    rope1.insert(206454, "you ");
-    rope1.insert(0, "doing?\r\n");
+    // Verify rope integrity
+    rope.assert_integrity();
+    rope.assert_invariants();
 
-    rope2.insert(54321, "Hello ");
-    rope2.insert(2345, "world! ");
-    rope2.insert(96756, "How are ");
-    rope2.insert(206454, "you ");
-    rope2.insert(0, "doing?\r\n");
-
-    for (a, b) in Iterator::zip(rope1.chars(), rope2.chars()) {
-        assert_eq!(a, b);
+    // Verify that they match
+    let mut idx = 0;
+    for chunk in rope.chunks() {
+        assert_eq!(chunk, &TEXT[idx..(idx + chunk.len())]);
+        idx += chunk.len();
     }
 }
 
