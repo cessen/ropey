@@ -439,8 +439,7 @@ impl Node {
             &Node::Leaf(ref text) => {
                 // Leaf size
                 if !is_root {
-                    println!("{:?}\n", text);
-                    //assert!(text.len() > 0);
+                    assert!(text.len() > 0);
                 }
             }
             &Node::Internal(ref children) => {
