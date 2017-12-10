@@ -3,7 +3,7 @@
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::Node;
 
-/// An immutable view into part of a Rope.
+/// An immutable view into part of a `Rope`.
 pub struct RopeSlice<'a> {
     node: &'a Node,
     start_char: usize,
@@ -55,54 +55,54 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Total number of bytes in the RopeSlice.
+    /// Total number of bytes in the `RopeSlice`.
     pub fn len_bytes(&self) -> usize {
         self.node.char_to_byte(self.end_char) - self.node.char_to_byte(self.start_char)
     }
 
-    /// Total number of chars in the RopeSlice.
+    /// Total number of chars in the `RopeSlice`.
     pub fn len_chars(&self) -> usize {
         self.end_char - self.start_char
     }
 
-    /// Total number of lines in the RopeSlice.
+    /// Total number of lines in the `RopeSlice`.
     pub fn len_lines(&self) -> usize {
         self.node.char_to_line(self.end_char) - self.node.char_to_line(self.start_char) + 1
     }
 
-    /// Returns an immutable slice of the RopeSlice in the char range `start..end`.
+    /// Returns an immutable slice of the `RopeSlice` in the char range `start..end`.
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice<'a> {
         assert!(start <= end);
         assert!(end <= (self.end_char - self.start_char));
         RopeSlice::new_with_range(self.node, self.start_char + start, self.start_char + end)
     }
 
-    /// Creates an iterator over the bytes of the RopeSlice.
+    /// Creates an iterator over the bytes of the `RopeSlice`.
     pub fn bytes(&self) -> RopeBytes<'a> {
         RopeBytes::new_with_range(self.node, self.start_char, self.end_char)
     }
 
-    /// Creates an iterator over the chars of the RopeSlice.
+    /// Creates an iterator over the chars of the `RopeSlice`.
     pub fn chars(&self) -> RopeChars<'a> {
         RopeChars::new_with_range(self.node, self.start_char, self.end_char)
     }
 
-    /// Creates an iterator over the grapheme clusters of the RopeSlice.
+    /// Creates an iterator over the grapheme clusters of the `RopeSlice`.
     pub fn graphemes(&self) -> RopeGraphemes<'a> {
         RopeGraphemes::new_with_range(self.node, true, self.start_char, self.end_char)
     }
 
-    /// Creates an iterator over the lines of the RopeSlice.
+    /// Creates an iterator over the lines of the `RopeSlice`.
     pub fn lines(&self) -> RopeLines<'a> {
         RopeLines::new_with_range(self.node, self.start_char, self.end_char)
     }
 
-    /// Creates an iterator over the chunks of the RopeSlice.
+    /// Creates an iterator over the chunks of the `RopeSlice`.
     pub fn chunks(&self) -> RopeChunks<'a> {
         RopeChunks::new_with_range(self.node, self.start_char, self.end_char)
     }
 
-    /// Returns the entire text of the RopeSlice as a newly allocated String.
+    /// Returns the entire text of the `RopeSlice` as a newly allocated `String`.
     pub fn to_string(&self) -> String {
         let mut text = String::new();
         for chunk in self.chunks() {

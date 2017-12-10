@@ -21,21 +21,24 @@ pub struct Rope {
 }
 
 impl Rope {
-    /// Creates an empty Rope.
+    /// Creates an empty `Rope`.
     pub fn new() -> Rope {
         Rope { root: Arc::new(Node::new()) }
     }
 
+    /// Creates a `Rope` from a string slice.
     pub fn from_str(text: &str) -> Rope {
         let mut builder = RopeBuilder::new();
         builder.append(text);
         builder.finish()
     }
 
-    /// Creates a Rope from an arbitrary input source.
+    /// Creates a `Rope` from an arbitrary reader.
     ///
-    /// This can fail, since it expects utf8 input.  Returns
-    /// None if it fails.
+    /// This expects utf8 data, and will fail if the reader provides
+    /// anything else.
+    ///
+    /// Returns None if it fails.
     pub fn from_reader_utf8<T: io::Read>(reader: &mut T) -> Option<Rope> {
         // TODO: return a proper Result type that propagates errors.
         const BUFFER_SIZE: usize = MAX_BYTES * 2;
@@ -98,17 +101,17 @@ impl Rope {
         }
     }
 
-    /// Total number of bytes in the Rope.
+    /// Total number of bytes in the `Rope`.
     pub fn len_bytes(&self) -> usize {
         self.root.byte_count()
     }
 
-    /// Total number of chars in the Rope.
+    /// Total number of chars in the `Rope`.
     pub fn len_chars(&self) -> usize {
         self.root.char_count()
     }
 
-    /// Total number of lines in the Rope.
+    /// Total number of lines in the `Rope`.
     pub fn len_lines(&self) -> usize {
         self.root.line_break_count() + 1
     }
@@ -166,37 +169,37 @@ impl Rope {
         self.root.next_grapheme_boundary(char_idx)
     }
 
-    /// Returns an immutable slice of the Rope in the char range `start..end`.
+    /// Returns an immutable slice of the `Rope` in the char range `start..end`.
     pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
         self.root.slice(start, end)
     }
 
-    /// Creates an iterator over the bytes of the Rope.
+    /// Creates an iterator over the bytes of the `Rope`.
     pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
         RopeBytes::new(&self.root)
     }
 
-    /// Creates an iterator over the chars of the Rope.
+    /// Creates an iterator over the chars of the `Rope`.
     pub fn chars<'a>(&'a self) -> RopeChars<'a> {
         RopeChars::new(&self.root)
     }
 
-    /// Creates an iterator over the grapheme clusteres of the Rope.
+    /// Creates an iterator over the grapheme clusters of the `Rope`.
     pub fn graphemes<'a>(&'a self) -> RopeGraphemes<'a> {
         RopeGraphemes::new(&self.root, true)
     }
 
-    /// Creates an iterator over the lines of the Rope.
+    /// Creates an iterator over the lines of the `Rope`.
     pub fn lines<'a>(&'a self) -> RopeLines<'a> {
         RopeLines::new(&self.root)
     }
 
-    /// Creates an iterator over the chunks of the Rope.
+    /// Creates an iterator over the chunks of the `Rope`.
     pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
         RopeChunks::new(&self.root)
     }
 
-    /// Returns the entire text of the Rope as a newly allocated String.
+    /// Returns the entire text of the `Rope` as a newly allocated String.
     pub fn to_string(&self) -> String {
         use iter::RopeChunks;
         let mut text = String::new();
@@ -237,16 +240,16 @@ impl Rope {
         unimplemented!()
     }
 
-    /// Splits the Rope at char index `split_char_idx`.
+    /// Splits the `Rope` at char index `split_char_idx`.
     ///
-    /// The left side of the split remians in this Rope, and
-    /// the right side is returned as a new Rope.
+    /// The left side of the split remians in this `Rope`, and
+    /// the right side is returned as a new `Rope`.
     pub fn split(&mut self, split_char_idx: usize) -> Rope {
         let _ = split_char_idx;
         unimplemented!()
     }
 
-    /// Appends a Rope to the end of this one, consuming the other Rope.
+    /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
     pub fn append(&mut self, other: Rope) {
         let _ = other;
         unimplemented!()
@@ -256,8 +259,23 @@ impl Rope {
 
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
-    pub(crate) fn verify_integrity(&self) {
-        self.root.verify_integrity();
+    #[doc(hidden)]
+    pub fn assert_integrity(&self) {
+        self.root.assert_integrity();
+    }
+
+    /// Debugging tool to make sure that all branches of the tree are
+    /// at the same depth.
+    #[doc(hidden)]
+    pub fn assert_balance(&self) {
+        self.root.assert_balance();
+    }
+
+    /// Debugging tool to make sure that graphemes aren't split across
+    /// chunks.
+    #[doc(hidden)]
+    pub fn assert_grapheme_seams(&self) {
+        self.root.assert_grapheme_seams();
     }
 }
 

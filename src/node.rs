@@ -397,14 +397,14 @@ impl Node {
 
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
-    pub(crate) fn verify_integrity(&self) {
+    pub(crate) fn assert_integrity(&self) {
         match self {
             &Node::Empty => {}
             &Node::Leaf(_) => {}
             &Node::Internal(ref children) => {
                 for (info, node) in children.iter() {
                     assert_eq!(*info, node.text_info());
-                    node.verify_integrity();
+                    node.assert_integrity();
                 }
             }
         }
@@ -412,14 +412,14 @@ impl Node {
 
     /// Debugging tool to make sure that all branches of the tree are
     /// at the same depth.
-    pub(crate) fn verify_balanced(&self) -> usize {
+    pub(crate) fn assert_balance(&self) -> usize {
         match self {
             &Node::Empty => 1,
             &Node::Leaf(_) => 1,
             &Node::Internal(ref children) => {
-                let first_depth = children.nodes()[0].verify_balanced();
+                let first_depth = children.nodes()[0].assert_balance();
                 for node in &children.nodes()[1..] {
-                    assert_eq!(node.verify_balanced(), first_depth);
+                    assert_eq!(node.assert_balance(), first_depth);
                 }
                 first_depth + 1
             }
@@ -428,7 +428,7 @@ impl Node {
 
     /// Debugging tool to make sure that graphemes aren't split across
     /// chunks.
-    pub(crate) fn verify_grapheme_seams(&self) {
+    pub(crate) fn assert_grapheme_seams(&self) {
         let slice = self.slice(0, self.text_info().chars as usize);
         if slice.chunks().count() > 0 {
             let mut itr = slice.chunks();

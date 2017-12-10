@@ -9,12 +9,26 @@ use str_utils::{is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boun
 use child_array::ChildArray;
 use small_string::SmallString;
 
+
+/// An incremental `Rope` builder.
+///
+/// To use this builder, repeatedly call `append()` to build the rope
+/// up, and call `finish()` when you're done to get the completed `Rope`.
+///
+/// This API is both more limited and faster than repeatedly calling
+/// `Rope::insert()`, and is intended primarily for loading
+/// already-existing text data from another source.
+///
+/// If you want to read data in from a utf8-formatted text file, see
+/// `Rope::from_reader()`, which uses this builder internally.
+#[derive(Debug, Clone)]
 pub struct RopeBuilder {
     stack: VecDeque<Node>,
     buffer: String,
 }
 
 impl RopeBuilder {
+    /// Creates a new RopeBuilder, ready for input.
     pub fn new() -> RopeBuilder {
         RopeBuilder {
             stack: {
@@ -26,6 +40,11 @@ impl RopeBuilder {
         }
     }
 
+    /// Appends `text` to the end of the in-progress `Rope`.
+    ///
+    /// This method is intended to be called repeatedly to incrementally
+    /// build up a `Rope`.  The passed text can be as large or small as
+    /// desired, but larger chunks are more efficient.
     pub fn append(&mut self, text: &str) {
         let mut text = text;
 
@@ -51,6 +70,11 @@ impl RopeBuilder {
         }
     }
 
+    /// Finishes the build, and returns the `Rope`.
+    ///
+    /// Note: this consumes the builder.  If you want to continue building
+    /// other ropes with the same prefix, you can clone the builder before
+    /// calling `finish()`.
     pub fn finish(mut self) -> Rope {
         // Append the last leaf
         if self.buffer.len() > 0 {

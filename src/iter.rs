@@ -9,7 +9,7 @@ use slice::RopeSlice;
 
 //==========================================================
 
-/// An iterator over a Rope's bytes.
+/// An iterator over a `Rope`'s bytes.
 pub struct RopeBytes<'a> {
     chunk_iter: RopeChunks<'a>,
     cur_chunk: Bytes<'a>,
@@ -56,7 +56,7 @@ impl<'a> Iterator for RopeBytes<'a> {
 
 //==========================================================
 
-/// An iterator over a Rope's chars.
+/// An iterator over a `Rope`'s chars.
 pub struct RopeChars<'a> {
     chunk_iter: RopeChunks<'a>,
     cur_chunk: Chars<'a>,
@@ -103,7 +103,11 @@ impl<'a> Iterator for RopeChars<'a> {
 
 //==========================================================
 
-/// An iterator over a Rope's grapheme clusters.
+/// An iterator over a `Rope`'s grapheme clusters.
+///
+/// The grapheme clusters returned are the extended grapheme
+/// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/))
+/// Each grapheme cluster is returned as a utf8 `&str` slice.
 pub struct RopeGraphemes<'a> {
     chunk_iter: RopeChunks<'a>,
     cur_chunk: Graphemes<'a>,
@@ -154,11 +158,12 @@ impl<'a> Iterator for RopeGraphemes<'a> {
 
 //==========================================================
 
-/// An iterator over a Rope's lines.
+/// An iterator over a `Rope`'s lines.
 ///
-/// The returned lines include the line break characters at the end if
-/// there are any in the text.  If the last line is blank, it is also
-/// returned (as an empty slice).
+/// The returned lines include the line-break at the end.
+///
+/// The last line is returned even if blank, in which case it
+/// is returned as an empty slice.
 pub struct RopeLines<'a> {
     node: &'a Node,
     start_char: usize,
@@ -220,15 +225,16 @@ impl<'a> Iterator for RopeLines<'a> {
 
 //==========================================================
 
-/// An iterator over a Rope's contiguous `str` chunks.
+/// An iterator over a `Rope`'s contiguous `str` chunks.
 ///
 /// Internally, `Rope` stores text as a segemented collection of utf8 strings.
-/// This iterator iterates over those chunks, returning `&str` slices into
-/// them.  This is primarily useful for efficiently saving text to disk,
-/// converting the Rope's contents into another type, or building your own
-/// iterators on top of `Rope`.
+/// This iterator iterates over those segments, returning a `&str` slicee for
+/// each one.  This is primarily useful for efficiently sending a `Rope`'s
+/// text data somewhere else (e.g. writing it to disk).  But it can also be
+/// the basis for building custom iterators for `Rope`.
 ///
-/// This iterator has the following API guarantees about the chunks it yields:
+/// This iterator has the following two API guarantees about the chunks it
+/// yields:
 ///
 /// 1. They are in-order, non-overlapping, and complete (i.e. the entire
 ///    text is iterated over in order).

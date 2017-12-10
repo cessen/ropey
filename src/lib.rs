@@ -20,7 +20,7 @@
 //! - **Thread safety.** Data is shared between clones of Ropey-ropes, making
 //!   clones extremley cheap. This is entirely thread safe, and clones can be
 //!   freely sent between threads.  More memory is only taken up incrementally
-//!   as edits cause the clones to diverge.
+//!   as edits cause clones to diverge.
 //! - **Efficiency.**  All of the above is fast and minimizes memory usage.
 
 
@@ -31,11 +31,13 @@ mod child_array;
 mod node;
 mod rope;
 mod rope_builder;
+mod slice;
 mod small_string;
 mod str_utils;
 mod text_info;
 
 pub mod iter;
-pub mod slice;
 
 pub use rope::Rope;
+pub use rope_builder::RopeBuilder;
+pub use slice::RopeSlice;
