@@ -354,6 +354,14 @@ impl Node {
         }
     }
 
+    pub(crate) fn leaf_text(&self) -> &str {
+        if let &Node::Leaf(ref text) = self {
+            text
+        } else {
+            panic!()
+        }
+    }
+
     /// Returns the chunk that contains the given byte, and the byte's
     /// byte-offset within the chunk.
     fn get_chunk_at_byte<'a>(&'a self, byte_idx: usize) -> (&'a str, usize) {
@@ -431,7 +439,8 @@ impl Node {
             &Node::Leaf(ref text) => {
                 // Leaf size
                 if !is_root {
-                    assert!(text.len() > 0);
+                    println!("{:?}\n", text);
+                    //assert!(text.len() > 0);
                 }
             }
             &Node::Internal(ref children) => {

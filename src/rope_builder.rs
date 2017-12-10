@@ -140,11 +140,14 @@ impl RopeBuilder {
         let last = self.stack.pop_back().unwrap();
         match last {
             Node::Leaf(_) => {
-                let mut children = ChildArray::new();
-                children.push((last.text_info(), Arc::new(last)));
-                children.push((leaf.text_info(), Arc::new(leaf)));
-
-                self.stack.push_back(Node::Internal(children));
+                if last.leaf_text().len() == 0 {
+                    self.stack.push_back(leaf);
+                } else {
+                    let mut children = ChildArray::new();
+                    children.push((last.text_info(), Arc::new(last)));
+                    children.push((leaf.text_info(), Arc::new(leaf)));
+                    self.stack.push_back(Node::Internal(children));
+                }
             }
 
             Node::Internal(_) => {
