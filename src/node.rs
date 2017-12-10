@@ -64,32 +64,30 @@ impl Node {
                 text.len()
             };
 
-            // Split text off of the left
+            // Split text off of the left, and make a leaf node from it.
             let leaf_text = &text[..split_idx];
             text = &text[split_idx..];
-
+            let leaf = Node::Leaf(SmallString::from_str(leaf_text));
 
             // Append the text as a leaf node, balancing the tree
             // appropriately as we go.
             let last = stack.pop_back().unwrap();
             match last {
                 Node::Empty => {
-                    stack.push_back(Node::Leaf(SmallString::from_str(leaf_text)));
+                    stack.push_back(leaf);
                 }
 
                 Node::Leaf(_) => {
-                    let right = Node::Leaf(SmallString::from_str(leaf_text));
-
                     let mut children = ChildArray::new();
                     children.push((last.text_info(), Arc::new(last)));
-                    children.push((right.text_info(), Arc::new(right)));
+                    children.push((leaf.text_info(), Arc::new(leaf)));
 
                     stack.push_back(Node::Internal(children));
                 }
 
-                Node::Internal(children) => {
-                    stack.push_back(Node::Internal(children));
-                    let mut left = Node::Leaf(SmallString::from_str(leaf_text));
+                Node::Internal(_) => {
+                    stack.push_back(last);
+                    let mut left = leaf;
                     let mut stack_idx = (stack.len() - 1) as isize;
                     loop {
                         if stack_idx < 0 {
