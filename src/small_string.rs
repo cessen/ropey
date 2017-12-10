@@ -203,7 +203,7 @@ impl<B: Array<Item = u8>> Deref for SmallString<B> {
     type Target = str;
 
     fn deref(&self) -> &str {
-        // We only allow `buffer` to be created from an existing valid string,
+        // SmallString's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
     }
@@ -211,7 +211,7 @@ impl<B: Array<Item = u8>> Deref for SmallString<B> {
 
 impl<B: Array<Item = u8>> AsRef<str> for SmallString<B> {
     fn as_ref(&self) -> &str {
-        // We only allow `buffer` to be created from an existing valid string,
+        // SmallString's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
     }
@@ -219,7 +219,7 @@ impl<B: Array<Item = u8>> AsRef<str> for SmallString<B> {
 
 impl<B: Array<Item = u8>> Borrow<str> for SmallString<B> {
     fn borrow(&self) -> &str {
-        // We only allow `buffer` to be created from an existing valid string,
+        // SmallString's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
     }
