@@ -1,12 +1,15 @@
 #![allow(dead_code)]
 
 use std;
+use std::io;
 use std::sync::Arc;
+use std::ptr;
 
 use child_array::ChildArray;
 
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
-use node::Node;
+use node::{Node, MAX_BYTES};
+use rope_builder::RopeBuilder;
 use slice::RopeSlice;
 use text_info::Count;
 
@@ -24,7 +27,75 @@ impl Rope {
     }
 
     pub fn from_str(text: &str) -> Rope {
-        Rope { root: Arc::new(Node::from_str(text)) }
+        let mut builder = RopeBuilder::new();
+        builder.append(text);
+        builder.finish()
+    }
+
+    /// Creates a Rope from an arbitrary input source.
+    ///
+    /// This can fail, since it expects utf8 input.  Returns
+    /// None if it fails.
+    pub fn from_reader_utf8<T: io::Read>(reader: &mut T) -> Option<Rope> {
+        // TODO: return a proper Result type that propagates errors.
+        const BUFFER_SIZE: usize = MAX_BYTES * 2;
+        let mut builder = RopeBuilder::new();
+        let mut buffer = [0u8; BUFFER_SIZE];
+        let mut fill_idx = 0; // How much `buffer` is currently filled with valid data
+        loop {
+            match reader.read(&mut buffer[fill_idx..]) {
+                Ok(read_count) => {
+                    fill_idx = fill_idx + read_count;
+
+                    // Determine how much of the buffer is valid utf8
+                    let valid_count = match std::str::from_utf8(&buffer[..fill_idx]) {
+                        Ok(_) => fill_idx,
+                        Err(e) => e.valid_up_to(),
+                    };
+
+                    // Append the valid part of the buffer to the rope.
+                    if valid_count > 0 {
+                        builder.append(unsafe {
+                            std::str::from_utf8_unchecked(&buffer[..valid_count])
+                        });
+                    }
+
+                    // Shift the un-read part of the buffer to the beginning
+                    if valid_count < fill_idx {
+                        unsafe {
+                            ptr::copy(
+                                buffer.as_ptr().offset(valid_count as isize),
+                                buffer.as_mut_ptr().offset(0),
+                                fill_idx - valid_count,
+                            );
+                        }
+                    }
+                    fill_idx -= valid_count;
+
+                    if fill_idx == BUFFER_SIZE {
+                        // Buffer is full and none of it could be consumed.  Utf8
+                        // codepoints don't get that large, so it's clearly not
+                        // valid text.
+                        return None;
+                    }
+
+                    // If we're done reading
+                    if read_count == 0 {
+                        if fill_idx > 0 {
+                            // We couldn't consume all data.
+                            return None;
+                        } else {
+                            return Some(builder.finish());
+                        }
+                    }
+                }
+
+                Err(_) => {
+                    // Read error
+                    return None;
+                }
+            }
+        }
     }
 
     /// Total number of bytes in the Rope.

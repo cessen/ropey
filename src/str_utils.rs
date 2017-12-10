@@ -2,7 +2,7 @@
 
 use std;
 
-use unicode_segmentation::GraphemeCursor;
+use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 
 pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
@@ -174,6 +174,30 @@ pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize 
     }
 }
 
+pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
+    assert!(l.len() > 0 && r.len() > 0);
+
+    let tot_len = l.len() + r.len();
+    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
+
+    gc.next_boundary(r, l.len()).unwrap();
+    let prev = {
+        match gc.prev_boundary(r, l.len()) {
+            Ok(pos) => pos,
+            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
+            _ => unreachable!(),
+        }
+    };
+
+    if let Some(a) = prev {
+        if a == l.len() {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 //======================================================================
 
 /// An iterator that yields the byte indices of line breaks in a string.
@@ -296,6 +320,22 @@ mod tests {
         assert!(is_grapheme_boundary(text, 12));
         assert!(is_grapheme_boundary(text, 3));
         assert!(!is_grapheme_boundary(text, 6));
+    }
+
+    #[test]
+    fn seam_is_grapheme_boundary_01() {
+        let text1 = "\r\n\r\n\r\n";
+        let text2 = "\r\n\r\n";
+
+        assert!(seam_is_grapheme_boundary(text1, text2));
+    }
+
+    #[test]
+    fn seam_is_grapheme_boundary_02() {
+        let text1 = "\r\n\r\n\r";
+        let text2 = "\n\r\n\r\n";
+
+        assert!(!seam_is_grapheme_boundary(text1, text2));
     }
 
     #[test]

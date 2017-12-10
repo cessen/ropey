@@ -30,6 +30,7 @@ extern crate unicode_segmentation;
 mod child_array;
 mod node;
 mod rope;
+mod rope_builder;
 mod small_string;
 mod str_utils;
 mod text_info;

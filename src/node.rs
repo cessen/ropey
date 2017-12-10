@@ -1,8 +1,6 @@
 #![allow(dead_code)]
 
-use std;
 use std::sync::Arc;
-use std::collections::VecDeque;
 
 use child_array::ChildArray;
 use smallvec::Array;
@@ -13,7 +11,7 @@ use small_string::SmallString;
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                 char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
                 is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
-                nearest_internal_grapheme_boundary};
+                nearest_internal_grapheme_boundary, seam_is_grapheme_boundary};
 use text_info::{TextInfo, Count};
 
 
@@ -22,7 +20,7 @@ pub(crate) const MAX_CHILDREN: usize = 17;
 const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 // Leaf node min/max values.
-const MAX_BYTES: usize = 335;
+pub(crate) const MAX_BYTES: usize = 335;
 const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 
@@ -36,102 +34,6 @@ pub(crate) enum Node {
 impl Node {
     pub(crate) fn new() -> Node {
         Node::Empty
-    }
-
-    pub(crate) fn from_str(text: &str) -> Node {
-        // We keep a stack of the right-most nodes
-        // down the edge of the rope tree.  This allows
-        // us to process everything without recursion.
-        // Not actually sure if that's a gain or not,
-        // but it works!
-        let mut stack = VecDeque::with_capacity(32);
-        stack.push_back(Node::Empty);
-
-        // Loop over the text, splitting bits off the left and
-        // appending them to the rope as we go.
-        let mut text = text;
-        while text.len() > 0 {
-            // Calculate split point
-            let split_idx = if text.len() > MAX_BYTES {
-                if is_grapheme_boundary(text, MAX_BYTES) {
-                    MAX_BYTES
-                } else {
-                    let prev = prev_grapheme_boundary(text, MAX_BYTES);
-                    let next = next_grapheme_boundary(text, MAX_BYTES);
-                    if prev > 0 { prev } else { next }
-                }
-            } else {
-                text.len()
-            };
-
-            // Split text off of the left, and make a leaf node from it.
-            let leaf_text = &text[..split_idx];
-            text = &text[split_idx..];
-            let leaf = Node::Leaf(SmallString::from_str(leaf_text));
-
-            // Append the text as a leaf node, balancing the tree
-            // appropriately as we go.
-            let last = stack.pop_back().unwrap();
-            match last {
-                Node::Empty => {
-                    stack.push_back(leaf);
-                }
-
-                Node::Leaf(_) => {
-                    let mut children = ChildArray::new();
-                    children.push((last.text_info(), Arc::new(last)));
-                    children.push((leaf.text_info(), Arc::new(leaf)));
-
-                    stack.push_back(Node::Internal(children));
-                }
-
-                Node::Internal(_) => {
-                    stack.push_back(last);
-                    let mut left = leaf;
-                    let mut stack_idx = (stack.len() - 1) as isize;
-                    loop {
-                        if stack_idx < 0 {
-                            // We're above the root, so do a root split.
-                            let mut children = ChildArray::new();
-                            children.push((left.text_info(), Arc::new(left)));
-                            stack.push_front(Node::Internal(children));
-                            break;
-                        } else if stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
-                            // There's room to add a child, so do that.
-                            stack[stack_idx as usize].children().push((
-                                left.text_info(),
-                                Arc::new(left),
-                            ));
-                            break;
-                        } else {
-                            // Not enough room to fit a child, so split.
-                            left =
-                                Node::Internal(stack[stack_idx as usize].children().push_split((
-                                    left.text_info(),
-                                    Arc::new(left),
-                                )));
-                            std::mem::swap(&mut left, &mut stack[stack_idx as usize]);
-                            stack_idx -= 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Zip up all the remaining nodes on the stack
-        let mut stack_idx = stack.len() - 1;
-        while stack_idx >= 1 {
-            let node = stack.pop_back().unwrap();
-            if let Node::Internal(ref mut children) = stack[stack_idx - 1] {
-                children.push((node.text_info(), Arc::new(node)));
-            } else {
-                unreachable!();
-            }
-            stack_idx -= 1;
-        }
-
-        // Return the root.
-        stack.pop_back().unwrap()
     }
 
     /// Total number of bytes in the Rope.
@@ -450,7 +352,7 @@ impl Node {
 
     //-----------------------------------------
 
-    fn child_count(&self) -> usize {
+    pub(crate) fn child_count(&self) -> usize {
         if let &Node::Internal(ref children) = self {
             children.len()
         } else {
@@ -458,7 +360,7 @@ impl Node {
         }
     }
 
-    fn children(&mut self) -> &mut ChildArray {
+    pub(crate) fn children(&mut self) -> &mut ChildArray {
         match self {
             &mut Node::Internal(ref mut children) => children,
             _ => panic!(),
@@ -522,6 +424,34 @@ impl Node {
                 first_depth + 1
             }
         }
+    }
+
+    /// Debugging tool to make sure that graphemes aren't split across
+    /// chunks.
+    pub(crate) fn verify_grapheme_seams(&self) {
+        let slice = self.slice(0, self.text_info().chars as usize);
+        if slice.chunks().count() > 0 {
+            let mut itr = slice.chunks();
+            let mut last_chunk = itr.next().unwrap();
+            for chunk in itr {
+                if chunk.len() > 1 && last_chunk.len() > 1 {
+                    assert!(seam_is_grapheme_boundary(last_chunk, chunk));
+                    last_chunk = chunk;
+                }
+            }
+        }
+    }
+
+    /// A for-fun tool for playing with silly text files.
+    pub(crate) fn largest_grapheme_size(&self) -> usize {
+        let mut size = 0;
+        let slice = self.slice(0, self.text_info().chars as usize);
+        for g in slice.graphemes() {
+            if g.len() > size {
+                size = g.len();
+            }
+        }
+        size
     }
 
     /// Checks to make sure that a boundary between leaf nodes (given as a byte
