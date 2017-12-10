@@ -248,8 +248,12 @@ impl Clone for ChildArray {
         let mut clone_array = ChildArray::new();
 
         // Copy nodes... carefully.
-        for (i, arc) in self.nodes[..self.len()].iter().enumerate() {
-            mem::forget(mem::replace(&mut clone_array.nodes[i], arc.clone()));
+        for (clone_arc, arc) in Iterator::zip(
+            clone_array.nodes[..self.len()].iter_mut(),
+            self.nodes[..self.len()].iter(),
+        )
+        {
+            mem::forget(mem::replace(clone_arc, arc.clone()));
         }
 
         // Copy TextInfo
@@ -264,6 +268,15 @@ impl Clone for ChildArray {
 
         // Set length
         clone_array.len = self.len;
+
+        // Some sanity checks for debug builds
+        #[cfg(debug_assertions)]
+        {
+            for (a, b) in Iterator::zip(clone_array.iter(), self.iter()) {
+                assert_eq!(a.0, b.0);
+                assert!(Arc::ptr_eq(a.1, b.1));
+            }
+        }
 
         clone_array
     }
