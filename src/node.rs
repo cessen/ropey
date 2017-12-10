@@ -584,14 +584,14 @@ impl Node {
 //===========================================================================
 
 /// Inserts the given text into the given string at the given char index.
-pub fn insert_at_char<B: Array<Item = u8>>(s: &mut SmallString<B>, text: &str, pos: usize) {
+pub(crate) fn insert_at_char<B: Array<Item = u8>>(s: &mut SmallString<B>, text: &str, pos: usize) {
     let byte_pos = char_idx_to_byte_idx(s, pos);
     s.insert_str(byte_pos, text);
 }
 
 
 /// Removes the text between the given char indices in the given string.
-pub fn remove_text_between_char_indices<B: Array<Item = u8>>(
+pub(crate) fn remove_text_between_char_indices<B: Array<Item = u8>>(
     s: &mut SmallString<B>,
     pos_a: usize,
     pos_b: usize,
@@ -633,7 +633,7 @@ pub fn remove_text_between_char_indices<B: Array<Item = u8>>(
 /// Splits a string into two strings at the char index given.
 /// The first section of the split is stored in the original string,
 /// while the second section of the split is returned as a new string.
-pub fn split_string_at_char<B: Array<Item = u8>>(
+pub(crate) fn split_string_at_char<B: Array<Item = u8>>(
     s1: &mut SmallString<B>,
     pos: usize,
 ) -> SmallString<B> {
@@ -645,7 +645,10 @@ pub fn split_string_at_char<B: Array<Item = u8>>(
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
 /// is one big grapheme.
-pub fn fix_grapheme_seam<B: Array<Item = u8>>(l: &mut SmallString<B>, r: &mut SmallString<B>) {
+pub(crate) fn fix_grapheme_seam<B: Array<Item = u8>>(
+    l: &mut SmallString<B>,
+    r: &mut SmallString<B>,
+) {
     let tot_len = l.len() + r.len();
     let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
     let next = gc.next_boundary(r, l.len()).unwrap();

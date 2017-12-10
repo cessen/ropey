@@ -1,32 +1,135 @@
 use std;
 
 use std::borrow::Borrow;
-use std::ffi::OsStr;
-use std::iter::{FromIterator, IntoIterator};
+use std::iter::IntoIterator;
 use std::ops::Deref;
 use std::ptr;
 use std::str;
 
-use smallvec;
 use smallvec::{Array, SmallVec};
 
 
 #[derive(Clone, Default)]
-pub struct SmallString<B: Array<Item = u8>> {
+pub(crate) struct SmallString<B: Array<Item = u8>> {
     buffer: SmallVec<B>,
 }
 
 impl<B: Array<Item = u8>> SmallString<B> {
+    /// Creates a new empty `SmallString`
+    #[inline]
     pub fn new() -> Self {
         SmallString { buffer: SmallVec::new() }
     }
 
+    /// Creates a new empty `SmallString` with at least `capacity` bytes
+    /// of capacity.
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         SmallString { buffer: SmallVec::with_capacity(capacity) }
     }
 
-    pub fn from_str(s: &str) -> Self {
-        SmallString { buffer: s.as_bytes().into_iter().cloned().collect() }
+    /// Creates a new `SmallString` with the same contents as the given `&str`.
+    #[inline]
+    pub fn from_str(string: &str) -> Self {
+        SmallString { buffer: string.as_bytes().into_iter().cloned().collect() }
+    }
+
+    /// Inserts a `&str` at byte offset `idx`.
+    ///
+    /// Panics if `idx` is not a char boundary, as that would result in an
+    /// invalid utf8 string.
+    #[inline]
+    pub fn insert_str(&mut self, idx: usize, string: &str) {
+        assert!(self.is_char_boundary(idx));
+        assert!(idx <= self.len());
+
+        unsafe {
+            self.insert_bytes(idx, string.as_bytes());
+        }
+    }
+
+    /// Appends a `&str` to end the of the `SmallString`.
+    #[inline]
+    pub fn push_str(&mut self, string: &str) {
+        let len = self.len();
+        unsafe {
+            self.insert_bytes(len, string.as_bytes());
+        }
+    }
+
+    /// Drops the text after byte index `idx`.
+    ///
+    /// Panics if `idx` is not a char boundary, as that would result in an
+    /// invalid utf8 string.
+    #[inline]
+    pub fn truncate(&mut self, idx: usize) {
+        assert!(self.is_char_boundary(idx));
+        assert!(idx <= self.len());
+        self.buffer.truncate(idx);
+    }
+
+    /// Drops the text before byte index `idx`, shifting the
+    /// rest of the text to fill in the space.
+    ///
+    /// Panics if `idx` is not a char boundary, as that would result in an
+    /// invalid utf8 string.
+    #[inline]
+    pub fn truncate_front(&mut self, idx: usize) {
+        assert!(self.is_char_boundary(idx));
+        assert!(idx <= self.len());
+        unsafe {
+            self.remove_bytes(0, idx);
+        }
+    }
+
+    /// Removes the text in the byte index interval `[start, end)`.
+    ///
+    /// Panics if either `start` or `end` are not char boundaries, as that
+    /// would result in an invalid utf8 string.
+    #[inline]
+    pub fn remove_range(&mut self, start: usize, end: usize) {
+        assert!(self.is_char_boundary(start));
+        assert!(self.is_char_boundary(end));
+        assert!(end < self.len());
+        assert!(start <= end);
+        unsafe {
+            self.remove_bytes(start, end);
+        }
+    }
+
+    /// Splits the `SmallString` at `idx`.
+    ///
+    /// The left part remains in the original, and the right part is
+    /// returned in a new `SmallString`.
+    ///
+    /// Panics if `idx` is not a char boundary, as that would result in an
+    /// invalid utf8 string.
+    #[inline]
+    pub fn split_off(&mut self, idx: usize) -> SmallString<B> {
+        assert!(self.is_char_boundary(idx));
+        assert!(idx <= self.len());
+        let len = self.len();
+        let mut other = SmallString::with_capacity(len - idx);
+        unsafe {
+            ptr::copy_nonoverlapping(
+                self.buffer.as_ptr().offset(idx as isize),
+                other.buffer.as_mut_ptr().offset(0),
+                len - idx,
+            );
+            self.buffer.set_len(idx);
+            other.buffer.set_len(len - idx);
+        }
+        other
+    }
+
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.buffer.shrink_to_fit();
+    }
+
+    #[inline]
+    pub unsafe fn as_mut_smallvec(&mut self) -> &mut SmallVec<B> {
+        &mut self.buffer
     }
 
     unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
@@ -50,7 +153,6 @@ impl<B: Array<Item = u8>> SmallString<B> {
 
     unsafe fn remove_bytes(&mut self, start: usize, end: usize) {
         debug_assert!(end >= start);
-        debug_assert!(start > 0);
         debug_assert!(end <= self.len());
         let len = self.len();
         let amt = end - start;
@@ -61,74 +163,8 @@ impl<B: Array<Item = u8>> SmallString<B> {
         );
         self.buffer.set_len(len - amt);
     }
-
-    #[inline]
-    pub fn insert_str(&mut self, idx: usize, string: &str) {
-        assert!(self.is_char_boundary(idx));
-
-        unsafe {
-            self.insert_bytes(idx, string.as_bytes());
-        }
-    }
-
-    #[inline]
-    pub fn push_str(&mut self, string: &str) {
-        let len = self.len();
-        unsafe {
-            self.insert_bytes(len, string.as_bytes());
-        }
-    }
-
-    #[inline]
-    pub unsafe fn as_mut_smallvec(&mut self) -> &mut SmallVec<B> {
-        &mut self.buffer
-    }
-
-    #[inline]
-    pub fn split_off(&mut self, at: usize) -> SmallString<B> {
-        assert!(self.is_char_boundary(at));
-        let len = self.len();
-        let mut other = SmallString::with_capacity(len - at);
-        unsafe {
-            ptr::copy_nonoverlapping(
-                self.buffer.as_ptr().offset(at as isize),
-                other.buffer.as_mut_ptr().offset(0),
-                len - at,
-            );
-            self.buffer.set_len(at);
-            other.buffer.set_len(len - at);
-        }
-        other
-    }
-
-    #[inline]
-    pub fn truncate(&mut self, size: usize) {
-        assert!(self.is_char_boundary(size));
-        self.buffer.truncate(size);
-    }
-
-    #[inline]
-    pub fn truncate_front(&mut self, size: usize) {
-        assert!(self.is_char_boundary(size));
-        unsafe {
-            self.remove_bytes(0, size);
-        }
-    }
-
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.buffer.shrink_to_fit();
-    }
 }
 
-
-
-impl<B: Array<Item = u8>> std::hash::Hash for SmallString<B> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let s: &str = self;
-        s.hash(state)
-    }
-}
 
 impl<B: Array<Item = u8>> std::cmp::PartialEq for SmallString<B> {
     fn eq(&self, other: &Self) -> bool {
@@ -136,8 +172,6 @@ impl<B: Array<Item = u8>> std::cmp::PartialEq for SmallString<B> {
         s1 == s2
     }
 }
-
-impl<B: Array<Item = u8>> std::cmp::Eq for SmallString<B> {}
 
 impl<'a, B: Array<Item = u8>> PartialEq<SmallString<B>> for &'a str {
     fn eq(&self, other: &SmallString<B>) -> bool {
@@ -183,94 +217,11 @@ impl<B: Array<Item = u8>> AsRef<str> for SmallString<B> {
     }
 }
 
-struct Utf8Iterator<I>(I, Option<smallvec::IntoIter<[u8; 4]>>);
-
-impl<I: Iterator<Item = char>> Utf8Iterator<I> {
-    pub fn new<In: IntoIterator<IntoIter = I, Item = char>>(into: In) -> Self {
-        Utf8Iterator(into.into_iter(), None)
-    }
-}
-
-impl<I: Iterator<Item = char>> Iterator for Utf8Iterator<I> {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(mut into) = self.1.take() {
-            if let Some(n) = into.next() {
-                self.1 = Some(into);
-                return Some(n);
-            }
-        }
-
-        let out = self.0.next();
-
-        out.and_then(|chr| {
-            let mut dest = [0u8; 4];
-            let outstr = chr.encode_utf8(&mut dest);
-
-            self.1 = Some(
-                outstr
-                    .as_bytes()
-                    .into_iter()
-                    .cloned()
-                    .collect::<SmallVec<[u8; 4]>>()
-                    .into_iter(),
-            );
-
-            self.1.as_mut().and_then(|i| i.next())
-        })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let hint = self.0.size_hint();
-
-        (hint.0, hint.1.map(|x| x * 4))
-    }
-}
-
-impl<B: Array<Item = u8>> FromIterator<char> for SmallString<B> {
-    fn from_iter<T: IntoIterator<Item = char>>(into_iter: T) -> Self {
-        // We're a shell so we mostly work with ASCII data - optimise for this
-        // case since we have to optimise for _some_ fixed size of char.
-        let utf8 = Utf8Iterator::new(into_iter);
-
-        SmallString { buffer: utf8.collect() }
-    }
-}
-
-#[cfg(feature = "as-mut")]
-impl<B: Array<Item = u8>> AsMut<str> for SmallString<B> {
-    fn as_mut(&mut self) -> &mut str {
-        // We only allow `buffer` to be created from an existing valid string,
-        // so this is safe.
-        unsafe { str::from_utf8_unchecked_mut(self.buffer.as_mut()) }
-    }
-}
-
-impl<B: Array<Item = u8>> AsRef<OsStr> for SmallString<B> {
-    fn as_ref(&self) -> &OsStr {
-        let s: &str = self.as_ref();
-        s.as_ref()
-    }
-}
-
 impl<B: Array<Item = u8>> Borrow<str> for SmallString<B> {
     fn borrow(&self) -> &str {
         // We only allow `buffer` to be created from an existing valid string,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
-    }
-}
-
-impl<B: Array<Item = u8>> From<String> for SmallString<B> {
-    fn from(s: String) -> SmallString<B> {
-        SmallString { buffer: SmallVec::from_vec(s.into_bytes()) }
-    }
-}
-
-impl<B: Array<Item = u8>> From<SmallString<B>> for String {
-    fn from(s: SmallString<B>) -> String {
-        unsafe { String::from_utf8_unchecked(s.buffer.into_vec()) }
     }
 }
 
