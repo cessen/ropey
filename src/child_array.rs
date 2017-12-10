@@ -14,7 +14,7 @@ use text_info::TextInfo;
 
 const MAX_LEN: usize = node::MAX_CHILDREN;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct ChildArray {
     nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
     info: [TextInfo; MAX_LEN],
@@ -25,7 +25,7 @@ impl ChildArray {
     /// Creates a new empty array.
     pub fn new() -> ChildArray {
         ChildArray {
-            nodes: unsafe { std::mem::uninitialized() },
+            nodes: ManuallyDrop::new(unsafe { std::mem::uninitialized() }),
             info: unsafe { std::mem::uninitialized() },
             len: 0,
         }
@@ -154,7 +154,7 @@ impl ChildArray {
         self.push_split(extra)
     }
 
-    /// Removes the at the given index from the the array.
+    /// Removes the item at the given index from the the array.
     ///
     /// Decreases length by one.  Preserves ordering of the other items.
     pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
@@ -240,5 +240,31 @@ impl Drop for ChildArray {
             let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
             unsafe { ptr::drop_in_place(mptr) };
         }
+    }
+}
+
+impl Clone for ChildArray {
+    fn clone(&self) -> ChildArray {
+        let mut clone_array = ChildArray::new();
+
+        // Copy nodes... carefully.
+        for (i, arc) in self.nodes[..self.len()].iter().enumerate() {
+            mem::forget(mem::replace(&mut clone_array.nodes[i], arc.clone()));
+        }
+
+        // Copy TextInfo
+        for (clone_info, info) in
+            Iterator::zip(
+                clone_array.info[..self.len()].iter_mut(),
+                self.info[..self.len()].iter(),
+            )
+        {
+            *clone_info = *info;
+        }
+
+        // Set length
+        clone_array.len = self.len;
+
+        clone_array
     }
 }
