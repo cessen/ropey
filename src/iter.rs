@@ -228,7 +228,7 @@ impl<'a> Iterator for RopeLines<'a> {
 /// An iterator over a `Rope`'s contiguous `str` chunks.
 ///
 /// Internally, `Rope` stores text as a segemented collection of utf8 strings.
-/// This iterator iterates over those segments, returning a `&str` slicee for
+/// This iterator iterates over those segments, returning a `&str` slice for
 /// each one.  This is primarily useful for efficiently sending a `Rope`'s
 /// text data somewhere else (e.g. writing it to disk).  But it can also be
 /// the basis for building custom iterators for `Rope`.
