@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std;
+use std::fmt;
 use std::iter::{Iterator, Zip};
 use std::mem;
 use std::mem::ManuallyDrop;
@@ -14,7 +15,6 @@ use text_info::TextInfo;
 
 const MAX_LEN: usize = node::MAX_CHILDREN;
 
-#[derive(Debug)]
 pub(crate) struct ChildArray {
     nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
     info: [TextInfo; MAX_LEN],
@@ -231,6 +231,16 @@ impl ChildArray {
             }
         }
         panic!("Predicate is mal-formed and never evaluated true.")
+    }
+}
+
+impl fmt::Debug for ChildArray {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ChildArray")
+            .field("nodes", &&self.nodes[0..self.len()])
+            .field("info", &&self.info[0..self.len()])
+            .field("len", &self.len)
+            .finish()
     }
 }
 
