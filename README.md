@@ -65,6 +65,8 @@ Clones can be sent to other threads for both reading and writing.
 
 ## Things to still investigate
 
+### Memory overhead
+
 Although text loaded from a file has low memory overhead, the same size text
 created from scratch by many small inserts has a lot more overhead.  In the
 worst cases it can be almost 140%.  This likely isn't a problem for the primary
@@ -75,6 +77,16 @@ it would be good to address this anyway.
 The most likely solution is to be more aggressive about merging leaf nodes when
 possible, even during insertion.  The tricky part will be doing that without
 harming performance too much.
+
+### Grapheme indexing
+
+The previous version of Ropey had grapheme indexing.  Unfortunately, keeping the
+grapheme metadata up-to-date introduced a lot of overhead (5-10x slower).
+
+In practice, it's not clear how useful that feature really is.  The way
+graphemes are usually worked with in practice doesn't (I think) need direct
+indexing.  Nevertheless, it would be cool to get that feature back.  But not
+at such a significant cost to performance.
 
 ## Contributing
 
