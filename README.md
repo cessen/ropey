@@ -1,3 +1,5 @@
+# Ropey
+
 Ropey is a utf8-text rope library for Rust, designed for efficient editing and
 manipulation of large texts.
 
@@ -6,9 +8,9 @@ and is not yet published to crates.io.  The currently published versions can be
 found at https://github.com/cessen/ropey_old
 
 
-# Features
+## Features
 
-## Strong Unicode support
+### Strong Unicode support
 Ropey treats Unicode code points as the base unit of text.  In other words,
 you can index into, slice by, and iterate over a rope by `char` index.
 
@@ -17,20 +19,20 @@ are never split in its internal representation, and thus can always be accessed
 as coherent `&str` slices.  Moreover, Ropey provides APIs for iterating over
 graphemes and querying about grapheme boundaries.
 
-## Slicing
+### Slicing
 
 Ropey has rope slices that allows you to work with just parts of a rope, using
 any of the read-only operations of a full rope including iterators and making
 sub-slices.
 
 
-## Line-aware
+### Line-aware
 
 Ropey knows about line breaks, allowing you to index into and iterate over lines
 of text.
 
 
-## Streaming loading and saving
+### Streaming loading and saving
 
 Ropey provides APIs for efficiently streaming text data to and from ropes.  This
 is primarily intended for efficiently saving a rope's text to disk and
@@ -38,7 +40,7 @@ efficiently loading text from disk into a new rope.  But the APIs are flexible,
 and can be used for whatever you like.
 
 
-## Efficient
+### Efficient
 
 Ropey is fast and minimizes memory usage:
 
@@ -55,13 +57,13 @@ Ropey is fast and minimizes memory usage:
   (fragmentation from memory allocators aside).
 
 
-## Thread safe
+### Thread safe
 
 Ropey ensures that even though clones share memory, everything is thread-safe.
 Clones can be sent to other threads for both reading and writing.
 
 
-# Things to still investigate
+## Things to still investigate
 
 Although text loaded from a file has low memory overhead, the same size text
 created from scratch by many small inserts has a lot more overhead.  In the
@@ -74,7 +76,7 @@ The most likely solution is to be more aggressive about merging leaf nodes when
 possible, even during insertion.  The tricky part will be doing that without
 harming performance too much.
 
-# Contributing
+## Contributing
 
 Contributions are absolutely welcome!  However, I do have a feeling for how I
 want Ropey to be structured and work, so please open an issue or email me to
