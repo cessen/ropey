@@ -97,7 +97,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
     pub fn remove_range(&mut self, start: usize, end: usize) {
         assert!(self.is_char_boundary(start));
         assert!(self.is_char_boundary(end));
-        assert!(end < self.len());
+        assert!(end <= self.len());
         assert!(start <= end);
         unsafe {
             self.remove_bytes(start, end);
