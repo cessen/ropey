@@ -51,6 +51,206 @@ impl Node {
         self.text_info().line_breaks as usize
     }
 
+    /// Inserts the text at the given char index.
+    ///
+    /// Returns a right-side residual node if the insertion wouldn't fit
+    /// within this node.  Also returns the byte position where there may
+    /// be a grapheme seam to fix, if any.
+    ///
+    /// TODO: handle the situation where what's being inserted is larger
+    /// than MAX_BYTES.
+    pub(crate) fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
+        match self {
+            // If it's a leaf
+            &mut Node::Leaf(ref mut cur_text) => {
+                let byte_pos = char_idx_to_byte_idx(cur_text, char_pos as usize);
+                let seam = if byte_pos == 0 {
+                    Some(0)
+                } else if byte_pos == cur_text.len() {
+                    let count = (cur_text.len() + text.len()) as Count;
+                    Some(count)
+                } else {
+                    None
+                };
+
+                cur_text.insert_str(byte_pos, text);
+
+                if cur_text.len() <= MAX_BYTES {
+                    return (None, seam);
+                } else {
+                    let split_pos = {
+                        let pos = cur_text.len() - (cur_text.len() / 2);
+                        nearest_internal_grapheme_boundary(&cur_text, pos)
+                    };
+                    let right_text = cur_text.split_off(split_pos);
+                    if right_text.len() > 0 {
+                        cur_text.shrink_to_fit();
+                        return (Some(Node::Leaf(right_text)), seam);
+                    } else {
+                        // Leaf couldn't be validly split, so leave it oversized
+                        return (None, seam);
+                    }
+                }
+            }
+
+            // If it's internal, things get a little more complicated
+            &mut Node::Internal(ref mut children) => {
+                // Find the child to traverse into along with its starting char
+                // offset.
+                let (child_i, start_info) =
+                    children.search_combine_info(|inf| char_pos <= inf.chars);
+                let start_char = start_info.chars;
+
+                // Navigate into the appropriate child
+                let (residual, child_seam) = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                    .insert(char_pos - start_char, text);
+                children.info_mut()[child_i] = children.nodes()[child_i].text_info();
+
+                // Calculate the seam offset relative to this node
+                let seam = child_seam.map(|byte_pos| byte_pos + start_info.bytes);
+
+                // Handle the new node, if any.
+                if let Some(r_node) = residual {
+                    // The new node will fit as a child of this node
+                    if children.len() < MAX_CHILDREN {
+                        children.insert(child_i + 1, (r_node.text_info(), Arc::new(r_node)));
+                        return (None, seam);
+                    }
+                    // The new node won't fit!  Must split.
+                    else {
+                        let r_children = children.insert_split(
+                            child_i + 1,
+                            (r_node.text_info(), Arc::new(r_node)),
+                        );
+
+                        return (Some(Node::Internal(r_children)), seam);
+                    }
+                } else {
+                    // No new node.  Easy.
+                    return (None, seam);
+                }
+            }
+        }
+    }
+
+    // Recursive function.  The returned bool means:
+    //
+    // - True: I'm too small now, merge me with a neighbor.
+    // - False: I'm fine, no need to merge.
+    pub(crate) fn remove(&mut self, start: usize, end: usize) -> bool {
+        debug_assert!(start <= end);
+        if start == end {
+            return false;
+        }
+
+        match self {
+            &mut Node::Leaf(ref mut cur_text) => {
+                debug_assert!(end <= cur_text.chars().count());
+                let start_byte = char_idx_to_byte_idx(&cur_text, start);
+                let end_byte = char_idx_to_byte_idx(&cur_text, end);
+                cur_text.remove_range(start_byte, end_byte);
+
+                assert!(cur_text.len() > 0);
+                return cur_text.len() < MIN_BYTES;
+            }
+
+            &mut Node::Internal(ref mut children) => {
+                // Find the end-point nodes of the removal
+                let (l_child_i, l_acc_info) =
+                    children.search_combine_info(|inf| start as Count <= inf.chars);
+                let (mut r_child_i, r_acc_info) =
+                    children.search_combine_info(|inf| end as Count <= inf.chars);
+
+                let l_merge; // Flag for whether to merge the left node
+                let r_merge; // Flag for whether to merge the right node
+                let l_gone; // Flag for whether the left node is completely removed
+                let r_gone; // Flag for whether the right node is completely removed
+
+                // Do the removal
+                if l_child_i == r_child_i {
+                    let l_start = start - l_acc_info.chars as usize;
+                    let l_end = end - l_acc_info.chars as usize;
+                    l_gone = false;
+                    r_gone = false;
+                    r_merge = false;
+
+                    l_merge = if (l_start == 0) &&
+                        (l_end == children.info()[l_child_i as usize].chars as usize)
+                    {
+                        children.remove(l_child_i);
+                        false
+                    } else {
+                        // Remove the text
+                        let m = Arc::make_mut(&mut children.nodes_mut()[l_child_i as usize])
+                            .remove(l_start, l_end);
+
+                        // Update child info
+                        children.info_mut()[l_child_i] = children.nodes()[l_child_i as usize]
+                            .text_info();
+                        m
+                    };
+                } else {
+                    // Calculate the local char indices to remove for the left- and
+                    // right-most nodes that touch the removal range.
+                    let l_start = start - l_acc_info.chars as usize;
+                    let l_end = children.info()[l_child_i as usize].chars as usize;
+                    let r_start = 0;
+                    let r_end = end - r_acc_info.chars as usize;
+
+                    // Determine if the left-most or right-most nodes need to be
+                    // completely removed.
+                    l_gone = l_start == 0;
+                    r_gone = r_end == children.info()[r_child_i as usize].chars as usize;
+
+                    // Remove children that are completely encompassed
+                    // in the range.
+                    let removal_start = if l_gone { l_child_i } else { l_child_i + 1 };
+                    let removal_end = if r_gone { r_child_i + 1 } else { r_child_i };
+                    for _ in (removal_start as usize)..(removal_end as usize) {
+                        children.remove(removal_start);
+                    }
+
+                    // Update r_child_i based on removals
+                    r_child_i = if l_gone { l_child_i } else { l_child_i + 1 };
+
+                    // Remove the text from the left and right nodes
+                    // and update their text info.
+                    let (info, nodes) = children.info_and_nodes_mut();
+                    l_merge = if !l_gone {
+                        let m =
+                            Arc::make_mut(&mut nodes[l_child_i as usize]).remove(l_start, l_end);
+                        info[l_child_i as usize] = nodes[l_child_i as usize].text_info();
+                        m
+                    } else {
+                        false
+                    };
+
+                    let r_merge = if !r_gone {
+                        let m =
+                            Arc::make_mut(&mut nodes[r_child_i as usize]).remove(r_start, r_end);
+                        info[r_child_i as usize] = nodes[r_child_i as usize].text_info();
+                        m
+                    } else {
+                        false
+                    };
+                }
+
+                // TODO:
+                // Do the merging, if necessary.
+                // if l_merge && r_merge {
+                //
+                // } else if l_merge {
+
+                // } else if r_merge {
+
+                // }
+
+                debug_assert!(children.len() > 0);
+                return children.len() < MIN_CHILDREN;
+            }
+        }
+    }
+
     /// Returns the char index of the given byte.
     pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
         match self {
@@ -255,88 +455,6 @@ impl Node {
         }
     }
 
-    /// Inserts the text at the given char index.
-    ///
-    /// Returns a right-side residual node if the insertion wouldn't fit
-    /// within this node.  Also returns the byte position where there may
-    /// be a grapheme seam to fix, if any.
-    ///
-    /// TODO: handle the situation where what's being inserted is larger
-    /// than MAX_BYTES.
-    pub(crate) fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
-        match self {
-            // If it's a leaf
-            &mut Node::Leaf(ref mut cur_text) => {
-                let byte_pos = char_idx_to_byte_idx(cur_text, char_pos as usize);
-                let seam = if byte_pos == 0 {
-                    Some(0)
-                } else if byte_pos == cur_text.len() {
-                    let count = (cur_text.len() + text.len()) as Count;
-                    Some(count)
-                } else {
-                    None
-                };
-
-                cur_text.insert_str(byte_pos, text);
-
-                if cur_text.len() <= MAX_BYTES {
-                    return (None, seam);
-                } else {
-                    let split_pos = {
-                        let pos = cur_text.len() - (cur_text.len() / 2);
-                        nearest_internal_grapheme_boundary(&cur_text, pos)
-                    };
-                    let right_text = cur_text.split_off(split_pos);
-                    if right_text.len() > 0 {
-                        cur_text.shrink_to_fit();
-                        return (Some(Node::Leaf(right_text)), seam);
-                    } else {
-                        // Leaf couldn't be validly split, so leave it oversized
-                        return (None, seam);
-                    }
-                }
-            }
-
-            // If it's internal, things get a little more complicated
-            &mut Node::Internal(ref mut children) => {
-                // Find the child to traverse into along with its starting char
-                // offset.
-                let (child_i, start_info) =
-                    children.search_combine_info(|inf| char_pos <= inf.chars);
-                let start_char = start_info.chars;
-
-                // Navigate into the appropriate child
-                let (residual, child_seam) = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                    .insert(char_pos - start_char, text);
-                children.info_mut()[child_i] = children.nodes()[child_i].text_info();
-
-                // Calculate the seam offset relative to this node
-                let seam = child_seam.map(|byte_pos| byte_pos + start_info.bytes);
-
-                // Handle the new node, if any.
-                if let Some(r_node) = residual {
-                    // The new node will fit as a child of this node
-                    if children.len() < MAX_CHILDREN {
-                        children.insert(child_i + 1, (r_node.text_info(), Arc::new(r_node)));
-                        return (None, seam);
-                    }
-                    // The new node won't fit!  Must split.
-                    else {
-                        let r_children = children.insert_split(
-                            child_i + 1,
-                            (r_node.text_info(), Arc::new(r_node)),
-                        );
-
-                        return (Some(Node::Internal(r_children)), seam);
-                    }
-                } else {
-                    // No new node.  Easy.
-                    return (None, seam);
-                }
-            }
-        }
-    }
-
     //-----------------------------------------
 
     pub(crate) fn child_count(&self) -> usize {
@@ -482,6 +600,17 @@ impl Node {
             }
         }
         size
+    }
+
+    /// Attempts to merge two nodes, and if it's too much data to merge
+    /// equi-distributes it between the two.
+    ///
+    /// Returns:
+    ///
+    /// - True: merge was successful, `other` is now empty.
+    /// - False: merge failed, equidistributed instead.
+    fn merge_or_distribute(&mut self, other: &mut Node) -> bool {
+        unimplemented!()
     }
 
     /// Checks to make sure that a boundary between leaf nodes (given as a byte

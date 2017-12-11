@@ -116,6 +116,45 @@ impl Rope {
         self.root.line_break_count() + 1
     }
 
+    /// Inserts the given text at char index `char_idx`.
+    pub fn insert(&mut self, char_idx: usize, text: &str) {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        // Get root for mutation
+        let root = Arc::make_mut(&mut self.root);
+
+        // Do the insertion
+        let (residual, seam) = root.insert(char_idx as Count, text);
+
+        // Handle root splitting, if any.
+        if let Some(r_node) = residual {
+            let mut l_node = Node::new();
+            std::mem::swap(&mut l_node, root);
+
+            let mut children = ChildArray::new();
+            children.push((l_node.text_info(), Arc::new(l_node)));
+            children.push((r_node.text_info(), Arc::new(r_node)));
+
+            *root = Node::Internal(children);
+        }
+
+        // Handle seam, if any.
+        if let Some(byte_pos) = seam {
+            root.fix_grapheme_seam(byte_pos);
+        }
+    }
+
+    /// Removes the text in char range `start..end`.
+    pub fn remove(&mut self, start: usize, end: usize) {
+        Arc::make_mut(&mut self.root).remove(start, end);
+    }
+
     /// Returns the char index of the given byte.
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         self.root.byte_to_char(byte_idx)
@@ -207,46 +246,6 @@ impl Rope {
             text.push_str(chunk);
         }
         text
-    }
-
-    /// Inserts the given text at char index `char_idx`.
-    pub fn insert(&mut self, char_idx: usize, text: &str) {
-        // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        // Get root for mutation
-        let root = Arc::make_mut(&mut self.root);
-
-        // Do the insertion
-        let (residual, seam) = root.insert(char_idx as Count, text);
-
-        // Handle root splitting, if any.
-        if let Some(r_node) = residual {
-            let mut l_node = Node::new();
-            std::mem::swap(&mut l_node, root);
-
-            let mut children = ChildArray::new();
-            children.push((l_node.text_info(), Arc::new(l_node)));
-            children.push((r_node.text_info(), Arc::new(r_node)));
-
-            *root = Node::Internal(children);
-        }
-
-        // Handle seam, if any.
-        if let Some(byte_pos) = seam {
-            root.fix_grapheme_seam(byte_pos);
-        }
-    }
-
-    /// Removes the text in char range `start..end`.
-    pub fn remove(&mut self, start: usize, end: usize) {
-        let _ = (start, end);
-        unimplemented!()
     }
 
     /// Splits the `Rope` at char index `split_char_idx`.
@@ -359,5 +358,20 @@ mod tests {
         r.insert(11, "！");
         r.insert(7, "zopter");
         assert_eq!("こんいちは、みzopterんなさん！", &r.to_string());
+    }
+
+    #[test]
+    fn remove_01() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        r.remove(5, 11);
+        r.remove(24, 31);
+        r.remove(19, 25);
+        assert_eq!("Hello! How are you みんなさん！", &r.to_string());
+
+        // r.assert_integrity();
+        // r.assert_invariants();
     }
 }
