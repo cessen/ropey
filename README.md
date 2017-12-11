@@ -14,14 +14,14 @@ found at https://github.com/cessen/ropey_old
 Ropey treats Unicode code points as the base unit of text.  In other words,
 you can index into, slice by, and iterate over a rope by `char` index.
 
-Ropey also ensures that [grapheme clusters](https://www.unicode.org/reports/tr29/)
+Ropey also ensures that [grapheme clusters](https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
 are never split in its internal representation, and thus can always be accessed
 as coherent `&str` slices.  Moreover, Ropey provides APIs for iterating over
 graphemes and querying about grapheme boundaries.
 
 ### Slicing
 
-Ropey has rope slices that allows you to work with just parts of a rope, using
+Ropey has rope slices that allow you to work with just parts of a rope, using
 any of the read-only operations of a full rope including iterators and making
 sub-slices.
 
