@@ -1,3 +1,10 @@
+// Code originally derived from the smallstring crate:
+// https://crates.io/crates/smallstring
+// Which is under the MIT license.
+//
+// Many methods have been added that are needed by Ropey, and the
+// stuff Ropey doesn't use has been removed.
+
 use std;
 
 use std::borrow::Borrow;

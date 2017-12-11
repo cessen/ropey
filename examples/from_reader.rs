@@ -22,7 +22,7 @@ fn main() {
     let rope = Rope::from_reader_utf8(&mut io::BufReader::new(File::open(&filepath).unwrap()))
         .unwrap();
 
-    // Read the text into a string, to verify
+    // Read the text into a string as well
     let text = {
         let mut input = String::new();
         let mut f = io::BufReader::new(File::open(&filepath).unwrap());
@@ -30,7 +30,7 @@ fn main() {
         input
     };
 
-    // Verify that they match
+    // Verify that the rope and string match
     let mut idx = 0;
     for chunk in rope.chunks() {
         assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
