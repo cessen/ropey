@@ -97,6 +97,20 @@ impl ChildArray {
         right
     }
 
+    /// Redistributes the elements between two `ChildArray`'s, so they are equal.
+    ///
+    /// If it's an odd number of elements, the +1 is put in this ChildArray.
+    pub fn distribute(&mut self, other: &mut ChildArray) {
+        let r_target_len = (self.len() + other.len()) / 2;
+
+        while other.len() < r_target_len {
+            other.insert(0, self.pop());
+        }
+        while other.len() > r_target_len {
+            self.push(other.remove(0));
+        }
+    }
+
     /// Pops an item off the end of the array and returns it.
     ///
     /// Decreases length by one.  Panics if already empty.
@@ -196,6 +210,27 @@ impl ChildArray {
             &mut self.info[self.len as usize],
             &mut self.nodes[self.len as usize],
         )
+    }
+
+    /// Fetches two children simultaneously, returning mutable references
+    /// to their info and nodes.
+    ///
+    /// `idx1` must be less than `idx2`.
+    pub fn get_two_mut(
+        &mut self,
+        idx1: usize,
+        idx2: usize,
+    ) -> ((&mut TextInfo, &mut Arc<Node>), (&mut TextInfo, &mut Arc<Node>)) {
+        assert!(idx1 < idx2);
+        assert!(idx2 < self.len());
+
+        let (info1, info2) = self.info.split_at_mut(idx1 + 1);
+        let (nodes1, nodes2) = self.nodes.split_at_mut(idx1 + 1);
+
+        ((info1.last_mut().unwrap(), nodes1.last_mut().unwrap()), (
+            &mut info2[idx2 - idx1],
+            &mut nodes2[idx2 - idx1],
+        ))
     }
 
     /// Creates an iterator over the array's items.
