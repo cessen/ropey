@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use node;
 use node::Node;
+use str_utils::nearest_internal_grapheme_boundary;
 use text_info::TextInfo;
 
 const MAX_LEN: usize = node::MAX_CHILDREN;
@@ -73,7 +74,7 @@ impl ChildArray {
     ///
     /// Increases length by one.  Panics if already full.
     pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
-        assert!((self.len as usize) < MAX_LEN);
+        assert!(self.len() < MAX_LEN);
         self.info[self.len as usize] = item.0;
         mem::forget(mem::replace(&mut self.nodes[self.len as usize], item.1));
         self.len += 1;
@@ -84,30 +85,85 @@ impl ChildArray {
     ///
     /// This works even when the array is full.
     pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> ChildArray {
-        let mut right = ChildArray::new();
-
         let r_count = (self.len() + 1) / 2;
         let l_count = (self.len() + 1) - r_count;
 
-        for _ in l_count..self.len() {
-            right.push(self.remove(l_count));
-        }
+        let mut right = self.split_off(l_count);
         right.push(new_child);
-
         right
     }
 
-    /// Redistributes the elements between two `ChildArray`'s, so they are equal.
+    /// Attempts to merge two nodes, and if it's too much data to merge
+    /// equi-distributes it between the two.
     ///
-    /// If it's an odd number of elements, the +1 is put in this ChildArray.
-    pub fn distribute(&mut self, other: &mut ChildArray) {
-        let r_target_len = (self.len() + other.len()) / 2;
+    /// Returns:
+    ///
+    /// - True: merge was successful.
+    /// - False: merge failed, equidistributed instead.
+    pub fn merge_distribute(&mut self, idx1: usize, idx2: usize) -> bool {
+        assert!(idx1 < idx2);
+        assert!(idx2 < self.len());
+        let remove_right = {
+            let ((_, mut node1), (_, mut node2)) = self.get_two_mut(idx1, idx2);
+            let node1 = Arc::make_mut(&mut node1);
+            let node2 = Arc::make_mut(&mut node2);
+            match node1 {
+                &mut Node::Leaf(ref mut text1) => {
+                    if let &mut Node::Leaf(ref mut text2) = node2 {
+                        text1.push_str(text2);
 
-        while other.len() < r_target_len {
-            other.insert(0, self.pop());
-        }
-        while other.len() > r_target_len {
-            self.push(other.remove(0));
+                        if text1.len() <= node::MAX_BYTES {
+                            true
+                        } else {
+                            let split_pos = {
+                                let pos = text1.len() - (text1.len() / 2);
+                                nearest_internal_grapheme_boundary(&text1, pos)
+                            };
+                            *text2 = text1.split_off(split_pos);
+                            if text2.len() > 0 {
+                                text1.shrink_to_fit();
+                                false
+                            } else {
+                                true
+                            }
+                        }
+                    } else {
+                        panic!("Siblings have different node types");
+                    }
+                }
+
+                &mut Node::Internal(ref mut children1) => {
+                    if let &mut Node::Internal(ref mut children2) = node2 {
+                        if (children1.len() + children2.len()) < MAX_LEN {
+                            for _ in 0..children2.len() {
+                                children1.push(children2.remove(0));
+                            }
+                            true
+                        } else {
+                            let r_target_len = (children1.len() + children2.len()) / 2;
+                            while children2.len() < r_target_len {
+                                children2.insert(0, children1.pop());
+                            }
+                            while children2.len() > r_target_len {
+                                children1.push(children2.remove(0));
+                            }
+                            false
+                        }
+                    } else {
+                        panic!("Siblings have different node types");
+                    }
+                }
+            }
+        };
+
+        if remove_right {
+            self.remove(idx2);
+            self.info[idx1] = self.nodes[idx1].text_info();
+            return true;
+        } else {
+            self.info[idx1] = self.nodes[idx1].text_info();
+            self.info[idx2] = self.nodes[idx2].text_info();
+            return false;
         }
     }
 
@@ -115,7 +171,7 @@ impl ChildArray {
     ///
     /// Decreases length by one.  Panics if already empty.
     pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
-        assert!(self.len > 0);
+        assert!(self.len() > 0);
         self.len -= 1;
         let item = (self.info[self.len as usize], unsafe {
             ptr::read(&self.nodes[self.len as usize])
@@ -128,8 +184,8 @@ impl ChildArray {
     /// Increases length by one.  Panics if already full.  Preserves ordering
     /// of the other items.
     pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
-        assert!(idx <= (self.len as usize));
-        assert!((self.len as usize) < MAX_LEN);
+        assert!(idx <= self.len());
+        assert!(self.len() < MAX_LEN);
 
         let len = self.len as usize;
         unsafe {
@@ -157,6 +213,7 @@ impl ChildArray {
     /// This works even when the array is full.
     pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> ChildArray {
         assert!(self.len() > 0);
+        assert!(idx <= self.len());
         let extra = if idx < self.len() {
             let extra = self.pop();
             self.insert(idx, item);
@@ -172,7 +229,8 @@ impl ChildArray {
     ///
     /// Decreases length by one.  Preserves ordering of the other items.
     pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
-        assert!(idx < (self.len as usize));
+        assert!(self.len() > 0);
+        assert!(idx < self.len());
 
         let item = (self.info[idx], unsafe { ptr::read(&self.nodes[idx]) });
 
@@ -194,9 +252,26 @@ impl ChildArray {
         return item;
     }
 
+    /// Splits the array in two at `idx`, returning the right part of the split.
+    ///
+    /// TODO: implement this more efficiently.
+    pub fn split_off(&mut self, idx: usize) -> ChildArray {
+        assert!(idx <= self.len());
+
+        let mut other = ChildArray::new();
+        let count = self.len() - idx;
+        for _ in 0..count {
+            other.push(self.remove(idx));
+        }
+
+        assert!(self.len() <= self.nodes.len());
+        assert!(other.len() <= self.nodes.len());
+        other
+    }
+
     /// Gets references to the nth item's node and info.
     pub fn i(&self, n: usize) -> (&TextInfo, &Arc<Node>) {
-        assert!(n < self.len as usize);
+        assert!(n < self.len());
         (
             &self.info[self.len as usize],
             &self.nodes[self.len as usize],
@@ -205,7 +280,7 @@ impl ChildArray {
 
     /// Gets mut references to the nth item's node and info.
     pub fn i_mut(&mut self, n: usize) -> (&mut TextInfo, &mut Arc<Node>) {
-        assert!(n < self.len as usize);
+        assert!(n < self.len());
         (
             &mut self.info[self.len as usize],
             &mut self.nodes[self.len as usize],

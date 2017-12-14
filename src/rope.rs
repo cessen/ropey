@@ -253,8 +253,7 @@ impl Rope {
     /// The left side of the split remians in this `Rope`, and
     /// the right side is returned as a new `Rope`.
     pub fn split(&mut self, split_char_idx: usize) -> Rope {
-        let _ = split_char_idx;
-        unimplemented!()
+        Rope { root: Arc::new(Arc::make_mut(&mut self.root).split(split_char_idx)) }
     }
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
@@ -370,6 +369,23 @@ mod tests {
         r.remove(24, 31);
         r.remove(19, 25);
         assert_eq!("Hello! How are you みんなさん！", &r.to_string());
+
+        // r.assert_integrity();
+        // r.assert_invariants();
+    }
+
+    #[test]
+    fn split_01() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        let r2 = r.split(20);
+        assert_eq!("Hello world! How are", &r.to_string());
+        assert_eq!(
+            " you doing? こんいちは、みんなさん！",
+            &r2.to_string()
+        );
 
         // r.assert_integrity();
         // r.assert_invariants();

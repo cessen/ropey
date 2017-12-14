@@ -16,11 +16,11 @@ use text_info::{TextInfo, Count};
 
 
 // Internal node min/max values.
-pub(crate) const MAX_CHILDREN: usize = 17;
+pub(crate) const MAX_CHILDREN: usize = 3;
 const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 // Leaf node min/max values.
-pub(crate) const MAX_BYTES: usize = 335;
+pub(crate) const MAX_BYTES: usize = 2;
 const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 
@@ -247,6 +247,47 @@ impl Node {
 
                 debug_assert!(children.len() > 0);
                 return children.len() < MIN_CHILDREN;
+            }
+        }
+    }
+
+    /// Splits the `Node` at char index `char_idx`, returning
+    /// the right side of the split.
+    pub fn split(&mut self, char_idx: usize) -> Node {
+        match self {
+            &mut Node::Leaf(ref mut text) => {
+                let char_idx = char_idx_to_byte_idx(text, char_idx);
+                Node::Leaf(text.split_off(char_idx))
+            }
+            &mut Node::Internal(ref mut children) => {
+                let (child_i, acc_info) =
+                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                let child_info = children.info()[child_i];
+
+                if char_idx == acc_info.chars as usize {
+                    Node::Internal(children.split_off(child_i))
+                } else if char_idx == (acc_info.chars as usize + child_info.chars as usize) {
+                    Node::Internal(children.split_off(child_i + 1))
+                } else {
+                    let mut r_children = children.split_off(child_i + 1);
+
+                    // Recurse
+                    let r_node = Arc::make_mut(&mut children.nodes_mut()[child_i]).split(
+                        char_idx - acc_info.chars as usize,
+                    );
+
+                    r_children.insert(0, (r_node.text_info(), Arc::new(r_node)));
+
+                    // TODO: optimize for not having to do this every time
+                    if children.len() > 1 {
+                        children.merge_distribute(child_i - 1, child_i);
+                    }
+                    if r_children.len() > 1 {
+                        r_children.merge_distribute(0, 1);
+                    }
+
+                    Node::Internal(r_children)
+                }
             }
         }
     }
@@ -600,17 +641,6 @@ impl Node {
             }
         }
         size
-    }
-
-    /// Attempts to merge two nodes, and if it's too much data to merge
-    /// equi-distributes it between the two.
-    ///
-    /// Returns:
-    ///
-    /// - True: merge was successful, `other` is now empty.
-    /// - False: merge failed, equidistributed instead.
-    fn merge_or_distribute(&mut self, other: &mut Node) -> bool {
-        unimplemented!()
     }
 
     /// Checks to make sure that a boundary between leaf nodes (given as a byte
