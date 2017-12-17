@@ -70,6 +70,11 @@ impl ChildArray {
         )
     }
 
+    /// Updates the text info of the child at `idx`.
+    pub fn update_child_info(&mut self, idx: usize) {
+        self.info[idx] = self.nodes[idx].text_info();
+    }
+
     /// Pushes an item into the end of the array.
     ///
     /// Increases length by one.  Panics if already full.
@@ -348,9 +353,9 @@ impl ChildArray {
 impl fmt::Debug for ChildArray {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ChildArray")
-            .field("nodes", &&self.nodes[0..self.len()])
-            .field("info", &&self.info[0..self.len()])
             .field("len", &self.len)
+            .field("info", &&self.info[0..self.len()])
+            .field("nodes", &&self.nodes[0..self.len()])
             .finish()
     }
 }

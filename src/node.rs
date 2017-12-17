@@ -161,8 +161,8 @@ impl Node {
                 let (mut r_child_i, r_acc_info) =
                     children.search_combine_info(|inf| end as Count <= inf.chars);
 
-                let l_merge; // Flag for whether to merge the left node
-                let r_merge; // Flag for whether to merge the right node
+                let _l_merge; // Flag for whether to merge the left node
+                let _r_merge; // Flag for whether to merge the right node
                 let l_gone; // Flag for whether the left node is completely removed
                 let r_gone; // Flag for whether the right node is completely removed
 
@@ -170,11 +170,11 @@ impl Node {
                 if l_child_i == r_child_i {
                     let l_start = start - l_acc_info.chars as usize;
                     let l_end = end - l_acc_info.chars as usize;
-                    l_gone = false;
-                    r_gone = false;
-                    r_merge = false;
+                    // l_gone = false;
+                    // r_gone = false;
+                    _r_merge = false;
 
-                    l_merge = if (l_start == 0) &&
+                    _l_merge = if (l_start == 0) &&
                         (l_end == children.info()[l_child_i as usize].chars as usize)
                     {
                         children.remove(l_child_i);
@@ -216,7 +216,7 @@ impl Node {
                     // Remove the text from the left and right nodes
                     // and update their text info.
                     let (info, nodes) = children.info_and_nodes_mut();
-                    l_merge = if !l_gone {
+                    _l_merge = if !l_gone {
                         let m =
                             Arc::make_mut(&mut nodes[l_child_i as usize]).remove(l_start, l_end);
                         info[l_child_i as usize] = nodes[l_child_i as usize].text_info();
@@ -225,7 +225,7 @@ impl Node {
                         false
                     };
 
-                    let r_merge = if !r_gone {
+                    let _r_merge = if !r_gone {
                         let m =
                             Arc::make_mut(&mut nodes[r_child_i as usize]).remove(r_start, r_end);
                         info[r_child_i as usize] = nodes[r_child_i as usize].text_info();
@@ -281,9 +281,13 @@ impl Node {
                     // TODO: optimize for not having to do this every time
                     if children.len() > 1 {
                         children.merge_distribute(child_i - 1, child_i);
+                    } else {
+                        children.update_child_info(child_i);
                     }
                     if r_children.len() > 1 {
                         r_children.merge_distribute(0, 1);
+                    } else {
+                        r_children.update_child_info(0);
                     }
 
                     Node::Internal(r_children)
@@ -518,6 +522,13 @@ impl Node {
             text
         } else {
             panic!()
+        }
+    }
+
+    pub(crate) fn is_leaf(&self) -> bool {
+        match self {
+            &Node::Leaf(_) => true,
+            &Node::Internal(_) => false,
         }
     }
 
