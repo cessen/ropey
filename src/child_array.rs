@@ -104,9 +104,9 @@ impl ChildArray {
         assert!(idx1 < idx2);
         assert!(idx2 < self.len());
         let remove_right = {
-            let ((_, mut node1), (_, mut node2)) = self.get_two_mut(idx1, idx2);
-            let node1 = Arc::make_mut(&mut node1);
-            let node2 = Arc::make_mut(&mut node2);
+            let ((_, node1), (_, node2)) = self.get_two_mut(idx1, idx2);
+            let node1 = Arc::make_mut(node1);
+            let node2 = Arc::make_mut(node2);
             match node1 {
                 &mut Node::Leaf(ref mut text1) => {
                     if let &mut Node::Leaf(ref mut text2) = node2 {
@@ -264,8 +264,6 @@ impl ChildArray {
             other.push(self.remove(idx));
         }
 
-        assert!(self.len() <= self.nodes.len());
-        assert!(other.len() <= self.nodes.len());
         other
     }
 
@@ -299,12 +297,15 @@ impl ChildArray {
         assert!(idx1 < idx2);
         assert!(idx2 < self.len());
 
-        let (info1, info2) = self.info.split_at_mut(idx1 + 1);
-        let (nodes1, nodes2) = self.nodes.split_at_mut(idx1 + 1);
+        let split_idx = idx1 + 1;
+        let (info1, info2) = self.info.split_at_mut(split_idx);
+        let (nodes1, nodes2) = self.nodes.split_at_mut(split_idx);
 
-        ((info1.last_mut().unwrap(), nodes1.last_mut().unwrap()), (
-            &mut info2[idx2 - idx1],
-            &mut nodes2[idx2 - idx1],
+        ((&mut info1[idx1], &mut nodes1[idx1]), (
+            &mut info2
+                [idx2 - split_idx],
+            &mut nodes2
+                [idx2 - split_idx],
         ))
     }
 
