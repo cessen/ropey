@@ -19,8 +19,7 @@ fn main() {
     };
 
     // Build rope from file contents
-    let rope = Rope::from_reader_utf8(&mut io::BufReader::new(File::open(&filepath).unwrap()))
-        .unwrap();
+    let rope = Rope::from_reader(&mut io::BufReader::new(File::open(&filepath).unwrap())).unwrap();
 
     // Read the text into a string as well
     let text = {

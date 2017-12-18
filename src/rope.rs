@@ -37,13 +37,13 @@ impl Rope {
         builder.finish()
     }
 
-    /// Creates a `Rope` from an arbitrary reader.
+    /// Creates a `Rope` from a output of a reader.
     ///
     /// This expects utf8 data, and will fail if the reader provides
     /// anything else.
     ///
     /// Returns None if it fails.
-    pub fn from_reader_utf8<T: io::Read>(reader: &mut T) -> Option<Rope> {
+    pub fn from_reader<T: io::Read>(reader: &mut T) -> Option<Rope> {
         // TODO: return a proper Result type that propagates errors.
         const BUFFER_SIZE: usize = MAX_BYTES * 2;
         let mut builder = RopeBuilder::new();
