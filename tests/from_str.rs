@@ -5,7 +5,7 @@ use ropey::Rope;
 #[test]
 fn from_str() {
     // Build rope from file contents
-    let mut rope = Rope::from_str(TEXT);
+    let rope = Rope::from_str(TEXT);
 
     // Verify rope integrity
     rope.assert_integrity();

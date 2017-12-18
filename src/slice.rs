@@ -1,9 +1,12 @@
 #![allow(dead_code)]
 
+use std;
+
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::Node;
 
 /// An immutable view into part of a `Rope`.
+#[derive(Copy, Clone)]
 pub struct RopeSlice<'a> {
     node: &'a Node,
     start_char: usize,
@@ -109,6 +112,96 @@ impl<'a> RopeSlice<'a> {
             text.push_str(chunk);
         }
         text
+    }
+}
+
+//==============================================================
+
+impl<'a> std::fmt::Debug for RopeSlice<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_list().entries(self.chunks()).finish()
+    }
+}
+
+impl<'a> std::fmt::Display for RopeSlice<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for chunk in self.chunks() {
+            write!(f, "{}", chunk)?
+        }
+        Ok(())
+    }
+}
+
+impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for RopeSlice<'a> {
+    fn eq(&self, other: &RopeSlice) -> bool {
+        if self.len_bytes() != other.len_bytes() {
+            return false;
+        }
+
+        let mut chunk_itr_1 = self.chunks();
+        let mut chunk_itr_2 = other.chunks();
+        let mut chunk1 = chunk_itr_1.next().unwrap();
+        let mut chunk2 = chunk_itr_2.next().unwrap();
+
+        loop {
+            if chunk1.len() > chunk2.len() {
+                if &chunk1[..chunk2.len()] != chunk2 {
+                    return false;
+                } else {
+                    chunk1 = &chunk1[chunk2.len()..];
+                    chunk2 = "";
+                }
+            } else {
+                if &chunk2[..chunk1.len()] != chunk1 {
+                    return false;
+                } else {
+                    chunk2 = &chunk2[chunk1.len()..];
+                    chunk1 = "";
+                }
+            }
+
+            if chunk1.len() == 0 {
+                if let Some(chunk) = chunk_itr_1.next() {
+                    chunk1 = chunk;
+                } else {
+                    break;
+                }
+            }
+
+            if chunk2.len() == 0 {
+                if let Some(chunk) = chunk_itr_2.next() {
+                    chunk2 = chunk;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
+impl<'a> std::cmp::PartialEq<&'a str> for RopeSlice<'a> {
+    fn eq(&self, other: &&'a str) -> bool {
+        if self.len_bytes() != other.len() {
+            return false;
+        }
+
+        let mut idx = 0;
+        for chunk in self.chunks() {
+            if chunk != &other[idx..(idx + chunk.len())] {
+                return false;
+            }
+            idx += chunk.len();
+        }
+
+        return true;
+    }
+}
+
+impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for &'a str {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
+        other == self
     }
 }
 

@@ -375,6 +375,14 @@ impl Rope {
         text
     }
 
+    /// Returns a slice to the entire contents of the `Rope`.
+    ///
+    /// Mainly just a convenience method, since the `RangeArgument` trait
+    /// isn't stabilized yet.
+    pub fn to_slice(&self) -> RopeSlice {
+        self.slice(0, self.len_chars())
+    }
+
     //-----------------------------------------------------------------------
     // Debugging
 
@@ -417,68 +425,19 @@ impl std::fmt::Display for Rope {
 
 impl<'a> std::cmp::PartialEq<Rope> for Rope {
     fn eq(&self, other: &Rope) -> bool {
-        if self.len_bytes() != other.len_bytes() {
-            return false;
-        }
-
-        let mut chunk_itr_1 = self.chunks();
-        let mut chunk_itr_2 = other.chunks();
-        let mut chunk1 = chunk_itr_1.next().unwrap();
-        let mut chunk2 = chunk_itr_2.next().unwrap();
-
-        loop {
-            if chunk1.len() > chunk2.len() {
-                if &chunk1[..chunk2.len()] != chunk2 {
-                    return false;
-                } else {
-                    chunk1 = &chunk1[chunk2.len()..];
-                    chunk2 = "";
-                }
-            } else {
-                if &chunk2[..chunk1.len()] != chunk1 {
-                    return false;
-                } else {
-                    chunk2 = &chunk2[chunk1.len()..];
-                    chunk1 = "";
-                }
-            }
-
-            if chunk1.len() == 0 {
-                if let Some(chunk) = chunk_itr_1.next() {
-                    chunk1 = chunk;
-                } else {
-                    break;
-                }
-            }
-
-            if chunk2.len() == 0 {
-                if let Some(chunk) = chunk_itr_2.next() {
-                    chunk2 = chunk;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        return true;
+        self.to_slice() == other.to_slice()
     }
 }
 
 impl<'a> std::cmp::PartialEq<&'a str> for Rope {
     fn eq(&self, other: &&'a str) -> bool {
-        if self.len_bytes() != other.len() {
-            return false;
-        }
+        self.to_slice() == *other
+    }
+}
 
-        let mut idx = 0;
-        for chunk in self.chunks() {
-            if chunk != &other[idx..(idx + chunk.len())] {
-                return false;
-            }
-            idx += chunk.len();
-        }
-
-        return true;
+impl<'a> std::cmp::PartialEq<Rope> for &'a str {
+    fn eq(&self, other: &Rope) -> bool {
+        other.to_slice() == *self
     }
 }
 
