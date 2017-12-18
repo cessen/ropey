@@ -353,8 +353,8 @@ impl Node {
         debug_assert!(char_idx != (self.text_info().chars as usize));
         match self {
             &mut Node::Leaf(ref mut text) => {
-                let char_idx = char_idx_to_byte_idx(text, char_idx);
-                Node::Leaf(text.split_off(char_idx))
+                let byte_idx = char_idx_to_byte_idx(text, char_idx);
+                Node::Leaf(text.split_off(byte_idx))
             }
             &mut Node::Internal(ref mut children) => {
                 let (child_i, acc_info) =

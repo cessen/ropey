@@ -22,6 +22,9 @@ pub struct Rope {
 }
 
 impl Rope {
+    //-----------------------------------------------------------------------
+    // Constructors
+
     /// Creates an empty `Rope`.
     pub fn new() -> Rope {
         Rope { root: Arc::new(Node::new()) }
@@ -102,6 +105,9 @@ impl Rope {
         }
     }
 
+    //-----------------------------------------------------------------------
+    // Informational methods
+
     /// Total number of bytes in the `Rope`.
     pub fn len_bytes(&self) -> usize {
         self.root.byte_count()
@@ -117,7 +123,10 @@ impl Rope {
         self.root.line_break_count() + 1
     }
 
-    /// Inserts the given text at char index `char_idx`.
+    //-----------------------------------------------------------------------
+    // Edit methods
+
+    /// Inserts `text` at char index `char_idx`.
     pub fn insert(&mut self, char_idx: usize, text: &str) {
         // Bounds check
         assert!(
@@ -162,7 +171,7 @@ impl Rope {
             *self = new_rope;
         } else {
             let text_rope = Rope::from_str(text);
-            let right = self.split(char_idx);
+            let right = self.split_off(char_idx);
             self.append(text_rope);
             self.append(right);
         }
@@ -170,118 +179,24 @@ impl Rope {
 
     /// Removes the text in char range `start..end`.
     pub fn remove(&mut self, start: usize, end: usize) {
+        // TODO: handle large removals properly
         Arc::make_mut(&mut self.root).remove(start, end);
     }
 
-    /// Returns the char index of the given byte.
-    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        self.root.byte_to_char(byte_idx)
-    }
-
-    /// Returns the line index of the given byte.
-    pub fn byte_to_line(&self, byte_idx: usize) -> usize {
-        self.root.byte_to_line(byte_idx)
-    }
-
-    /// Returns the byte index of the given char.
-    pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        self.root.char_to_byte(char_idx) as usize
-    }
-
-    /// Returns the line index of the given char.
-    pub fn char_to_line(&self, char_idx: usize) -> usize {
-        self.root.char_to_line(char_idx)
-    }
-
-    /// Returns the byte index of the start of the given line.
-    pub fn line_to_byte(&self, line_idx: usize) -> usize {
-        self.root.line_to_byte(line_idx)
-    }
-
-    /// Returns the char index of the start of the given line.
-    pub fn line_to_char(&self, line_idx: usize) -> usize {
-        self.root.line_to_char(line_idx)
-    }
-
-    /// Returns whether the given char index is a grapheme cluster
-    /// boundary or not.
-    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
-        self.root.is_grapheme_boundary(char_idx)
-    }
-
-    /// Returns the previous grapheme cluster boundary to the left of
-    /// the given char index (excluding the given char index itself).
-    ///
-    /// If `char_idx` is at the beginning of the rope, returns 0.
-    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
-        self.root.prev_grapheme_boundary(char_idx)
-    }
-
-    /// Returns the next grapheme cluster boundary to the right of
-    /// the given char index (excluding the given char index itself).
-    ///
-    /// If `char_idx` is at the end of the rope, returns the end
-    /// position.
-    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
-        self.root.next_grapheme_boundary(char_idx)
-    }
-
-    /// Returns an immutable slice of the `Rope` in the char range `start..end`.
-    pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
-        self.root.slice(start, end)
-    }
-
-    /// Creates an iterator over the bytes of the `Rope`.
-    pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
-        RopeBytes::new(&self.root)
-    }
-
-    /// Creates an iterator over the chars of the `Rope`.
-    pub fn chars<'a>(&'a self) -> RopeChars<'a> {
-        RopeChars::new(&self.root)
-    }
-
-    /// Creates an iterator over the grapheme clusters of the `Rope`.
-    pub fn graphemes<'a>(&'a self) -> RopeGraphemes<'a> {
-        RopeGraphemes::new(&self.root, true)
-    }
-
-    /// Creates an iterator over the lines of the `Rope`.
-    pub fn lines<'a>(&'a self) -> RopeLines<'a> {
-        RopeLines::new(&self.root)
-    }
-
-    /// Creates an iterator over the chunks of the `Rope`.
-    pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
-        RopeChunks::new(&self.root)
-    }
-
-    /// Returns the entire text of the `Rope` as a newly allocated String.
-    pub fn to_string(&self) -> String {
-        use iter::RopeChunks;
-        let mut text = String::new();
-        for chunk in RopeChunks::new(&self.root) {
-            text.push_str(chunk);
-        }
-        text
-    }
-
-    /// Splits the `Rope` at char index `split_char_idx`.
-    ///
-    /// The left side of the split remians in this `Rope`, and
-    /// the right side is returned as a new `Rope`.
-    pub fn split(&mut self, split_char_idx: usize) -> Rope {
-        if split_char_idx == 0 {
+    /// Splits the `Rope` at `char_idx`, returning the right part of
+    /// the split.
+    pub fn split_off(&mut self, char_idx: usize) -> Rope {
+        if char_idx == 0 {
             // Special case 1
             let mut new_rope = Rope::new();
             std::mem::swap(self, &mut new_rope);
             new_rope
-        } else if split_char_idx == self.len_chars() {
+        } else if char_idx == self.len_chars() {
             // Special case 2
             Rope::new()
         } else {
             // Do the split
-            let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(split_char_idx));
+            let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(char_idx));
 
             // Fix up the edges
             Arc::make_mut(&mut self.root).zip_right();
@@ -352,7 +267,116 @@ impl Rope {
         }
     }
 
-    //--------------
+    //-----------------------------------------------------------------------
+    // Index conversion methods
+
+    /// Returns the char index of the given byte.
+    pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
+        self.root.byte_to_char(byte_idx)
+    }
+
+    /// Returns the line index of the given byte.
+    pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
+        self.root.byte_to_line(byte_idx)
+    }
+
+    /// Returns the byte index of the given char.
+    pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
+        self.root.char_to_byte(char_idx) as usize
+    }
+
+    /// Returns the line index of the given char.
+    pub fn char_to_line(&self, char_idx: usize) -> usize {
+        self.root.char_to_line(char_idx)
+    }
+
+    /// Returns the byte index of the start of the given line.
+    pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
+        self.root.line_to_byte(line_idx)
+    }
+
+    /// Returns the char index of the start of the given line.
+    pub fn line_to_char(&self, line_idx: usize) -> usize {
+        self.root.line_to_char(line_idx)
+    }
+
+    //-----------------------------------------------------------------------
+    // Grapheme methods
+
+    /// Returns whether `char_idx` is a grapheme cluster boundary or not.
+    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
+        self.root.is_grapheme_boundary(char_idx)
+    }
+
+    /// Returns the char index of the grapheme cluster boundary to the left
+    /// of `char_idx`.
+    ///
+    /// This excludes any boundary that might be at `char_idx` itself, unless
+    /// `char_idx` is at the beginning of the rope.
+    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
+        self.root.prev_grapheme_boundary(char_idx)
+    }
+
+    /// Returns the char index of the grapheme cluster boundary to the right
+    /// of `char_idx`.
+    ///
+    /// This excludes any boundary that might be at `char_idx` itself, unless
+    /// `char_idx` is at the end of the rope.
+    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
+        self.root.next_grapheme_boundary(char_idx)
+    }
+
+    //-----------------------------------------------------------------------
+    // Slicing
+
+    /// Returns an immutable slice of the `Rope` in the char range `start..end`.
+    pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
+        self.root.slice(start, end)
+    }
+
+    //-----------------------------------------------------------------------
+    // Iterator methods
+
+    /// Creates an iterator over the bytes of the `Rope`.
+    pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
+        RopeBytes::new(&self.root)
+    }
+
+    /// Creates an iterator over the chars of the `Rope`.
+    pub fn chars<'a>(&'a self) -> RopeChars<'a> {
+        RopeChars::new(&self.root)
+    }
+
+    /// Creates an iterator over the grapheme clusters of the `Rope`.
+    pub fn graphemes<'a>(&'a self) -> RopeGraphemes<'a> {
+        RopeGraphemes::new(&self.root, true)
+    }
+
+    /// Creates an iterator over the lines of the `Rope`.
+    pub fn lines<'a>(&'a self) -> RopeLines<'a> {
+        RopeLines::new(&self.root)
+    }
+
+    /// Creates an iterator over the chunks of the `Rope`.
+    pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
+        RopeChunks::new(&self.root)
+    }
+
+    //-----------------------------------------------------------------------
+    // Conversion methods
+
+    /// Returns the entire text of the `Rope` as a newly allocated String.
+    pub fn to_string(&self) -> String {
+        use iter::RopeChunks;
+        let mut text = String::new();
+        for chunk in RopeChunks::new(&self.root) {
+            text.push_str(chunk);
+        }
+        text
+    }
+
+    //-----------------------------------------------------------------------
+    // Debugging
 
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
@@ -465,12 +489,12 @@ mod tests {
     }
 
     #[test]
-    fn split_01() {
+    fn split_off_01() {
         let mut r = Rope::from_str(
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
 
-        let r2 = r.split(20);
+        let r2 = r.split_off(20);
         assert_eq!("Hello world! How are", &r.to_string());
         assert_eq!(
             " you doing? こんいちは、みんなさん！",
@@ -484,12 +508,12 @@ mod tests {
     }
 
     #[test]
-    fn split_02() {
+    fn split_off_02() {
         let mut r = Rope::from_str(
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
 
-        let r2 = r.split(1);
+        let r2 = r.split_off(1);
         assert_eq!("H", &r.to_string());
         assert_eq!(
             "ello world! How are you doing? こんいちは、みんなさん！",
@@ -503,12 +527,12 @@ mod tests {
     }
 
     #[test]
-    fn split_03() {
+    fn split_off_03() {
         let mut r = Rope::from_str(
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
 
-        let r2 = r.split(43);
+        let r2 = r.split_off(43);
         assert_eq!(
             "Hello world! How are you doing? こんいちは、みんなさん",
             &r.to_string()
@@ -522,12 +546,12 @@ mod tests {
     }
 
     #[test]
-    fn split_04() {
+    fn split_off_04() {
         let mut r = Rope::from_str(
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
 
-        let r2 = r.split(0);
+        let r2 = r.split_off(0);
         assert_eq!("", &r.to_string());
         assert_eq!(
             "Hello world! How are you doing? こんいちは、みんなさん！",
@@ -541,12 +565,12 @@ mod tests {
     }
 
     #[test]
-    fn split_05() {
+    fn split_off_05() {
         let mut r = Rope::from_str(
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
 
-        let r2 = r.split(44);
+        let r2 = r.split_off(44);
         assert_eq!(
             "Hello world! How are you doing? こんいちは、みんなさん！",
             &r.to_string()
