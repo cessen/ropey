@@ -145,13 +145,7 @@ impl ChildArray {
                             }
                             true
                         } else {
-                            let r_target_len = (children1.len() + children2.len()) / 2;
-                            while children2.len() < r_target_len {
-                                children2.insert(0, children1.pop());
-                            }
-                            while children2.len() > r_target_len {
-                                children1.push(children2.remove(0));
-                            }
+                            children1.distribute_with(children2);
                             false
                         }
                     } else {
@@ -169,6 +163,18 @@ impl ChildArray {
             self.info[idx1] = self.nodes[idx1].text_info();
             self.info[idx2] = self.nodes[idx2].text_info();
             return false;
+        }
+    }
+
+    /// Equi-distributes the children between the two child arrays,
+    /// preserving ordering.
+    pub fn distribute_with(&mut self, other: &mut ChildArray) {
+        let r_target_len = (self.len() + other.len()) / 2;
+        while other.len() < r_target_len {
+            other.insert(0, self.pop());
+        }
+        while other.len() > r_target_len {
+            self.push(other.remove(0));
         }
     }
 

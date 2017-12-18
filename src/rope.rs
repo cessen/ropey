@@ -287,8 +287,36 @@ impl Rope {
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
     pub fn append(&mut self, other: Rope) {
-        let _ = other;
-        unimplemented!()
+        let seam_byte_i = self.root.text_info().bytes;
+
+        let l_depth = self.root.depth();
+        let r_depth = other.root.depth();
+
+        if l_depth > r_depth {
+            let extra =
+                Arc::make_mut(&mut self.root).append_at_depth(other.root, l_depth - r_depth);
+            if let Some(node) = extra {
+                let mut children = ChildArray::new();
+                children.push((self.root.text_info(), self.root.clone()));
+                children.push((node.text_info(), node));
+                self.root = Arc::new(Node::Internal(children));
+            }
+        } else {
+            let mut other = other;
+            let extra = Arc::make_mut(&mut other.root).prepend_at_depth(
+                self.root.clone(),
+                r_depth - l_depth,
+            );
+            if let Some(node) = extra {
+                let mut children = ChildArray::new();
+                children.push((node.text_info(), node));
+                children.push((other.root.text_info(), other.root.clone()));
+                other.root = Arc::new(Node::Internal(children));
+            }
+            *self = other;
+        };
+
+        Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i);
     }
 
     //--------------
@@ -420,5 +448,35 @@ mod tests {
         r2.assert_integrity();
         r.assert_invariants();
         r2.assert_invariants();
+    }
+
+    #[test]
+    fn append_01() {
+        let mut r = Rope::from_str("Hello world! How are");
+        let r2 = Rope::from_str(" you doing? こんいちは、みんなさん！");
+
+        r.append(r2);
+        assert_eq!(
+            &r.to_string(),
+            "Hello world! How are you doing? こんいちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn append_02() {
+        let mut r = Rope::from_str("Hello world! How are you doing? こんい");
+        let r2 = Rope::from_str("ちは、みんなさん！");
+
+        r.append(r2);
+        assert_eq!(
+            &r.to_string(),
+            "Hello world! How are you doing? こんいちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 }

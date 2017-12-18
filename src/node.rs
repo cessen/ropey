@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std;
 use std::sync::Arc;
 
 use child_array::ChildArray;
@@ -11,7 +12,7 @@ use small_string::SmallString;
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                 char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
                 is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
-                nearest_internal_grapheme_boundary, seam_is_grapheme_boundary};
+                seam_is_grapheme_boundary};
 use text_info::{TextInfo, Count};
 
 
@@ -73,19 +74,14 @@ impl Node {
                     None
                 };
 
-                cur_text.insert_str(byte_pos, text);
 
                 if cur_text.len() <= MAX_BYTES {
+                    cur_text.insert_str(byte_pos, text);
                     return (None, seam);
                 } else {
-                    let split_pos = {
-                        let pos = cur_text.len() - (cur_text.len() / 2);
-                        nearest_internal_grapheme_boundary(&cur_text, pos)
-                    };
-                    let right_text = cur_text.split_off(split_pos);
-                    if right_text.len() > 0 {
-                        cur_text.shrink_to_fit();
-                        return (Some(Node::Leaf(right_text)), seam);
+                    let r_text = cur_text.insert_str_split(byte_pos, text);
+                    if r_text.len() > 0 {
+                        return (Some(Node::Leaf(r_text)), seam);
                     } else {
                         // Leaf couldn't be validly split, so leave it oversized
                         return (None, seam);
@@ -130,6 +126,102 @@ impl Node {
                     return (None, seam);
                 }
             }
+        }
+    }
+
+    pub(crate) fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+        if depth == 0 {
+            match self {
+                &mut Node::Leaf(_) => {
+                    if !other.is_leaf() {
+                        panic!("Tree-append siblings have differing types.");
+                    } else {
+                        return Some(other);
+                    }
+                }
+                &mut Node::Internal(ref mut children_l) => {
+                    let mut other = other;
+                    if let &mut Node::Internal(ref mut children_r) = Arc::make_mut(&mut other) {
+                        if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
+                            for _ in 0..children_r.len() {
+                                children_l.push(children_r.remove(0));
+                            }
+                            return None;
+                        } else {
+                            children_l.distribute_with(children_r);
+                            // Return lower down, to avoid borrow-checker.
+                        }
+                    } else {
+                        panic!("Tree-append siblings have differing types.");
+                    }
+                    return Some(other);
+                }
+            }
+        } else if let &mut Node::Internal(ref mut children) = self {
+            let residual = Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap())
+                .append_at_depth(other, depth - 1);
+            if let Some(extra_node) = residual {
+                if children.len() < MAX_CHILDREN {
+                    children.push((extra_node.text_info(), extra_node));
+                    return None;
+                } else {
+                    let r_children = children.push_split((extra_node.text_info(), extra_node));
+                    return Some(Arc::new(Node::Internal(r_children)));
+                }
+            } else {
+                return None;
+            }
+        } else {
+            panic!("Reached leaf before getting to target depth.");
+        }
+    }
+
+    pub(crate) fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+        if depth == 0 {
+            match self {
+                &mut Node::Leaf(_) => {
+                    if !other.is_leaf() {
+                        panic!("Tree-append siblings have differing types.");
+                    } else {
+                        return Some(other);
+                    }
+                }
+                &mut Node::Internal(ref mut children_r) => {
+                    let mut other = other;
+                    if let &mut Node::Internal(ref mut children_l) = Arc::make_mut(&mut other) {
+                        if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
+                            for _ in 0..children_l.len() {
+                                children_r.insert(0, children_l.pop());
+                            }
+                            return None;
+                        } else {
+                            children_l.distribute_with(children_r);
+                            // Return lower down, to avoid borrow-checker.
+                        }
+                    } else {
+                        panic!("Tree-append siblings have differing types.");
+                    }
+                    return Some(other);
+                }
+            }
+        } else if let &mut Node::Internal(ref mut children) = self {
+            let residual = Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap())
+                .prepend_at_depth(other, depth - 1);
+            if let Some(extra_node) = residual {
+                if children.len() < MAX_CHILDREN {
+                    children.insert(0, (extra_node.text_info(), extra_node));
+                    return None;
+                } else {
+                    let mut r_children =
+                        children.insert_split(0, (extra_node.text_info(), extra_node));
+                    std::mem::swap(children, &mut r_children);
+                    return Some(Arc::new(Node::Internal(r_children)));
+                }
+            } else {
+                return None;
+            }
+        } else {
+            panic!("Reached leaf before getting to target depth.");
         }
     }
 
@@ -523,6 +615,18 @@ impl Node {
         }
     }
 
+    /// How many nodes deep the tree is.
+    ///
+    /// This counts root and leafs.  For example, a single leaf node
+    /// has depth 1.
+    pub(crate) fn depth(&self) -> usize {
+        1 +
+            match self {
+                &Node::Leaf(_) => 0,
+                &Node::Internal(ref children) => children.nodes()[0].depth(),
+            }
+    }
+
     /// Returns the chunk that contains the given byte, and the byte's
     /// byte-offset within the chunk.
     fn get_chunk_at_byte<'a>(&'a self, byte_idx: usize) -> (&'a str, usize) {
@@ -650,6 +754,10 @@ impl Node {
     ///
     /// Note: panics if the given byte position is not on the boundary between
     /// two leaf nodes.
+    ///
+    /// Note 2: theoretically can leave an empty leaf node, though that would
+    /// require an insanely long grapheme.  Given how unlikely it is, it doesn't
+    /// seem worth handling.  Code shouldn't break on empty leaf nodes anyway.
     pub(crate) fn fix_grapheme_seam(
         &mut self,
         byte_pos: Count,

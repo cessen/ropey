@@ -14,6 +14,7 @@ use std::ptr;
 use std::str;
 
 use smallvec::{Array, SmallVec};
+use str_utils::nearest_internal_grapheme_boundary;
 
 
 #[derive(Clone, Default)]
@@ -55,6 +56,26 @@ impl<B: Array<Item = u8>> SmallString<B> {
         }
     }
 
+    /// Inserts a `&str` and splits the resulting string in half, returning
+    /// the right half.
+    ///
+    /// Only splits on grapheme boundaries, so if the whole string is a
+    /// single grapheme, the split will fail and the returned string
+    /// will be empty.
+    ///
+    /// TODO: make this work without allocations when possible.
+    #[inline]
+    pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
+        self.insert_str(idx, string);
+
+        let split_pos = {
+            let pos = self.len() - (self.len() / 2);
+            nearest_internal_grapheme_boundary(&self, pos)
+        };
+
+        self.split_off(split_pos)
+    }
+
     /// Appends a `&str` to end the of the `SmallString`.
     #[inline]
     pub fn push_str(&mut self, string: &str) {
@@ -62,6 +83,26 @@ impl<B: Array<Item = u8>> SmallString<B> {
         unsafe {
             self.insert_bytes(len, string.as_bytes());
         }
+    }
+
+    /// Appends a `&str` and splits the resulting string in half, returning
+    /// the right half.
+    ///
+    /// Only splits on grapheme boundaries, so if the whole string is a
+    /// single grapheme, the split will fail and the returned string
+    /// will be empty.
+    ///
+    /// TODO: make this work without allocations when possible.
+    #[inline]
+    pub fn push_str_split(&mut self, string: &str) -> Self {
+        self.push_str(string);
+
+        let split_pos = {
+            let pos = self.len() - (self.len() / 2);
+            nearest_internal_grapheme_boundary(&self, pos)
+        };
+
+        self.split_off(split_pos)
     }
 
     /// Drops the text after byte index `idx`.
