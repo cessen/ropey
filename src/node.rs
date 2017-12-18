@@ -16,11 +16,11 @@ use text_info::{TextInfo, Count};
 
 
 // Internal node min/max values.
-pub(crate) const MAX_CHILDREN: usize = 3;
+pub(crate) const MAX_CHILDREN: usize = 17;
 const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 // Leaf node min/max values.
-pub(crate) const MAX_BYTES: usize = 2;
+pub(crate) const MAX_BYTES: usize = 335;
 const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 
@@ -278,17 +278,8 @@ impl Node {
 
                     r_children.insert(0, (r_node.text_info(), Arc::new(r_node)));
 
-                    // TODO: optimize for not having to do this every time
-                    if children.len() > 1 {
-                        children.merge_distribute(child_i - 1, child_i);
-                    } else {
-                        children.update_child_info(child_i);
-                    }
-                    if r_children.len() > 1 {
-                        r_children.merge_distribute(0, 1);
-                    } else {
-                        r_children.update_child_info(0);
-                    }
+                    children.update_child_info(child_i);
+                    r_children.update_child_info(0);
 
                     Node::Internal(r_children)
                 }
@@ -747,6 +738,65 @@ impl Node {
                 *children.info_mut().last_mut().unwrap() =
                     children.nodes().last().unwrap().text_info();
             }
+        }
+    }
+
+    /// Fixes dangling nodes down the left side of the tree.
+    ///
+    /// Returns whether it did anything or not that would affect the
+    /// parent.
+    pub(crate) fn zip_left(&mut self) -> bool {
+        if let &mut Node::Internal(ref mut children) = self {
+            let mut did_stuff = false;
+            loop {
+                let do_merge = (children.len() > 1) &&
+                    match *children.nodes()[0] {
+                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                    };
+
+                if do_merge {
+                    children.merge_distribute(0, 1);
+                    did_stuff = true;
+                }
+
+                if !Arc::make_mut(&mut children.nodes_mut()[0]).zip_left() {
+                    break;
+                }
+            }
+            did_stuff
+        } else {
+            false
+        }
+    }
+
+    /// Fixes dangling nodes down the right side of the tree.
+    ///
+    /// Returns whether it did anything or not that would affect the
+    /// parent. True: did stuff, false: didn't do stuff
+    pub(crate) fn zip_right(&mut self) -> bool {
+        if let &mut Node::Internal(ref mut children) = self {
+            let mut did_stuff = false;
+            loop {
+                let last_i = children.len() - 1;
+                let do_merge = (children.len() > 1) &&
+                    match *children.nodes()[last_i] {
+                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                    };
+
+                if do_merge {
+                    children.merge_distribute(last_i - 1, last_i);
+                    did_stuff = true;
+                }
+
+                if !Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap()).zip_right() {
+                    break;
+                }
+            }
+            did_stuff
+        } else {
+            false
         }
     }
 }

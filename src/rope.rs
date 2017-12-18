@@ -253,7 +253,35 @@ impl Rope {
     /// The left side of the split remians in this `Rope`, and
     /// the right side is returned as a new `Rope`.
     pub fn split(&mut self, split_char_idx: usize) -> Rope {
-        let new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(split_char_idx));
+        // Do the split
+        let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(split_char_idx));
+
+        // Fix up the edges
+        Arc::make_mut(&mut self.root).zip_right();
+        Arc::make_mut(&mut new_rope_root).zip_left();
+
+        // Pull up singular nodes
+        while (!self.root.is_leaf()) && self.root.child_count() == 1 {
+            let child = if let Node::Internal(ref children) = *self.root {
+                children.nodes()[0].clone()
+            } else {
+                unreachable!()
+            };
+
+            self.root = child;
+        }
+
+        while (!new_rope_root.is_leaf()) && new_rope_root.child_count() == 1 {
+            let child = if let Node::Internal(ref children) = *new_rope_root {
+                children.nodes()[0].clone()
+            } else {
+                unreachable!()
+            };
+
+            new_rope_root = child;
+        }
+
+        // Return right rope
         Rope { root: new_rope_root }
     }
 
@@ -389,6 +417,8 @@ mod tests {
         );
 
         r.assert_integrity();
+        r2.assert_integrity();
         r.assert_invariants();
+        r2.assert_invariants();
     }
 }

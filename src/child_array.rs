@@ -139,7 +139,7 @@ impl ChildArray {
 
                 &mut Node::Internal(ref mut children1) => {
                     if let &mut Node::Internal(ref mut children2) = node2 {
-                        if (children1.len() + children2.len()) < MAX_LEN {
+                        if (children1.len() + children2.len()) <= MAX_LEN {
                             for _ in 0..children2.len() {
                                 children1.push(children2.remove(0));
                             }
