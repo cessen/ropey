@@ -114,6 +114,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
         self.buffer.truncate(idx);
+        self.inline_if_possible();
     }
 
     /// Drops the text before byte index `idx`, shifting the
@@ -143,6 +144,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
         unsafe {
             self.remove_bytes(start, end);
         }
+        self.inline_if_possible();
     }
 
     /// Splits the `SmallString` at `idx`.
@@ -167,6 +169,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
             self.buffer.set_len(idx);
             other.buffer.set_len(len - idx);
         }
+        self.inline_if_possible();
         other
     }
 
@@ -180,6 +183,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
         &mut self.buffer
     }
 
+    #[inline(always)]
     unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
         debug_assert!(idx <= self.len());
         let len = self.len();
@@ -199,6 +203,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
         self.buffer.set_len(len + amt);
     }
 
+    #[inline(always)]
     unsafe fn remove_bytes(&mut self, start: usize, end: usize) {
         debug_assert!(end >= start);
         debug_assert!(end <= self.len());
@@ -210,6 +215,17 @@ impl<B: Array<Item = u8>> SmallString<B> {
             len - end,
         );
         self.buffer.set_len(len - amt);
+
+        self.inline_if_possible();
+    }
+
+    /// Re-inlines the data if it's been heap allocated but can
+    /// fit inline.
+    #[inline(always)]
+    fn inline_if_possible(&mut self) {
+        if self.buffer.spilled() && (self.buffer.len() <= self.buffer.inline_size()) {
+            self.buffer.shrink_to_fit();
+        }
     }
 }
 

@@ -271,70 +271,85 @@ impl Rope {
     /// The left side of the split remians in this `Rope`, and
     /// the right side is returned as a new `Rope`.
     pub fn split(&mut self, split_char_idx: usize) -> Rope {
-        // Do the split
-        let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(split_char_idx));
+        if split_char_idx == 0 {
+            // Special case 1
+            let mut new_rope = Rope::new();
+            std::mem::swap(self, &mut new_rope);
+            new_rope
+        } else if split_char_idx == self.len_chars() {
+            // Special case 2
+            Rope::new()
+        } else {
+            // Do the split
+            let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(split_char_idx));
 
-        // Fix up the edges
-        Arc::make_mut(&mut self.root).zip_right();
-        Arc::make_mut(&mut new_rope_root).zip_left();
+            // Fix up the edges
+            Arc::make_mut(&mut self.root).zip_right();
+            Arc::make_mut(&mut new_rope_root).zip_left();
 
-        // Pull up singular nodes
-        while (!self.root.is_leaf()) && self.root.child_count() == 1 {
-            let child = if let Node::Internal(ref children) = *self.root {
-                children.nodes()[0].clone()
-            } else {
-                unreachable!()
-            };
+            // Pull up singular nodes
+            while (!self.root.is_leaf()) && self.root.child_count() == 1 {
+                let child = if let Node::Internal(ref children) = *self.root {
+                    children.nodes()[0].clone()
+                } else {
+                    unreachable!()
+                };
 
-            self.root = child;
+                self.root = child;
+            }
+
+            while (!new_rope_root.is_leaf()) && new_rope_root.child_count() == 1 {
+                let child = if let Node::Internal(ref children) = *new_rope_root {
+                    children.nodes()[0].clone()
+                } else {
+                    unreachable!()
+                };
+
+                new_rope_root = child;
+            }
+
+            // Return right rope
+            Rope { root: new_rope_root }
         }
-
-        while (!new_rope_root.is_leaf()) && new_rope_root.child_count() == 1 {
-            let child = if let Node::Internal(ref children) = *new_rope_root {
-                children.nodes()[0].clone()
-            } else {
-                unreachable!()
-            };
-
-            new_rope_root = child;
-        }
-
-        // Return right rope
-        Rope { root: new_rope_root }
     }
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
     pub fn append(&mut self, other: Rope) {
-        let seam_byte_i = self.root.text_info().bytes;
-
-        let l_depth = self.root.depth();
-        let r_depth = other.root.depth();
-
-        if l_depth > r_depth {
-            let extra =
-                Arc::make_mut(&mut self.root).append_at_depth(other.root, l_depth - r_depth);
-            if let Some(node) = extra {
-                let mut children = ChildArray::new();
-                children.push((self.root.text_info(), self.root.clone()));
-                children.push((node.text_info(), node));
-                self.root = Arc::new(Node::Internal(children));
-            }
-        } else {
+        if self.len_chars() == 0 {
             let mut other = other;
-            let extra = Arc::make_mut(&mut other.root).prepend_at_depth(
-                self.root.clone(),
-                r_depth - l_depth,
-            );
-            if let Some(node) = extra {
-                let mut children = ChildArray::new();
-                children.push((node.text_info(), node));
-                children.push((other.root.text_info(), other.root.clone()));
-                other.root = Arc::new(Node::Internal(children));
-            }
-            *self = other;
-        };
+            std::mem::swap(self, &mut other);
+        } else if other.len_chars() > 0 {
+            let seam_byte_i = self.root.text_info().bytes;
 
-        Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i);
+            let l_depth = self.root.depth();
+            let r_depth = other.root.depth();
+
+            if l_depth > r_depth {
+                let extra =
+                    Arc::make_mut(&mut self.root).append_at_depth(other.root, l_depth - r_depth);
+                if let Some(node) = extra {
+                    let mut children = ChildArray::new();
+                    children.push((self.root.text_info(), self.root.clone()));
+                    children.push((node.text_info(), node));
+                    self.root = Arc::new(Node::Internal(children));
+                }
+            } else {
+                let mut other = other;
+                let extra = Arc::make_mut(&mut other.root).prepend_at_depth(
+                    self.root.clone(),
+                    r_depth - l_depth,
+                );
+                if let Some(node) = extra {
+                    let mut children = ChildArray::new();
+                    children.push((node.text_info(), node));
+                    children.push((other.root.text_info(), other.root.clone()));
+                    other.root = Arc::new(Node::Internal(children));
+                }
+                *self = other;
+            };
+
+            Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i);
+        }
     }
 
     //--------------
@@ -474,6 +489,44 @@ mod tests {
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
 
+        let r2 = r.split(1);
+        assert_eq!("H", &r.to_string());
+        assert_eq!(
+            "ello world! How are you doing? こんいちは、みんなさん！",
+            &r2.to_string()
+        );
+
+        r.assert_integrity();
+        r2.assert_integrity();
+        r.assert_invariants();
+        r2.assert_invariants();
+    }
+
+    #[test]
+    fn split_03() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        let r2 = r.split(43);
+        assert_eq!(
+            "Hello world! How are you doing? こんいちは、みんなさん",
+            &r.to_string()
+        );
+        assert_eq!("！", &r2.to_string());
+
+        r.assert_integrity();
+        r2.assert_integrity();
+        r.assert_invariants();
+        r2.assert_invariants();
+    }
+
+    #[test]
+    fn split_04() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
         let r2 = r.split(0);
         assert_eq!("", &r.to_string());
         assert_eq!(
@@ -488,7 +541,7 @@ mod tests {
     }
 
     #[test]
-    fn split_03() {
+    fn split_05() {
         let mut r = Rope::from_str(
             "Hello world! How are you doing? こんいちは、みんなさん！",
         );
@@ -525,6 +578,74 @@ mod tests {
     fn append_02() {
         let mut r = Rope::from_str("Hello world! How are you doing? こんい");
         let r2 = Rope::from_str("ちは、みんなさん！");
+
+        r.append(r2);
+        assert_eq!(
+            &r.to_string(),
+            "Hello world! How are you doing? こんいちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn append_03() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん",
+        );
+        let r2 = Rope::from_str("！");
+
+        r.append(r2);
+        assert_eq!(
+            &r.to_string(),
+            "Hello world! How are you doing? こんいちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn append_04() {
+        let mut r = Rope::from_str("H");
+        let r2 = Rope::from_str(
+            "ello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        r.append(r2);
+        assert_eq!(
+            &r.to_string(),
+            "Hello world! How are you doing? こんいちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn append_05() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+        let r2 = Rope::from_str("");
+
+        r.append(r2);
+        assert_eq!(
+            &r.to_string(),
+            "Hello world! How are you doing? こんいちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn append_06() {
+        let mut r = Rope::from_str("");
+        let r2 = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
 
         r.append(r2);
         assert_eq!(

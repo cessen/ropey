@@ -158,8 +158,10 @@ impl Node {
                 }
             }
         } else if let &mut Node::Internal(ref mut children) = self {
-            let residual = Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap())
+            let last_i = children.len() - 1;
+            let residual = Arc::make_mut(&mut children.nodes_mut()[last_i])
                 .append_at_depth(other, depth - 1);
+            children.update_child_info(last_i);
             if let Some(extra_node) = residual {
                 if children.len() < MAX_CHILDREN {
                     children.push((extra_node.text_info(), extra_node));
@@ -205,8 +207,9 @@ impl Node {
                 }
             }
         } else if let &mut Node::Internal(ref mut children) = self {
-            let residual = Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap())
+            let residual = Arc::make_mut(&mut children.nodes_mut()[0])
                 .prepend_at_depth(other, depth - 1);
+            children.update_child_info(0);
             if let Some(extra_node) = residual {
                 if children.len() < MAX_CHILDREN {
                     children.insert(0, (extra_node.text_info(), extra_node));
@@ -346,6 +349,8 @@ impl Node {
     /// Splits the `Node` at char index `char_idx`, returning
     /// the right side of the split.
     pub fn split(&mut self, char_idx: usize) -> Node {
+        debug_assert!(char_idx != 0);
+        debug_assert!(char_idx != (self.text_info().chars as usize));
         match self {
             &mut Node::Leaf(ref mut text) => {
                 let char_idx = char_idx_to_byte_idx(text, char_idx);
@@ -864,8 +869,7 @@ impl Node {
                     };
 
                 if do_merge {
-                    children.merge_distribute(0, 1);
-                    did_stuff = true;
+                    did_stuff |= children.merge_distribute(0, 1);
                 }
 
                 if !Arc::make_mut(&mut children.nodes_mut()[0]).zip_left() {
@@ -894,8 +898,7 @@ impl Node {
                     };
 
                 if do_merge {
-                    children.merge_distribute(last_i - 1, last_i);
-                    did_stuff = true;
+                    did_stuff |= children.merge_distribute(last_i - 1, last_i);
                 }
 
                 if !Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap()).zip_right() {
