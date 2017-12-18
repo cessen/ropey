@@ -40,11 +40,10 @@ impl Rope {
     /// Creates a `Rope` from the output of a reader.
     ///
     /// This expects utf8 data, and will fail if the reader provides
-    /// anything else.
+    /// anything else, returning an IO error with kind `InvalidData`.
     ///
-    /// Returns None if it fails.
-    pub fn from_reader<T: io::Read>(reader: &mut T) -> Option<Rope> {
-        // TODO: return a proper Result type that propagates errors.
+    /// If there is an error in the reader, it is returned.
+    pub fn from_reader<T: io::Read>(reader: &mut T) -> io::Result<Rope> {
         const BUFFER_SIZE: usize = MAX_BYTES * 2;
         let mut builder = RopeBuilder::new();
         let mut buffer = [0u8; BUFFER_SIZE];
@@ -83,23 +82,29 @@ impl Rope {
                         // Buffer is full and none of it could be consumed.  Utf8
                         // codepoints don't get that large, so it's clearly not
                         // valid text.
-                        return None;
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "stream did not contain valid UTF-8",
+                        ));
                     }
 
                     // If we're done reading
                     if read_count == 0 {
                         if fill_idx > 0 {
                             // We couldn't consume all data.
-                            return None;
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "stream did not contain valid UTF-8",
+                            ));
                         } else {
-                            return Some(builder.finish());
+                            return Ok(builder.finish());
                         }
                     }
                 }
 
-                Err(_) => {
+                Err(e) => {
                     // Read error
-                    return None;
+                    return Err(e);
                 }
             }
         }

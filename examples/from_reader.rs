@@ -25,7 +25,7 @@ fn main() {
     let text = {
         let mut input = String::new();
         let mut f = io::BufReader::new(File::open(&filepath).unwrap());
-        let _ = f.read_to_string(&mut input);
+        f.read_to_string(&mut input).unwrap();
         input
     };
 
