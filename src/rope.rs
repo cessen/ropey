@@ -16,7 +16,7 @@ use text_info::Count;
 
 
 /// A utf8 text rope.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Arc<Node>,
 }
@@ -395,6 +395,90 @@ impl Rope {
     #[doc(hidden)]
     pub fn assert_invariants(&self) {
         self.root.assert_invariants(true);
+    }
+}
+
+//==============================================================
+
+impl std::fmt::Debug for Rope {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_list().entries(self.chunks()).finish()
+    }
+}
+
+impl std::fmt::Display for Rope {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for chunk in self.chunks() {
+            write!(f, "{}", chunk)?
+        }
+        Ok(())
+    }
+}
+
+impl<'a> std::cmp::PartialEq<Rope> for Rope {
+    fn eq(&self, other: &Rope) -> bool {
+        if self.len_bytes() != other.len_bytes() {
+            return false;
+        }
+
+        let mut chunk_itr_1 = self.chunks();
+        let mut chunk_itr_2 = other.chunks();
+        let mut chunk1 = chunk_itr_1.next().unwrap();
+        let mut chunk2 = chunk_itr_2.next().unwrap();
+
+        loop {
+            if chunk1.len() > chunk2.len() {
+                if &chunk1[..chunk2.len()] != chunk2 {
+                    return false;
+                } else {
+                    chunk1 = &chunk1[chunk2.len()..];
+                    chunk2 = "";
+                }
+            } else {
+                if &chunk2[..chunk1.len()] != chunk1 {
+                    return false;
+                } else {
+                    chunk2 = &chunk2[chunk1.len()..];
+                    chunk1 = "";
+                }
+            }
+
+            if chunk1.len() == 0 {
+                if let Some(chunk) = chunk_itr_1.next() {
+                    chunk1 = chunk;
+                } else {
+                    break;
+                }
+            }
+
+            if chunk2.len() == 0 {
+                if let Some(chunk) = chunk_itr_2.next() {
+                    chunk2 = chunk;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
+impl<'a> std::cmp::PartialEq<&'a str> for Rope {
+    fn eq(&self, other: &&'a str) -> bool {
+        if self.len_bytes() != other.len() {
+            return false;
+        }
+
+        let mut idx = 0;
+        for chunk in self.chunks() {
+            if chunk != &other[idx..(idx + chunk.len())] {
+                return false;
+            }
+            idx += chunk.len();
+        }
+
+        return true;
     }
 }
 

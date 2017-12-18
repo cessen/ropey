@@ -5,18 +5,14 @@ use ropey::Rope;
 #[test]
 fn from_str() {
     // Build rope from file contents
-    let rope = Rope::from_str(TEXT);
+    let mut rope = Rope::from_str(TEXT);
 
     // Verify rope integrity
     rope.assert_integrity();
     rope.assert_invariants();
 
     // Verify that they match
-    let mut idx = 0;
-    for chunk in rope.chunks() {
-        assert_eq!(chunk, &TEXT[idx..(idx + chunk.len())]);
-        idx += chunk.len();
-    }
+    assert_eq!(rope, TEXT);
 }
 
 const TEXT: &str = "
