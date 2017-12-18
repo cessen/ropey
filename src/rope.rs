@@ -453,7 +453,7 @@ mod tests {
         r.insert(0, "Hello world!");
         r.insert(3, "zopter");
 
-        assert_eq!("Helzopterlo world!", &r.to_string());
+        assert_eq!("Helzopterlo world!", r);
     }
 
     #[test]
@@ -462,7 +462,7 @@ mod tests {
         r.insert(0, "Hello world!");
         r.insert(0, "zopter");
 
-        assert_eq!("zopterHello world!", &r.to_string());
+        assert_eq!("zopterHello world!", r);
     }
 
     #[test]
@@ -471,7 +471,7 @@ mod tests {
         r.insert(0, "Hello world!");
         r.insert(12, "zopter");
 
-        assert_eq!("Hello world!zopter", &r.to_string());
+        assert_eq!("Hello world!zopter", r);
     }
 
     #[test]
@@ -486,7 +486,7 @@ mod tests {
         r.insert(10, "d!");
         r.insert(3, "zopter");
 
-        assert_eq!("Helzopterlo world!", &r.to_string());
+        assert_eq!("Helzopterlo world!", r);
     }
 
     #[test]
@@ -494,7 +494,7 @@ mod tests {
         let mut r = Rope::new();
         r.insert(0, "こんいちは、みんなさん！");
         r.insert(7, "zopter");
-        assert_eq!("こんいちは、みzopterんなさん！", &r.to_string());
+        assert_eq!("こんいちは、みzopterんなさん！", r);
     }
 
     #[test]
@@ -513,7 +513,7 @@ mod tests {
         r.insert(10, "ん");
         r.insert(11, "！");
         r.insert(7, "zopter");
-        assert_eq!("こんいちは、みzopterんなさん！", &r.to_string());
+        assert_eq!("こんいちは、みzopterんなさん！", r);
     }
 
     #[test]
@@ -525,7 +525,7 @@ mod tests {
         r.remove(5, 11);
         r.remove(24, 31);
         r.remove(19, 25);
-        assert_eq!("Hello! How are you みんなさん！", &r.to_string());
+        assert_eq!("Hello! How are you みんなさん！", r);
 
         // r.assert_integrity();
         // r.assert_invariants();
@@ -538,7 +538,7 @@ mod tests {
         );
 
         let r2 = r.split_off(20);
-        assert_eq!("Hello world! How are", &r.to_string());
+        assert_eq!("Hello world! How are", r);
         assert_eq!(
             " you doing? こんいちは、みんなさん！",
             &r2.to_string()
@@ -557,10 +557,10 @@ mod tests {
         );
 
         let r2 = r.split_off(1);
-        assert_eq!("H", &r.to_string());
+        assert_eq!("H", r);
         assert_eq!(
             "ello world! How are you doing? こんいちは、みんなさん！",
-            &r2.to_string()
+            r2
         );
 
         r.assert_integrity();
@@ -578,9 +578,9 @@ mod tests {
         let r2 = r.split_off(43);
         assert_eq!(
             "Hello world! How are you doing? こんいちは、みんなさん",
-            &r.to_string()
+            r
         );
-        assert_eq!("！", &r2.to_string());
+        assert_eq!("！", r2);
 
         r.assert_integrity();
         r2.assert_integrity();
@@ -595,10 +595,10 @@ mod tests {
         );
 
         let r2 = r.split_off(0);
-        assert_eq!("", &r.to_string());
+        assert_eq!("", r);
         assert_eq!(
             "Hello world! How are you doing? こんいちは、みんなさん！",
-            &r2.to_string()
+            r2
         );
 
         r.assert_integrity();
@@ -616,9 +616,9 @@ mod tests {
         let r2 = r.split_off(44);
         assert_eq!(
             "Hello world! How are you doing? こんいちは、みんなさん！",
-            &r.to_string()
+            r
         );
-        assert_eq!("", &r2.to_string());
+        assert_eq!("", r2);
 
         r.assert_integrity();
         r2.assert_integrity();
@@ -633,7 +633,7 @@ mod tests {
 
         r.append(r2);
         assert_eq!(
-            &r.to_string(),
+            r,
             "Hello world! How are you doing? こんいちは、みんなさん！"
         );
 
@@ -648,7 +648,7 @@ mod tests {
 
         r.append(r2);
         assert_eq!(
-            &r.to_string(),
+            r,
             "Hello world! How are you doing? こんいちは、みんなさん！"
         );
 
@@ -665,7 +665,7 @@ mod tests {
 
         r.append(r2);
         assert_eq!(
-            &r.to_string(),
+            r,
             "Hello world! How are you doing? こんいちは、みんなさん！"
         );
 
@@ -682,7 +682,7 @@ mod tests {
 
         r.append(r2);
         assert_eq!(
-            &r.to_string(),
+            r,
             "Hello world! How are you doing? こんいちは、みんなさん！"
         );
 
@@ -699,7 +699,7 @@ mod tests {
 
         r.append(r2);
         assert_eq!(
-            &r.to_string(),
+            r,
             "Hello world! How are you doing? こんいちは、みんなさん！"
         );
 
@@ -716,7 +716,7 @@ mod tests {
 
         r.append(r2);
         assert_eq!(
-            &r.to_string(),
+            r,
             "Hello world! How are you doing? こんいちは、みんなさん！"
         );
 

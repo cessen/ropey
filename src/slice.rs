@@ -219,7 +219,7 @@ mod tests {
 
         let s = r.slice(0, r.len_chars());
 
-        assert_eq!(text, &s.to_string());
+        assert_eq!(text, s);
     }
 
     #[test]
@@ -230,6 +230,6 @@ mod tests {
 
         let s = r.slice(5, 21);
 
-        assert_eq!(&text[5..21], &s.to_string());
+        assert_eq!(&text[5..21], s);
     }
 }

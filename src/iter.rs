@@ -436,22 +436,22 @@ isn't it?  Aren't you glad we're alive?\r\n\
 
         let mut lines = r.lines();
 
-        assert_eq!("\r\n", &lines.next().unwrap().to_string());
+        assert_eq!("\r\n", lines.next().unwrap());
 
         for _ in 0..16 {
             assert_eq!(
                 "Hello there!  How're you doing?  It's a fine day, \
                  isn't it?  Aren't you glad we're alive?\r\n",
-                &lines.next().unwrap().to_string()
+                lines.next().unwrap()
             );
             assert_eq!(
                 "こんにちは！元気ですか？日はいいですね。\
                  私たちが生きだって嬉しいではないか？\r\n",
-                &lines.next().unwrap().to_string()
+                lines.next().unwrap()
             );
         }
 
-        assert_eq!("", &lines.next().unwrap().to_string());
+        assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
@@ -463,8 +463,8 @@ isn't it?  Aren't you glad we're alive?\r\n\
         assert_eq!(2, r.lines().count());
 
         let mut lines = r.lines();
-        assert_eq!("Hello there!\n", &lines.next().unwrap().to_string());
-        assert_eq!("How goes it?", &lines.next().unwrap().to_string());
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
