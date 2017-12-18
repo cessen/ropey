@@ -37,7 +37,7 @@ impl Rope {
         builder.finish()
     }
 
-    /// Creates a `Rope` from a output of a reader.
+    /// Creates a `Rope` from the output of a reader.
     ///
     /// This expects utf8 data, and will fail if the reader provides
     /// anything else.
