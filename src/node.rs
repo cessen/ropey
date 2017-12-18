@@ -58,8 +58,8 @@ impl Node {
     /// within this node.  Also returns the byte position where there may
     /// be a grapheme seam to fix, if any.
     ///
-    /// TODO: handle the situation where what's being inserted is larger
-    /// than MAX_BYTES.
+    /// Note: this does not handle large insertions (i.e. larger than
+    /// MAX_BYTES) well.  That is handled at Rope::insert().
     pub(crate) fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
         match self {
             // If it's a leaf

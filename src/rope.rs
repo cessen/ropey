@@ -11,6 +11,7 @@ use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::{Node, MAX_BYTES};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
+use str_utils::char_idx_to_byte_idx;
 use text_info::Count;
 
 
@@ -126,27 +127,44 @@ impl Rope {
             self.len_chars()
         );
 
-        // Get root for mutation
-        let root = Arc::make_mut(&mut self.root);
+        if text.len() <= MAX_BYTES {
+            // Get root for mutation
+            let root = Arc::make_mut(&mut self.root);
 
-        // Do the insertion
-        let (residual, seam) = root.insert(char_idx as Count, text);
+            // Do the insertion
+            let (residual, seam) = root.insert(char_idx as Count, text);
 
-        // Handle root splitting, if any.
-        if let Some(r_node) = residual {
-            let mut l_node = Node::new();
-            std::mem::swap(&mut l_node, root);
+            // Handle root splitting, if any.
+            if let Some(r_node) = residual {
+                let mut l_node = Node::new();
+                std::mem::swap(&mut l_node, root);
 
-            let mut children = ChildArray::new();
-            children.push((l_node.text_info(), Arc::new(l_node)));
-            children.push((r_node.text_info(), Arc::new(r_node)));
+                let mut children = ChildArray::new();
+                children.push((l_node.text_info(), Arc::new(l_node)));
+                children.push((r_node.text_info(), Arc::new(r_node)));
 
-            *root = Node::Internal(children);
-        }
+                *root = Node::Internal(children);
+            }
 
-        // Handle seam, if any.
-        if let Some(byte_pos) = seam {
-            root.fix_grapheme_seam(byte_pos);
+            // Handle seam, if any.
+            if let Some(byte_pos) = seam {
+                root.fix_grapheme_seam(byte_pos);
+            }
+        } else if self.root.is_leaf() && (self.root.text_info().bytes as usize <= MAX_BYTES) {
+            let mut new_rope = Rope::from_str(text);
+            {
+                let orig_text = self.root.leaf_text();
+                let byte_idx = char_idx_to_byte_idx(orig_text, char_idx);
+                new_rope.insert(0, &orig_text[..byte_idx]);
+                let end_idx = new_rope.root.text_info().chars as usize;
+                new_rope.insert(end_idx, &orig_text[byte_idx..]);
+            }
+            *self = new_rope;
+        } else {
+            let text_rope = Rope::from_str(text);
+            let right = self.split(char_idx);
+            self.append(text_rope);
+            self.append(right);
         }
     }
 
@@ -443,6 +461,44 @@ mod tests {
             " you doing? こんいちは、みんなさん！",
             &r2.to_string()
         );
+
+        r.assert_integrity();
+        r2.assert_integrity();
+        r.assert_invariants();
+        r2.assert_invariants();
+    }
+
+    #[test]
+    fn split_02() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        let r2 = r.split(0);
+        assert_eq!("", &r.to_string());
+        assert_eq!(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+            &r2.to_string()
+        );
+
+        r.assert_integrity();
+        r2.assert_integrity();
+        r.assert_invariants();
+        r2.assert_invariants();
+    }
+
+    #[test]
+    fn split_03() {
+        let mut r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        let r2 = r.split(44);
+        assert_eq!(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+            &r.to_string()
+        );
+        assert_eq!("", &r2.to_string());
 
         r.assert_integrity();
         r2.assert_integrity();
