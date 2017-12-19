@@ -3,52 +3,40 @@
 use std;
 use std::sync::Arc;
 
-use child_array::ChildArray;
-use smallvec::Array;
-use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-
 use slice::RopeSlice;
-use small_string::SmallString;
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                 char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
                 is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
                 seam_is_grapheme_boundary};
-use text_info::{TextInfo, Count};
-
-
-// Internal node min/max values.
-pub(crate) const MAX_CHILDREN: usize = 17;
-const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
-
-// Leaf node min/max values.
-pub(crate) const MAX_BYTES: usize = 335;
-const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
+use tree::{NodeChildren, NodeText, TextInfo, Count, MAX_CHILDREN, MIN_CHILDREN, MAX_BYTES,
+           MIN_BYTES};
+use tree::node_text::fix_grapheme_seam;
 
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
-    Leaf(SmallString<BackingArray>),
-    Internal(ChildArray),
+    Leaf(NodeText),
+    Internal(NodeChildren),
 }
 
 impl Node {
     /// Creates an empty node.
-    pub(crate) fn new() -> Node {
-        Node::Leaf(SmallString::from_str(""))
+    pub fn new() -> Node {
+        Node::Leaf(NodeText::from_str(""))
     }
 
     /// Total number of bytes in the Rope.
-    pub(crate) fn byte_count(&self) -> usize {
+    pub fn byte_count(&self) -> usize {
         self.text_info().bytes as usize
     }
 
     /// Total number of chars in the Rope.
-    pub(crate) fn char_count(&self) -> usize {
+    pub fn char_count(&self) -> usize {
         self.text_info().chars as usize
     }
 
     /// Total number of line breaks in the Rope.
-    pub(crate) fn line_break_count(&self) -> usize {
+    pub fn line_break_count(&self) -> usize {
         self.text_info().line_breaks as usize
     }
 
@@ -60,7 +48,7 @@ impl Node {
     ///
     /// Note: this does not handle large insertions (i.e. larger than
     /// MAX_BYTES) well.  That is handled at Rope::insert().
-    pub(crate) fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
+    pub fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
         match self {
             // If it's a leaf
             &mut Node::Leaf(ref mut cur_text) => {
@@ -129,7 +117,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+    pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
             match self {
                 &mut Node::Leaf(_) => {
@@ -178,7 +166,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+    pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
             match self {
                 &mut Node::Leaf(_) => {
@@ -232,7 +220,7 @@ impl Node {
     //
     // - True: I'm too small now, merge me with a neighbor.
     // - False: I'm fine, no need to merge.
-    pub(crate) fn remove(&mut self, start: usize, end: usize) -> bool {
+    pub fn remove(&mut self, start: usize, end: usize) -> bool {
         debug_assert!(start <= end);
         if start == end {
             return false;
@@ -385,7 +373,7 @@ impl Node {
     }
 
     /// Returns the char index of the given byte.
-    pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
+    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         match self {
             &Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
             &Node::Internal(ref children) => {
@@ -408,7 +396,7 @@ impl Node {
     }
 
     /// Returns the line index of the given byte.
-    pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
+    pub fn byte_to_line(&self, byte_idx: usize) -> usize {
         match self {
             &Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
             &Node::Internal(ref children) => {
@@ -432,7 +420,7 @@ impl Node {
     }
 
     /// Returns the byte index of the given char.
-    pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
         match self {
             &Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
             &Node::Internal(ref children) => {
@@ -455,7 +443,7 @@ impl Node {
     }
 
     /// Returns the line index of the given char.
-    pub(crate) fn char_to_line(&self, char_idx: usize) -> usize {
+    pub fn char_to_line(&self, char_idx: usize) -> usize {
         match self {
             &Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
             &Node::Internal(ref children) => {
@@ -479,7 +467,7 @@ impl Node {
     }
 
     /// Returns the byte index of the start of the given line.
-    pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
+    pub fn line_to_byte(&self, line_idx: usize) -> usize {
         match self {
             &Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
             &Node::Internal(ref children) => {
@@ -493,7 +481,7 @@ impl Node {
     }
 
     /// Returns the char index of the start of the given line.
-    pub(crate) fn line_to_char(&self, line_idx: usize) -> usize {
+    pub fn line_to_char(&self, line_idx: usize) -> usize {
         match self {
             &Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
             &Node::Internal(ref children) => {
@@ -577,11 +565,11 @@ impl Node {
     }
 
     /// Returns an immutable slice of the Rope in the char range `start..end`.
-    pub(crate) fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
+    pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
         RopeSlice::new_with_range(self, start, end)
     }
 
-    pub(crate) fn text_info(&self) -> TextInfo {
+    pub fn text_info(&self) -> TextInfo {
         match self {
             &Node::Leaf(ref text) => TextInfo::from_str(text),
             &Node::Internal(ref children) => children.combined_info(),
@@ -590,7 +578,7 @@ impl Node {
 
     //-----------------------------------------
 
-    pub(crate) fn child_count(&self) -> usize {
+    pub fn child_count(&self) -> usize {
         if let &Node::Internal(ref children) = self {
             children.len()
         } else {
@@ -598,14 +586,14 @@ impl Node {
         }
     }
 
-    pub(crate) fn children(&mut self) -> &mut ChildArray {
+    pub fn children(&mut self) -> &mut NodeChildren {
         match self {
             &mut Node::Internal(ref mut children) => children,
             _ => panic!(),
         }
     }
 
-    pub(crate) fn leaf_text(&self) -> &str {
+    pub fn leaf_text(&self) -> &str {
         if let &Node::Leaf(ref text) = self {
             text
         } else {
@@ -613,7 +601,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn is_leaf(&self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         match self {
             &Node::Leaf(_) => true,
             &Node::Internal(_) => false,
@@ -624,7 +612,7 @@ impl Node {
     ///
     /// This counts root and leafs.  For example, a single leaf node
     /// has depth 1.
-    pub(crate) fn depth(&self) -> usize {
+    pub fn depth(&self) -> usize {
         1 +
             match self {
                 &Node::Leaf(_) => 0,
@@ -660,7 +648,7 @@ impl Node {
 
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
-    pub(crate) fn assert_integrity(&self) {
+    pub fn assert_integrity(&self) {
         match self {
             &Node::Leaf(_) => {}
             &Node::Internal(ref children) => {
@@ -679,7 +667,7 @@ impl Node {
     /// - All internal nodes have the minimum number of children.
     /// - All leaf nodes are non-empty.
     /// - Graphemes are never split over chunk boundaries.
-    pub(crate) fn assert_invariants(&self, is_root: bool) {
+    pub fn assert_invariants(&self, is_root: bool) {
         self.assert_balance();
         self.assert_node_size(is_root);
         if is_root {
@@ -743,7 +731,7 @@ impl Node {
     }
 
     /// A for-fun tool for playing with silly text files.
-    pub(crate) fn largest_grapheme_size(&self) -> usize {
+    pub fn largest_grapheme_size(&self) -> usize {
         let mut size = 0;
         let slice = self.slice(0, self.text_info().chars as usize);
         for g in slice.graphemes() {
@@ -763,10 +751,7 @@ impl Node {
     /// Note 2: theoretically can leave an empty leaf node, though that would
     /// require an insanely long grapheme.  Given how unlikely it is, it doesn't
     /// seem worth handling.  Code shouldn't break on empty leaf nodes anyway.
-    pub(crate) fn fix_grapheme_seam(
-        &mut self,
-        byte_pos: Count,
-    ) -> Option<&mut SmallString<BackingArray>> {
+    pub fn fix_grapheme_seam(&mut self, byte_pos: Count) -> Option<&mut NodeText> {
         match self {
             &mut Node::Leaf(ref mut text) => {
                 if byte_pos == 0 || byte_pos == text.len() as Count {
@@ -858,7 +843,7 @@ impl Node {
     ///
     /// Returns whether it did anything or not that would affect the
     /// parent.
-    pub(crate) fn zip_left(&mut self) -> bool {
+    pub fn zip_left(&mut self) -> bool {
         if let &mut Node::Internal(ref mut children) = self {
             let mut did_stuff = false;
             loop {
@@ -886,7 +871,7 @@ impl Node {
     ///
     /// Returns whether it did anything or not that would affect the
     /// parent. True: did stuff, false: didn't do stuff
-    pub(crate) fn zip_right(&mut self) -> bool {
+    pub fn zip_right(&mut self) -> bool {
         if let &mut Node::Internal(ref mut children) = self {
             let mut did_stuff = false;
             loop {
@@ -909,139 +894,6 @@ impl Node {
         } else {
             false
         }
-    }
-}
-
-//===========================================================================
-
-/// Inserts the given text into the given string at the given char index.
-pub(crate) fn insert_at_char<B: Array<Item = u8>>(s: &mut SmallString<B>, text: &str, pos: usize) {
-    let byte_pos = char_idx_to_byte_idx(s, pos);
-    s.insert_str(byte_pos, text);
-}
-
-
-/// Removes the text between the given char indices in the given string.
-pub(crate) fn remove_text_between_char_indices<B: Array<Item = u8>>(
-    s: &mut SmallString<B>,
-    pos_a: usize,
-    pos_b: usize,
-) {
-    // Bounds checks
-    assert!(
-        pos_a <= pos_b,
-        "remove_text_between_char_indices(): pos_a must be less than or equal to pos_b."
-    );
-
-    if pos_a == pos_b {
-        return;
-    }
-
-    // Find removal positions in bytes
-    // TODO: get both of these in a single pass
-    let byte_pos_a = char_idx_to_byte_idx(&s[..], pos_a);
-    let byte_pos_b = char_idx_to_byte_idx(&s[..], pos_b);
-
-    // Get byte vec of string
-    let byte_vec = unsafe { s.as_mut_smallvec() };
-
-    // Move bytes to fill in the gap left by the removed bytes
-    let mut from = byte_pos_b;
-    let mut to = byte_pos_a;
-    while from < byte_vec.len() {
-        byte_vec[to] = byte_vec[from];
-
-        from += 1;
-        to += 1;
-    }
-
-    // Remove data from the end
-    let final_text_size = byte_vec.len() + byte_pos_a - byte_pos_b;
-    byte_vec.truncate(final_text_size);
-}
-
-
-/// Splits a string into two strings at the char index given.
-/// The first section of the split is stored in the original string,
-/// while the second section of the split is returned as a new string.
-pub(crate) fn split_string_at_char<B: Array<Item = u8>>(
-    s1: &mut SmallString<B>,
-    pos: usize,
-) -> SmallString<B> {
-    let split_pos = char_idx_to_byte_idx(&s1[..], pos);
-    s1.split_off(split_pos)
-}
-
-/// Takes two SmallStrings and mends the grapheme boundary between them, if any.
-///
-/// Note: this will leave one of the strings empty if the entire composite string
-/// is one big grapheme.
-pub(crate) fn fix_grapheme_seam<B: Array<Item = u8>>(
-    l: &mut SmallString<B>,
-    r: &mut SmallString<B>,
-) {
-    let tot_len = l.len() + r.len();
-    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
-    let next = gc.next_boundary(r, l.len()).unwrap();
-    let prev = {
-        match gc.prev_boundary(r, l.len()) {
-            Ok(pos) => pos,
-            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
-            _ => unreachable!(),
-        }
-    };
-
-    // Find the new split position, if any.
-    let new_split_pos = if let (Some(a), Some(b)) = (prev, next) {
-        if a == l.len() {
-            // We're on a graphem boundary, don't need to do anything
-            return;
-        }
-        if a == 0 {
-            b
-        } else if b == tot_len {
-            a
-        } else if l.len() > r.len() {
-            a
-        } else {
-            b
-        }
-    } else if let Some(a) = prev {
-        if a == l.len() {
-            return;
-        }
-        a
-    } else if let Some(b) = next {
-        b
-    } else {
-        unreachable!()
-    };
-
-    // Move the bytes to create the new split
-    if new_split_pos < l.len() {
-        r.insert_str(0, &l[new_split_pos..]);
-        l.truncate(new_split_pos);
-    } else {
-        let pos = new_split_pos - l.len();
-        l.push_str(&r[..pos]);
-        r.truncate_front(pos);
-    }
-}
-
-//===========================================================================
-
-#[derive(Copy, Clone)]
-pub(crate) struct BackingArray([u8; MAX_BYTES]);
-unsafe impl Array for BackingArray {
-    type Item = u8;
-    fn size() -> usize {
-        MAX_BYTES
-    }
-    fn ptr(&self) -> *const u8 {
-        &self.0[0]
-    }
-    fn ptr_mut(&mut self) -> *mut u8 {
-        &mut self.0[0]
     }
 }
 

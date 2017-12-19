@@ -3,7 +3,7 @@
 use std;
 
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
-use node::Node;
+use tree::Node;
 use rope::Rope;
 
 /// An immutable view into part of a `Rope`.

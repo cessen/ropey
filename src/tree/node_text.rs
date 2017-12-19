@@ -1,10 +1,3 @@
-// Code originally derived from the smallstring crate:
-// https://crates.io/crates/smallstring
-// Which is under the MIT license.
-//
-// Many methods have been added that are needed by Ropey, and the
-// stuff Ropey doesn't use has been removed.
-
 use std;
 
 use std::borrow::Borrow;
@@ -13,40 +6,44 @@ use std::ops::Deref;
 use std::ptr;
 use std::str;
 
+use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+
 use smallvec::{Array, SmallVec};
-use str_utils::nearest_internal_grapheme_boundary;
+use str_utils::{char_idx_to_byte_idx, nearest_internal_grapheme_boundary};
+use tree::MAX_BYTES;
 
 
+/// A custom small string, with an internal buffer of `tree::MAX_BYTES`
+/// length.  Has a bunch of methods on it that are useful for the rope
+/// tree.
 #[derive(Clone, Default)]
-pub(crate) struct SmallString<B: Array<Item = u8>> {
-    buffer: SmallVec<B>,
+pub(crate) struct NodeText {
+    buffer: SmallVec<BackingArray>,
 }
 
-impl<B: Array<Item = u8>> SmallString<B> {
-    /// Creates a new empty `SmallString`
-    #[inline]
+impl NodeText {
+    /// Creates a new empty `NodeText`
+    #[inline(always)]
     pub fn new() -> Self {
-        SmallString { buffer: SmallVec::new() }
+        NodeText { buffer: SmallVec::new() }
     }
 
-    /// Creates a new empty `SmallString` with at least `capacity` bytes
+    /// Creates a new empty `NodeText` with at least `capacity` bytes
     /// of capacity.
-    #[inline]
+    #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
-        SmallString { buffer: SmallVec::with_capacity(capacity) }
+        NodeText { buffer: SmallVec::with_capacity(capacity) }
     }
 
-    /// Creates a new `SmallString` with the same contents as the given `&str`.
-    #[inline]
+    /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        SmallString { buffer: string.as_bytes().into_iter().cloned().collect() }
+        NodeText { buffer: string.as_bytes().into_iter().cloned().collect() }
     }
 
     /// Inserts a `&str` at byte offset `idx`.
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    #[inline]
     pub fn insert_str(&mut self, idx: usize, string: &str) {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
@@ -54,6 +51,12 @@ impl<B: Array<Item = u8>> SmallString<B> {
         unsafe {
             self.insert_bytes(idx, string.as_bytes());
         }
+    }
+
+    /// Inserts the given text into the given string at the given char index.
+    pub fn insert_str_at_char(&mut self, text: &str, char_idx: usize) {
+        let byte_idx = char_idx_to_byte_idx(self, char_idx);
+        self.insert_str(byte_idx, text);
     }
 
     /// Inserts a `&str` and splits the resulting string in half, returning
@@ -64,7 +67,6 @@ impl<B: Array<Item = u8>> SmallString<B> {
     /// will be empty.
     ///
     /// TODO: make this work without allocations when possible.
-    #[inline]
     pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
         self.insert_str(idx, string);
 
@@ -76,8 +78,7 @@ impl<B: Array<Item = u8>> SmallString<B> {
         self.split_off(split_pos)
     }
 
-    /// Appends a `&str` to end the of the `SmallString`.
-    #[inline]
+    /// Appends a `&str` to end the of the `NodeText`.
     pub fn push_str(&mut self, string: &str) {
         let len = self.len();
         unsafe {
@@ -93,7 +94,6 @@ impl<B: Array<Item = u8>> SmallString<B> {
     /// will be empty.
     ///
     /// TODO: make this work without allocations when possible.
-    #[inline]
     pub fn push_str_split(&mut self, string: &str) -> Self {
         self.push_str(string);
 
@@ -109,7 +109,6 @@ impl<B: Array<Item = u8>> SmallString<B> {
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    #[inline]
     pub fn truncate(&mut self, idx: usize) {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
@@ -122,7 +121,6 @@ impl<B: Array<Item = u8>> SmallString<B> {
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    #[inline]
     pub fn truncate_front(&mut self, idx: usize) {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
@@ -135,7 +133,6 @@ impl<B: Array<Item = u8>> SmallString<B> {
     ///
     /// Panics if either `start` or `end` are not char boundaries, as that
     /// would result in an invalid utf8 string.
-    #[inline]
     pub fn remove_range(&mut self, start: usize, end: usize) {
         assert!(self.is_char_boundary(start));
         assert!(self.is_char_boundary(end));
@@ -147,19 +144,29 @@ impl<B: Array<Item = u8>> SmallString<B> {
         self.inline_if_possible();
     }
 
-    /// Splits the `SmallString` at `idx`.
+    pub fn remove_char_range(&mut self, start: usize, end: usize) {
+        assert!(start <= end);
+
+        // TODO: get both of these in a single pass
+        let byte_start = char_idx_to_byte_idx(self, start);
+        let byte_end = char_idx_to_byte_idx(self, end);
+
+        unsafe { self.remove_bytes(byte_start, byte_end) }
+        self.inline_if_possible();
+    }
+
+    /// Splits the `NodeText` at `idx`.
     ///
     /// The left part remains in the original, and the right part is
-    /// returned in a new `SmallString`.
+    /// returned in a new `NodeText`.
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    #[inline]
-    pub fn split_off(&mut self, idx: usize) -> SmallString<B> {
+    pub fn split_off(&mut self, idx: usize) -> NodeText {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
         let len = self.len();
-        let mut other = SmallString::with_capacity(len - idx);
+        let mut other = NodeText::with_capacity(len - idx);
         unsafe {
             ptr::copy_nonoverlapping(
                 self.buffer.as_ptr().offset(idx as isize),
@@ -173,13 +180,21 @@ impl<B: Array<Item = u8>> SmallString<B> {
         other
     }
 
-    #[inline]
+    /// Splits a string into two strings at the char index given.
+    /// The first section of the split is stored in the original string,
+    /// while the second section of the split is returned as a new string.
+    pub fn split_off_at_char(&mut self, char_idx: usize) -> NodeText {
+        let byte_idx = char_idx_to_byte_idx(self, char_idx);
+        self.split_off(byte_idx)
+    }
+
+    #[inline(always)]
     pub fn shrink_to_fit(&mut self) {
         self.buffer.shrink_to_fit();
     }
 
-    #[inline]
-    pub unsafe fn as_mut_smallvec(&mut self) -> &mut SmallVec<B> {
+    #[inline(always)]
+    pub unsafe fn as_mut_smallvec(&mut self) -> &mut SmallVec<BackingArray> {
         &mut self.buffer
     }
 
@@ -230,75 +245,151 @@ impl<B: Array<Item = u8>> SmallString<B> {
 }
 
 
-impl<B: Array<Item = u8>> std::cmp::PartialEq for SmallString<B> {
+impl std::cmp::PartialEq for NodeText {
     fn eq(&self, other: &Self) -> bool {
         let (s1, s2): (&str, &str) = (self, other);
         s1 == s2
     }
 }
 
-impl<'a, B: Array<Item = u8>> PartialEq<SmallString<B>> for &'a str {
-    fn eq(&self, other: &SmallString<B>) -> bool {
+impl<'a> PartialEq<NodeText> for &'a str {
+    fn eq(&self, other: &NodeText) -> bool {
         *self == (other as &str)
     }
 }
 
-impl<B: Array<Item = u8>> std::fmt::Display for SmallString<B> {
+impl<'a> PartialEq<&'a str> for NodeText {
+    fn eq(&self, other: &&'a str) -> bool {
+        (self as &str) == *other
+    }
+}
+
+impl std::fmt::Display for NodeText {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        let s: &str = SmallString::deref(self);
-        s.fmt(fm)
+        NodeText::deref(self).fmt(fm)
     }
 }
 
-impl<B: Array<Item = u8>> std::fmt::Debug for SmallString<B> {
+impl std::fmt::Debug for NodeText {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let s: &str = SmallString::deref(self);
-        s.fmt(fm)
+        NodeText::deref(self).fmt(fm)
     }
 }
 
-impl<'a, B: Array<Item = u8>> From<&'a str> for SmallString<B> {
+impl<'a> From<&'a str> for NodeText {
     fn from(s: &str) -> Self {
         Self::from_str(s)
     }
 }
 
-impl<B: Array<Item = u8>> Deref for SmallString<B> {
+impl Deref for NodeText {
     type Target = str;
 
     fn deref(&self) -> &str {
-        // SmallString's methods don't allow `buffer` to become invalid utf8,
+        // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
     }
 }
 
-impl<B: Array<Item = u8>> AsRef<str> for SmallString<B> {
+impl AsRef<str> for NodeText {
     fn as_ref(&self) -> &str {
-        // SmallString's methods don't allow `buffer` to become invalid utf8,
+        // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
     }
 }
 
-impl<B: Array<Item = u8>> Borrow<str> for SmallString<B> {
+impl Borrow<str> for NodeText {
     fn borrow(&self) -> &str {
-        // SmallString's methods don't allow `buffer` to become invalid utf8,
+        // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
         unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
     }
 }
 
+//=======================================================================
+
+/// Takes two NodeTexts and mends the grapheme boundary between them, if any.
+///
+/// Note: this will leave one of the strings empty if the entire composite string
+/// is one big grapheme.
+pub(crate) fn fix_grapheme_seam(l: &mut NodeText, r: &mut NodeText) {
+    let tot_len = l.len() + r.len();
+    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
+    let next = gc.next_boundary(r, l.len()).unwrap();
+    let prev = {
+        match gc.prev_boundary(r, l.len()) {
+            Ok(pos) => pos,
+            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
+            _ => unreachable!(),
+        }
+    };
+
+    // Find the new split position, if any.
+    let new_split_pos = if let (Some(a), Some(b)) = (prev, next) {
+        if a == l.len() {
+            // We're on a graphem boundary, don't need to do anything
+            return;
+        }
+        if a == 0 {
+            b
+        } else if b == tot_len {
+            a
+        } else if l.len() > r.len() {
+            a
+        } else {
+            b
+        }
+    } else if let Some(a) = prev {
+        if a == l.len() {
+            return;
+        }
+        a
+    } else if let Some(b) = next {
+        b
+    } else {
+        unreachable!()
+    };
+
+    // Move the bytes to create the new split
+    if new_split_pos < l.len() {
+        r.insert_str(0, &l[new_split_pos..]);
+        l.truncate(new_split_pos);
+    } else {
+        let pos = new_split_pos - l.len();
+        l.push_str(&r[..pos]);
+        r.truncate_front(pos);
+    }
+}
+
+//=======================================================================
+
+/// The backing internal buffer for `NodeText`.
+#[derive(Copy, Clone)]
+pub(crate) struct BackingArray([u8; MAX_BYTES]);
+unsafe impl Array for BackingArray {
+    type Item = u8;
+    fn size() -> usize {
+        MAX_BYTES
+    }
+    fn ptr(&self) -> *const u8 {
+        &self.0[0]
+    }
+    fn ptr_mut(&mut self) -> *mut u8 {
+        &mut self.0[0]
+    }
+}
+
+//=======================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use node::BackingArray;
-    type SS = SmallString<BackingArray>;
 
     #[test]
     fn remove_bytes_01() {
-        let mut s = SS::new();
+        let mut s = NodeText::new();
         s.push_str("Hello there, everyone!  How's it going?");
         unsafe {
             s.remove_bytes(11, 21);

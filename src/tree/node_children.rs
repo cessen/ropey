@@ -9,23 +9,23 @@ use std::ptr;
 use std::slice;
 use std::sync::Arc;
 
-use node;
-use node::Node;
+use tree;
+use tree::Node;
 use str_utils::nearest_internal_grapheme_boundary;
-use text_info::TextInfo;
+use tree::TextInfo;
 
-const MAX_LEN: usize = node::MAX_CHILDREN;
+const MAX_LEN: usize = tree::MAX_CHILDREN;
 
-pub(crate) struct ChildArray {
+pub(crate) struct NodeChildren {
     nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
     info: [TextInfo; MAX_LEN],
     len: u8,
 }
 
-impl ChildArray {
+impl NodeChildren {
     /// Creates a new empty array.
-    pub fn new() -> ChildArray {
-        ChildArray {
+    pub fn new() -> NodeChildren {
+        NodeChildren {
             nodes: ManuallyDrop::new(unsafe { std::mem::uninitialized() }),
             info: unsafe { std::mem::uninitialized() },
             len: 0,
@@ -89,7 +89,7 @@ impl ChildArray {
     /// returning the right half.
     ///
     /// This works even when the array is full.
-    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> ChildArray {
+    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> NodeChildren {
         let r_count = (self.len() + 1) / 2;
         let l_count = (self.len() + 1) - r_count;
 
@@ -117,7 +117,7 @@ impl ChildArray {
                     if let &mut Node::Leaf(ref mut text2) = node2 {
                         text1.push_str(text2);
 
-                        if text1.len() <= node::MAX_BYTES {
+                        if text1.len() <= tree::MAX_BYTES {
                             true
                         } else {
                             let split_pos = {
@@ -168,7 +168,7 @@ impl ChildArray {
 
     /// Equi-distributes the children between the two child arrays,
     /// preserving ordering.
-    pub fn distribute_with(&mut self, other: &mut ChildArray) {
+    pub fn distribute_with(&mut self, other: &mut NodeChildren) {
         let r_target_len = (self.len() + other.len()) / 2;
         while other.len() < r_target_len {
             other.insert(0, self.pop());
@@ -222,7 +222,7 @@ impl ChildArray {
     /// the right half.
     ///
     /// This works even when the array is full.
-    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> ChildArray {
+    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> NodeChildren {
         assert!(self.len() > 0);
         assert!(idx <= self.len());
         let extra = if idx < self.len() {
@@ -266,10 +266,10 @@ impl ChildArray {
     /// Splits the array in two at `idx`, returning the right part of the split.
     ///
     /// TODO: implement this more efficiently.
-    pub fn split_off(&mut self, idx: usize) -> ChildArray {
+    pub fn split_off(&mut self, idx: usize) -> NodeChildren {
         assert!(idx <= self.len());
 
-        let mut other = ChildArray::new();
+        let mut other = NodeChildren::new();
         let count = self.len() - idx;
         for _ in 0..count {
             other.push(self.remove(idx));
@@ -356,9 +356,9 @@ impl ChildArray {
     }
 }
 
-impl fmt::Debug for ChildArray {
+impl fmt::Debug for NodeChildren {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ChildArray")
+        f.debug_struct("NodeChildren")
             .field("len", &self.len)
             .field("info", &&self.info[0..self.len()])
             .field("nodes", &&self.nodes[0..self.len()])
@@ -366,7 +366,7 @@ impl fmt::Debug for ChildArray {
     }
 }
 
-impl Drop for ChildArray {
+impl Drop for NodeChildren {
     fn drop(&mut self) {
         for node in &mut self.nodes[..self.len as usize] {
             let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
@@ -375,9 +375,9 @@ impl Drop for ChildArray {
     }
 }
 
-impl Clone for ChildArray {
-    fn clone(&self) -> ChildArray {
-        let mut clone_array = ChildArray::new();
+impl Clone for NodeChildren {
+    fn clone(&self) -> NodeChildren {
+        let mut clone_array = NodeChildren::new();
 
         // Copy nodes... carefully.
         for (clone_arc, arc) in Iterator::zip(

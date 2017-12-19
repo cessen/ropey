@@ -1,16 +1,15 @@
 use str_utils::LineBreakIter;
-
-pub(crate) type Count = u32;
+use tree::Count;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) struct TextInfo {
+pub struct TextInfo {
     pub(crate) bytes: Count,
     pub(crate) chars: Count,
     pub(crate) line_breaks: Count,
 }
 
 impl TextInfo {
-    pub(crate) fn new() -> TextInfo {
+    pub fn new() -> TextInfo {
         TextInfo {
             bytes: 0,
             chars: 0,
@@ -18,7 +17,7 @@ impl TextInfo {
         }
     }
 
-    pub(crate) fn from_str(text: &str) -> TextInfo {
+    pub fn from_str(text: &str) -> TextInfo {
         TextInfo {
             bytes: text.len() as Count,
             chars: text.chars().count() as Count,
@@ -26,7 +25,7 @@ impl TextInfo {
         }
     }
 
-    pub(crate) fn combine(&self, other: &TextInfo) -> TextInfo {
+    pub fn combine(&self, other: &TextInfo) -> TextInfo {
         TextInfo {
             bytes: self.bytes + other.bytes,
             chars: self.chars + other.chars,

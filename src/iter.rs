@@ -4,7 +4,7 @@ use std::str::{Bytes, Chars};
 
 use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
-use node::Node;
+use tree::Node;
 use slice::RopeSlice;
 
 //==========================================================

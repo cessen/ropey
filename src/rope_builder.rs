@@ -3,11 +3,9 @@ use std::sync::Arc;
 use std::collections::VecDeque;
 
 use rope::Rope;
-use node::{Node, MAX_BYTES, MAX_CHILDREN};
 use str_utils::{is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
                 nearest_internal_grapheme_boundary};
-use child_array::ChildArray;
-use small_string::SmallString;
+use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 
 /// An incremental `Rope` builder.
@@ -59,12 +57,12 @@ impl RopeBuilder {
             match leaf_text {
                 NextText::None => break,
                 NextText::UseBuffer => {
-                    let string = SmallString::from_str(&self.buffer);
+                    let string = NodeText::from_str(&self.buffer);
                     self.append_leaf_node(Node::Leaf(string));
                     self.buffer.clear();
                 }
                 NextText::String(s) => {
-                    self.append_leaf_node(Node::Leaf(SmallString::from_str(s)));
+                    self.append_leaf_node(Node::Leaf(NodeText::from_str(s)));
                 }
             }
         }
@@ -78,7 +76,7 @@ impl RopeBuilder {
     pub fn finish(mut self) -> Rope {
         // Append the last leaf
         if self.buffer.len() > 0 {
-            let string = SmallString::from_str(&self.buffer);
+            let string = NodeText::from_str(&self.buffer);
             self.append_leaf_node(Node::Leaf(string));
         }
 
@@ -147,7 +145,7 @@ impl RopeBuilder {
                 if last.leaf_text().len() == 0 {
                     self.stack.push_back(leaf);
                 } else {
-                    let mut children = ChildArray::new();
+                    let mut children = NodeChildren::new();
                     children.push((last.text_info(), Arc::new(last)));
                     children.push((leaf.text_info(), Arc::new(leaf)));
                     self.stack.push_back(Node::Internal(children));
@@ -161,7 +159,7 @@ impl RopeBuilder {
                 loop {
                     if stack_idx < 0 {
                         // We're above the root, so do a root split.
-                        let mut children = ChildArray::new();
+                        let mut children = NodeChildren::new();
                         children.push((left.text_info(), Arc::new(left)));
                         self.stack.push_front(Node::Internal(children));
                         break;

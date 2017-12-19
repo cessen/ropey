@@ -27,14 +27,11 @@
 extern crate smallvec;
 extern crate unicode_segmentation;
 
-mod child_array;
-mod node;
+mod tree;
 mod rope;
 mod rope_builder;
 mod slice;
-mod small_string;
 mod str_utils;
-mod text_info;
 
 pub mod iter;
 

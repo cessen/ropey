@@ -5,14 +5,11 @@ use std::io;
 use std::sync::Arc;
 use std::ptr;
 
-use child_array::ChildArray;
-
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
-use node::{Node, MAX_BYTES};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
 use str_utils::char_idx_to_byte_idx;
-use text_info::Count;
+use tree::{Node, NodeChildren, MAX_BYTES, Count};
 
 
 /// A utf8 text rope.
@@ -153,7 +150,7 @@ impl Rope {
                 let mut l_node = Node::new();
                 std::mem::swap(&mut l_node, root);
 
-                let mut children = ChildArray::new();
+                let mut children = NodeChildren::new();
                 children.push((l_node.text_info(), Arc::new(l_node)));
                 children.push((r_node.text_info(), Arc::new(r_node)));
 
@@ -248,7 +245,7 @@ impl Rope {
                 let extra =
                     Arc::make_mut(&mut self.root).append_at_depth(other.root, l_depth - r_depth);
                 if let Some(node) = extra {
-                    let mut children = ChildArray::new();
+                    let mut children = NodeChildren::new();
                     children.push((self.root.text_info(), self.root.clone()));
                     children.push((node.text_info(), node));
                     self.root = Arc::new(Node::Internal(children));
@@ -260,7 +257,7 @@ impl Rope {
                     r_depth - l_depth,
                 );
                 if let Some(node) = extra {
-                    let mut children = ChildArray::new();
+                    let mut children = NodeChildren::new();
                     children.push((node.text_info(), node));
                     children.push((other.root.text_info(), other.root.clone()));
                     other.root = Arc::new(Node::Internal(children));
