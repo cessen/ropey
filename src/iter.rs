@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::str::{Bytes, Chars};
+use std::sync::Arc;
 
 use unicode_segmentation::{Graphemes, UnicodeSegmentation};
 
@@ -16,7 +17,7 @@ pub struct RopeBytes<'a> {
 }
 
 impl<'a> RopeBytes<'a> {
-    pub(crate) fn new<'b>(node: &'b Node) -> RopeBytes<'b> {
+    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeBytes<'b> {
         RopeBytes {
             chunk_iter: RopeChunks::new(node),
             cur_chunk: "".bytes(),
@@ -24,7 +25,7 @@ impl<'a> RopeBytes<'a> {
     }
 
     pub(crate) fn new_with_range<'b>(
-        node: &'b Node,
+        node: &'b Arc<Node>,
         start_char: usize,
         end_char: usize,
     ) -> RopeBytes<'b> {
@@ -63,7 +64,7 @@ pub struct RopeChars<'a> {
 }
 
 impl<'a> RopeChars<'a> {
-    pub(crate) fn new<'b>(node: &'b Node) -> RopeChars<'b> {
+    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeChars<'b> {
         RopeChars {
             chunk_iter: RopeChunks::new(node),
             cur_chunk: "".chars(),
@@ -71,7 +72,7 @@ impl<'a> RopeChars<'a> {
     }
 
     pub(crate) fn new_with_range<'b>(
-        node: &'b Node,
+        node: &'b Arc<Node>,
         start_char: usize,
         end_char: usize,
     ) -> RopeChars<'b> {
@@ -115,7 +116,7 @@ pub struct RopeGraphemes<'a> {
 }
 
 impl<'a> RopeGraphemes<'a> {
-    pub(crate) fn new<'b>(node: &'b Node, extended: bool) -> RopeGraphemes<'b> {
+    pub(crate) fn new<'b>(node: &'b Arc<Node>, extended: bool) -> RopeGraphemes<'b> {
         RopeGraphemes {
             chunk_iter: RopeChunks::new(node),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
@@ -124,7 +125,7 @@ impl<'a> RopeGraphemes<'a> {
     }
 
     pub(crate) fn new_with_range<'b>(
-        node: &'b Node,
+        node: &'b Arc<Node>,
         extended: bool,
         start_char: usize,
         end_char: usize,
@@ -165,14 +166,14 @@ impl<'a> Iterator for RopeGraphemes<'a> {
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
 pub struct RopeLines<'a> {
-    node: &'a Node,
+    node: &'a Arc<Node>,
     start_char: usize,
     end_char: usize,
     line_idx: usize,
 }
 
 impl<'a> RopeLines<'a> {
-    pub(crate) fn new<'b>(node: &'b Node) -> RopeLines<'b> {
+    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeLines<'b> {
         RopeLines {
             node: node,
             start_char: 0,
@@ -182,7 +183,7 @@ impl<'a> RopeLines<'a> {
     }
 
     pub(crate) fn new_with_range<'b>(
-        node: &'b Node,
+        node: &'b Arc<Node>,
         start_char: usize,
         end_char: usize,
     ) -> RopeLines<'b> {
@@ -218,7 +219,7 @@ impl<'a> Iterator for RopeLines<'a> {
 
             self.line_idx += 1;
 
-            return Some(self.node.slice(a, b));
+            return Some(RopeSlice::new_with_range(self.node, a, b));
         }
     }
 }
@@ -246,14 +247,14 @@ impl<'a> Iterator for RopeLines<'a> {
 /// of any size (including empty), line breaks and chunk boundaries have no
 /// guaranteed relationship, etc.
 pub struct RopeChunks<'a> {
-    node_stack: Vec<&'a Node>,
+    node_stack: Vec<&'a Arc<Node>>,
     start: usize,
     end: usize,
     idx: usize,
 }
 
 impl<'a> RopeChunks<'a> {
-    pub(crate) fn new<'b>(node: &'b Node) -> RopeChunks<'b> {
+    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeChunks<'b> {
         RopeChunks {
             node_stack: vec![node],
             start: 0,
@@ -263,7 +264,7 @@ impl<'a> RopeChunks<'a> {
     }
 
     pub(crate) fn new_with_range<'b>(
-        node: &'b Node,
+        node: &'b Arc<Node>,
         start_char: usize,
         end_char: usize,
     ) -> RopeChunks<'b> {
@@ -285,43 +286,43 @@ impl<'a> Iterator for RopeChunks<'a> {
         }
 
         loop {
-            match self.node_stack.pop() {
-                Some(&Node::Leaf(ref text)) => {
-                    let start_byte = if self.start <= self.idx {
-                        0
-                    } else {
-                        self.start - self.idx
-                    };
-                    let end_byte = if self.end >= (self.idx + text.len()) {
-                        text.len()
-                    } else {
-                        self.end - self.idx
-                    };
-                    self.idx += text.len();
-                    return Some(&text[start_byte..end_byte]);
-                }
-
-                Some(&Node::Internal(ref children)) => {
-                    // Find the first child that isn't before `self.start`,
-                    // updating `self.idx` as we go.
-                    let mut child_i = 0;
-                    for inf in children.info().iter() {
-                        if (self.idx + inf.bytes as usize) > self.start {
-                            break;
+            if let Some(node) = self.node_stack.pop() {
+                match **node {
+                    Node::Leaf(ref text) => {
+                        let start_byte = if self.start <= self.idx {
+                            0
                         } else {
-                            self.idx += inf.bytes as usize;
-                            child_i += 1;
+                            self.start - self.idx
+                        };
+                        let end_byte = if self.end >= (self.idx + text.len()) {
+                            text.len()
+                        } else {
+                            self.end - self.idx
+                        };
+                        self.idx += text.len();
+                        return Some(&text[start_byte..end_byte]);
+                    }
+
+                    Node::Internal(ref children) => {
+                        // Find the first child that isn't before `self.start`,
+                        // updating `self.idx` as we go.
+                        let mut child_i = 0;
+                        for inf in children.info().iter() {
+                            if (self.idx + inf.bytes as usize) > self.start {
+                                break;
+                            } else {
+                                self.idx += inf.bytes as usize;
+                                child_i += 1;
+                            }
+                        }
+                        // Push relevant children to the stack.
+                        for child in (&children.nodes()[child_i..]).iter().rev() {
+                            self.node_stack.push(child);
                         }
                     }
-                    // Push relevant children to the stack.
-                    for child in (&children.nodes()[child_i..]).iter().rev() {
-                        self.node_stack.push(child);
-                    }
                 }
-
-                _ => {
-                    return None;
-                }
+            } else {
+                return None;
             }
         }
     }

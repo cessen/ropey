@@ -8,7 +8,7 @@ use std::ptr;
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use str_utils::char_idx_to_byte_idx;
+use str_utils::{char_idx_to_byte_idx, seam_is_grapheme_boundary};
 use tree::{Node, NodeChildren, MAX_BYTES, Count};
 
 
@@ -333,7 +333,7 @@ impl Rope {
 
     /// Returns an immutable slice of the `Rope` in the char range `start..end`.
     pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
-        self.root.slice(start, end)
+        RopeSlice::new_with_range(&self.root, start, end)
     }
 
     //-----------------------------------------------------------------------
@@ -404,7 +404,35 @@ impl Rope {
     /// - Graphemes are never split over chunk boundaries.
     #[doc(hidden)]
     pub fn assert_invariants(&self) {
-        self.root.assert_invariants(true);
+        self.root.assert_balance();
+        self.root.assert_node_size(true);
+        self.assert_grapheme_seams();
+    }
+
+    /// Checks that graphemes are never split over chunk boundaries.
+    fn assert_grapheme_seams(&self) {
+        if self.chunks().count() > 0 {
+            let mut itr = self.chunks();
+            let mut last_chunk = itr.next().unwrap();
+            for chunk in itr {
+                if chunk.len() > 1 && last_chunk.len() > 1 {
+                    assert!(seam_is_grapheme_boundary(last_chunk, chunk));
+                    last_chunk = chunk;
+                }
+            }
+        }
+    }
+
+    /// A for-fun tool for playing with silly text files.
+    #[doc(hidden)]
+    pub fn largest_grapheme_size(&self) -> usize {
+        let mut size = 0;
+        for g in self.graphemes() {
+            if g.len() > size {
+                size = g.len();
+            }
+        }
+        size
     }
 }
 

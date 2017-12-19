@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std;
+use std::sync::Arc;
 
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use tree::{Node, Count};
@@ -9,7 +10,7 @@ use rope::Rope;
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a> {
-    node: &'a Node,
+    node: &'a Arc<Node>,
     start_byte: Count,
     end_byte: Count,
     start_char: Count,
@@ -19,7 +20,7 @@ pub struct RopeSlice<'a> {
 }
 
 impl<'a> RopeSlice<'a> {
-    pub(crate) fn new<'b>(node: &'b Node) -> RopeSlice<'b> {
+    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeSlice<'b> {
         RopeSlice {
             node: node,
             start_byte: 0,
@@ -31,7 +32,11 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    pub(crate) fn new_with_range<'b>(node: &'b Node, start: usize, end: usize) -> RopeSlice<'b> {
+    pub(crate) fn new_with_range<'b>(
+        node: &'b Arc<Node>,
+        start: usize,
+        end: usize,
+    ) -> RopeSlice<'b> {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
 
@@ -220,6 +225,24 @@ impl<'a> RopeSlice<'a> {
         }
         text
     }
+
+    /// Creates a new `Rope` from the contents of the `RopeSlice`.
+    pub fn to_rope(&self) -> Rope {
+        let mut rope = Rope { root: self.node.clone() };
+
+        // Chop off right end if needed
+        if self.end_char < self.node.text_info().chars {
+            rope.split_off(self.end_char as usize);
+        }
+
+        // Chop off left end if needed
+        if self.start_char > 0 {
+            rope = rope.split_off(self.start_char as usize);
+        }
+
+        // Return the rope
+        rope
+    }
 }
 
 //==============================================================
@@ -330,60 +353,90 @@ impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
 mod tests {
     use rope::Rope;
 
+    const TEXT: &str = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
+                        Aren't you glad we're alive?";
+
     #[test]
     fn slice_01() {
-        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
-                    Aren't you glad we're alive?";
-        let r = Rope::from_str(text);
+        let r = Rope::from_str(TEXT);
 
         let s = r.slice(0, r.len_chars());
 
-        assert_eq!(text, s);
+        assert_eq!(TEXT, s);
     }
 
     #[test]
     fn slice_02() {
-        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
-                    Aren't you glad we're alive?";
-        let r = Rope::from_str(text);
+        let r = Rope::from_str(TEXT);
 
         let s = r.slice(5, 21);
 
-        assert_eq!(&text[5..21], s);
+        assert_eq!(&TEXT[5..21], s);
     }
 
     #[test]
     fn eq_str_01() {
-        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
-                    Aren't you glad we're alive?";
-        let r = Rope::from_str(text);
+        let r = Rope::from_str(TEXT);
         let slice = r.to_slice();
 
-        assert_eq!(slice, text);
-        assert_eq!(text, slice);
+        assert_eq!(slice, TEXT);
+        assert_eq!(TEXT, slice);
     }
 
     #[test]
     fn eq_str_02() {
-        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
-                    Aren't you glad we're alive?";
-        let r = Rope::from_str(text);
+        let r = Rope::from_str(TEXT);
         let slice = r.slice(0, 20);
 
-        assert_ne!(slice, text);
-        assert_ne!(text, slice);
+        assert_ne!(slice, TEXT);
+        assert_ne!(TEXT, slice);
     }
 
     #[test]
     fn eq_str_03() {
-        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
-                    Aren't you glad we're alive?";
-        let mut r = Rope::from_str(text);
+        let mut r = Rope::from_str(TEXT);
         r.remove(20, 21);
         r.insert(20, "z");
         let slice = r.to_slice();
 
-        assert_ne!(slice, text);
-        assert_ne!(text, slice);
+        assert_ne!(slice, TEXT);
+        assert_ne!(TEXT, slice);
+    }
+
+    #[test]
+    fn to_rope_01() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.to_slice();
+        let r2 = s.to_rope();
+
+        assert_eq!(r1, r2);
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn to_rope_02() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(0, 24);
+        let r2 = s.to_rope();
+
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn to_rope_03() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(13, 89);
+        let r2 = s.to_rope();
+
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn to_rope_04() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(13, 41);
+        let r2 = s.to_rope();
+
+        assert_eq!(s, r2);
     }
 }

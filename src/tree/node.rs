@@ -3,11 +3,9 @@
 use std;
 use std::sync::Arc;
 
-use slice::RopeSlice;
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                 char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
-                is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
-                seam_is_grapheme_boundary};
+                is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary};
 use tree::{NodeChildren, NodeText, TextInfo, Count, MAX_CHILDREN, MIN_CHILDREN, MAX_BYTES,
            MIN_BYTES};
 use tree::node_text::fix_grapheme_seam;
@@ -564,11 +562,6 @@ impl Node {
         };
     }
 
-    /// Returns an immutable slice of the Rope in the char range `start..end`.
-    pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
-        RopeSlice::new_with_range(self, start, end)
-    }
-
     pub fn text_info(&self) -> TextInfo {
         match self {
             &Node::Leaf(ref text) => TextInfo::from_str(text),
@@ -660,23 +653,8 @@ impl Node {
         }
     }
 
-    /// Debugging tool to make sure that all of the following invariants
-    /// hold true throughout the tree:
-    ///
-    /// - The tree is the same height everywhere.
-    /// - All internal nodes have the minimum number of children.
-    /// - All leaf nodes are non-empty.
-    /// - Graphemes are never split over chunk boundaries.
-    pub fn assert_invariants(&self, is_root: bool) {
-        self.assert_balance();
-        self.assert_node_size(is_root);
-        if is_root {
-            self.assert_grapheme_seams();
-        }
-    }
-
     /// Checks that the entire tree is the same height everywhere.
-    fn assert_balance(&self) -> usize {
+    pub fn assert_balance(&self) -> usize {
         // Depth, child count, and leaf node emptiness
         match self {
             &Node::Leaf(_) => 1,
@@ -692,7 +670,7 @@ impl Node {
 
     /// Checks that all internal nodes have the minimum number of
     /// children and all non-root leaf nodes are non-empty.
-    fn assert_node_size(&self, is_root: bool) {
+    pub fn assert_node_size(&self, is_root: bool) {
         match self {
             &Node::Leaf(ref text) => {
                 // Leaf size
@@ -713,33 +691,6 @@ impl Node {
                 }
             }
         }
-    }
-
-    /// Checks that graphemes are never split over chunk boundaries.
-    fn assert_grapheme_seams(&self) {
-        let slice = self.slice(0, self.text_info().chars as usize);
-        if slice.chunks().count() > 0 {
-            let mut itr = slice.chunks();
-            let mut last_chunk = itr.next().unwrap();
-            for chunk in itr {
-                if chunk.len() > 1 && last_chunk.len() > 1 {
-                    assert!(seam_is_grapheme_boundary(last_chunk, chunk));
-                    last_chunk = chunk;
-                }
-            }
-        }
-    }
-
-    /// A for-fun tool for playing with silly text files.
-    pub fn largest_grapheme_size(&self) -> usize {
-        let mut size = 0;
-        let slice = self.slice(0, self.text_info().chars as usize);
-        for g in slice.graphemes() {
-            if g.len() > size {
-                size = g.len();
-            }
-        }
-        size
     }
 
     /// Checks to make sure that a boundary between leaf nodes (given as a byte
