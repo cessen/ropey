@@ -107,7 +107,7 @@ impl<'a> Iterator for RopeChars<'a> {
 /// An iterator over a `Rope`'s grapheme clusters.
 ///
 /// The grapheme clusters returned are the extended grapheme
-/// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/))
+/// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/).
 /// Each grapheme cluster is returned as a utf8 `&str` slice.
 pub struct RopeGraphemes<'a> {
     chunk_iter: RopeChunks<'a>,
