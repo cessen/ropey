@@ -442,7 +442,7 @@ impl<'a> std::cmp::PartialEq<&'a str> for Rope {
 
 impl<'a> std::cmp::PartialEq<Rope> for &'a str {
     fn eq(&self, other: &Rope) -> bool {
-        other.to_slice() == *self
+        *self == other.to_slice()
     }
 }
 

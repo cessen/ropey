@@ -4,6 +4,7 @@ use std;
 
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use node::Node;
+use rope::Rope;
 
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
@@ -132,8 +133,8 @@ impl<'a> std::fmt::Display for RopeSlice<'a> {
     }
 }
 
-impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for RopeSlice<'a> {
-    fn eq(&self, other: &RopeSlice) -> bool {
+impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
+    fn eq(&self, other: &RopeSlice<'b>) -> bool {
         if self.len_bytes() != other.len_bytes() {
             return false;
         }
@@ -181,8 +182,8 @@ impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for RopeSlice<'a> {
     }
 }
 
-impl<'a> std::cmp::PartialEq<&'a str> for RopeSlice<'a> {
-    fn eq(&self, other: &&'a str) -> bool {
+impl<'a, 'b> std::cmp::PartialEq<&'b str> for RopeSlice<'a> {
+    fn eq(&self, other: &&'b str) -> bool {
         if self.len_bytes() != other.len() {
             return false;
         }
@@ -199,9 +200,21 @@ impl<'a> std::cmp::PartialEq<&'a str> for RopeSlice<'a> {
     }
 }
 
-impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for &'a str {
+impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'a>> for &'b str {
     fn eq(&self, other: &RopeSlice<'a>) -> bool {
         other == self
+    }
+}
+
+impl<'a> std::cmp::PartialEq<Rope> for RopeSlice<'a> {
+    fn eq(&self, other: &Rope) -> bool {
+        *self == other.to_slice()
+    }
+}
+
+impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
+        self.to_slice() == *other
     }
 }
 
@@ -231,5 +244,40 @@ mod tests {
         let s = r.slice(5, 21);
 
         assert_eq!(&text[5..21], s);
+    }
+
+    #[test]
+    fn eq_str_01() {
+        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
+                    Aren't you glad we're alive?";
+        let r = Rope::from_str(text);
+        let slice = r.to_slice();
+
+        assert_eq!(slice, text);
+        assert_eq!(text, slice);
+    }
+
+    #[test]
+    fn eq_str_02() {
+        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
+                    Aren't you glad we're alive?";
+        let r = Rope::from_str(text);
+        let slice = r.slice(0, 20);
+
+        assert_ne!(slice, text);
+        assert_ne!(text, slice);
+    }
+
+    #[test]
+    fn eq_str_03() {
+        let text = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
+                    Aren't you glad we're alive?";
+        let mut r = Rope::from_str(text);
+        r.remove(20, 21);
+        r.insert(20, "z");
+        let slice = r.to_slice();
+
+        assert_ne!(slice, text);
+        assert_ne!(text, slice);
     }
 }
