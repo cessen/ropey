@@ -219,7 +219,7 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns the entire text of the `RopeSlice` as a newly allocated `String`.
     pub fn to_string(&self) -> String {
-        let mut text = String::new();
+        let mut text = String::with_capacity(self.len_bytes());
         for chunk in self.chunks() {
             text.push_str(chunk);
         }

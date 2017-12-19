@@ -370,7 +370,7 @@ impl Rope {
     /// Returns the entire text of the `Rope` as a newly allocated String.
     pub fn to_string(&self) -> String {
         use iter::RopeChunks;
-        let mut text = String::new();
+        let mut text = String::with_capacity(self.len_bytes());
         for chunk in RopeChunks::new(&self.root) {
             text.push_str(chunk);
         }
