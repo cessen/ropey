@@ -3,23 +3,31 @@
 use std;
 
 use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
-use tree::Node;
+use tree::{Node, Count};
 use rope::Rope;
 
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a> {
     node: &'a Node,
-    start_char: usize,
-    end_char: usize,
+    start_byte: Count,
+    end_byte: Count,
+    start_char: Count,
+    end_char: Count,
+    start_line_break: Count,
+    end_line_break: Count,
 }
 
 impl<'a> RopeSlice<'a> {
     pub(crate) fn new<'b>(node: &'b Node) -> RopeSlice<'b> {
         RopeSlice {
             node: node,
+            start_byte: 0,
+            end_byte: node.text_info().bytes,
             start_char: 0,
-            end_char: node.text_info().chars as usize,
+            end_char: node.text_info().chars,
+            start_line_break: 0,
+            end_line_break: node.text_info().line_breaks,
         }
     }
 
@@ -54,57 +62,155 @@ impl<'a> RopeSlice<'a> {
         // Create the slice
         RopeSlice {
             node: node,
-            start_char: n_start,
-            end_char: n_end,
+            start_byte: node.char_to_byte(n_start) as Count,
+            end_byte: node.char_to_byte(n_end) as Count,
+            start_char: n_start as Count,
+            end_char: n_end as Count,
+            start_line_break: node.char_to_line(n_start) as Count,
+            end_line_break: node.char_to_line(n_end) as Count,
         }
     }
 
+    //-----------------------------------------------------------------------
+    // Informational methods
+
     /// Total number of bytes in the `RopeSlice`.
     pub fn len_bytes(&self) -> usize {
-        self.node.char_to_byte(self.end_char) - self.node.char_to_byte(self.start_char)
+        (self.end_byte - self.start_byte) as usize
     }
 
     /// Total number of chars in the `RopeSlice`.
     pub fn len_chars(&self) -> usize {
-        self.end_char - self.start_char
+        (self.end_char - self.start_char) as usize
     }
 
     /// Total number of lines in the `RopeSlice`.
     pub fn len_lines(&self) -> usize {
-        self.node.char_to_line(self.end_char) - self.node.char_to_line(self.start_char) + 1
+        (self.end_line_break - self.start_line_break) as usize + 1
     }
+
+    //-----------------------------------------------------------------------
+    // Index conversion methods
+
+    /// Returns the line index of the given char.
+    pub fn char_to_line(&self, char_idx: usize) -> usize {
+        assert!(char_idx <= self.len_chars());
+        self.node.char_to_line(self.start_char as usize + char_idx) -
+            (self.start_line_break as usize)
+    }
+
+    /// Returns the char index of the start of the given line.
+    pub fn line_to_char(&self, line_idx: usize) -> usize {
+        assert!(line_idx <= (self.len_lines() - 1));
+        let char_idx = self.node.line_to_char(
+            self.start_line_break as usize + line_idx,
+        ) - self.start_char as usize;
+
+        if char_idx < (self.start_char as usize) {
+            0
+        } else {
+            char_idx
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    // Grapheme methods
+
+    /// Returns whether `char_idx` is a grapheme cluster boundary or not.
+    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
+        assert!(char_idx <= self.len_chars());
+        if char_idx == 0 || char_idx == self.len_chars() {
+            true
+        } else {
+            self.node.is_grapheme_boundary(
+                self.start_char as usize + char_idx,
+            )
+        }
+    }
+
+    /// Returns the char index of the grapheme cluster boundary to the left
+    /// of `char_idx`.
+    ///
+    /// This excludes any boundary that might be at `char_idx` itself, unless
+    /// `char_idx` is at the beginning of the rope.
+    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
+        assert!(char_idx <= self.len_chars());
+        let boundary_idx = self.node.prev_grapheme_boundary(
+            self.start_char as usize + char_idx,
+        );
+        if boundary_idx < self.start_char as usize {
+            0
+        } else {
+            boundary_idx - self.start_char as usize
+        }
+    }
+
+    /// Returns the char index of the grapheme cluster boundary to the right
+    /// of `char_idx`.
+    ///
+    /// This excludes any boundary that might be at `char_idx` itself, unless
+    /// `char_idx` is at the end of the rope.
+    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
+        assert!(char_idx <= self.len_chars());
+        let boundary_idx = self.node.next_grapheme_boundary(
+            self.start_char as usize + char_idx,
+        );
+        if boundary_idx >= self.end_char as usize {
+            self.len_chars()
+        } else {
+            boundary_idx - self.start_char as usize
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    // Slicing
 
     /// Returns an immutable slice of the `RopeSlice` in the char range `start..end`.
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice<'a> {
         assert!(start <= end);
-        assert!(end <= (self.end_char - self.start_char));
-        RopeSlice::new_with_range(self.node, self.start_char + start, self.start_char + end)
+        assert!(end <= (self.end_char - self.start_char) as usize);
+        RopeSlice::new_with_range(
+            self.node,
+            self.start_char as usize + start,
+            self.start_char as usize + end,
+        )
     }
+
+    //-----------------------------------------------------------------------
+    // Iterator methods
 
     /// Creates an iterator over the bytes of the `RopeSlice`.
     pub fn bytes(&self) -> RopeBytes<'a> {
-        RopeBytes::new_with_range(self.node, self.start_char, self.end_char)
+        RopeBytes::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the chars of the `RopeSlice`.
     pub fn chars(&self) -> RopeChars<'a> {
-        RopeChars::new_with_range(self.node, self.start_char, self.end_char)
+        RopeChars::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the grapheme clusters of the `RopeSlice`.
     pub fn graphemes(&self) -> RopeGraphemes<'a> {
-        RopeGraphemes::new_with_range(self.node, true, self.start_char, self.end_char)
+        RopeGraphemes::new_with_range(
+            self.node,
+            true,
+            self.start_char as usize,
+            self.end_char as usize,
+        )
     }
 
     /// Creates an iterator over the lines of the `RopeSlice`.
     pub fn lines(&self) -> RopeLines<'a> {
-        RopeLines::new_with_range(self.node, self.start_char, self.end_char)
+        RopeLines::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the chunks of the `RopeSlice`.
     pub fn chunks(&self) -> RopeChunks<'a> {
-        RopeChunks::new_with_range(self.node, self.start_char, self.end_char)
+        RopeChunks::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
+
+    //-----------------------------------------------------------------------
+    // Conversion methods
 
     /// Returns the entire text of the `RopeSlice` as a newly allocated `String`.
     pub fn to_string(&self) -> String {
