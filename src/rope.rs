@@ -130,6 +130,9 @@ impl Rope {
 
     /// Inserts `text` at char index `char_idx`.
     pub fn insert(&mut self, char_idx: usize, text: &str) {
+        // TODO: handle large insertions more efficiently, instead of doing a split
+        // and appends.
+
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
@@ -159,7 +162,7 @@ impl Rope {
 
             // Handle seam, if any.
             if let Some(byte_pos) = seam {
-                root.fix_grapheme_seam(byte_pos);
+                root.fix_grapheme_seam(byte_pos, true);
             }
         } else if self.root.is_leaf() && (self.root.text_info().bytes as usize <= MAX_BYTES) {
             let mut new_rope = Rope::from_str(text);
@@ -181,8 +184,20 @@ impl Rope {
 
     /// Removes the text in char range `start..end`.
     pub fn remove(&mut self, start: usize, end: usize) {
-        // TODO: handle large removals properly
-        Arc::make_mut(&mut self.root).remove(start, end);
+        // Scope to contain borrow of root
+        {
+            let root = Arc::make_mut(&mut self.root);
+            let (need_zip, seam) = root.remove(start, end);
+
+            if need_zip {
+                root.zip_fix(start);
+            }
+            if let Some(seam_idx) = seam {
+                root.fix_grapheme_seam(seam_idx as Count, false);
+            }
+        }
+
+        self.pull_up_singular_nodes();
     }
 
     /// Splits the `Rope` at `char_idx`, returning the right part of
@@ -201,19 +216,9 @@ impl Rope {
             let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(char_idx));
 
             // Fix up the edges
-            Arc::make_mut(&mut self.root).zip_right();
-            Arc::make_mut(&mut new_rope_root).zip_left();
-
-            // Pull up singular nodes
-            while (!self.root.is_leaf()) && self.root.child_count() == 1 {
-                let child = if let Node::Internal(ref children) = *self.root {
-                    children.nodes()[0].clone()
-                } else {
-                    unreachable!()
-                };
-
-                self.root = child;
-            }
+            Arc::make_mut(&mut self.root).zip_fix_right();
+            Arc::make_mut(&mut new_rope_root).zip_fix_left();
+            self.pull_up_singular_nodes();
 
             while (!new_rope_root.is_leaf()) && new_rope_root.child_count() == 1 {
                 let child = if let Node::Internal(ref children) = *new_rope_root {
@@ -265,7 +270,7 @@ impl Rope {
                 *self = other;
             };
 
-            Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i);
+            Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i, true);
         }
     }
 
@@ -415,8 +420,10 @@ impl Rope {
             let mut itr = self.chunks();
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
-                if chunk.len() > 1 && last_chunk.len() > 1 {
+                if chunk.len() > 0 && last_chunk.len() > 0 {
                     assert!(seam_is_grapheme_boundary(last_chunk, chunk));
+                    last_chunk = chunk;
+                } else if last_chunk.len() == 0 {
                     last_chunk = chunk;
                 }
             }
@@ -433,6 +440,23 @@ impl Rope {
             }
         }
         size
+    }
+
+    //-----------------------------------------------------------------------
+    // Internal utilities
+
+    /// Iteratively replaced the root node with its child if it only has
+    /// one child.
+    pub(crate) fn pull_up_singular_nodes(&mut self) {
+        while (!self.root.is_leaf()) && self.root.child_count() == 1 {
+            let child = if let Node::Internal(ref children) = *self.root {
+                children.nodes()[0].clone()
+            } else {
+                unreachable!()
+            };
+
+            self.root = child;
+        }
     }
 }
 
@@ -557,8 +581,19 @@ mod tests {
         r.remove(19, 25);
         assert_eq!("Hello! How are you みんなさん！", r);
 
-        // r.assert_integrity();
-        // r.assert_invariants();
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn remove_02() {
+        let mut r = Rope::from_str("\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+
+        r.remove(3, 6);
+        assert_eq!("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n", r);
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]

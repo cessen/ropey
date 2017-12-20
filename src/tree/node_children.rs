@@ -354,6 +354,16 @@ impl NodeChildren {
         }
         panic!("Predicate is mal-formed and never evaluated true.")
     }
+
+    // Debug function, to help verify tree integrity
+    pub fn is_info_accurate(&self) -> bool {
+        for (info, ref node) in self.info().iter().zip(self.nodes().iter()) {
+            if *info != node.text_info() {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 impl fmt::Debug for NodeChildren {

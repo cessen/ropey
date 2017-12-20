@@ -94,10 +94,12 @@ impl RopeBuilder {
 
         // Get root and fix any right-side nodes with too few children.
         let mut root = self.stack.pop_back().unwrap();
-        root.zip_right();
+        root.zip_fix_right();
 
-        // Use the root as the root for a rope, and return it.
-        Rope { root: Arc::new(root) }
+        // Crate the rope, make sure it's well-formed, and return it.
+        let mut rope = Rope { root: Arc::new(root) };
+        rope.pull_up_singular_nodes();
+        return rope;
     }
 
     //-----------------------------------------------------------------
