@@ -811,24 +811,26 @@ impl Node {
                         // Internal to child
                         // WARNING: we use raw pointers to work around the borrow
                         // checker here, so be careful when modifying this code!
-                        // At first glance, it looks like this could be re-arranged
-                        // to avoid the unsafe code, but in fact there is a strange
-                        // interwoven set of things going on that subtly prevent this
-                        // from being expressed entirely in safe code.
-                        let raw_text = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                            .fix_grapheme_seam(pos_in_child, must_be_boundary)
-                            .map(|text| text as *mut NodeText);
+                        {
+                            let raw_text = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                                .fix_grapheme_seam(pos_in_child, must_be_boundary)
+                                .map(|text| text as *mut NodeText);
 
-                        children.update_child_info(child_i);
+                            // This is the bit we have to work arround.  If raw_text
+                            // weren't cast to a raw_point, it's &mut would keep us
+                            // from calling this.  However, this is actually safe,
+                            // since it doesn't modify the `Node`.
+                            children.update_child_info(child_i);
 
-                        // This is the dangerous part: we're removing the node
-                        // that raw_text may refer to.  It's important to verify
-                        // that raw_text is actually empty!
-                        if raw_text == None && children.info()[child_i].bytes == 0 {
-                            children.remove(child_i);
+                            // If the node isn't empty, return the text.
+                            if children.info()[child_i].bytes > 0 {
+                                return raw_text.map(|text| unsafe { &mut *text });
+                            }
                         }
 
-                        return raw_text.map(|text| unsafe { &mut *text });
+                        // If the node _is_ empty, remove it.
+                        children.remove(child_i);
+                        return None;
                     }
                 }
             }
