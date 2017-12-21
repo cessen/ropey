@@ -13,6 +13,54 @@ use tree::{Node, NodeChildren, MAX_BYTES, Count};
 
 
 /// A utf8 text rope.
+///
+/// `Rope`'s atomic unit of data is Unicode code points (or `char`s in Rust).
+/// Except where otherwise documented, all methods that index into a rope
+/// or return an index into a rope do so by `char` index.  This makes the API's
+/// intuitive and prevents accidentally creating a Rope with invalid utf8 data.
+///
+/// The primary editing operations available for `Rope` are insertion of text,
+/// deletion of text, splitting a `Rope` in two, and appending one `Rope` to
+/// another.  For example:
+///
+/// ```
+/// # use ropey::Rope;
+/// #
+/// let mut rope = Rope::from_str("Hello みんなさん!");
+/// rope.remove(6, 11);
+/// rope.insert(6, "world");
+/// 
+/// assert_eq!(rope, "Hello world!");
+/// ```
+///
+/// Cloning `Rope`'s is extremely cheap, taking only a few instructions and
+/// 8 bytes of memory, regardless of text size.  This is accomplished by data
+/// sharing between `Rope` clones, and the memory used by clones only grows
+/// incrementally as the their contents diverge due to edits.  All of this
+/// is thread safe, and clones can be sent freely between threads.
+///
+/// `Rope` tracks line endings, and has efficient API's for working with lines.
+/// You can convert between `char` and line index, determining which line a
+/// given `char` is on or the `char` index of the beginning of a line:
+///
+/// ```
+/// # use ropey::Rope;
+/// #
+/// let rope = Rope::from_str("Hello individual!\nHow are you?\nThis text has multiple lines!");
+///
+/// assert_eq!(rope.char_to_line(5), 0);
+/// assert_eq!(rope.char_to_line(21), 1);
+///
+/// assert_eq!(rope.line_to_char(0), 0);
+/// assert_eq!(rope.line_to_char(1), 18);
+/// assert_eq!(rope.line_to_char(2), 31);
+/// ```
+///
+/// `Rope` is written to be fast and memory efficient.  All editing and
+/// query operations execute in worst-case `O(log N)` time in the length of
+/// the text.  (If they don't, file a bug!)  It is designed to work efficiently
+/// even for huge (hundreds of megabytes) and pathological (all on one line)
+/// texts.  It should be able to handle just about anything you can throw at it.
 #[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Arc<Node>,

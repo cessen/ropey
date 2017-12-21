@@ -10,15 +10,40 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An incremental `Rope` builder.
 ///
-/// To use this builder, repeatedly call `append()` to build the rope
-/// up, and call `finish()` when you're done to get the completed `Rope`.
+/// `RopeBuilder` is used to efficiently build `Rope`s from sequences
+/// of text chunks.  It is useful for situations such as:
+/// 
+/// - Creating a rope from a large text file without pre-loading the
+///   entire contents of the file into memory first (but see
+///   `Rope::from_reader()` which uses `RopeBuilder` internally for
+///   precisely this use-case).
+/// - Creating a rope from a streaming data source.
+/// - Loading a non-utf8 text source into a rope, doing the encoding
+///   conversion incrementally as you go.
 ///
-/// This API is both more limited and faster than repeatedly calling
-/// `Rope::insert()`, and is intended primarily for loading
-/// already-existing text data from another source.
+/// Unlike repeatedly calling `Rope::insert()` on the end of a rope,
+/// this API runs in time linear to the amount of data fed to it.  It
+/// also creates more memory-compact ropes.
 ///
-/// If you want to read data in from a utf8-formatted text file, see
-/// `Rope::from_reader()`, which uses this builder internally.
+/// (The converse of this API is the [`RopeChunks`](iter/struct.RopeChunks.html)
+/// iterator.)
+///
+/// # Example
+/// ```
+/// # use ropey::RopeBuilder;
+/// #
+/// let mut builder = RopeBuilder::new();
+/// 
+/// builder.append("Hello ");
+/// builder.append("world!\n");
+/// builder.append("How's ");
+/// builder.append("it goin");
+/// builder.append("g?");
+/// 
+/// let rope = builder.finish();
+/// 
+/// assert_eq!(rope, "Hello world!\nHow's it going?");
+/// ```
 #[derive(Debug, Clone)]
 pub struct RopeBuilder {
     stack: VecDeque<Node>,
@@ -38,20 +63,22 @@ impl RopeBuilder {
         }
     }
 
-    /// Appends `text` to the end of the in-progress `Rope`.
+    /// Appends `chunk` to the end of the in-progress `Rope`.
     ///
-    /// This method is intended to be called repeatedly to incrementally
-    /// build up a `Rope`.  The passed text can be as large or small as
+    /// This method is called repeatedly to incrementally build up a
+    /// `Rope`.  The passed text chunk can be as large or small as
     /// desired, but larger chunks are more efficient.
-    pub fn append(&mut self, text: &str) {
-        let mut text = text;
+    ///
+    /// `chunk` must be valid utf8 text.
+    pub fn append(&mut self, chunk: &str) {
+        let mut chunk = chunk;
 
         // Repeatedly chop text off the end of the input, creating
         // leaf nodes out of them and appending them to the tree.
-        while text.len() > 0 {
+        while chunk.len() > 0 {
             // Get the text for the next leaf
-            let (leaf_text, remainder) = self.get_next_leaf_text(text);
-            text = remainder;
+            let (leaf_text, remainder) = self.get_next_leaf_text(chunk);
+            chunk = remainder;
 
             // Append the leaf to the rope
             match leaf_text {

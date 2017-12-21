@@ -1,16 +1,52 @@
-//! Ropey provides a unicode-aware implementation of utf8 text ropes for Rust.
-//! It is designed with the following in mind:
+//! Ropey is a utf8 text rope library, designed to be the backing text
+//! buffer for applications such as text editors.  Ropey is fast,
+//! Unicode-safe, has low memory overhead, and can handle huge texts
+//! and memory-incoherent edits without breaking a sweat.
 //!
-//! - **Text editing.**  Ropey is specifically designed with text editing
-//!   in mind, including editing of very large texts (e.g. hundreds of
-//!   megabytes).
-//! - **Strong Unicode support.**  Ropey treats Unicode code points as the
-//!   base unit of text.  It also provides facilities for working with grapheme
-//!   clusters.
-//! - **Line-aware.**  Ropey knows about line breaks, so you can index into
-//!   and iterate over lines of text.
-//! - **Efficiency.**  Ropey aims to be fast and to minimize memory usage.
-
+//! The library is made up of four main components:
+//!
+//! - [`Rope`](struct.Rope.html): the main editable text buffer type.
+//! - [`RopeSlice`](struct.RopeSlice.html): an immutable view into part
+//!   of a `Rope`.
+//! - [`RopeBuilder`](struct.RopeBuilder.html): a type for efficiently
+//!   creating `Rope`s from streaming data.
+//! - [`iter`](iter/index.html): iterators over a `Rope`/`RopeSlice`'s
+//!   data.
+//!
+//! # Basic examples
+//!
+//! ## Insertion and deletion
+//! ```
+//! use ropey::Rope;
+//! 
+//! let mut rope = Rope::from_str("Hello individual!");
+//! rope.remove(6, 16);
+//! rope.insert(6, "world");
+//! 
+//! assert_eq!(rope, "Hello world!");
+//! ```
+//!
+//! ## Slicing
+//! ```
+//! # use ropey::Rope;
+//! #
+//! let mut rope = Rope::from_str("Hello individual!");
+//! let slice = rope.slice(6, 16);
+//!
+//! assert_eq!(slice, "individual");
+//! ```
+//!
+//! ## Iterating over lines
+//! ```
+//! # use ropey::Rope;
+//! #
+//! let mut rope = Rope::from_str("Hello individual!\nHow are you?");
+//! let mut itr = rope.lines();
+//!
+//! assert_eq!(itr.next().unwrap(), "Hello individual!\n");
+//! assert_eq!(itr.next().unwrap(), "How are you?");
+//! assert_eq!(itr.next(), None);
+//! ```
 
 extern crate smallvec;
 extern crate unicode_segmentation;

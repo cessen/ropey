@@ -1,3 +1,11 @@
+//! Iterators over a `Rope`'s data.
+//!
+//! All iterators here can also be used with `RopeSlice`'s.  When used
+//! with a `RopeSlice`, they iterate over only the data that the
+//! `RopeSlice` refers to.  For the line, chunk, and grapheme iterators,
+//! the data of the first and last yielded item will be truncated to
+//! match the `RopeSlice`.
+
 #![allow(dead_code)]
 
 use std::str::{Bytes, Chars};
@@ -228,24 +236,29 @@ impl<'a> Iterator for RopeLines<'a> {
 
 /// An iterator over a `Rope`'s contiguous `str` chunks.
 ///
-/// Internally, `Rope` stores text as a segemented collection of utf8 strings.
-/// This iterator iterates over those segments, returning a `&str` slice for
-/// each one.  This is primarily useful for efficiently sending a `Rope`'s
-/// text data somewhere else (e.g. writing it to disk).  But it can also be
-/// the basis for building custom iterators for `Rope`.
+/// Internally, each `Rope` stores text as a segemented collection of utf8
+/// strings. This iterator iterates over those segments, returning a
+/// `&str` slice for each one.  It is useful for situations such as:
 ///
-/// This iterator has the following two API guarantees about the chunks it
-/// yields:
+/// - Writing a rope's text data to disk.
+/// - Streaming a rope's text data somewhere.
+/// - Saving a rope to a non-utf8 encoding, doing the encoding conversion
+///   incrementally as you go.
+/// - Writing custom iterators over a rope's text data.
+///
+/// This iterator has only two API guarantees about the chunks it yields:
 ///
 /// 1. They are in-order, non-overlapping, and complete (i.e. the entire
 ///    text is iterated over in order).
-/// 2. Grapheme clusters are _never_ split between chunks.  (Grapheme clusters
-///    in this case are defined as the extended grapheme clusters in [Unicode
-///    Standard Annex #29](https://www.unicode.org/reports/tr29/))
+/// 2. Grapheme clusters are _never_ split between chunks.  (Grapheme
+///    clusters in this case are defined as the extended grapheme
+///    clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/))
 ///
-/// There are no other API guarantees.  For example, chunks can theoretically be
-/// of any size (including empty), line breaks and chunk boundaries have no
-/// guaranteed relationship, etc.
+/// There are no other API guarantees.  For example, chunks can
+/// theoretically be of any size (including empty), line breaks and chunk
+/// boundaries have no guaranteed relationship, etc.
+///
+/// (The converse of this API is the [`RopeBuilder`](../struct.RopeBuilder.html).)
 pub struct RopeChunks<'a> {
     node_stack: Vec<&'a Arc<Node>>,
     start: usize,
