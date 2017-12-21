@@ -12,7 +12,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 ///
 /// `RopeBuilder` is used to efficiently build `Rope`s from sequences
 /// of text chunks.  It is useful for situations such as:
-/// 
+///
 /// - Creating a rope from a large text file without pre-loading the
 ///   entire contents of the file into memory first (but see
 ///   `Rope::from_reader()` which uses `RopeBuilder` internally for
@@ -33,15 +33,15 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// # use ropey::RopeBuilder;
 /// #
 /// let mut builder = RopeBuilder::new();
-/// 
+///
 /// builder.append("Hello ");
 /// builder.append("world!\n");
 /// builder.append("How's ");
 /// builder.append("it goin");
 /// builder.append("g?");
-/// 
+///
 /// let rope = builder.finish();
-/// 
+///
 /// assert_eq!(rope, "Hello world!\nHow's it going?");
 /// ```
 #[derive(Debug, Clone)]

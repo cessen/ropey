@@ -4,6 +4,56 @@ use std;
 
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
+/// Uses bit-fiddling magic to count utf8 chars really quickly.
+/// We actually count the number of non-starting utf8 bytes, since
+/// they have a consistent starting two-bit pattern.  We then
+/// subtract from the byte length of the text to get the final
+/// count.
+pub fn count_chars(text: &str) -> usize {
+    #[allow(overflowing_literals)]
+    const ONEMASK: usize = 0x01010101010101010101010101010101;
+
+    let tsize: usize = std::mem::size_of::<usize>();
+
+    let len = text.len();
+    let mut ptr = text.as_ptr();
+    let end_ptr = unsafe { ptr.offset(len as isize) };
+    let mut inv_count = 0;
+
+    // Take care of any unaligned bytes at the beginning
+    let end_pre_ptr = {
+        let aligned = ptr as usize + (tsize - (ptr as usize & (tsize - 1)));
+        (end_ptr as usize).min(aligned) as *const u8
+    };
+    while ptr < end_pre_ptr {
+        let byte = unsafe { *ptr };
+        let a = (byte >> 7) & (!byte >> 6);
+        inv_count += a as usize;
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Use usize to count multiple bytes at once, using bit-fiddling magic.
+    let mut ptr = ptr as *const usize;
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (tsize - 1))) as *const usize;
+    while ptr < end_mid_ptr {
+        // Do the clever counting
+        let n = unsafe { *ptr };
+        let masked = ((n & (ONEMASK.wrapping_mul(0x80))) >> 7) & (!n >> 6);
+        inv_count += (masked.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Take care of any unaligned bytes at the end
+    let mut ptr = ptr as *const u8;
+    while ptr < end_ptr {
+        let byte = unsafe { *ptr };
+        let a = (byte >> 7) & (!byte >> 6);
+        inv_count += a as usize;
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    len - inv_count
+}
 
 pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
     let mut char_i = 0;
@@ -233,37 +283,33 @@ impl<'a> Iterator for LineBreakIter<'a> {
     fn next(&mut self) -> Option<usize> {
         while let Some(byte) = self.byte_itr.next() {
             self.byte_idx += 1;
-            match byte {
-                0x0A | 0x0B | 0x0C => {
-                    return Some(self.byte_idx);
-                }
-                0x0D => {
+            if (byte <= 0x0D) && (byte >= 0x0A) {
+                if byte == 0x0D {
                     // We're basically "peeking" here.
                     if let Some(0x0A) = self.byte_itr.clone().next() {
                         self.byte_itr.next();
                         self.byte_idx += 1;
                     }
+                }
+                return Some(self.byte_idx);
+            }
+            if byte == 0xC2 {
+                if let Some(0x85) = self.byte_itr.next() {
+                    self.byte_idx += 1;
                     return Some(self.byte_idx);
                 }
-                0xC2 => {
-                    if let Some(0x85) = self.byte_itr.next() {
-                        self.byte_idx += 1;
-                        return Some(self.byte_idx);
-                    }
-                }
-                0xE2 => {
+            }
+            if byte == 0xE2 {
+                self.byte_idx += 1;
+                if let Some(0x80) = self.byte_itr.next() {
                     self.byte_idx += 1;
-                    if let Some(0x80) = self.byte_itr.next() {
-                        self.byte_idx += 1;
-                        match self.byte_itr.next() {
-                            Some(0xA8) | Some(0xA9) => {
-                                return Some(self.byte_idx);
-                            }
-                            _ => {}
+                    match self.byte_itr.next() {
+                        Some(0xA8) | Some(0xA9) => {
+                            return Some(self.byte_idx);
                         }
+                        _ => {}
                     }
                 }
-                _ => {}
             }
         }
 
@@ -276,6 +322,13 @@ impl<'a> Iterator for LineBreakIter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn count_chars_01() {
+        let text = "Hello せかい! Hello せかい! Hello せかい! Hello せかい! Hello せかい!";
+
+        assert_eq!(54, count_chars(text));
+    }
 
     #[test]
     fn nearest_internal_grapheme_boundary_01() {

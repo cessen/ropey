@@ -3,7 +3,7 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
+use str_utils::{count_chars, byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
                 char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
                 is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary};
 use tree::{NodeChildren, NodeText, TextInfo, Count, MAX_CHILDREN, MIN_CHILDREN, MAX_BYTES,
@@ -229,7 +229,7 @@ impl Node {
 
         match self {
             &mut Node::Leaf(ref mut cur_text) => {
-                debug_assert!(end <= cur_text.chars().count());
+                debug_assert!(end <= count_chars(cur_text));
                 let start_byte = char_idx_to_byte_idx(&cur_text, start);
                 let end_byte = char_idx_to_byte_idx(&cur_text, end);
                 let is_on_edge = start_byte == 0 || end_byte == cur_text.len();
@@ -542,11 +542,11 @@ impl Node {
             } else {
                 let (chunk, _) = self.get_chunk_at_char(char_idx - 1);
                 let prev_byte_idx = prev_grapheme_boundary(chunk, chunk.len());
-                return char_idx - (&chunk[prev_byte_idx..]).chars().count();
+                return char_idx - count_chars(&chunk[prev_byte_idx..]);
             }
         } else {
             let prev_byte_idx = prev_grapheme_boundary(chunk, byte_idx);
-            return char_idx - (&chunk[prev_byte_idx..byte_idx]).chars().count();
+            return char_idx - count_chars(&chunk[prev_byte_idx..byte_idx]);
         }
     }
 
@@ -574,11 +574,11 @@ impl Node {
             } else {
                 let (chunk, _) = self.get_chunk_at_char(char_idx + 1);
                 let next_byte_idx = next_grapheme_boundary(chunk, 0);
-                return char_idx + (&chunk[..next_byte_idx]).chars().count();
+                return char_idx + count_chars(&chunk[..next_byte_idx]);
             }
         } else {
             let next_byte_idx = next_grapheme_boundary(chunk, byte_idx);
-            return char_idx + (&chunk[byte_idx..next_byte_idx]).chars().count();
+            return char_idx + count_chars(&chunk[byte_idx..next_byte_idx]);
         };
     }
 

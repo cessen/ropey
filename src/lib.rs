@@ -18,11 +18,11 @@
 //! ## Insertion and deletion
 //! ```
 //! use ropey::Rope;
-//! 
+//!
 //! let mut rope = Rope::from_str("Hello individual!");
 //! rope.remove(6, 16);
 //! rope.insert(6, "world");
-//! 
+//!
 //! assert_eq!(rope, "Hello world!");
 //! ```
 //!

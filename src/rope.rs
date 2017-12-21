@@ -29,7 +29,7 @@ use tree::{Node, NodeChildren, MAX_BYTES, Count};
 /// let mut rope = Rope::from_str("Hello みんなさん!");
 /// rope.remove(6, 11);
 /// rope.insert(6, "world");
-/// 
+///
 /// assert_eq!(rope, "Hello world!");
 /// ```
 ///
