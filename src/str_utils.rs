@@ -256,10 +256,10 @@ pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
 ///
 /// The following unicode sequences are considered newlines by this function:
 /// - u{000A} (a.k.a. LF)
-/// - u{000D} (a.k.a. CR)
-/// - u{000D}u{000A} (a.k.a. CRLF)
 /// - u{000B}
 /// - u{000C}
+/// - u{000D} (a.k.a. CR)
+/// - u{000D}u{000A} (a.k.a. CRLF)
 /// - u{0085}
 /// - u{2028}
 /// - u{2029}
@@ -283,6 +283,7 @@ impl<'a> Iterator for LineBreakIter<'a> {
     fn next(&mut self) -> Option<usize> {
         while let Some(byte) = self.byte_itr.next() {
             self.byte_idx += 1;
+            // Handle u{000A}, u{000B}, u{000C}, and u{000D}
             if (byte <= 0x0D) && (byte >= 0x0A) {
                 if byte == 0x0D {
                     // We're basically "peeking" here.
@@ -293,22 +294,20 @@ impl<'a> Iterator for LineBreakIter<'a> {
                 }
                 return Some(self.byte_idx);
             }
-            if byte == 0xC2 {
+            // Handle u{0085}
+            else if byte == 0xC2 {
+                self.byte_idx += 1;
                 if let Some(0x85) = self.byte_itr.next() {
-                    self.byte_idx += 1;
                     return Some(self.byte_idx);
                 }
             }
-            if byte == 0xE2 {
-                self.byte_idx += 1;
-                if let Some(0x80) = self.byte_itr.next() {
-                    self.byte_idx += 1;
-                    match self.byte_itr.next() {
-                        Some(0xA8) | Some(0xA9) => {
-                            return Some(self.byte_idx);
-                        }
-                        _ => {}
-                    }
+            // Handle u{2028} and u{2029}
+            else if byte == 0xE2 {
+                self.byte_idx += 2;
+                let byte2 = self.byte_itr.next().unwrap();
+                let byte3 = self.byte_itr.next().unwrap() >> 1;
+                if byte2 == 0x80 && byte3 == 0x54 {
+                    return Some(self.byte_idx);
                 }
             }
         }
