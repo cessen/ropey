@@ -9,6 +9,9 @@ readme = "README.md"
 license = "MIT"
 keywords = ["rope", "text", "buffer"]
 
+[profile.release]
+debug = true
+
 [dependencies]
 smallvec = "0.6"
 unicode-segmentation = "1.2"
