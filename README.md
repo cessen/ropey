@@ -28,7 +28,7 @@ Ropey is fast and minimizes memory usage:
 
 ### Strong Unicode support
 Ropey treats Unicode code points (`char`s in Rust) as the atomic unit of text.
-Indexing and edits are all done in terms of code points, making the API's
+Indexing and edits are all done in terms of code points, making the APIs
 intuitive and making it impossible to accidentally create invalid utf8 data
 through edits.
 
