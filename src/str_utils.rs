@@ -10,8 +10,7 @@ use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 /// subtract from the byte length of the text to get the final
 /// count.
 pub fn count_chars(text: &str) -> usize {
-    #[allow(overflowing_literals)]
-    const ONEMASK: usize = 0x01010101010101010101010101010101;
+    const ONEMASK: usize = std::usize::MAX / 0xFF;
 
     let tsize: usize = std::mem::size_of::<usize>();
 
@@ -27,8 +26,7 @@ pub fn count_chars(text: &str) -> usize {
     };
     while ptr < end_pre_ptr {
         let byte = unsafe { *ptr };
-        let a = (byte >> 7) & (!byte >> 6);
-        inv_count += a as usize;
+        inv_count += ((byte & 0xC0) == 0x80) as usize;
         ptr = unsafe { ptr.offset(1) };
     }
 
@@ -38,8 +36,8 @@ pub fn count_chars(text: &str) -> usize {
     while ptr < end_mid_ptr {
         // Do the clever counting
         let n = unsafe { *ptr };
-        let masked = ((n & (ONEMASK.wrapping_mul(0x80))) >> 7) & (!n >> 6);
-        inv_count += (masked.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
+        let byte_bools = ((n >> 7) & (!n >> 6)) & ONEMASK;
+        inv_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
         ptr = unsafe { ptr.offset(1) };
     }
 
@@ -47,8 +45,7 @@ pub fn count_chars(text: &str) -> usize {
     let mut ptr = ptr as *const u8;
     while ptr < end_ptr {
         let byte = unsafe { *ptr };
-        let a = (byte >> 7) & (!byte >> 6);
-        inv_count += a as usize;
+        inv_count += ((byte & 0xC0) == 0x80) as usize;
         ptr = unsafe { ptr.offset(1) };
     }
 
