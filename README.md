@@ -1,7 +1,7 @@
 # Ropey
 
-Ropey is a utf8-text rope library for Rust, designed for efficient editing and
-manipulation of large texts.
+Ropey is a utf8 text buffer for Rust, implemented as a text rope and designed
+for efficient editing and manipulation of large texts.
 
 Note: this repository is currently a WIP for the new implementation of Ropey,
 and is not yet published to crates.io.  The currently published versions can be
@@ -89,11 +89,17 @@ graphemes are usually worked with in practice doesn't (I think) need direct
 indexing.  Nevertheless, it would be cool to get that feature back.  But not
 at such a significant cost to performance.
 
+
+## License
+
+Ropey is licensed under the MIT license (LICENSE.md or http://opensource.org/licenses/MIT)
+
+
 ## Contributing
 
-Contributions are absolutely welcome!  However, I do have a feeling for how I
-want Ropey to be structured and work, so please open an issue or email me to
-discuss larger changes, to avoid doing a lot of work for nothing.
+Contributions are absolutely welcome!  However, please open an issue or email me
+to discuss larger changes, to avoid doing a lot of work that may get rejected.
 
-By submitting a pull request to this repository, you implicitly license your
-code under the same license (MIT, see LICENSE.md) as Ropey.
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in Ropey by you will be licensed as above, without any additional
+terms or conditions.
