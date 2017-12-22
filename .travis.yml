@@ -4,13 +4,11 @@ rust:
 - beta
 - nightly
 matrix:
-    allow_failures:
-        - rust: nightly
+  allow_failures:
+  - rust: nightly
 env:
   global:
-    - MAKEFLAGS="-j 2"
-    - secure: HymLL+xGbR8WmBN7j5c/dNgCZ7WtLInNNDyqQKYA3Y0bEDTF4s26Q06YDrEuJtIsAvXCBxiNxONb4PYTqXTOBl6chc8BXGQoRx7tQBo9KXlV4DLwGiKSpl5/tmDsBXublFGAO1hh+tXjhgL6vA2kgLfvHq3rYV2eEioGEHXC4UOxdbEgPLeZ2FxqZrQuG9b4+tL8hjUuvZP26NgR23y80nnubAoiJb/qSwgtDdDaslBpU7/kQI5HU6C3Kt45feIGFhmYAPNVUjV4DyzT7d3tvZopcITTlBqMDAgYj0bYUF79c6FSQ7iDVJAh4ZQ3G0hXvzTe5IIaQ+BazG8yNSm4RY4R9MS0SkiVKT82LXYEtglPDO0QFL753QxGktkSfPFwhqK9AFIyJYXDGehqhpfA9ZR4innMANejWYNE5MB0XfSPuUsl2yKsxwoEWeDx5BkiiZj0IhwqAb2Y6fHdVgRMdsOVUHm06BMzVmBgVed0SNzdrfaqECxH5uIbGPWShiTJQmD82y2Bf/0qYPe42mNpAdEIcW6/Kf+emZMhkwS1a7W9Kkls6k8LykdJxQ00Ico6OTQd2Zr3t99aQQ3uRpQwkDS2Qo1GV2P3BGnkhUEesZxKctfYVpHFg+5F5eVOQ4knZskLQW5ha0dTnX8jIjdFnJQU36M1psrt4fdkTgwc44A=
-
+    secure: T539XLLi1Z+BBwnwqm/AnHJjNY/YUX4rRkEr1Nt5u/KKhQePjXEjGjqOC9/aVYbAKEc4bmTZkRrt6KoLRKhUOqHAAI/4xZkkey6vehqAclWX+rtOlbX0qJFFI/v2YHzYEU+32afhcXI+d1ttcu3ai8S92VPTt4jcT3dhxvBQAzzizzNsndLbbVJo8AGSnI0hV5vz/jOjtrEcFCrqjBuejZjZDFOZ9Jkg3VtITvR8QyCTlRE5zKNGDjj3Iaw/XVwUg1GqVqfyeS3WyQ5HjqtQbLm6/iA7zH3ISaQ5dAafzCKhB0bErWvUgk47N4Btku0tL9M0StFYBJQWzGkj/IENfNW1WlAjoaO4i75HO5Ms53QZipFPKBlQgz1iqKbETfJ0B2LZvXbnRkVNLrbIs2OE8oG/7mq0kp44qOPkWKjJEtAjCn0wgEyqMKrdJ09V8OzzpMvLnzdW4zG+Wuqm4tBuVHErCw47WFSncL3ibOwqS6qEhqbf6+uhs/j0Mmqrr3HRQJZGT6VSmMx1LUB/oMK6QseVTKgUp5AOUTmpUc3Pe8tNjAy9uvzy0aUEkZP3MRmYE0QPUqanvlTX2sO2EKBKfvNMgaBR37ZyQjjTXtPCvvneMP5VIBk6mfSoIVmXQB1e/sRN1rPvYCfDUWL+u2TDM6hHseAa6HwfUe5RTS2BCVk=
 before_script:
 - |
   pip install 'travis-cargo<0.2' --user &&
@@ -22,7 +20,6 @@ script:
   travis-cargo --only stable doc
 after_success:
 - travis-cargo --only stable doc-upload
-
 cache:
   pip: true
   cargo: true
