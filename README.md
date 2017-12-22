@@ -3,10 +3,6 @@
 Ropey is a utf8 text buffer for Rust, implemented as a text rope and designed
 for efficient editing and manipulation of large texts.
 
-Note: this repository is currently a WIP for the new implementation of Ropey,
-and is not yet published to crates.io.  The currently published versions can be
-found at https://github.com/cessen/ropey_old
-
 
 ## Features
 
