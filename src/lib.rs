@@ -62,3 +62,4 @@ pub mod iter;
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;
 pub use slice::RopeSlice;
+pub use tree::MAX_ROPE_LEN;

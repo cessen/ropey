@@ -9,7 +9,7 @@ use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
 use str_utils::{char_idx_to_byte_idx, seam_is_grapheme_boundary};
-use tree::{Node, NodeChildren, MAX_BYTES, Count};
+use tree::{Node, NodeChildren, Count, MAX_BYTES, MAX_ROPE_LEN, add_exceeds_max_rope_size};
 
 
 /// A utf8 text rope.
@@ -77,6 +77,13 @@ impl Rope {
 
     /// Creates a `Rope` from a string slice.
     pub fn from_str(text: &str) -> Rope {
+        // Max rope size check
+        assert!(
+            text.len() <= MAX_ROPE_LEN,
+            "Ropes cannot exceed {} bytes in size",
+            MAX_ROPE_LEN
+        );
+
         let mut builder = RopeBuilder::new();
         builder.append(text);
         builder.finish()
@@ -180,6 +187,14 @@ impl Rope {
     pub fn insert(&mut self, char_idx: usize, text: &str) {
         // TODO: handle large insertions more efficiently, instead of doing a split
         // and appends.
+
+        // Max rope size check
+        assert!(
+            !add_exceeds_max_rope_size(self.len_bytes() as Count, text.len() as Count),
+            "Ropes cannot exceed {} bytes in size, insertion would result in {} bytes",
+            MAX_ROPE_LEN,
+            self.len_bytes() + text.len()
+        );
 
         // Bounds check
         assert!(
@@ -301,6 +316,14 @@ impl Rope {
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
     pub fn append(&mut self, other: Rope) {
+        // Max rope size check
+        assert!(
+            !add_exceeds_max_rope_size(self.len_bytes() as Count, other.len_bytes() as Count),
+            "Ropes cannot exceed {} bytes in size, append would result in {} bytes",
+            MAX_ROPE_LEN,
+            self.len_bytes() + other.len_bytes()
+        );
+
         if self.len_chars() == 0 {
             let mut other = other;
             std::mem::swap(self, &mut other);
