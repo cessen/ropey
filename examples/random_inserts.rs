@@ -9,7 +9,7 @@ fn main() {
     let mut tree = Rope::new();
     let mut insert_count = 0;
 
-    for _ in 0..(1 << 17) {
+    for _ in 0..(1 << 20) {
         let len = tree.len_chars().max(1);
         tree.insert(rng.gen::<usize>() % len, "Hello ");
         tree.insert(rng.gen::<usize>() % len, "world! ");

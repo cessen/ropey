@@ -5,8 +5,7 @@ use std::collections::VecDeque;
 use rope::Rope;
 use str_utils::{is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
                 nearest_internal_grapheme_boundary};
-use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN, Count, MAX_ROPE_LEN,
-           add_exceeds_max_rope_size};
+use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 
 /// An incremental `Rope` builder.
@@ -49,7 +48,6 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN, Count, MAX_ROP
 pub struct RopeBuilder {
     stack: VecDeque<Node>,
     buffer: String,
-    rope_size: usize, // Track how big the rope is getting
 }
 
 impl RopeBuilder {
@@ -62,7 +60,6 @@ impl RopeBuilder {
                 stack
             },
             buffer: String::with_capacity(MAX_BYTES),
-            rope_size: 0,
         }
     }
 
@@ -171,14 +168,6 @@ impl RopeBuilder {
     }
 
     fn append_leaf_node(&mut self, leaf: Node) {
-        // Max rope size check
-        assert!(
-            !add_exceeds_max_rope_size(self.rope_size as Count, leaf.leaf_text().len() as Count),
-            "Ropes cannot exceed {} bytes in size",
-            MAX_ROPE_LEN
-        );
-        self.rope_size += leaf.leaf_text().len();
-
         let last = self.stack.pop_back().unwrap();
         match last {
             Node::Leaf(_) => {
