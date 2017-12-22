@@ -53,18 +53,14 @@ pub fn count_chars(text: &str) -> usize {
 }
 
 pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
-    let mut char_i = 0;
-    for (offset, _) in text.char_indices() {
-        if byte_idx < offset {
-            break;
-        } else {
-            char_i += 1;
-        }
-    }
-    if byte_idx == text.len() {
-        char_i
+    if byte_idx == 0 {
+        return 0;
+    } else if byte_idx >= text.len() {
+        return count_chars(text);
     } else {
-        char_i - 1
+        return count_chars(unsafe {
+            std::str::from_utf8_unchecked(&text.as_bytes()[0..(byte_idx + 1)])
+        }) - 1;
     }
 }
 
@@ -81,10 +77,50 @@ pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
 }
 
 pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
-    if let Some((offset, _)) = text.char_indices().nth(char_idx) {
-        offset
+    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    let tsize: usize = std::mem::size_of::<usize>();
+
+    let mut char_count = 0;
+    let mut ptr = text.as_ptr();
+    let start_ptr = text.as_ptr();
+    let end_ptr = unsafe { ptr.offset(text.len() as isize) };
+
+    // Take care of any unaligned bytes at the beginning
+    let end_pre_ptr = {
+        let aligned = ptr as usize + (tsize - (ptr as usize & (tsize - 1)));
+        (end_ptr as usize).min(aligned) as *const u8
+    };
+    while ptr < end_pre_ptr && char_count <= char_idx {
+        let byte = unsafe { *ptr };
+        char_count += ((byte & 0xC0) != 0x80) as usize;
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Use usize to count multiple bytes at once, using bit-fiddling magic.
+    let mut ptr = ptr as *const usize;
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (tsize - 1))) as *const usize;
+    while ptr < end_mid_ptr && (char_count + tsize) <= char_idx {
+        // Do the clever counting
+        let n = unsafe { *ptr };
+        let byte_bools = (!((n >> 7) & (!n >> 6))) & ONEMASK;
+        char_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Take care of any unaligned bytes at the end
+    let mut ptr = ptr as *const u8;
+    while ptr < end_ptr && char_count <= char_idx {
+        let byte = unsafe { *ptr };
+        char_count += ((byte & 0xC0) != 0x80) as usize;
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Finish up
+    let byte_count = ptr as usize - start_ptr as usize;
+    if ptr == end_ptr && char_count == char_idx {
+        byte_count
     } else {
-        text.len()
+        byte_count - 1
     }
 }
 
@@ -407,8 +443,9 @@ mod tests {
     #[test]
     fn byte_idx_to_char_idx_01() {
         let text = "Hello せかい!";
-        assert_eq!(8, byte_idx_to_char_idx(text, 12));
         assert_eq!(0, byte_idx_to_char_idx(text, 0));
+        assert_eq!(1, byte_idx_to_char_idx(text, 1));
+        assert_eq!(8, byte_idx_to_char_idx(text, 12));
         assert_eq!(10, byte_idx_to_char_idx(text, 16));
     }
 
@@ -473,9 +510,51 @@ mod tests {
     #[test]
     fn char_idx_to_byte_idx_01() {
         let text = "Hello せかい!";
-        assert_eq!(12, char_idx_to_byte_idx(text, 8));
         assert_eq!(0, char_idx_to_byte_idx(text, 0));
+        assert_eq!(1, char_idx_to_byte_idx(text, 1));
+        assert_eq!(2, char_idx_to_byte_idx(text, 2));
+        assert_eq!(5, char_idx_to_byte_idx(text, 5));
+        assert_eq!(6, char_idx_to_byte_idx(text, 6));
+        assert_eq!(12, char_idx_to_byte_idx(text, 8));
+        assert_eq!(15, char_idx_to_byte_idx(text, 9));
         assert_eq!(16, char_idx_to_byte_idx(text, 10));
+    }
+
+    #[test]
+    fn char_idx_to_byte_idx_02() {
+        let text = "せかい";
+        assert_eq!(0, char_idx_to_byte_idx(text, 0));
+        assert_eq!(3, char_idx_to_byte_idx(text, 1));
+        assert_eq!(6, char_idx_to_byte_idx(text, 2));
+        assert_eq!(9, char_idx_to_byte_idx(text, 3));
+    }
+
+    #[test]
+    fn char_idx_to_byte_idx_03() {
+        let text = "Hello world!";
+        assert_eq!(0, char_idx_to_byte_idx(text, 0));
+        assert_eq!(1, char_idx_to_byte_idx(text, 1));
+        assert_eq!(8, char_idx_to_byte_idx(text, 8));
+        assert_eq!(11, char_idx_to_byte_idx(text, 11));
+        assert_eq!(12, char_idx_to_byte_idx(text, 12));
+    }
+
+    #[test]
+    fn char_idx_to_byte_idx_04() {
+        let text = "Hello world! Hello せかい! Hello world! Hello せかい! \
+                    Hello world! Hello せかい! Hello world! Hello せかい! \
+                    Hello world! Hello せかい! Hello world! Hello せかい! \
+                    Hello world! Hello せかい! Hello world! Hello せかい!";
+        assert_eq!(0, char_idx_to_byte_idx(text, 0));
+        assert_eq!(30, char_idx_to_byte_idx(text, 24));
+        assert_eq!(60, char_idx_to_byte_idx(text, 48));
+        assert_eq!(90, char_idx_to_byte_idx(text, 72));
+        assert_eq!(115, char_idx_to_byte_idx(text, 93));
+        assert_eq!(120, char_idx_to_byte_idx(text, 96));
+        assert_eq!(150, char_idx_to_byte_idx(text, 120));
+        assert_eq!(180, char_idx_to_byte_idx(text, 144));
+        assert_eq!(210, char_idx_to_byte_idx(text, 168));
+        assert_eq!(239, char_idx_to_byte_idx(text, 191));
     }
 
     #[test]
