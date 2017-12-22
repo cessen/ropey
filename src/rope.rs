@@ -232,6 +232,14 @@ impl Rope {
 
     /// Removes the text in char range `start..end`.
     pub fn remove(&mut self, start: usize, end: usize) {
+        // Bounds check
+        assert!(
+            end <= self.len_chars(),
+            "Attempt to remove past end of Rope: removal end {}, Rope length {}",
+            end,
+            self.len_chars()
+        );
+
         // Scope to contain borrow of root
         {
             let root = Arc::make_mut(&mut self.root);
@@ -251,6 +259,14 @@ impl Rope {
     /// Splits the `Rope` at `char_idx`, returning the right part of
     /// the split.
     pub fn split_off(&mut self, char_idx: usize) -> Rope {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to split past end of Rope: split point {}, Rope length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         if char_idx == 0 {
             // Special case 1
             let mut new_rope = Rope::new();
@@ -327,32 +343,124 @@ impl Rope {
 
     /// Returns the char index of the given byte.
     pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
         self.root.byte_to_char(byte_idx)
     }
 
     /// Returns the line index of the given byte.
     pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
         self.root.byte_to_line(byte_idx)
     }
 
     /// Returns the byte index of the given char.
     pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         self.root.char_to_byte(char_idx) as usize
     }
 
     /// Returns the line index of the given char.
+    ///
+    /// Note: lines are zero-indexed.
     pub fn char_to_line(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         self.root.char_to_line(char_idx)
     }
 
     /// Returns the byte index of the start of the given line.
+    ///
+    /// Note: lines are zero-indexed.
     pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line index {}, Rope line length {}",
+            line_idx,
+            self.len_lines()
+        );
         self.root.line_to_byte(line_idx)
     }
 
     /// Returns the char index of the start of the given line.
+    ///
+    /// Note: lines are zero-indexed.
     pub fn line_to_char(&self, line_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line index {}, Rope line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
         self.root.line_to_char(line_idx)
+    }
+
+    //-----------------------------------------------------------------------
+    // Fetch methods
+    // TODO: possibly make these more efficient.
+
+    /// Returns the char at `char_idx`.
+    pub fn get_char(&self, char_idx: usize) -> char {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        self.slice(char_idx, char_idx + 1).chars().nth(0).unwrap()
+    }
+
+    /// Returns the line at `line_idx`.
+    ///
+    /// Note: lines are zero-indexed.
+    pub fn get_line<'a>(&'a self, line_idx: usize) -> RopeSlice<'a> {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line index {}, Rope line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
+        let start = self.line_to_char(line_idx);
+        let end = if (line_idx + 1) < self.len_lines() {
+            self.line_to_char(line_idx + 1)
+        } else {
+            self.len_chars()
+        };
+
+        self.slice(start, end)
     }
 
     //-----------------------------------------------------------------------
@@ -360,6 +468,14 @@ impl Rope {
 
     /// Returns whether `char_idx` is a grapheme cluster boundary or not.
     pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         self.root.is_grapheme_boundary(char_idx)
     }
 
@@ -369,6 +485,14 @@ impl Rope {
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the beginning of the rope.
     pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         self.root.prev_grapheme_boundary(char_idx)
     }
 
@@ -378,6 +502,14 @@ impl Rope {
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the end of the rope.
     pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         self.root.next_grapheme_boundary(char_idx)
     }
 
@@ -386,6 +518,15 @@ impl Rope {
 
     /// Returns an immutable slice of the `Rope` in the char range `start..end`.
     pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
+        // Bounds check
+        assert!(start <= end);
+        assert!(
+            end <= self.len_chars(),
+            "Attempt to slice past end of Rope: slice end {}, Rope length {}",
+            end,
+            self.len_chars()
+        );
+
         RopeSlice::new_with_range(&self.root, start, end)
     }
 
@@ -835,5 +976,35 @@ mod tests {
 
         r.assert_integrity();
         r.assert_invariants();
+    }
+
+    #[test]
+    fn get_char_01() {
+        let r = Rope::from_str(
+            "Hello world! How are you doing? こんいちは、みんなさん！",
+        );
+
+        assert_eq!(r.get_char(0), 'H');
+        assert_eq!(r.get_char(10), 'd');
+        assert_eq!(r.get_char(18), 'r');
+        assert_eq!(r.get_char(43), '！');
+    }
+
+    #[test]
+    fn get_line_01() {
+        let r = Rope::from_str(
+            "Hello world!\nHow are you doing?\nこんいちは、みんなさん！",
+        );
+
+        assert_eq!(r.get_line(0), "Hello world!\n");
+        assert_eq!(r.get_line(1), "How are you doing?\n");
+        assert_eq!(r.get_line(2), "こんいちは、みんなさん！");
+    }
+
+    #[test]
+    fn get_line_02() {
+        let r = Rope::from_str("");
+
+        assert_eq!(r.get_line(0), "");
     }
 }

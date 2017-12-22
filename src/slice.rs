@@ -99,14 +99,28 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns the line index of the given char.
     pub fn char_to_line(&self, char_idx: usize) -> usize {
-        assert!(char_idx <= self.len_chars());
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         self.node.char_to_line(self.start_char as usize + char_idx) -
             (self.start_line_break as usize)
     }
 
     /// Returns the char index of the start of the given line.
     pub fn line_to_char(&self, line_idx: usize) -> usize {
-        assert!(line_idx <= (self.len_lines() - 1));
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of slice: line index {}, slice line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
         let char_idx = self.node.line_to_char(
             self.start_line_break as usize + line_idx,
         ) - self.start_char as usize;
@@ -119,11 +133,57 @@ impl<'a> RopeSlice<'a> {
     }
 
     //-----------------------------------------------------------------------
+    // Fetch methods
+    // TODO: possibly make these more efficient.
+
+    /// Returns the char at `char_idx`.
+    pub fn get_char(&self, char_idx: usize) -> char {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        self.slice(char_idx, char_idx + 1).chars().nth(0).unwrap()
+    }
+
+    /// Returns the line at `line_idx`.
+    ///
+    /// Note: lines are zero-indexed.
+    pub fn get_line(&self, line_idx: usize) -> RopeSlice<'a> {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of slice: line index {}, slice line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
+        let start = self.line_to_char(line_idx);
+        let end = if (line_idx + 1) < self.len_lines() {
+            self.line_to_char(line_idx + 1)
+        } else {
+            self.len_chars()
+        };
+
+        self.slice(start, end)
+    }
+
+    //-----------------------------------------------------------------------
     // Grapheme methods
 
     /// Returns whether `char_idx` is a grapheme cluster boundary or not.
     pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
-        assert!(char_idx <= self.len_chars());
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         if char_idx == 0 || char_idx == self.len_chars() {
             true
         } else {
@@ -139,7 +199,14 @@ impl<'a> RopeSlice<'a> {
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the beginning of the rope.
     pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
-        assert!(char_idx <= self.len_chars());
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         let boundary_idx = self.node.prev_grapheme_boundary(
             self.start_char as usize + char_idx,
         );
@@ -156,7 +223,14 @@ impl<'a> RopeSlice<'a> {
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the end of the rope.
     pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
-        assert!(char_idx <= self.len_chars());
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         let boundary_idx = self.node.next_grapheme_boundary(
             self.start_char as usize + char_idx,
         );
@@ -172,8 +246,15 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns an immutable slice of the `RopeSlice` in the char range `start..end`.
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice<'a> {
+        // Bounds check
         assert!(start <= end);
-        assert!(end <= (self.end_char - self.start_char) as usize);
+        assert!(
+            end <= self.len_chars(),
+            "Attempt to slice past end of RopeSlice: slice end {}, RopeSlice length {}",
+            end,
+            self.len_chars()
+        );
+
         RopeSlice::new_with_range(
             self.node,
             self.start_char as usize + start,

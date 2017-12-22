@@ -512,6 +512,8 @@ impl Node {
         }
     }
 
+
+
     /// Returns whether the given char index is a grapheme cluster
     /// boundary or not.
     pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
