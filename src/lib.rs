@@ -1,7 +1,7 @@
 //! Ropey is a utf8 text rope library, designed to be the backing text
 //! buffer for applications such as text editors.  Ropey is fast,
 //! Unicode-safe, has low memory overhead, and can handle huge texts
-//! and memory-incoherent edits without breaking a sweat.
+//! and memory-incoherent edits without trouble.
 //!
 //! The library is made up of four main components:
 //!
