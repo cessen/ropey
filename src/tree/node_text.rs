@@ -1,7 +1,6 @@
 use std;
 
 use std::borrow::Borrow;
-use std::iter::IntoIterator;
 use std::ops::Deref;
 use std::ptr;
 use std::str;
@@ -40,9 +39,9 @@ impl NodeText {
 
     /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        NodeText {
-            buffer: string.as_bytes().into_iter().cloned().collect(),
-        }
+        let mut nodetext = NodeText::with_capacity(string.len());
+        unsafe { nodetext.insert_bytes(0, string.as_bytes()) };
+        nodetext
     }
 
     /// Inserts a `&str` at byte offset `idx`.
