@@ -3,8 +3,8 @@
 use std;
 use std::sync::Arc;
 
-use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
-use tree::{Node, Count};
+use iter::{RopeBytes, RopeChars, RopeChunks, RopeGraphemes, RopeLines};
+use tree::{Count, Node};
 use rope::Rope;
 
 /// An immutable view into part of a `Rope`.
@@ -107,8 +107,8 @@ impl<'a> RopeSlice<'a> {
             self.len_chars()
         );
 
-        self.node.char_to_line(self.start_char as usize + char_idx) -
-            (self.start_line_break as usize)
+        self.node.char_to_line(self.start_char as usize + char_idx)
+            - (self.start_line_break as usize)
     }
 
     /// Returns the char index of the start of the given line.
@@ -121,9 +121,9 @@ impl<'a> RopeSlice<'a> {
             self.len_lines()
         );
 
-        let char_idx = self.node.line_to_char(
-            self.start_line_break as usize + line_idx,
-        ) - self.start_char as usize;
+        let char_idx = self.node
+            .line_to_char(self.start_line_break as usize + line_idx)
+            - self.start_char as usize;
 
         if char_idx < (self.start_char as usize) {
             0
@@ -187,9 +187,8 @@ impl<'a> RopeSlice<'a> {
         if char_idx == 0 || char_idx == self.len_chars() {
             true
         } else {
-            self.node.is_grapheme_boundary(
-                self.start_char as usize + char_idx,
-            )
+            self.node
+                .is_grapheme_boundary(self.start_char as usize + char_idx)
         }
     }
 
@@ -207,9 +206,8 @@ impl<'a> RopeSlice<'a> {
             self.len_chars()
         );
 
-        let boundary_idx = self.node.prev_grapheme_boundary(
-            self.start_char as usize + char_idx,
-        );
+        let boundary_idx = self.node
+            .prev_grapheme_boundary(self.start_char as usize + char_idx);
         if boundary_idx < self.start_char as usize {
             0
         } else {
@@ -231,9 +229,8 @@ impl<'a> RopeSlice<'a> {
             self.len_chars()
         );
 
-        let boundary_idx = self.node.next_grapheme_boundary(
-            self.start_char as usize + char_idx,
-        );
+        let boundary_idx = self.node
+            .next_grapheme_boundary(self.start_char as usize + char_idx);
         if boundary_idx >= self.end_char as usize {
             self.len_chars()
         } else {
@@ -309,7 +306,9 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates a new `Rope` from the contents of the `RopeSlice`.
     pub fn to_rope(&self) -> Rope {
-        let mut rope = Rope { root: self.node.clone() };
+        let mut rope = Rope {
+            root: self.node.clone(),
+        };
 
         // Chop off right end if needed
         if self.end_char < self.node.text_info().chars {

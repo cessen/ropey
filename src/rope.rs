@@ -5,12 +5,11 @@ use std::io;
 use std::sync::Arc;
 use std::ptr;
 
-use iter::{RopeBytes, RopeChars, RopeGraphemes, RopeLines, RopeChunks};
+use iter::{RopeBytes, RopeChars, RopeChunks, RopeGraphemes, RopeLines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
 use str_utils::{char_idx_to_byte_idx, seam_is_grapheme_boundary};
-use tree::{Node, NodeChildren, Count, MAX_BYTES};
-
+use tree::{Count, Node, NodeChildren, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
@@ -72,7 +71,9 @@ impl Rope {
 
     /// Creates an empty `Rope`.
     pub fn new() -> Rope {
-        Rope { root: Arc::new(Node::new()) }
+        Rope {
+            root: Arc::new(Node::new()),
+        }
     }
 
     /// Creates a `Rope` from a string slice.
@@ -295,7 +296,9 @@ impl Rope {
             }
 
             // Return right rope
-            Rope { root: new_rope_root }
+            Rope {
+                root: new_rope_root,
+            }
         }
     }
 
@@ -321,10 +324,8 @@ impl Rope {
                 }
             } else {
                 let mut other = other;
-                let extra = Arc::make_mut(&mut other.root).prepend_at_depth(
-                    self.root.clone(),
-                    r_depth - l_depth,
-                );
+                let extra = Arc::make_mut(&mut other.root)
+                    .prepend_at_depth(self.root.clone(), r_depth - l_depth);
                 if let Some(node) = extra {
                     let mut children = NodeChildren::new();
                     children.push((node.text_info(), node));
@@ -761,9 +762,8 @@ mod tests {
 
     #[test]
     fn remove_01() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         r.remove(5, 11);
         r.remove(24, 31);
@@ -787,9 +787,8 @@ mod tests {
 
     #[test]
     fn split_off_01() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         let r2 = r.split_off(20);
         assert_eq!("Hello world! How are", r);
@@ -806,9 +805,8 @@ mod tests {
 
     #[test]
     fn split_off_02() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         let r2 = r.split_off(1);
         assert_eq!("H", r);
@@ -825,9 +823,8 @@ mod tests {
 
     #[test]
     fn split_off_03() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         let r2 = r.split_off(43);
         assert_eq!(
@@ -844,9 +841,8 @@ mod tests {
 
     #[test]
     fn split_off_04() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         let r2 = r.split_off(0);
         assert_eq!("", r);
@@ -863,9 +859,8 @@ mod tests {
 
     #[test]
     fn split_off_05() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         let r2 = r.split_off(44);
         assert_eq!(
@@ -912,9 +907,8 @@ mod tests {
 
     #[test]
     fn append_03() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん");
         let r2 = Rope::from_str("！");
 
         r.append(r2);
@@ -930,9 +924,8 @@ mod tests {
     #[test]
     fn append_04() {
         let mut r = Rope::from_str("H");
-        let r2 = Rope::from_str(
-            "ello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let r2 =
+            Rope::from_str("ello world! How are you doing? こんいちは、みんなさん！");
 
         r.append(r2);
         assert_eq!(
@@ -946,9 +939,8 @@ mod tests {
 
     #[test]
     fn append_05() {
-        let mut r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let mut r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
         let r2 = Rope::from_str("");
 
         r.append(r2);
@@ -964,9 +956,8 @@ mod tests {
     #[test]
     fn append_06() {
         let mut r = Rope::from_str("");
-        let r2 = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let r2 =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         r.append(r2);
         assert_eq!(
@@ -980,9 +971,8 @@ mod tests {
 
     #[test]
     fn get_char_01() {
-        let r = Rope::from_str(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-        );
+        let r =
+            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
         assert_eq!(r.get_char(0), 'H');
         assert_eq!(r.get_char(10), 'd');

@@ -1,4 +1,4 @@
-use str_utils::{LineBreakIter, count_chars};
+use str_utils::{count_chars, LineBreakIter};
 use tree::Count;
 
 #[derive(Debug, Copy, Clone, PartialEq)]

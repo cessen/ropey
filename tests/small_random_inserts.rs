@@ -1,5 +1,5 @@
-extern crate ropey;
 extern crate rand;
+extern crate ropey;
 
 use ropey::Rope;
 use rand::Rng;

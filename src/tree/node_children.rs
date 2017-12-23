@@ -304,7 +304,10 @@ impl NodeChildren {
         &mut self,
         idx1: usize,
         idx2: usize,
-    ) -> ((&mut TextInfo, &mut Arc<Node>), (&mut TextInfo, &mut Arc<Node>)) {
+    ) -> (
+        (&mut TextInfo, &mut Arc<Node>),
+        (&mut TextInfo, &mut Arc<Node>),
+    ) {
         assert!(idx1 < idx2);
         assert!(idx2 < self.len());
 
@@ -312,12 +315,10 @@ impl NodeChildren {
         let (info1, info2) = self.info.split_at_mut(split_idx);
         let (nodes1, nodes2) = self.nodes.split_at_mut(split_idx);
 
-        ((&mut info1[idx1], &mut nodes1[idx1]), (
-            &mut info2
-                [idx2 - split_idx],
-            &mut nodes2
-                [idx2 - split_idx],
-        ))
+        (
+            (&mut info1[idx1], &mut nodes1[idx1]),
+            (&mut info2[idx2 - split_idx], &mut nodes2[idx2 - split_idx]),
+        )
     }
 
     /// Creates an iterator over the array's items.
@@ -337,10 +338,9 @@ impl NodeChildren {
     }
 
     pub fn combined_info(&self) -> TextInfo {
-        self.info[..self.len()].iter().fold(
-            TextInfo::new(),
-            |a, b| a.combine(b),
-        )
+        self.info[..self.len()]
+            .iter()
+            .fold(TextInfo::new(), |a, b| a.combine(b))
     }
 
     pub fn search_combine_info<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo) {
@@ -393,18 +393,15 @@ impl Clone for NodeChildren {
         for (clone_arc, arc) in Iterator::zip(
             clone_array.nodes[..self.len()].iter_mut(),
             self.nodes[..self.len()].iter(),
-        )
-        {
+        ) {
             mem::forget(mem::replace(clone_arc, arc.clone()));
         }
 
         // Copy TextInfo
-        for (clone_info, info) in
-            Iterator::zip(
-                clone_array.info[..self.len()].iter_mut(),
-                self.info[..self.len()].iter(),
-            )
-        {
+        for (clone_info, info) in Iterator::zip(
+            clone_array.info[..self.len()].iter_mut(),
+            self.info[..self.len()].iter(),
+        ) {
             *clone_info = *info;
         }
 

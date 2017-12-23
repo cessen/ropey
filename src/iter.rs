@@ -349,71 +349,71 @@ mod tests {
     use rope::Rope;
 
     const TEXT: &str = "\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-Hello there!  How're you doing?  It's a fine day, \
-isn't it?  Aren't you glad we're alive?\r\n\
-こんにちは！元気ですか？日はいいですね。\
-私たちが生きだって嬉しいではないか？\r\n\
-";
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        Hello there!  How're you doing?  It's a fine day, \
+                        isn't it?  Aren't you glad we're alive?\r\n\
+                        こんにちは！元気ですか？日はいいですね。\
+                        私たちが生きだって嬉しいではないか？\r\n\
+                        ";
 
     #[test]
     fn bytes_01() {
@@ -434,9 +434,8 @@ isn't it?  Aren't you glad we're alive?\r\n\
     #[test]
     fn graphemes_01() {
         let r = Rope::from_str(TEXT);
-        for (gr, gt) in r.graphemes().zip(
-            UnicodeSegmentation::graphemes(TEXT, true),
-        )
+        for (gr, gt) in r.graphemes()
+            .zip(UnicodeSegmentation::graphemes(TEXT, true))
         {
             assert_eq!(gr, gt);
         }

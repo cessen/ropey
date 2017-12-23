@@ -12,7 +12,6 @@ use smallvec::{Array, SmallVec};
 use str_utils::{char_idx_to_byte_idx, nearest_internal_grapheme_boundary};
 use tree::MAX_BYTES;
 
-
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
 /// length.  Has a bunch of methods on it that are useful for the rope
 /// tree.
@@ -25,19 +24,25 @@ impl NodeText {
     /// Creates a new empty `NodeText`
     #[inline(always)]
     pub fn new() -> Self {
-        NodeText { buffer: SmallVec::new() }
+        NodeText {
+            buffer: SmallVec::new(),
+        }
     }
 
     /// Creates a new empty `NodeText` with at least `capacity` bytes
     /// of capacity.
     #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
-        NodeText { buffer: SmallVec::with_capacity(capacity) }
+        NodeText {
+            buffer: SmallVec::with_capacity(capacity),
+        }
     }
 
     /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        NodeText { buffer: string.as_bytes().into_iter().cloned().collect() }
+        NodeText {
+            buffer: string.as_bytes().into_iter().cloned().collect(),
+        }
     }
 
     /// Inserts a `&str` at byte offset `idx`.
@@ -243,7 +248,6 @@ impl NodeText {
         }
     }
 }
-
 
 impl std::cmp::PartialEq for NodeText {
     fn eq(&self, other: &Self) -> bool {

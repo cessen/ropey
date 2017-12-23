@@ -3,10 +3,9 @@ use std::sync::Arc;
 use std::collections::VecDeque;
 
 use rope::Rope;
-use str_utils::{is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary,
-                nearest_internal_grapheme_boundary};
+use str_utils::{is_grapheme_boundary, nearest_internal_grapheme_boundary, next_grapheme_boundary,
+                prev_grapheme_boundary};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
-
 
 /// An incremental `Rope` builder.
 ///
@@ -124,7 +123,9 @@ impl RopeBuilder {
         root.zip_fix_right();
 
         // Crate the rope, make sure it's well-formed, and return it.
-        let mut rope = Rope { root: Arc::new(root) };
+        let mut rope = Rope {
+            root: Arc::new(root),
+        };
         rope.pull_up_singular_nodes();
         return rope;
     }
@@ -194,18 +195,17 @@ impl RopeBuilder {
                         break;
                     } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
                         // There's room to add a child, so do that.
-                        self.stack[stack_idx as usize].children().push((
-                            left.text_info(),
-                            Arc::new(left),
-                        ));
+                        self.stack[stack_idx as usize]
+                            .children()
+                            .push((left.text_info(), Arc::new(left)));
                         break;
                     } else {
                         // Not enough room to fit a child, so split.
-                        left =
-                            Node::Internal(self.stack[stack_idx as usize].children().push_split((
-                                left.text_info(),
-                                Arc::new(left),
-                            )));
+                        left = Node::Internal(
+                            self.stack[stack_idx as usize]
+                                .children()
+                                .push_split((left.text_info(), Arc::new(left))),
+                        );
                         std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
                         stack_idx -= 1;
                     }
@@ -227,6 +227,10 @@ fn find_good_split_idx(text: &str, idx: usize) -> usize {
     } else {
         let prev = prev_grapheme_boundary(text, idx);
         let next = next_grapheme_boundary(text, idx);
-        if prev > 0 { prev } else { next }
+        if prev > 0 {
+            prev
+        } else {
+            next
+        }
     }
 }

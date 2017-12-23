@@ -3,13 +3,12 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{count_chars, byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
-                char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
-                is_grapheme_boundary, prev_grapheme_boundary, next_grapheme_boundary};
-use tree::{NodeChildren, NodeText, TextInfo, Count, MAX_CHILDREN, MIN_CHILDREN, MAX_BYTES,
-           MIN_BYTES};
+use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
+                char_idx_to_line_idx, count_chars, is_grapheme_boundary, line_idx_to_byte_idx,
+                line_idx_to_char_idx, next_grapheme_boundary, prev_grapheme_boundary};
+use tree::{Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES,
+           MIN_CHILDREN};
 use tree::node_text::fix_grapheme_seam;
-
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
@@ -60,7 +59,6 @@ impl Node {
                     None
                 };
 
-
                 if cur_text.len() <= MAX_BYTES {
                     cur_text.insert_str(byte_pos, text);
                     return (None, seam);
@@ -100,10 +98,8 @@ impl Node {
                     }
                     // The new node won't fit!  Must split.
                     else {
-                        let r_children = children.insert_split(
-                            child_i + 1,
-                            (r_node.text_info(), Arc::new(r_node)),
-                        );
+                        let r_children = children
+                            .insert_split(child_i + 1, (r_node.text_info(), Arc::new(r_node)));
 
                         return (Some(Node::Internal(r_children)), seam);
                     }
@@ -145,8 +141,8 @@ impl Node {
             }
         } else if let &mut Node::Internal(ref mut children) = self {
             let last_i = children.len() - 1;
-            let residual = Arc::make_mut(&mut children.nodes_mut()[last_i])
-                .append_at_depth(other, depth - 1);
+            let residual =
+                Arc::make_mut(&mut children.nodes_mut()[last_i]).append_at_depth(other, depth - 1);
             children.update_child_info(last_i);
             if let Some(extra_node) = residual {
                 if children.len() < MAX_CHILDREN {
@@ -193,8 +189,8 @@ impl Node {
                 }
             }
         } else if let &mut Node::Internal(ref mut children) = self {
-            let residual = Arc::make_mut(&mut children.nodes_mut()[0])
-                .prepend_at_depth(other, depth - 1);
+            let residual =
+                Arc::make_mut(&mut children.nodes_mut()[0]).prepend_at_depth(other, depth - 1);
             children.update_child_info(0);
             if let Some(extra_node) = residual {
                 if children.len() < MAX_CHILDREN {
@@ -263,17 +259,17 @@ impl Node {
                         seam = Some(l_acc_info.bytes as usize);
                     } else {
                         // Remove the text
-                        let (child_need_zip, child_seam) =
-                            Arc::make_mut(&mut children.nodes_mut()[l_child_i as usize])
-                                .remove(l_start, l_end);
+                        let (child_need_zip, child_seam) = Arc::make_mut(
+                            &mut children.nodes_mut()[l_child_i as usize],
+                        ).remove(l_start, l_end);
 
                         // Set return values
                         need_zip |= child_need_zip;
                         seam = child_seam.map(|idx| idx + l_acc_info.bytes as usize);
 
                         // Update child info
-                        children.info_mut()[l_child_i] = children.nodes()[l_child_i as usize]
-                            .text_info();
+                        children.info_mut()[l_child_i] =
+                            children.nodes()[l_child_i as usize].text_info();
                     }
                 } else {
                     // Calculate the local char indices to remove for the left- and
@@ -324,9 +320,9 @@ impl Node {
 
                 // Do the merging, if necessary.
                 // First, merge left and right if necessary/possible.
-                if (l_child_i + 1) < children.len() &&
-                    (children.nodes()[l_child_i].is_undersized() ||
-                         children.nodes()[l_child_i + 1].is_undersized())
+                if (l_child_i + 1) < children.len()
+                    && (children.nodes()[l_child_i].is_undersized()
+                        || children.nodes()[l_child_i + 1].is_undersized())
                 {
                     children.merge_distribute(l_child_i, l_child_i + 1);
                 }
@@ -343,9 +339,9 @@ impl Node {
 
                 debug_assert!(children.len() > 0);
                 return (
-                    need_zip ||
-                        (l_child_i < children.len() &&
-                             children.nodes()[l_child_i].is_undersized()),
+                    need_zip
+                        || (l_child_i < children.len()
+                            && children.nodes()[l_child_i].is_undersized()),
                     seam,
                 );
             }
@@ -375,9 +371,8 @@ impl Node {
                     let mut r_children = children.split_off(child_i + 1);
 
                     // Recurse
-                    let r_node = Arc::make_mut(&mut children.nodes_mut()[child_i]).split(
-                        char_idx - acc_info.chars as usize,
-                    );
+                    let r_node = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                        .split(char_idx - acc_info.chars as usize);
 
                     r_children.insert(0, (r_node.text_info(), Arc::new(r_node)));
 
@@ -401,14 +396,14 @@ impl Node {
                 // Shortcuts
                 if byte_idx == 0 {
                     return 0;
-                } else if byte_idx ==
-                           acc_info.bytes as usize + children.info()[child_i].bytes as usize
+                } else if byte_idx
+                    == acc_info.bytes as usize + children.info()[child_i].bytes as usize
                 {
                     return acc_info.chars as usize + children.info()[child_i].chars as usize;
                 }
 
-                acc_info.chars as usize +
-                    children.nodes()[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
+                acc_info.chars as usize
+                    + children.nodes()[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
             }
         }
     }
@@ -424,15 +419,15 @@ impl Node {
                 // Shortcuts
                 if byte_idx == 0 {
                     return 0;
-                } else if byte_idx ==
-                           acc_info.bytes as usize + children.info()[child_i].bytes as usize
+                } else if byte_idx
+                    == acc_info.bytes as usize + children.info()[child_i].bytes as usize
                 {
-                    return acc_info.line_breaks as usize +
-                        children.info()[child_i].line_breaks as usize;
+                    return acc_info.line_breaks as usize
+                        + children.info()[child_i].line_breaks as usize;
                 }
 
-                acc_info.line_breaks as usize +
-                    children.nodes()[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
+                acc_info.line_breaks as usize
+                    + children.nodes()[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
             }
         }
     }
@@ -448,14 +443,14 @@ impl Node {
                 // Shortcuts
                 if char_idx == 0 {
                     return 0;
-                } else if char_idx ==
-                           acc_info.chars as usize + children.info()[child_i].chars as usize
+                } else if char_idx
+                    == acc_info.chars as usize + children.info()[child_i].chars as usize
                 {
                     return acc_info.bytes as usize + children.info()[child_i].bytes as usize;
                 }
 
-                acc_info.bytes as usize +
-                    children.nodes()[child_i].char_to_byte(char_idx - acc_info.chars as usize)
+                acc_info.bytes as usize
+                    + children.nodes()[child_i].char_to_byte(char_idx - acc_info.chars as usize)
             }
         }
     }
@@ -471,15 +466,15 @@ impl Node {
                 // Shortcuts
                 if char_idx == 0 {
                     return 0;
-                } else if char_idx ==
-                           acc_info.chars as usize + children.info()[child_i].chars as usize
+                } else if char_idx
+                    == acc_info.chars as usize + children.info()[child_i].chars as usize
                 {
-                    return acc_info.line_breaks as usize +
-                        children.info()[child_i].line_breaks as usize;
+                    return acc_info.line_breaks as usize
+                        + children.info()[child_i].line_breaks as usize;
                 }
 
-                acc_info.line_breaks as usize +
-                    children.nodes()[child_i].char_to_line(char_idx - acc_info.chars as usize)
+                acc_info.line_breaks as usize
+                    + children.nodes()[child_i].char_to_line(char_idx - acc_info.chars as usize)
             }
         }
     }
@@ -492,8 +487,9 @@ impl Node {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
 
-                acc_info.bytes as usize +
-                    children.nodes()[child_i].line_to_byte(line_idx - acc_info.line_breaks as usize)
+                acc_info.bytes as usize
+                    + children.nodes()[child_i]
+                        .line_to_byte(line_idx - acc_info.line_breaks as usize)
             }
         }
     }
@@ -506,13 +502,12 @@ impl Node {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
 
-                acc_info.chars as usize +
-                    children.nodes()[child_i].line_to_char(line_idx - acc_info.line_breaks as usize)
+                acc_info.chars as usize
+                    + children.nodes()[child_i]
+                        .line_to_char(line_idx - acc_info.line_breaks as usize)
             }
         }
     }
-
-
 
     /// Returns whether the given char index is a grapheme cluster
     /// boundary or not.
@@ -635,11 +630,10 @@ impl Node {
     /// This counts root and leafs.  For example, a single leaf node
     /// has depth 1.
     pub fn depth(&self) -> usize {
-        1 +
-            match self {
-                &Node::Leaf(_) => 0,
-                &Node::Internal(ref children) => children.nodes()[0].depth(),
-            }
+        1 + match self {
+            &Node::Leaf(_) => 0,
+            &Node::Internal(ref children) => children.nodes()[0].depth(),
+        }
     }
 
     /// Returns the chunk that contains the given byte, and the byte's
@@ -673,14 +667,12 @@ impl Node {
     pub fn assert_integrity(&self) {
         match self {
             &Node::Leaf(_) => {}
-            &Node::Internal(ref children) => {
-                for (info, node) in children.iter() {
-                    if *info != node.text_info() {
-                        assert_eq!(*info, node.text_info());
-                    }
-                    node.assert_integrity();
+            &Node::Internal(ref children) => for (info, node) in children.iter() {
+                if *info != node.text_info() {
+                    assert_eq!(*info, node.text_info());
                 }
-            }
+                node.assert_integrity();
+            },
         }
     }
 
@@ -756,12 +748,8 @@ impl Node {
                 } else if byte_pos == children.combined_info().bytes {
                     // Special-case 2
                     let (info, nodes) = children.info_and_nodes_mut();
-                    return Arc::make_mut(nodes.last_mut().unwrap()).fix_grapheme_seam(
-                        info.last()
-                            .unwrap()
-                            .bytes,
-                        must_be_boundary,
-                    );
+                    return Arc::make_mut(nodes.last_mut().unwrap())
+                        .fix_grapheme_seam(info.last().unwrap().bytes, must_be_boundary);
                 } else {
                     // Find the child to navigate into
                     let (child_i, start_info) =
@@ -878,11 +866,10 @@ impl Node {
         if let &mut Node::Internal(ref mut children) = self {
             let mut did_stuff = false;
             loop {
-                let do_merge = (children.len() > 1) &&
-                    match *children.nodes()[0] {
-                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                    };
+                let do_merge = (children.len() > 1) && match *children.nodes()[0] {
+                    Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                    Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                };
 
                 if do_merge {
                     did_stuff |= children.merge_distribute(0, 1);
@@ -907,11 +894,10 @@ impl Node {
             let mut did_stuff = false;
             loop {
                 let last_i = children.len() - 1;
-                let do_merge = (children.len() > 1) &&
-                    match *children.nodes()[last_i] {
-                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                    };
+                let do_merge = (children.len() > 1) && match *children.nodes()[last_i] {
+                    Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                    Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                };
 
                 if do_merge {
                     did_stuff |= children.merge_distribute(last_i - 1, last_i);
@@ -944,11 +930,10 @@ impl Node {
                     let do_merge = match *children.nodes()[child_i] {
                         Node::Leaf(ref text) => text.len() < MIN_BYTES,
                         Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                    } ||
-                        match *children.nodes()[child_i + 1] {
-                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                        };
+                    } || match *children.nodes()[child_i + 1] {
+                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                    };
 
                     if do_merge {
                         did_stuff |= children.merge_distribute(child_i, child_i + 1);
@@ -981,9 +966,8 @@ impl Node {
                         break;
                     }
                 } else {
-                    if !Arc::make_mut(&mut children.nodes_mut()[child_i]).zip_fix(
-                        char_idx - start_info.chars as usize,
-                    )
+                    if !Arc::make_mut(&mut children.nodes_mut()[child_i])
+                        .zip_fix(char_idx - start_info.chars as usize)
                     {
                         break;
                     }
