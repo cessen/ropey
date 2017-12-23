@@ -25,18 +25,18 @@ pub struct RopeBytes<'a> {
 }
 
 impl<'a> RopeBytes<'a> {
-    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeBytes<'b> {
+    pub(crate) fn new(node: &Arc<Node>) -> RopeBytes {
         RopeBytes {
             chunk_iter: RopeChunks::new(node),
             cur_chunk: "".bytes(),
         }
     }
 
-    pub(crate) fn new_with_range<'b>(
-        node: &'b Arc<Node>,
+    pub(crate) fn new_with_range(
+        node: &Arc<Node>,
         start_char: usize,
         end_char: usize,
-    ) -> RopeBytes<'b> {
+    ) -> RopeBytes {
         RopeBytes {
             chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".bytes(),
@@ -51,13 +51,11 @@ impl<'a> Iterator for RopeBytes<'a> {
         loop {
             if let Some(c) = self.cur_chunk.next() {
                 return Some(c);
+            } else if let Some(chunk) = self.chunk_iter.next() {
+                self.cur_chunk = chunk.bytes();
+                continue;
             } else {
-                if let Some(chunk) = self.chunk_iter.next() {
-                    self.cur_chunk = chunk.bytes();
-                    continue;
-                } else {
-                    return None;
-                }
+                return None;
             }
         }
     }
@@ -72,18 +70,18 @@ pub struct RopeChars<'a> {
 }
 
 impl<'a> RopeChars<'a> {
-    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeChars<'b> {
+    pub(crate) fn new(node: &Arc<Node>) -> RopeChars {
         RopeChars {
             chunk_iter: RopeChunks::new(node),
             cur_chunk: "".chars(),
         }
     }
 
-    pub(crate) fn new_with_range<'b>(
-        node: &'b Arc<Node>,
+    pub(crate) fn new_with_range(
+        node: &Arc<Node>,
         start_char: usize,
         end_char: usize,
-    ) -> RopeChars<'b> {
+    ) -> RopeChars {
         RopeChars {
             chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".chars(),
@@ -98,13 +96,11 @@ impl<'a> Iterator for RopeChars<'a> {
         loop {
             if let Some(c) = self.cur_chunk.next() {
                 return Some(c);
+            } else if let Some(chunk) = self.chunk_iter.next() {
+                self.cur_chunk = chunk.chars();
+                continue;
             } else {
-                if let Some(chunk) = self.chunk_iter.next() {
-                    self.cur_chunk = chunk.chars();
-                    continue;
-                } else {
-                    return None;
-                }
+                return None;
             }
         }
     }
@@ -124,7 +120,7 @@ pub struct RopeGraphemes<'a> {
 }
 
 impl<'a> RopeGraphemes<'a> {
-    pub(crate) fn new<'b>(node: &'b Arc<Node>, extended: bool) -> RopeGraphemes<'b> {
+    pub(crate) fn new(node: &Arc<Node>, extended: bool) -> RopeGraphemes {
         RopeGraphemes {
             chunk_iter: RopeChunks::new(node),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
@@ -132,12 +128,12 @@ impl<'a> RopeGraphemes<'a> {
         }
     }
 
-    pub(crate) fn new_with_range<'b>(
-        node: &'b Arc<Node>,
+    pub(crate) fn new_with_range(
+        node: &Arc<Node>,
         extended: bool,
         start_char: usize,
         end_char: usize,
-    ) -> RopeGraphemes<'b> {
+    ) -> RopeGraphemes {
         RopeGraphemes {
             chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
@@ -153,13 +149,11 @@ impl<'a> Iterator for RopeGraphemes<'a> {
         loop {
             if let Some(g) = self.cur_chunk.next() {
                 return Some(g);
+            } else if let Some(chunk) = self.chunk_iter.next() {
+                self.cur_chunk = UnicodeSegmentation::graphemes(chunk, self.extended);
+                continue;
             } else {
-                if let Some(chunk) = self.chunk_iter.next() {
-                    self.cur_chunk = UnicodeSegmentation::graphemes(chunk, self.extended);
-                    continue;
-                } else {
-                    return None;
-                }
+                return None;
             }
         }
     }
@@ -181,7 +175,7 @@ pub struct RopeLines<'a> {
 }
 
 impl<'a> RopeLines<'a> {
-    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeLines<'b> {
+    pub(crate) fn new(node: &Arc<Node>) -> RopeLines {
         RopeLines {
             node: node,
             start_char: 0,
@@ -190,11 +184,11 @@ impl<'a> RopeLines<'a> {
         }
     }
 
-    pub(crate) fn new_with_range<'b>(
-        node: &'b Arc<Node>,
+    pub(crate) fn new_with_range(
+        node: &Arc<Node>,
         start_char: usize,
         end_char: usize,
-    ) -> RopeLines<'b> {
+    ) -> RopeLines {
         RopeLines {
             node: node,
             start_char: start_char,
@@ -267,7 +261,7 @@ pub struct RopeChunks<'a> {
 }
 
 impl<'a> RopeChunks<'a> {
-    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeChunks<'b> {
+    pub(crate) fn new(node: &Arc<Node>) -> RopeChunks {
         RopeChunks {
             node_stack: vec![node],
             start: 0,
@@ -276,11 +270,11 @@ impl<'a> RopeChunks<'a> {
         }
     }
 
-    pub(crate) fn new_with_range<'b>(
-        node: &'b Arc<Node>,
+    pub(crate) fn new_with_range(
+        node: &Arc<Node>,
         start_char: usize,
         end_char: usize,
-    ) -> RopeChunks<'b> {
+    ) -> RopeChunks {
         RopeChunks {
             node_stack: vec![node],
             start: node.char_to_byte(start_char),

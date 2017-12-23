@@ -46,9 +46,9 @@ impl Node {
     /// Note: this does not handle large insertions (i.e. larger than
     /// MAX_BYTES) well.  That is handled at Rope::insert().
     pub fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
-        match self {
+        match *self {
             // If it's a leaf
-            &mut Node::Leaf(ref mut cur_text) => {
+            Node::Leaf(ref mut cur_text) => {
                 let byte_pos = char_idx_to_byte_idx(cur_text, char_pos as usize);
                 let seam = if byte_pos == 0 {
                     Some(0)
@@ -74,7 +74,7 @@ impl Node {
             }
 
             // If it's internal, things get a little more complicated
-            &mut Node::Internal(ref mut children) => {
+            Node::Internal(ref mut children) => {
                 // Find the child to traverse into along with its starting char
                 // offset.
                 let (child_i, start_info) =
@@ -113,17 +113,17 @@ impl Node {
 
     pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
-            match self {
-                &mut Node::Leaf(_) => {
+            match *self {
+                Node::Leaf(_) => {
                     if !other.is_leaf() {
                         panic!("Tree-append siblings have differing types.");
                     } else {
                         return Some(other);
                     }
                 }
-                &mut Node::Internal(ref mut children_l) => {
+                Node::Internal(ref mut children_l) => {
                     let mut other = other;
-                    if let &mut Node::Internal(ref mut children_r) = Arc::make_mut(&mut other) {
+                    if let Node::Internal(ref mut children_r) = *Arc::make_mut(&mut other) {
                         if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
                             for _ in 0..children_r.len() {
                                 children_l.push(children_r.remove(0));
@@ -139,7 +139,7 @@ impl Node {
                     return Some(other);
                 }
             }
-        } else if let &mut Node::Internal(ref mut children) = self {
+        } else if let Node::Internal(ref mut children) = *self {
             let last_i = children.len() - 1;
             let residual =
                 Arc::make_mut(&mut children.nodes_mut()[last_i]).append_at_depth(other, depth - 1);
@@ -162,17 +162,17 @@ impl Node {
 
     pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
-            match self {
-                &mut Node::Leaf(_) => {
+            match *self {
+                Node::Leaf(_) => {
                     if !other.is_leaf() {
                         panic!("Tree-append siblings have differing types.");
                     } else {
                         return Some(other);
                     }
                 }
-                &mut Node::Internal(ref mut children_r) => {
+                Node::Internal(ref mut children_r) => {
                     let mut other = other;
-                    if let &mut Node::Internal(ref mut children_l) = Arc::make_mut(&mut other) {
+                    if let Node::Internal(ref mut children_l) = *Arc::make_mut(&mut other) {
                         if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
                             for _ in 0..children_l.len() {
                                 children_r.insert(0, children_l.pop());
@@ -188,7 +188,7 @@ impl Node {
                     return Some(other);
                 }
             }
-        } else if let &mut Node::Internal(ref mut children) = self {
+        } else if let Node::Internal(ref mut children) = *self {
             let residual =
                 Arc::make_mut(&mut children.nodes_mut()[0]).prepend_at_depth(other, depth - 1);
             children.update_child_info(0);
@@ -223,11 +223,11 @@ impl Node {
         let mut need_zip = false;
         let seam;
 
-        match self {
-            &mut Node::Leaf(ref mut cur_text) => {
+        match *self {
+            Node::Leaf(ref mut cur_text) => {
                 debug_assert!(end <= count_chars(cur_text));
-                let start_byte = char_idx_to_byte_idx(&cur_text, start);
-                let end_byte = char_idx_to_byte_idx(&cur_text, end);
+                let start_byte = char_idx_to_byte_idx(cur_text, start);
+                let end_byte = char_idx_to_byte_idx(cur_text, end);
                 let is_on_edge = start_byte == 0 || end_byte == cur_text.len();
                 cur_text.remove_range(start_byte, end_byte);
 
@@ -238,7 +238,7 @@ impl Node {
                 );
             }
 
-            &mut Node::Internal(ref mut children) => {
+            Node::Internal(ref mut children) => {
                 // Find the end-point nodes of the removal
                 let (l_child_i, l_acc_info) =
                     children.search_combine_info(|inf| start as Count <= inf.chars);
@@ -353,12 +353,12 @@ impl Node {
     pub fn split(&mut self, char_idx: usize) -> Node {
         debug_assert!(char_idx != 0);
         debug_assert!(char_idx != (self.text_info().chars as usize));
-        match self {
-            &mut Node::Leaf(ref mut text) => {
+        match *self {
+            Node::Leaf(ref mut text) => {
                 let byte_idx = char_idx_to_byte_idx(text, char_idx);
                 Node::Leaf(text.split_off(byte_idx))
             }
-            &mut Node::Internal(ref mut children) => {
+            Node::Internal(ref mut children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| char_idx as Count <= inf.chars);
                 let child_info = children.info()[child_i];
@@ -387,9 +387,9 @@ impl Node {
 
     /// Returns the char index of the given byte.
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        match self {
-            &Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
 
@@ -410,9 +410,9 @@ impl Node {
 
     /// Returns the line index of the given byte.
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
-        match self {
-            &Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
 
@@ -434,9 +434,9 @@ impl Node {
 
     /// Returns the byte index of the given char.
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        match self {
-            &Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| char_idx as Count <= inf.chars);
 
@@ -457,9 +457,9 @@ impl Node {
 
     /// Returns the line index of the given char.
     pub fn char_to_line(&self, char_idx: usize) -> usize {
-        match self {
-            &Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| char_idx as Count <= inf.chars);
 
@@ -481,9 +481,9 @@ impl Node {
 
     /// Returns the byte index of the start of the given line.
     pub fn line_to_byte(&self, line_idx: usize) -> usize {
-        match self {
-            &Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
 
@@ -496,9 +496,9 @@ impl Node {
 
     /// Returns the char index of the start of the given line.
     pub fn line_to_char(&self, line_idx: usize) -> usize {
-        match self {
-            &Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
 
@@ -580,16 +580,16 @@ impl Node {
     }
 
     pub fn text_info(&self) -> TextInfo {
-        match self {
-            &Node::Leaf(ref text) => TextInfo::from_str(text),
-            &Node::Internal(ref children) => children.combined_info(),
+        match *self {
+            Node::Leaf(ref text) => TextInfo::from_str(text),
+            Node::Internal(ref children) => children.combined_info(),
         }
     }
 
     //-----------------------------------------
 
     pub fn child_count(&self) -> usize {
-        if let &Node::Internal(ref children) = self {
+        if let Node::Internal(ref children) = *self {
             children.len()
         } else {
             panic!()
@@ -597,14 +597,14 @@ impl Node {
     }
 
     pub fn children(&mut self) -> &mut NodeChildren {
-        match self {
-            &mut Node::Internal(ref mut children) => children,
+        match *self {
+            Node::Internal(ref mut children) => children,
             _ => panic!(),
         }
     }
 
     pub fn leaf_text(&self) -> &str {
-        if let &Node::Leaf(ref text) = self {
+        if let Node::Leaf(ref text) = *self {
             text
         } else {
             panic!()
@@ -612,16 +612,16 @@ impl Node {
     }
 
     pub fn is_leaf(&self) -> bool {
-        match self {
-            &Node::Leaf(_) => true,
-            &Node::Internal(_) => false,
+        match *self {
+            Node::Leaf(_) => true,
+            Node::Internal(_) => false,
         }
     }
 
     pub fn is_undersized(&self) -> bool {
-        match self {
-            &Node::Leaf(ref text) => text.len() < MIN_BYTES,
-            &Node::Internal(ref children) => children.len() < MIN_CHILDREN,
+        match *self {
+            Node::Leaf(ref text) => text.len() < MIN_BYTES,
+            Node::Internal(ref children) => children.len() < MIN_CHILDREN,
         }
     }
 
@@ -630,18 +630,18 @@ impl Node {
     /// This counts root and leafs.  For example, a single leaf node
     /// has depth 1.
     pub fn depth(&self) -> usize {
-        1 + match self {
-            &Node::Leaf(_) => 0,
-            &Node::Internal(ref children) => children.nodes()[0].depth(),
+        1 + match *self {
+            Node::Leaf(_) => 0,
+            Node::Internal(ref children) => children.nodes()[0].depth(),
         }
     }
 
     /// Returns the chunk that contains the given byte, and the byte's
     /// byte-offset within the chunk.
-    fn get_chunk_at_byte<'a>(&'a self, byte_idx: usize) -> (&'a str, usize) {
-        match self {
-            &Node::Leaf(ref text) => (text, byte_idx),
-            &Node::Internal(ref children) => {
+    fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
+        match *self {
+            Node::Leaf(ref text) => (text, byte_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
                 children.nodes()[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
@@ -651,10 +651,10 @@ impl Node {
 
     /// Returns the chunk that contains the given char, and the chars's
     /// char-offset within the chunk.
-    fn get_chunk_at_char<'a>(&'a self, char_idx: usize) -> (&'a str, usize) {
-        match self {
-            &Node::Leaf(ref text) => (text, char_idx),
-            &Node::Internal(ref children) => {
+    fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize) {
+        match *self {
+            Node::Leaf(ref text) => (text, char_idx),
+            Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| char_idx as Count <= inf.chars);
                 children.nodes()[child_i].get_chunk_at_char(char_idx - acc_info.chars as usize)
@@ -665,9 +665,9 @@ impl Node {
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
     pub fn assert_integrity(&self) {
-        match self {
-            &Node::Leaf(_) => {}
-            &Node::Internal(ref children) => for (info, node) in children.iter() {
+        match *self {
+            Node::Leaf(_) => {}
+            Node::Internal(ref children) => for (info, node) in children.iter() {
                 if *info != node.text_info() {
                     assert_eq!(*info, node.text_info());
                 }
@@ -679,9 +679,9 @@ impl Node {
     /// Checks that the entire tree is the same height everywhere.
     pub fn assert_balance(&self) -> usize {
         // Depth, child count, and leaf node emptiness
-        match self {
-            &Node::Leaf(_) => 1,
-            &Node::Internal(ref children) => {
+        match *self {
+            Node::Leaf(_) => 1,
+            Node::Internal(ref children) => {
                 let first_depth = children.nodes()[0].assert_balance();
                 for node in &children.nodes()[1..] {
                     assert_eq!(node.assert_balance(), first_depth);
@@ -694,14 +694,14 @@ impl Node {
     /// Checks that all internal nodes have the minimum number of
     /// children and all non-root leaf nodes are non-empty.
     pub fn assert_node_size(&self, is_root: bool) {
-        match self {
-            &Node::Leaf(ref text) => {
+        match *self {
+            Node::Leaf(ref text) => {
                 // Leaf size
                 if !is_root {
                     assert!(text.len() > 0);
                 }
             }
-            &Node::Internal(ref children) => {
+            Node::Internal(ref children) => {
                 // Child count
                 if is_root {
                     assert!(children.len() > 1);
@@ -726,13 +726,13 @@ impl Node {
     /// children, though that would require an insanely long grapheme.  Given how
     /// unlikely it is, it doesn't seem worth handling.  Code shouldn't break on
     /// such cases anyway.
-    pub fn fix_grapheme_seam<'a>(
-        &'a mut self,
+    pub fn fix_grapheme_seam(
+        &mut self,
         byte_pos: Count,
         must_be_boundary: bool,
-    ) -> Option<&'a mut NodeText> {
-        match self {
-            &mut Node::Leaf(ref mut text) => {
+    ) -> Option<&mut NodeText> {
+        match *self {
+            Node::Leaf(ref mut text) => {
                 if (!must_be_boundary) || byte_pos == 0 || byte_pos == text.len() as Count {
                     Some(text)
                 } else {
@@ -740,7 +740,7 @@ impl Node {
                 }
             }
 
-            &mut Node::Internal(ref mut children) => {
+            Node::Internal(ref mut children) => {
                 if byte_pos == 0 {
                     // Special-case 1
                     return Arc::make_mut(&mut children.nodes_mut()[0])
@@ -830,9 +830,9 @@ impl Node {
     /// Updates the tree meta-data down the left side of the tree, and removes empty
     /// children as it goes as well.
     fn fix_info_left(&mut self) {
-        match self {
-            &mut Node::Leaf(_) => {}
-            &mut Node::Internal(ref mut children) => {
+        match *self {
+            Node::Leaf(_) => {}
+            Node::Internal(ref mut children) => {
                 Arc::make_mut(&mut children.nodes_mut()[0]).fix_info_left();
                 children.update_child_info(0);
                 if children.info()[0].bytes == 0 {
@@ -845,9 +845,9 @@ impl Node {
     /// Updates the tree meta-data down the right side of the tree, and removes empty
     /// children as it goes as well.
     fn fix_info_right(&mut self) {
-        match self {
-            &mut Node::Leaf(_) => {}
-            &mut Node::Internal(ref mut children) => {
+        match *self {
+            Node::Leaf(_) => {}
+            Node::Internal(ref mut children) => {
                 let idx = children.len() - 1;
                 Arc::make_mut(&mut children.nodes_mut()[idx]).fix_info_right();
                 children.update_child_info(idx);
@@ -863,7 +863,7 @@ impl Node {
     /// Returns whether it did anything or not that would affect the
     /// parent.
     pub fn zip_fix_left(&mut self) -> bool {
-        if let &mut Node::Internal(ref mut children) = self {
+        if let Node::Internal(ref mut children) = *self {
             let mut did_stuff = false;
             loop {
                 let do_merge = (children.len() > 1) && match *children.nodes()[0] {
@@ -890,7 +890,7 @@ impl Node {
     /// Returns whether it did anything or not that would affect the
     /// parent. True: did stuff, false: didn't do stuff
     pub fn zip_fix_right(&mut self) -> bool {
-        if let &mut Node::Internal(ref mut children) = self {
+        if let Node::Internal(ref mut children) = *self {
             let mut did_stuff = false;
             loop {
                 let last_i = children.len() - 1;
@@ -918,7 +918,7 @@ impl Node {
     /// Returns whether it did anything or not that would affect the
     /// parent. True: did stuff, false: didn't do stuff
     pub fn zip_fix(&mut self, char_idx: usize) -> bool {
-        if let &mut Node::Internal(ref mut children) = self {
+        if let Node::Internal(ref mut children) = *self {
             let mut did_stuff = false;
             loop {
                 // Do merging
@@ -965,12 +965,10 @@ impl Node {
                     if (!effect_1) && (!effect_2) {
                         break;
                     }
-                } else {
-                    if !Arc::make_mut(&mut children.nodes_mut()[child_i])
-                        .zip_fix(char_idx - start_info.chars as usize)
-                    {
-                        break;
-                    }
+                } else if !Arc::make_mut(&mut children.nodes_mut()[child_i])
+                    .zip_fix(char_idx - start_info.chars as usize)
+                {
+                    break;
                 }
             }
             assert!(children.is_info_accurate());

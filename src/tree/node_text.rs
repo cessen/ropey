@@ -77,7 +77,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            nearest_internal_grapheme_boundary(&self, pos)
+            nearest_internal_grapheme_boundary(self, pos)
         };
 
         self.split_off(split_pos)
@@ -104,7 +104,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            nearest_internal_grapheme_boundary(&self, pos)
+            nearest_internal_grapheme_boundary(self, pos)
         };
 
         self.split_off(split_pos)
@@ -314,7 +314,7 @@ impl Borrow<str> for NodeText {
 
 //=======================================================================
 
-/// Takes two NodeTexts and mends the grapheme boundary between them, if any.
+/// Takes two `NodeText`s and mends the grapheme boundary between them, if any.
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
 /// is one big grapheme.
@@ -336,11 +336,7 @@ pub(crate) fn fix_grapheme_seam(l: &mut NodeText, r: &mut NodeText) {
             // We're on a graphem boundary, don't need to do anything
             return;
         }
-        if a == 0 {
-            b
-        } else if b == tot_len {
-            a
-        } else if l.len() > r.len() {
+        if a != 0 && (b == tot_len || l.len() > r.len()) {
             a
         } else {
             b

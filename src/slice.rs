@@ -20,7 +20,7 @@ pub struct RopeSlice<'a> {
 }
 
 impl<'a> RopeSlice<'a> {
-    pub(crate) fn new<'b>(node: &'b Arc<Node>) -> RopeSlice<'b> {
+    pub(crate) fn new(node: &Arc<Node>) -> RopeSlice {
         RopeSlice {
             node: node,
             start_byte: 0,
@@ -32,11 +32,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    pub(crate) fn new_with_range<'b>(
-        node: &'b Arc<Node>,
-        start: usize,
-        end: usize,
-    ) -> RopeSlice<'b> {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start: usize, end: usize) -> RopeSlice {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
 
@@ -45,10 +41,10 @@ impl<'a> RopeSlice<'a> {
         let mut n_end = end;
         let mut node = node;
         'outer: loop {
-            match node as &Node {
-                &Node::Leaf(_) => break,
+            match *(node as &Node) {
+                Node::Leaf(_) => break,
 
-                &Node::Internal(ref children) => {
+                Node::Internal(ref children) => {
                     let mut start_char = 0;
                     for (i, inf) in children.info().iter().enumerate() {
                         if n_start >= start_char && n_end < (start_char + inf.chars as usize) {
@@ -307,7 +303,7 @@ impl<'a> RopeSlice<'a> {
     /// Creates a new `Rope` from the contents of the `RopeSlice`.
     pub fn to_rope(&self) -> Rope {
         let mut rope = Rope {
-            root: self.node.clone(),
+            root: Arc::clone(self.node),
         };
 
         // Chop off right end if needed
@@ -361,16 +357,14 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
                     chunk1 = &chunk1[chunk2.len()..];
                     chunk2 = "";
                 }
+            } else if &chunk2[..chunk1.len()] != chunk1 {
+                return false;
             } else {
-                if &chunk2[..chunk1.len()] != chunk1 {
-                    return false;
-                } else {
-                    chunk2 = &chunk2[chunk1.len()..];
-                    chunk1 = "";
-                }
+                chunk2 = &chunk2[chunk1.len()..];
+                chunk1 = "";
             }
 
-            if chunk1.len() == 0 {
+            if chunk1.is_empty() {
                 if let Some(chunk) = chunk_itr_1.next() {
                     chunk1 = chunk;
                 } else {
@@ -378,7 +372,7 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
                 }
             }
 
-            if chunk2.len() == 0 {
+            if chunk2.is_empty() {
                 if let Some(chunk) = chunk_itr_2.next() {
                     chunk2 = chunk;
                 } else {

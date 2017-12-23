@@ -112,9 +112,9 @@ impl NodeChildren {
             let ((_, node1), (_, node2)) = self.get_two_mut(idx1, idx2);
             let node1 = Arc::make_mut(node1);
             let node2 = Arc::make_mut(node2);
-            match node1 {
-                &mut Node::Leaf(ref mut text1) => {
-                    if let &mut Node::Leaf(ref mut text2) = node2 {
+            match *node1 {
+                Node::Leaf(ref mut text1) => {
+                    if let Node::Leaf(ref mut text2) = *node2 {
                         text1.push_str(text2);
 
                         if text1.len() <= tree::MAX_BYTES {
@@ -122,7 +122,7 @@ impl NodeChildren {
                         } else {
                             let split_pos = {
                                 let pos = text1.len() - (text1.len() / 2);
-                                nearest_internal_grapheme_boundary(&text1, pos)
+                                nearest_internal_grapheme_boundary(text1, pos)
                             };
                             *text2 = text1.split_off(split_pos);
                             if text2.len() > 0 {
@@ -137,8 +137,8 @@ impl NodeChildren {
                     }
                 }
 
-                &mut Node::Internal(ref mut children1) => {
-                    if let &mut Node::Internal(ref mut children2) = node2 {
+                Node::Internal(ref mut children1) => {
+                    if let Node::Internal(ref mut children2) = *node2 {
                         if (children1.len() + children2.len()) <= MAX_LEN {
                             for _ in 0..children2.len() {
                                 children1.push(children2.remove(0));
@@ -184,10 +184,9 @@ impl NodeChildren {
     pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
         assert!(self.len() > 0);
         self.len -= 1;
-        let item = (self.info[self.len as usize], unsafe {
+        (self.info[self.len as usize], unsafe {
             ptr::read(&self.nodes[self.len as usize])
-        });
-        item
+        })
     }
 
     /// Inserts an item into the the array at the given index.
@@ -357,7 +356,7 @@ impl NodeChildren {
 
     // Debug function, to help verify tree integrity
     pub fn is_info_accurate(&self) -> bool {
-        for (info, ref node) in self.info().iter().zip(self.nodes().iter()) {
+        for (info, node) in self.info().iter().zip(self.nodes().iter()) {
             if *info != node.text_info() {
                 return false;
             }
@@ -394,7 +393,7 @@ impl Clone for NodeChildren {
             clone_array.nodes[..self.len()].iter_mut(),
             self.nodes[..self.len()].iter(),
         ) {
-            mem::forget(mem::replace(clone_arc, arc.clone()));
+            mem::forget(mem::replace(clone_arc, Arc::clone(arc)));
         }
 
         // Copy TextInfo

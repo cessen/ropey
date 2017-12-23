@@ -236,7 +236,9 @@ pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize 
 
     // Find the two nearest grapheme boundaries
     let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
-    let next = gc.next_boundary(text, 0).unwrap().unwrap_or(text.len());
+    let next = gc.next_boundary(text, 0)
+        .unwrap()
+        .unwrap_or_else(|| text.len());
     let prev = gc.prev_boundary(text, 0).unwrap().unwrap_or(0);
 
     // If the given byte was already on an internal grapheme boundary
@@ -246,11 +248,7 @@ pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize 
 
     // Otherwise, return the closest of prev and next that isn't the
     // start or end of the string
-    if prev == 0 {
-        return next;
-    } else if next == text.len() {
-        return prev;
-    } else if (byte_idx - prev) >= (next - byte_idx) {
+    if prev == 0 || (next != text.len() && (byte_idx - prev) >= (next - byte_idx)) {
         return next;
     } else {
         return prev;
@@ -258,7 +256,7 @@ pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize 
 }
 
 pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
-    assert!(l.len() > 0 && r.len() > 0);
+    assert!(!l.is_empty() && !r.is_empty());
 
     let tot_len = l.len() + r.len();
     let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
@@ -302,7 +300,7 @@ pub(crate) struct LineBreakIter<'a> {
 }
 
 impl<'a> LineBreakIter<'a> {
-    pub fn new<'b>(text: &'b str) -> LineBreakIter<'b> {
+    pub fn new(text: &str) -> LineBreakIter {
         LineBreakIter {
             byte_itr: text.bytes(),
             byte_idx: 0,

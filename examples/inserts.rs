@@ -7,11 +7,11 @@ fn main() {
 
     for _ in 0..16 {
         let len = tree.len_chars().max(1);
-        tree.insert(1298809 % len, "Hello world! How are you doing?\r\n");
+        tree.insert(1_298_809 % len, "Hello world! How are you doing?\r\n");
         let len = tree.len_chars().max(1);
-        tree.insert(1298809 % len, "Let's keep inserting more items.\r\n");
+        tree.insert(1_298_809 % len, "Let's keep inserting more items.\r\n");
         let len = tree.len_chars().max(1);
-        tree.insert(1298809 % len, "こんいちは、みんなさん！");
+        tree.insert(1_298_809 % len, "こんいちは、みんなさん！");
     }
 
     println!("{}", tree.to_string());

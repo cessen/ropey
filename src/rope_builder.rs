@@ -74,7 +74,7 @@ impl RopeBuilder {
 
         // Repeatedly chop text off the end of the input, creating
         // leaf nodes out of them and appending them to the tree.
-        while chunk.len() > 0 {
+        while !chunk.is_empty() {
             // Get the text for the next leaf
             let (leaf_text, remainder) = self.get_next_leaf_text(chunk);
             chunk = remainder;
@@ -101,7 +101,7 @@ impl RopeBuilder {
     /// calling `finish()`.
     pub fn finish(mut self) -> Rope {
         // Append the last leaf
-        if self.buffer.len() > 0 {
+        if !self.buffer.is_empty() {
             let string = NodeText::from_str(&self.buffer);
             self.append_leaf_node(Node::Leaf(string));
         }
@@ -134,7 +134,7 @@ impl RopeBuilder {
 
     // Returns (next_leaf_text, remaining_text)
     fn get_next_leaf_text<'a>(&mut self, text: &'a str) -> (NextText<'a>, &'a str) {
-        if self.buffer.len() == 0 {
+        if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
                 let split_idx = find_good_split_idx(text, MAX_BYTES);
@@ -172,7 +172,7 @@ impl RopeBuilder {
         let last = self.stack.pop_back().unwrap();
         match last {
             Node::Leaf(_) => {
-                if last.leaf_text().len() == 0 {
+                if last.leaf_text().is_empty() {
                     self.stack.push_back(leaf);
                 } else {
                     let mut children = NodeChildren::new();

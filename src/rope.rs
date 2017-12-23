@@ -97,7 +97,7 @@ impl Rope {
         loop {
             match reader.read(&mut buffer[fill_idx..]) {
                 Ok(read_count) => {
-                    fill_idx = fill_idx + read_count;
+                    fill_idx += read_count;
 
                     // Determine how much of the buffer is valid utf8
                     let valid_count = match std::str::from_utf8(&buffer[..fill_idx]) {
@@ -287,7 +287,7 @@ impl Rope {
 
             while (!new_rope_root.is_leaf()) && new_rope_root.child_count() == 1 {
                 let child = if let Node::Internal(ref children) = *new_rope_root {
-                    children.nodes()[0].clone()
+                    Arc::clone(&children.nodes()[0])
                 } else {
                     unreachable!()
                 };
@@ -318,18 +318,18 @@ impl Rope {
                     Arc::make_mut(&mut self.root).append_at_depth(other.root, l_depth - r_depth);
                 if let Some(node) = extra {
                     let mut children = NodeChildren::new();
-                    children.push((self.root.text_info(), self.root.clone()));
+                    children.push((self.root.text_info(), Arc::clone(&self.root)));
                     children.push((node.text_info(), node));
                     self.root = Arc::new(Node::Internal(children));
                 }
             } else {
                 let mut other = other;
                 let extra = Arc::make_mut(&mut other.root)
-                    .prepend_at_depth(self.root.clone(), r_depth - l_depth);
+                    .prepend_at_depth(Arc::clone(&self.root), r_depth - l_depth);
                 if let Some(node) = extra {
                     let mut children = NodeChildren::new();
                     children.push((node.text_info(), node));
-                    children.push((other.root.text_info(), other.root.clone()));
+                    children.push((other.root.text_info(), Arc::clone(&other.root)));
                     other.root = Arc::new(Node::Internal(children));
                 }
                 *self = other;
@@ -445,7 +445,7 @@ impl Rope {
     /// Returns the line at `line_idx`.
     ///
     /// Note: lines are zero-indexed.
-    pub fn get_line<'a>(&'a self, line_idx: usize) -> RopeSlice<'a> {
+    pub fn get_line(&self, line_idx: usize) -> RopeSlice {
         // Bounds check
         assert!(
             line_idx <= self.len_lines(),
@@ -518,7 +518,7 @@ impl Rope {
     // Slicing
 
     /// Returns an immutable slice of the `Rope` in the char range `start..end`.
-    pub fn slice<'a>(&'a self, start: usize, end: usize) -> RopeSlice<'a> {
+    pub fn slice(&self, start: usize, end: usize) -> RopeSlice {
         // Bounds check
         assert!(start <= end);
         assert!(
@@ -535,27 +535,27 @@ impl Rope {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `Rope`.
-    pub fn bytes<'a>(&'a self) -> RopeBytes<'a> {
+    pub fn bytes(&self) -> RopeBytes {
         RopeBytes::new(&self.root)
     }
 
     /// Creates an iterator over the chars of the `Rope`.
-    pub fn chars<'a>(&'a self) -> RopeChars<'a> {
+    pub fn chars(&self) -> RopeChars {
         RopeChars::new(&self.root)
     }
 
     /// Creates an iterator over the grapheme clusters of the `Rope`.
-    pub fn graphemes<'a>(&'a self) -> RopeGraphemes<'a> {
+    pub fn graphemes(&self) -> RopeGraphemes {
         RopeGraphemes::new(&self.root, true)
     }
 
     /// Creates an iterator over the lines of the `Rope`.
-    pub fn lines<'a>(&'a self) -> RopeLines<'a> {
+    pub fn lines(&self) -> RopeLines {
         RopeLines::new(&self.root)
     }
 
     /// Creates an iterator over the chunks of the `Rope`.
-    pub fn chunks<'a>(&'a self) -> RopeChunks<'a> {
+    pub fn chunks(&self) -> RopeChunks {
         RopeChunks::new(&self.root)
     }
 
@@ -610,10 +610,10 @@ impl Rope {
             let mut itr = self.chunks();
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
-                if chunk.len() > 0 && last_chunk.len() > 0 {
+                if !chunk.is_empty() && !last_chunk.is_empty() {
                     assert!(seam_is_grapheme_boundary(last_chunk, chunk));
                     last_chunk = chunk;
-                } else if last_chunk.len() == 0 {
+                } else if last_chunk.is_empty() {
                     last_chunk = chunk;
                 }
             }
@@ -640,7 +640,7 @@ impl Rope {
     pub(crate) fn pull_up_singular_nodes(&mut self) {
         while (!self.root.is_leaf()) && self.root.child_count() == 1 {
             let child = if let Node::Internal(ref children) = *self.root {
-                children.nodes()[0].clone()
+                Arc::clone(&children.nodes()[0])
             } else {
                 unreachable!()
             };
@@ -664,6 +664,12 @@ impl std::fmt::Display for Rope {
             write!(f, "{}", chunk)?
         }
         Ok(())
+    }
+}
+
+impl std::default::Default for Rope {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

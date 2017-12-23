@@ -15,7 +15,7 @@ fn main() {
             "You must pass a filepath!  Only recieved {} arguments.",
             std::env::args().count()
         );
-        panic!();
+        panic!()
     };
 
     // Build rope from file contents

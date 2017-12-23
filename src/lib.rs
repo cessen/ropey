@@ -48,6 +48,9 @@
 //! assert_eq!(itr.next(), None);
 //! ```
 
+#![cfg_attr(feature = "cargo-clippy", allow(inline_always))]
+#![cfg_attr(feature = "cargo-clippy", allow(needless_return))]
+
 extern crate smallvec;
 extern crate unicode_segmentation;
 
