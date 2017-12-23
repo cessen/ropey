@@ -94,6 +94,10 @@ impl<'a> RopeSlice<'a> {
     // Index conversion methods
 
     /// Returns the line index of the given char.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn char_to_line(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -108,10 +112,16 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Returns the char index of the start of the given line.
+    ///
+    /// Note: lines are zero-indexed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
-            line_idx <= self.len_lines(),
+            line_idx < self.len_lines(),
             "Attempt to index past end of slice: line index {}, slice line length {}",
             line_idx,
             self.len_lines()
@@ -133,10 +143,14 @@ impl<'a> RopeSlice<'a> {
     // TODO: possibly make these more efficient.
 
     /// Returns the char at `char_idx`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
     pub fn get_char(&self, char_idx: usize) -> char {
         // Bounds check
         assert!(
-            char_idx <= self.len_chars(),
+            char_idx < self.len_chars(),
             "Attempt to index past end of slice: char index {}, slice char length {}",
             char_idx,
             self.len_chars()
@@ -148,10 +162,14 @@ impl<'a> RopeSlice<'a> {
     /// Returns the line at `line_idx`.
     ///
     /// Note: lines are zero-indexed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     pub fn get_line(&self, line_idx: usize) -> RopeSlice<'a> {
         // Bounds check
         assert!(
-            line_idx <= self.len_lines(),
+            line_idx < self.len_lines(),
             "Attempt to index past end of slice: line index {}, slice line length {}",
             line_idx,
             self.len_lines()
@@ -171,6 +189,10 @@ impl<'a> RopeSlice<'a> {
     // Grapheme methods
 
     /// Returns whether `char_idx` is a grapheme cluster boundary or not.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
         // Bounds check
         assert!(
@@ -193,6 +215,10 @@ impl<'a> RopeSlice<'a> {
     ///
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the beginning of the rope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -216,6 +242,10 @@ impl<'a> RopeSlice<'a> {
     ///
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the end of the rope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -238,6 +268,11 @@ impl<'a> RopeSlice<'a> {
     // Slicing
 
     /// Returns an immutable slice of the `RopeSlice` in the char range `start..end`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start` is greater than `end` or `end` is out of bounds
+    /// (i.e. `end > len_chars()`).
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice<'a> {
         // Bounds check
         assert!(start <= end);

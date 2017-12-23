@@ -58,7 +58,7 @@ use tree::{Count, Node, NodeChildren, MAX_BYTES};
 /// `Rope` is written to be fast and memory efficient.  All editing and
 /// query operations execute in worst-case `O(log N)` time in the length of
 /// the text.  (If they don't, file a bug!)  It is designed to work efficiently
-/// even for huge (hundreds of megabytes) and pathological (all on one line)
+/// even for huge (in the gigabytes) and pathological (all on one line)
 /// texts.  It should be able to handle just about anything you can throw at it.
 #[derive(Clone)]
 pub struct Rope {
@@ -85,11 +85,16 @@ impl Rope {
 
     /// Creates a `Rope` from the output of a reader.
     ///
-    /// This expects utf8 data, and will fail if the reader provides
-    /// anything else, returning an IO error with kind `InvalidData`.
+    /// # Errors
     ///
-    /// If there is an error in the reader, it is returned.
-    pub fn from_reader<T: io::Read>(reader: &mut T) -> io::Result<Rope> {
+    /// - If the reader returns an error, `from_reader` stops and returns
+    ///   that error.
+    /// - If non-utf8 data is encountered, an IO error with kind
+    ///   `InvalidData` is returned.
+    ///
+    /// Note: some data from the reader is likely consumed even if there is
+    /// an error.
+    pub fn from_reader<T: io::Read>(mut reader: T) -> io::Result<Rope> {
         const BUFFER_SIZE: usize = MAX_BYTES * 2;
         let mut builder = RopeBuilder::new();
         let mut buffer = [0u8; BUFFER_SIZE];
@@ -178,6 +183,10 @@ impl Rope {
     // Edit methods
 
     /// Inserts `text` at char index `char_idx`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn insert(&mut self, char_idx: usize, text: &str) {
         // TODO: handle large insertions more efficiently, instead of doing a split
         // and appends.
@@ -232,6 +241,11 @@ impl Rope {
     }
 
     /// Removes the text in char range `start..end`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start` is greater than `end` or `end` is out of bounds
+    /// (i.e. `end > len_chars()`).
     pub fn remove(&mut self, start: usize, end: usize) {
         // Bounds check
         assert!(
@@ -259,6 +273,10 @@ impl Rope {
 
     /// Splits the `Rope` at `char_idx`, returning the right part of
     /// the split.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn split_off(&mut self, char_idx: usize) -> Rope {
         // Bounds check
         assert!(
@@ -343,6 +361,10 @@ impl Rope {
     // Index conversion methods
 
     /// Returns the char index of the given byte.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -356,6 +378,10 @@ impl Rope {
     }
 
     /// Returns the line index of the given byte.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -369,6 +395,10 @@ impl Rope {
     }
 
     /// Returns the byte index of the given char.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -383,7 +413,9 @@ impl Rope {
 
     /// Returns the line index of the given char.
     ///
-    /// Note: lines are zero-indexed.
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn char_to_line(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -399,6 +431,10 @@ impl Rope {
     /// Returns the byte index of the start of the given line.
     ///
     /// Note: lines are zero-indexed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -413,6 +449,10 @@ impl Rope {
     /// Returns the char index of the start of the given line.
     ///
     /// Note: lines are zero-indexed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -430,10 +470,14 @@ impl Rope {
     // TODO: possibly make these more efficient.
 
     /// Returns the char at `char_idx`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
     pub fn get_char(&self, char_idx: usize) -> char {
         // Bounds check
         assert!(
-            char_idx <= self.len_chars(),
+            char_idx < self.len_chars(),
             "Attempt to index past end of Rope: char index {}, Rope char length {}",
             char_idx,
             self.len_chars()
@@ -445,10 +489,14 @@ impl Rope {
     /// Returns the line at `line_idx`.
     ///
     /// Note: lines are zero-indexed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     pub fn get_line(&self, line_idx: usize) -> RopeSlice {
         // Bounds check
         assert!(
-            line_idx <= self.len_lines(),
+            line_idx < self.len_lines(),
             "Attempt to index past end of Rope: line index {}, Rope line length {}",
             line_idx,
             self.len_lines()
@@ -468,6 +516,10 @@ impl Rope {
     // Grapheme methods
 
     /// Returns whether `char_idx` is a grapheme cluster boundary or not.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
         // Bounds check
         assert!(
@@ -485,6 +537,10 @@ impl Rope {
     ///
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the beginning of the rope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -502,6 +558,10 @@ impl Rope {
     ///
     /// This excludes any boundary that might be at `char_idx` itself, unless
     /// `char_idx` is at the end of the rope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -518,6 +578,11 @@ impl Rope {
     // Slicing
 
     /// Returns an immutable slice of the `Rope` in the char range `start..end`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start` is greater than `end` or `end` is out of bounds
+    /// (i.e. `end > len_chars()`).
     pub fn slice(&self, start: usize, end: usize) -> RopeSlice {
         // Bounds check
         assert!(start <= end);
@@ -1002,5 +1067,16 @@ mod tests {
         let r = Rope::from_str("");
 
         assert_eq!(r.get_line(0), "");
+    }
+
+    #[test]
+    fn line_to_char_01() {
+        let r = Rope::from_str(
+            "Hello world!\nHow are you doing?\nこんいちは、みんなさん！",
+        );
+
+        assert_eq!(0, r.line_to_char(0));
+        assert_eq!(13, r.line_to_char(1));
+        assert_eq!(32, r.line_to_char(2));
     }
 }
