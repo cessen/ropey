@@ -452,7 +452,7 @@ impl Rope {
     ///
     /// # Panics
     ///
-    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -503,11 +503,7 @@ impl Rope {
         );
 
         let start = self.line_to_char(line_idx);
-        let end = if (line_idx + 1) < self.len_lines() {
-            self.line_to_char(line_idx + 1)
-        } else {
-            self.len_chars()
-        };
+        let end = self.line_to_char(line_idx + 1);
 
         self.slice(start, end)
     }
@@ -1078,5 +1074,6 @@ mod tests {
         assert_eq!(0, r.line_to_char(0));
         assert_eq!(13, r.line_to_char(1));
         assert_eq!(32, r.line_to_char(2));
+        assert_eq!(44, r.line_to_char(3));
     }
 }

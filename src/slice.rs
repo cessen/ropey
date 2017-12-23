@@ -117,11 +117,11 @@ impl<'a> RopeSlice<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
-            line_idx < self.len_lines(),
+            line_idx <= self.len_lines(),
             "Attempt to index past end of slice: line index {}, slice line length {}",
             line_idx,
             self.len_lines()
@@ -176,11 +176,7 @@ impl<'a> RopeSlice<'a> {
         );
 
         let start = self.line_to_char(line_idx);
-        let end = if (line_idx + 1) < self.len_lines() {
-            self.line_to_char(line_idx + 1)
-        } else {
-            self.len_chars()
-        };
+        let end = self.line_to_char(line_idx + 1);
 
         self.slice(start, end)
     }

@@ -216,7 +216,9 @@ pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     if line_idx == 0 {
         0
     } else {
-        LineBreakIter::new(text).nth(line_idx - 1).unwrap()
+        LineBreakIter::new(text)
+            .nth(line_idx - 1)
+            .unwrap_or_else(|| text.len())
     }
 }
 
