@@ -5,7 +5,7 @@ use std::io;
 use std::sync::Arc;
 use std::ptr;
 
-use iter::{RopeBytes, RopeChars, RopeChunks, RopeGraphemes, RopeLines};
+use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
 use str_utils::{char_idx_to_byte_idx, seam_is_grapheme_boundary};
@@ -467,14 +467,13 @@ impl Rope {
 
     //-----------------------------------------------------------------------
     // Fetch methods
-    // TODO: possibly make these more efficient.
 
     /// Returns the char at `char_idx`.
     ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
-    pub fn get_char(&self, char_idx: usize) -> char {
+    pub fn char(&self, char_idx: usize) -> char {
         // Bounds check
         assert!(
             char_idx < self.len_chars(),
@@ -483,6 +482,7 @@ impl Rope {
             self.len_chars()
         );
 
+        // TODO: make this more efficient.
         self.slice(char_idx, char_idx + 1).chars().nth(0).unwrap()
     }
 
@@ -493,7 +493,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
-    pub fn get_line(&self, line_idx: usize) -> RopeSlice {
+    pub fn line(&self, line_idx: usize) -> RopeSlice {
         // Bounds check
         assert!(
             line_idx < self.len_lines(),
@@ -596,28 +596,28 @@ impl Rope {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `Rope`.
-    pub fn bytes(&self) -> RopeBytes {
-        RopeBytes::new(&self.root)
+    pub fn bytes(&self) -> Bytes {
+        Bytes::new(&self.root)
     }
 
     /// Creates an iterator over the chars of the `Rope`.
-    pub fn chars(&self) -> RopeChars {
-        RopeChars::new(&self.root)
+    pub fn chars(&self) -> Chars {
+        Chars::new(&self.root)
     }
 
     /// Creates an iterator over the grapheme clusters of the `Rope`.
-    pub fn graphemes(&self) -> RopeGraphemes {
-        RopeGraphemes::new(&self.root, true)
+    pub fn graphemes(&self) -> Graphemes {
+        Graphemes::new(&self.root, true)
     }
 
     /// Creates an iterator over the lines of the `Rope`.
-    pub fn lines(&self) -> RopeLines {
-        RopeLines::new(&self.root)
+    pub fn lines(&self) -> Lines {
+        Lines::new(&self.root)
     }
 
     /// Creates an iterator over the chunks of the `Rope`.
-    pub fn chunks(&self) -> RopeChunks {
-        RopeChunks::new(&self.root)
+    pub fn chunks(&self) -> Chunks {
+        Chunks::new(&self.root)
     }
 
     //-----------------------------------------------------------------------
@@ -625,9 +625,9 @@ impl Rope {
 
     /// Returns the entire text of the `Rope` as a newly allocated String.
     pub fn to_string(&self) -> String {
-        use iter::RopeChunks;
+        use iter::Chunks;
         let mut text = String::with_capacity(self.len_bytes());
-        for chunk in RopeChunks::new(&self.root) {
+        for chunk in Chunks::new(&self.root) {
             text.push_str(chunk);
         }
         text
@@ -1037,32 +1037,32 @@ mod tests {
     }
 
     #[test]
-    fn get_char_01() {
+    fn char_01() {
         let r =
             Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
 
-        assert_eq!(r.get_char(0), 'H');
-        assert_eq!(r.get_char(10), 'd');
-        assert_eq!(r.get_char(18), 'r');
-        assert_eq!(r.get_char(43), '！');
+        assert_eq!(r.char(0), 'H');
+        assert_eq!(r.char(10), 'd');
+        assert_eq!(r.char(18), 'r');
+        assert_eq!(r.char(43), '！');
     }
 
     #[test]
-    fn get_line_01() {
+    fn line_01() {
         let r = Rope::from_str(
             "Hello world!\nHow are you doing?\nこんいちは、みんなさん！",
         );
 
-        assert_eq!(r.get_line(0), "Hello world!\n");
-        assert_eq!(r.get_line(1), "How are you doing?\n");
-        assert_eq!(r.get_line(2), "こんいちは、みんなさん！");
+        assert_eq!(r.line(0), "Hello world!\n");
+        assert_eq!(r.line(1), "How are you doing?\n");
+        assert_eq!(r.line(2), "こんいちは、みんなさん！");
     }
 
     #[test]
-    fn get_line_02() {
+    fn line_02() {
         let r = Rope::from_str("");
 
-        assert_eq!(r.get_line(0), "");
+        assert_eq!(r.line(0), "");
     }
 
     #[test]

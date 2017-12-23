@@ -8,10 +8,11 @@
 
 #![allow(dead_code)]
 
-use std::str::{Bytes, Chars};
+use std::str;
 use std::sync::Arc;
 
-use unicode_segmentation::{Graphemes, UnicodeSegmentation};
+use unicode_segmentation;
+use unicode_segmentation::UnicodeSegmentation;
 
 use tree::Node;
 use slice::RopeSlice;
@@ -19,32 +20,28 @@ use slice::RopeSlice;
 //==========================================================
 
 /// An iterator over a `Rope`'s bytes.
-pub struct RopeBytes<'a> {
-    chunk_iter: RopeChunks<'a>,
-    cur_chunk: Bytes<'a>,
+pub struct Bytes<'a> {
+    chunk_iter: Chunks<'a>,
+    cur_chunk: str::Bytes<'a>,
 }
 
-impl<'a> RopeBytes<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> RopeBytes {
-        RopeBytes {
-            chunk_iter: RopeChunks::new(node),
+impl<'a> Bytes<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Bytes {
+        Bytes {
+            chunk_iter: Chunks::new(node),
             cur_chunk: "".bytes(),
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node>,
-        start_char: usize,
-        end_char: usize,
-    ) -> RopeBytes {
-        RopeBytes {
-            chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
+        Bytes {
+            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".bytes(),
         }
     }
 }
 
-impl<'a> Iterator for RopeBytes<'a> {
+impl<'a> Iterator for Bytes<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<u8> {
@@ -64,32 +61,28 @@ impl<'a> Iterator for RopeBytes<'a> {
 //==========================================================
 
 /// An iterator over a `Rope`'s chars.
-pub struct RopeChars<'a> {
-    chunk_iter: RopeChunks<'a>,
-    cur_chunk: Chars<'a>,
+pub struct Chars<'a> {
+    chunk_iter: Chunks<'a>,
+    cur_chunk: str::Chars<'a>,
 }
 
-impl<'a> RopeChars<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> RopeChars {
-        RopeChars {
-            chunk_iter: RopeChunks::new(node),
+impl<'a> Chars<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Chars {
+        Chars {
+            chunk_iter: Chunks::new(node),
             cur_chunk: "".chars(),
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node>,
-        start_char: usize,
-        end_char: usize,
-    ) -> RopeChars {
-        RopeChars {
-            chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
+        Chars {
+            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".chars(),
         }
     }
 }
 
-impl<'a> Iterator for RopeChars<'a> {
+impl<'a> Iterator for Chars<'a> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
@@ -113,16 +106,16 @@ impl<'a> Iterator for RopeChars<'a> {
 /// The grapheme clusters returned are the extended grapheme
 /// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/).
 /// Each grapheme cluster is returned as a utf8 `&str` slice.
-pub struct RopeGraphemes<'a> {
-    chunk_iter: RopeChunks<'a>,
-    cur_chunk: Graphemes<'a>,
+pub struct Graphemes<'a> {
+    chunk_iter: Chunks<'a>,
+    cur_chunk: unicode_segmentation::Graphemes<'a>,
     extended: bool,
 }
 
-impl<'a> RopeGraphemes<'a> {
-    pub(crate) fn new(node: &Arc<Node>, extended: bool) -> RopeGraphemes {
-        RopeGraphemes {
-            chunk_iter: RopeChunks::new(node),
+impl<'a> Graphemes<'a> {
+    pub(crate) fn new(node: &Arc<Node>, extended: bool) -> Graphemes {
+        Graphemes {
+            chunk_iter: Chunks::new(node),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
             extended: extended,
         }
@@ -133,16 +126,16 @@ impl<'a> RopeGraphemes<'a> {
         extended: bool,
         start_char: usize,
         end_char: usize,
-    ) -> RopeGraphemes {
-        RopeGraphemes {
-            chunk_iter: RopeChunks::new_with_range(node, start_char, end_char),
+    ) -> Graphemes {
+        Graphemes {
+            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
             extended: extended,
         }
     }
 }
 
-impl<'a> Iterator for RopeGraphemes<'a> {
+impl<'a> Iterator for Graphemes<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
@@ -167,16 +160,16 @@ impl<'a> Iterator for RopeGraphemes<'a> {
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
-pub struct RopeLines<'a> {
+pub struct Lines<'a> {
     node: &'a Arc<Node>,
     start_char: usize,
     end_char: usize,
     line_idx: usize,
 }
 
-impl<'a> RopeLines<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> RopeLines {
-        RopeLines {
+impl<'a> Lines<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Lines {
+        Lines {
             node: node,
             start_char: 0,
             end_char: node.text_info().chars as usize,
@@ -184,12 +177,8 @@ impl<'a> RopeLines<'a> {
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node>,
-        start_char: usize,
-        end_char: usize,
-    ) -> RopeLines {
-        RopeLines {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Lines {
+        Lines {
             node: node,
             start_char: start_char,
             end_char: end_char,
@@ -198,7 +187,7 @@ impl<'a> RopeLines<'a> {
     }
 }
 
-impl<'a> Iterator for RopeLines<'a> {
+impl<'a> Iterator for Lines<'a> {
     type Item = RopeSlice<'a>;
 
     fn next(&mut self) -> Option<RopeSlice<'a>> {
@@ -253,16 +242,16 @@ impl<'a> Iterator for RopeLines<'a> {
 /// boundaries have no guaranteed relationship, etc.
 ///
 /// (The converse of this API is the [`RopeBuilder`](../struct.RopeBuilder.html).)
-pub struct RopeChunks<'a> {
+pub struct Chunks<'a> {
     node_stack: Vec<&'a Arc<Node>>,
     start: usize,
     end: usize,
     idx: usize,
 }
 
-impl<'a> RopeChunks<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> RopeChunks {
-        RopeChunks {
+impl<'a> Chunks<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Chunks {
+        Chunks {
             node_stack: vec![node],
             start: 0,
             end: node.text_info().bytes as usize,
@@ -270,12 +259,8 @@ impl<'a> RopeChunks<'a> {
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node>,
-        start_char: usize,
-        end_char: usize,
-    ) -> RopeChunks {
-        RopeChunks {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+        Chunks {
             node_stack: vec![node],
             start: node.char_to_byte(start_char),
             end: node.char_to_byte(end_char),
@@ -284,7 +269,7 @@ impl<'a> RopeChunks<'a> {
     }
 }
 
-impl<'a> Iterator for RopeChunks<'a> {
+impl<'a> Iterator for Chunks<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {

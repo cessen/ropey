@@ -24,7 +24,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// this API runs in time linear to the amount of data fed to it.  It
 /// also creates more memory-compact ropes.
 ///
-/// (The converse of this API is the [`RopeChunks`](iter/struct.RopeChunks.html)
+/// (The converse of this API is the [`Chunks`](iter/struct.Chunks.html)
 /// iterator.)
 ///
 /// # Example

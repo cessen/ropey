@@ -3,7 +3,7 @@
 use std;
 use std::sync::Arc;
 
-use iter::{RopeBytes, RopeChars, RopeChunks, RopeGraphemes, RopeLines};
+use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use tree::{Count, Node};
 use rope::Rope;
 
@@ -140,14 +140,13 @@ impl<'a> RopeSlice<'a> {
 
     //-----------------------------------------------------------------------
     // Fetch methods
-    // TODO: possibly make these more efficient.
 
     /// Returns the char at `char_idx`.
     ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
-    pub fn get_char(&self, char_idx: usize) -> char {
+    pub fn char(&self, char_idx: usize) -> char {
         // Bounds check
         assert!(
             char_idx < self.len_chars(),
@@ -156,6 +155,7 @@ impl<'a> RopeSlice<'a> {
             self.len_chars()
         );
 
+        // TODO: make this more efficient.
         self.slice(char_idx, char_idx + 1).chars().nth(0).unwrap()
     }
 
@@ -166,7 +166,7 @@ impl<'a> RopeSlice<'a> {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
-    pub fn get_line(&self, line_idx: usize) -> RopeSlice<'a> {
+    pub fn line(&self, line_idx: usize) -> RopeSlice<'a> {
         // Bounds check
         assert!(
             line_idx < self.len_lines(),
@@ -290,18 +290,18 @@ impl<'a> RopeSlice<'a> {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `RopeSlice`.
-    pub fn bytes(&self) -> RopeBytes<'a> {
-        RopeBytes::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
+    pub fn bytes(&self) -> Bytes<'a> {
+        Bytes::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the chars of the `RopeSlice`.
-    pub fn chars(&self) -> RopeChars<'a> {
-        RopeChars::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
+    pub fn chars(&self) -> Chars<'a> {
+        Chars::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the grapheme clusters of the `RopeSlice`.
-    pub fn graphemes(&self) -> RopeGraphemes<'a> {
-        RopeGraphemes::new_with_range(
+    pub fn graphemes(&self) -> Graphemes<'a> {
+        Graphemes::new_with_range(
             self.node,
             true,
             self.start_char as usize,
@@ -310,13 +310,13 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates an iterator over the lines of the `RopeSlice`.
-    pub fn lines(&self) -> RopeLines<'a> {
-        RopeLines::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
+    pub fn lines(&self) -> Lines<'a> {
+        Lines::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the chunks of the `RopeSlice`.
-    pub fn chunks(&self) -> RopeChunks<'a> {
-        RopeChunks::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
+    pub fn chunks(&self) -> Chunks<'a> {
+        Chunks::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     //-----------------------------------------------------------------------
