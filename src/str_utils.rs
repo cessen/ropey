@@ -20,10 +20,7 @@ pub fn count_chars(text: &str) -> usize {
     let mut inv_count = 0;
 
     // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = {
-        let aligned = ptr as usize + (tsize - (ptr as usize & (tsize - 1)));
-        (end_ptr as usize).min(aligned) as *const u8
-    };
+    let end_pre_ptr = next_aligned_ptr(unsafe { ptr.offset(-1) }, tsize).min(end_ptr);
     while ptr < end_pre_ptr {
         let byte = unsafe { *ptr };
         inv_count += ((byte & 0xC0) == 0x80) as usize;
@@ -50,6 +47,93 @@ pub fn count_chars(text: &str) -> usize {
     }
 
     len - inv_count
+}
+
+/// Uses bit-fiddling magic to count line breaks really quickly.
+///
+/// The following unicode sequences are considered newlines by this function:
+/// - u{000A} (a.k.a. LF)
+/// - u{000B}
+/// - u{000C}
+/// - u{000D} (a.k.a. CR)
+/// - u{000D}u{000A} (a.k.a. CRLF)
+/// - u{0085}
+/// - u{2028}
+/// - u{2029}
+pub fn count_line_breaks(text: &str) -> usize {
+    // TODO: right now this checks the high byte for the large line break codepoints
+    // when determining whether to skip the full check.  This penalizes texts that use
+    // a lot of code points in those ranges.  We should check the low bytes instead, to
+    // better distribute the penalty.
+    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    let tsize: usize = std::mem::size_of::<usize>();
+
+    let len = text.len();
+    let mut ptr = text.as_ptr();
+    let end_ptr = unsafe { ptr.offset(len as isize) };
+    let mut count = 0;
+
+    while ptr < end_ptr {
+        // Calculate the next aligned ptr after this one
+        let end_aligned_ptr = next_aligned_ptr(ptr, tsize).min(end_ptr);
+
+        // Do the full check, counting as we go.
+        while ptr < end_aligned_ptr {
+            let byte = unsafe { *ptr };
+
+            // Handle u{000A}, u{000B}, u{000C}, and u{000D}
+            if (byte <= 0x0D) && (byte >= 0x0A) {
+                // Check for CRLF and go forward one more if it is
+                let next = unsafe { ptr.offset(1) };
+                if byte == 0x0D && next < end_ptr && unsafe { *next } == 0x0A {
+                    ptr = next;
+                }
+
+                count += 1;
+            }
+            // Handle u{0085}
+            else if byte == 0xC2 {
+                ptr = unsafe { ptr.offset(1) };
+                if ptr < end_ptr && unsafe { *ptr } == 0x85 {
+                    count += 1;
+                }
+            }
+            // Handle u{2028} and u{2029}
+            else if byte == 0xE2 {
+                let next1 = unsafe { ptr.offset(1) };
+                let next2 = unsafe { ptr.offset(2) };
+                if next1 < end_ptr && next2 < end_ptr && unsafe { *next1 } == 0x80 && (unsafe {
+                    *next2
+                }
+                    >> 1)
+                    == 0x54
+                {
+                    count += 1;
+                }
+                ptr = unsafe { ptr.offset(2) };
+            }
+
+            ptr = unsafe { ptr.offset(1) };
+        }
+
+        // Use usize to to check if it's even possible that there are any
+        // line endings, using bit-fiddling magic.
+        if ptr == end_aligned_ptr {
+            while unsafe { ptr.offset(tsize as isize) } < end_ptr {
+                let n = unsafe { *(ptr as *const usize) };
+
+                // If there's a possibility that there might be a line-ending, stop
+                // and do the full check.
+                if has_bytes_less_than(n, 0x0E) || has_byte(n, 0xC2) || has_byte(n, 0xE2) {
+                    break;
+                }
+
+                ptr = unsafe { ptr.offset(tsize as isize) };
+            }
+        }
+    }
+
+    count
 }
 
 pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
@@ -279,6 +363,24 @@ pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
     return false;
 }
 
+#[inline(always)]
+pub fn has_bytes_less_than(word: usize, n: u8) -> bool {
+    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    (((word.wrapping_sub(ONEMASK * n as usize))) & !word & (ONEMASK * 128)) != 0
+}
+
+#[inline(always)]
+pub fn has_byte(word: usize, n: u8) -> bool {
+    const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
+    const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
+    let word = word ^ (n as usize * ONEMASK_LOW);
+    (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH) != 0
+}
+
+pub fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
+    (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
+}
+
 //======================================================================
 
 /// An iterator that yields the byte indices of line breaks in a string.
@@ -437,6 +539,20 @@ mod tests {
         assert_eq!(Some(32), itr.next());
         assert_eq!(Some(48), itr.next());
         assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn count_line_breaks_01() {
+        let text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
+                    There\u{2028}is something.\u{2029}";
+        assert_eq!(48, text.len());
+        assert_eq!(8, count_line_breaks(text));
+    }
+
+    #[test]
+    fn count_line_breaks_02() {
+        let text = "\u{000A}Hello world!  This is a longer text.\u{000D}\u{000A}\u{000D}To better test that skipping by usize doesn't mess things up.\u{000B}Hello せかい!\u{000C}\u{0085}Yet more text.  How boring.\u{2028}Hi.\u{2029}\u{000A}Hello world!  This is a longer text.\u{000D}\u{000A}\u{000D}To better test that skipping by usize doesn't mess things up.\u{000B}Hello せかい!\u{000C}\u{0085}Yet more text.  How boring.\u{2028}Hi.\u{2029}\u{000A}Hello world!  This is a longer text.\u{000D}\u{000A}\u{000D}To better test that skipping by usize doesn't mess things up.\u{000B}Hello せかい!\u{000C}\u{0085}Yet more text.  How boring.\u{2028}Hi.\u{2029}\u{000A}Hello world!  This is a longer text.\u{000D}\u{000A}\u{000D}To better test that skipping by usize doesn't mess things up.\u{000B}Hello せかい!\u{000C}\u{0085}Yet more text.  How boring.\u{2028}Hi.\u{2029}";
+        assert_eq!(count_line_breaks(text), LineBreakIter::new(text).count());
     }
 
     #[test]
@@ -624,5 +740,29 @@ mod tests {
             line_idx_to_char_idx(text, char_idx_to_line_idx(text, 21))
         );
         assert_eq!(5, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 5)));
+    }
+
+    #[test]
+    fn has_bytes_less_than_01() {
+        let v = 0x0709080905090609;
+        assert!(has_bytes_less_than(v, 0x0A));
+        assert!(has_bytes_less_than(v, 0x06));
+        assert!(!has_bytes_less_than(v, 0x05));
+    }
+
+    #[test]
+    fn has_byte_01() {
+        let v = 0x070908A60509E209;
+        assert!(has_byte(v, 0x07));
+        assert!(has_byte(v, 0x09));
+        assert!(has_byte(v, 0x08));
+        assert!(has_byte(v, 0xA6));
+        assert!(has_byte(v, 0x05));
+        assert!(has_byte(v, 0xE2));
+
+        assert!(!has_byte(v, 0xA0));
+        assert!(!has_byte(v, 0xA7));
+        assert!(!has_byte(v, 0x06));
+        assert!(!has_byte(v, 0xE3));
     }
 }

@@ -15,7 +15,7 @@ fn main() {
         tree.insert(rng.gen::<usize>() % len, "world! ");
         tree.insert(rng.gen::<usize>() % len, "How are ");
         tree.insert(rng.gen::<usize>() % len, "you ");
-        tree.insert(rng.gen::<usize>() % len, "doing?\r\n");
+        tree.insert(rng.gen::<usize>() % len, "doing? ");
         tree.insert(rng.gen::<usize>() % len, "Let's ");
         tree.insert(rng.gen::<usize>() % len, "keep ");
         tree.insert(rng.gen::<usize>() % len, "inserting ");

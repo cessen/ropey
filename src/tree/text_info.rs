@@ -1,4 +1,4 @@
-use str_utils::{count_chars, LineBreakIter};
+use str_utils::{count_chars, count_line_breaks};
 use tree::Count;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -21,7 +21,7 @@ impl TextInfo {
         TextInfo {
             bytes: text.len() as Count,
             chars: count_chars(text) as Count,
-            line_breaks: LineBreakIter::new(text).count() as Count,
+            line_breaks: count_line_breaks(text) as Count,
         }
     }
 
