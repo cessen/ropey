@@ -463,7 +463,11 @@ impl Rope {
             self.len_lines()
         );
 
-        self.root.line_to_char(line_idx)
+        if line_idx == self.len_lines() {
+            self.len_chars()
+        } else {
+            self.root.line_to_char(line_idx)
+        }
     }
 
     //-----------------------------------------------------------------------
