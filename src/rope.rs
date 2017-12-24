@@ -38,7 +38,7 @@ use tree::{Count, Node, NodeChildren, MAX_BYTES};
 /// incrementally as the their contents diverge due to edits.  All of this
 /// is thread safe, and clones can be sent freely between threads.
 ///
-/// `Rope` tracks line endings, and has efficient API's for working with lines.
+/// `Rope` tracks line endings and has efficient API's for working with lines.
 /// You can convert between `char` and line index, determining which line a
 /// given `char` is on or the `char` index of the beginning of a line:
 ///

@@ -1,8 +1,12 @@
 # Ropey [![Build Status][trav-ci-img]][trav-ci] [![crates.io badge][crates-io-badge]][crates-io-url]
 
-Ropey is a utf8 text buffer for Rust, implemented as a text rope and designed
-for efficient editing and manipulation of large texts.
+Ropey is a utf8 text buffer for Rust, designed to be the backing text buffer
+for applications such as text editors.  Ropey is fast, Unicode-safe, has low
+memory overhead, and can handle huge texts and memory-incoherent edits
+without trouble.
 
+Internally it's implemented as a b-tree
+[rope](https://en.wikipedia.org/wiki/Rope_(data_structure)).
 
 ## Features
 
@@ -24,21 +28,28 @@ Ropey is fast and minimizes memory usage:
 
 
 ### Strong Unicode support
-Ropey treats Unicode code points (`char`s in Rust) as the atomic unit of text.
-Indexing and edits are all done in terms of code points, making the APIs
-intuitive and making it impossible to accidentally create invalid utf8 data
-through edits.
+Ropey treats Unicode code points (`char`s in Rust) as the atomic unit of
+text.  Indexing and edits are all done in terms of code points, making the
+APIs intuitive and making it impossible to accidentally create invalid utf8
+data.
 
 Ropey also ensures that [grapheme clusters](https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
-are never split in its internal representation, and thus can always be accessed
-as coherent `&str` slices.  Moreover, Ropey provides APIs for iterating over
-graphemes and querying about grapheme boundaries.
+are never split in its internal representation, and thus can always be
+accessed as `&str` slices.  This is particularly helpful when printing text
+to screen because consuming code doesn't have to worry about finding split
+graphemes that should be printed as single visual characters. Moreover, Ropey
+provides APIs for iterating over graphemes and querying about grapheme
+boundaries.
 
 
 ### Line-aware
 
-Ropey knows about line breaks, allowing you to index into and iterate over lines
-of text.
+Ropey knows about line breaks, allowing you to index into and iterate over
+lines of text.
+
+Ropey also recognizes all eight Unicode-specified line breaks:
+line feed, carriage return, carriage return + line feed, vertical tab,
+form feed, next line, line separator, and paragraph separator.
 
 
 ### Slicing
