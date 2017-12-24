@@ -52,14 +52,14 @@ pub fn count_chars(text: &str) -> usize {
 /// Uses bit-fiddling magic to count line breaks really quickly.
 ///
 /// The following unicode sequences are considered newlines by this function:
-/// - u{000A} (a.k.a. LF)
-/// - u{000B}
-/// - u{000C}
-/// - u{000D} (a.k.a. CR)
-/// - u{000D}u{000A} (a.k.a. CRLF)
-/// - u{0085}
-/// - u{2028}
-/// - u{2029}
+/// - u{000A}        (Line Feed)
+/// - u{000B}        (Vertical Tab)
+/// - u{000C}        (Form Feed)
+/// - u{000D}        (Carriage Return)
+/// - u{000D}u{000A} (Carriage Return + Line Feed)
+/// - u{0085}        (Next Line)
+/// - u{2028}        (Line Separator)
+/// - u{2029}        (Paragraph Separator)
 pub fn count_line_breaks(text: &str) -> usize {
     // TODO: right now this checks the high byte for the large line break codepoints
     // when determining whether to skip the full check.  This penalizes texts that use
@@ -390,14 +390,14 @@ pub fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 /// character.
 ///
 /// The following unicode sequences are considered newlines by this function:
-/// - u{000A} (a.k.a. LF)
-/// - u{000B}
-/// - u{000C}
-/// - u{000D} (a.k.a. CR)
-/// - u{000D}u{000A} (a.k.a. CRLF)
-/// - u{0085}
-/// - u{2028}
-/// - u{2029}
+/// - u{000A}        (Line Feed)
+/// - u{000B}        (Vertical Tab)
+/// - u{000C}        (Form Feed)
+/// - u{000D}        (Carriage Return)
+/// - u{000D}u{000A} (Carriage Return + Line Feed)
+/// - u{0085}        (Next Line)
+/// - u{2028}        (Line Separator)
+/// - u{2029}        (Paragraph Separator)
 pub(crate) struct LineBreakIter<'a> {
     byte_itr: std::str::Bytes<'a>,
     byte_idx: usize,
