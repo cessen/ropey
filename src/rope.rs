@@ -248,6 +248,7 @@ impl Rope {
     /// (i.e. `end > len_chars()`).
     pub fn remove(&mut self, start: usize, end: usize) {
         // Bounds check
+        assert!(start <= end);
         assert!(
             end <= self.len_chars(),
             "Attempt to remove past end of Rope: removal end {}, Rope length {}",

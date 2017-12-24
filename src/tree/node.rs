@@ -231,7 +231,6 @@ impl Node {
                 let is_on_edge = start_byte == 0 || end_byte == cur_text.len();
                 cur_text.remove_range(start_byte, end_byte);
 
-                assert!(cur_text.len() > 0);
                 return (
                     cur_text.len() < MIN_BYTES,
                     if is_on_edge { Some(start_byte) } else { None },
@@ -334,8 +333,6 @@ impl Node {
                         children.merge_distribute(l_child_i - 1, l_child_i);
                     }
                 }
-
-                assert!(children.is_info_accurate());
 
                 debug_assert!(children.len() > 0);
                 return (
@@ -971,7 +968,7 @@ impl Node {
                     break;
                 }
             }
-            assert!(children.is_info_accurate());
+            debug_assert!(children.is_info_accurate());
             did_stuff
         } else {
             false
