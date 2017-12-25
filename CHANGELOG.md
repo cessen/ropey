@@ -1,3 +1,14 @@
+# 0.5.2 (2016-12-25)
+
+Bug fixes:
+
+* There were ocassionally unnecessary heap allocations that took up a small amount of extra space in the rope.
+
+Misc:
+
+* Memory overhead has been significantly reduced for ropes built up by many small coherent insertions.
+
+
 # 0.5.1 (2017-12-24)
 
 Bug fixes:
