@@ -263,7 +263,7 @@ pub fn prev_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
     // Find codepoint boundary
     let mut boundary_idx = byte_idx;
     while !text.is_char_boundary(boundary_idx) {
-        boundary_idx -= 1;
+        boundary_idx += 1;
     }
 
     // Find the next grapheme cluster boundary
@@ -292,7 +292,7 @@ pub fn next_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
     // Find codepoint boundary
     let mut boundary_idx = byte_idx;
     while !text.is_char_boundary(boundary_idx) {
-        boundary_idx += 1;
+        boundary_idx -= 1;
     }
 
     // Find the next grapheme cluster boundary
