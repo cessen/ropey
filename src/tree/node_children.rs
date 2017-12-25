@@ -10,8 +10,8 @@ use std::slice;
 use std::sync::Arc;
 
 use tree;
-use tree::Node;
-use str_utils::nearest_internal_grapheme_boundary;
+use tree::{Node, MAX_BYTES};
+use str_utils::{nearest_internal_grapheme_boundary, prev_grapheme_boundary};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -175,6 +175,47 @@ impl NodeChildren {
         }
         while other.len() > r_target_len {
             self.push(other.remove(0));
+        }
+    }
+
+    /// If the children are leaf nodes, compacts them to take up the fewest
+    /// nodes.
+    pub fn compact_leaves(&mut self) {
+        if !self.nodes[0].is_leaf() || self.len() < 2 {
+            return;
+        }
+
+        let mut i = 1;
+        while i < self.len() {
+            if (self.nodes()[i - 1].leaf_text().len() + self.nodes()[i].leaf_text().len())
+                <= MAX_BYTES
+            {
+                // Scope to contain borrows
+                {
+                    let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
+                    let text_l = Arc::make_mut(node_l).leaf_text_mut();
+                    let text_r = node_r.leaf_text();
+                    text_l.push_str(text_r);
+                }
+                self.remove(i);
+            } else if self.nodes()[i - 1].leaf_text().len() < MAX_BYTES {
+                // Scope to contain borrows
+                {
+                    let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
+                    let text_l = Arc::make_mut(node_l).leaf_text_mut();
+                    let text_r = Arc::make_mut(node_r).leaf_text_mut();
+                    let split_idx_r = prev_grapheme_boundary(text_r, MAX_BYTES - text_l.len());
+                    text_l.push_str(&text_r[..split_idx_r]);
+                    text_r.truncate_front(split_idx_r);
+                }
+                i += 1;
+            } else {
+                i += 1;
+            }
+        }
+
+        for i in 0..self.len() {
+            self.update_child_info(i);
         }
     }
 

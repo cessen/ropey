@@ -75,6 +75,14 @@ impl Node {
 
             // If it's internal, things get a little more complicated
             Node::Internal(ref mut children) => {
+                // Compact leaf children if we're close to maximum leaf
+                // fragmentation.
+                if children.len() == MAX_CHILDREN && children.nodes()[0].is_leaf()
+                    && (children.combined_info().bytes as usize) < (MAX_BYTES * (MIN_CHILDREN + 1))
+                {
+                    children.compact_leaves();
+                }
+
                 // Find the child to traverse into along with its starting char
                 // offset.
                 let (child_i, start_info) =
@@ -602,6 +610,14 @@ impl Node {
 
     pub fn leaf_text(&self) -> &str {
         if let Node::Leaf(ref text) = *self {
+            text
+        } else {
+            panic!()
+        }
+    }
+
+    pub fn leaf_text_mut(&mut self) -> &mut NodeText {
+        if let Node::Leaf(ref mut text) = *self {
             text
         } else {
             panic!()
