@@ -197,6 +197,12 @@ impl NodeText {
         self.buffer.shrink_to_fit();
     }
 
+    /// Returns whether the string has spilled out into a heap-allocated
+    /// memory area.
+    pub fn spilled(&self) -> bool {
+        self.buffer.spilled()
+    }
+
     #[inline(always)]
     pub unsafe fn as_mut_smallvec(&mut self) -> &mut SmallVec<BackingArray> {
         &mut self.buffer
