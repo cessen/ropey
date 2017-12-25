@@ -8,12 +8,23 @@ pub(crate) use self::node_children::NodeChildren;
 pub(crate) use self::node_text::NodeText;
 pub(crate) use self::text_info::TextInfo;
 
-// Internal node min/max values.
-pub(crate) const MAX_CHILDREN: usize = 11;
-pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
+// Once size_of() is a const fn, remove this and use size_of() instead.
+#[cfg(target_pointer_width = "64")]
+const PTR_SIZE: usize = 8;
+#[cfg(target_pointer_width = "32")]
+const PTR_SIZE: usize = 4;
+#[cfg(target_pointer_width = "16")]
+const PTR_SIZE: usize = 2;
 
-// Leaf node min/max values.
-pub(crate) const MAX_BYTES: usize = 368 - 17;
+// Aim for nodes to be 512 - Arc counters.  This makes it easier for the
+// memory allocator to avoid fragmentation.
+const TARGET_NODE_SIZE: usize = 512 - (PTR_SIZE * 2);
+
+// Node min/max values.
+// Determined by TARGET_NODE_SIZE, above.
+pub(crate) const MAX_CHILDREN: usize = (TARGET_NODE_SIZE - 1) / 32;
+pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
+pub(crate) const MAX_BYTES: usize = TARGET_NODE_SIZE - 1 - (PTR_SIZE * 2);
 pub(crate) const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
 
 // Type used for storing tree metadata, such as byte and char length.
