@@ -13,7 +13,7 @@ use tree::{Count, Node, NodeChildren, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
-/// `Rope`'s atomic unit of data is Unicode code points (or `char`s in Rust).
+/// `Rope`'s atomic unit of data is Unicode scalar values (or `char`s in Rust).
 /// Except where otherwise documented, all methods that index into a rope
 /// or return an index into a rope do so by `char` index.  This makes the API's
 /// intuitive and prevents accidentally creating a Rope with invalid utf8 data.
