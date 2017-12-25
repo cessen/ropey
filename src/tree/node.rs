@@ -59,7 +59,7 @@ impl Node {
                     None
                 };
 
-                if cur_text.len() <= MAX_BYTES {
+                if (cur_text.len() + text.len()) <= MAX_BYTES {
                     cur_text.insert_str(byte_pos, text);
                     return (None, seam);
                 } else {
