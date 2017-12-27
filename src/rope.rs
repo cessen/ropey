@@ -763,31 +763,79 @@ impl<'a> std::cmp::PartialEq<Rope> for &'a str {
 mod tests {
     use super::*;
 
+    // 127 bytes, 103 chars, 1 line
+    const TEXT: &str = "Hello there!  How're you doing?  It's \
+                        a fine day, isn't it?  Aren't you glad \
+                        we're alive?  こんにちは、みんなさん！";
+    // 124 bytes, 100 chars, 4 lines
+    const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
+                              a fine day, isn't it?\nAren't you glad \
+                              we're alive?\nこんにちは、みんなさん！";
+
+    #[test]
+    fn new_01() {
+        let r = Rope::new();
+        assert_eq!(r, "");
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn from_str() {
+        let r = Rope::from_str(TEXT);
+        assert_eq!(r, TEXT);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
     #[test]
     fn insert_01() {
-        let mut r = Rope::new();
-        r.insert(0, "Hello world!");
-        r.insert(3, "zopter");
+        let mut r = Rope::from_str(TEXT);
+        r.insert(3, "AA");
 
-        assert_eq!("Helzopterlo world!", r);
+        assert_eq!(
+            r,
+            "HelAAlo there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
     fn insert_02() {
-        let mut r = Rope::new();
-        r.insert(0, "Hello world!");
-        r.insert(0, "zopter");
+        let mut r = Rope::from_str(TEXT);
+        r.insert(0, "AA");
 
-        assert_eq!("zopterHello world!", r);
+        assert_eq!(
+            r,
+            "AAHello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
     fn insert_03() {
-        let mut r = Rope::new();
-        r.insert(0, "Hello world!");
-        r.insert(12, "zopter");
+        let mut r = Rope::from_str(TEXT);
+        r.insert(103, "AA");
 
-        assert_eq!("Hello world!zopter", r);
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！AA"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
@@ -803,6 +851,9 @@ mod tests {
         r.insert(3, "zopter");
 
         assert_eq!("Helzopterlo world!", r);
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
@@ -811,6 +862,9 @@ mod tests {
         r.insert(0, "こんいちは、みんなさん！");
         r.insert(7, "zopter");
         assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
@@ -830,17 +884,25 @@ mod tests {
         r.insert(11, "！");
         r.insert(7, "zopter");
         assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
     fn remove_01() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(TEXT);
 
         r.remove(5, 11);
         r.remove(24, 31);
         r.remove(19, 25);
-        assert_eq!("Hello! How are you みんなさん！", r);
+        r.remove(75, 79);
+        assert_eq!(
+            r,
+            "Hello!  How're you \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにんなさん！"
+        );
 
         r.assert_integrity();
         r.assert_invariants();
@@ -850,23 +912,76 @@ mod tests {
     fn remove_02() {
         let mut r = Rope::from_str("\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
 
+        // Make sure graphemes get merged properly, via
+        // assert_invariants() below.
         r.remove(3, 6);
-        assert_eq!("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n", r);
+        assert_eq!(r, "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
 
         r.assert_integrity();
         r.assert_invariants();
     }
 
     #[test]
-    fn split_off_01() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+    fn remove_03() {
+        let mut r = Rope::from_str(TEXT);
 
-        let r2 = r.split_off(20);
-        assert_eq!("Hello world! How are", r);
+        // Make sure graphemes get merged properly
+        r.remove(45, 45);
+        assert_eq!(r, TEXT);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_04() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(56, 55); // Wrong ordering of start/end
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_05() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(102, 104); // Removing past the end
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_06() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(103, 104); // Removing past the end
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_07() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(104, 104); // Removing past the end
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_08() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(104, 105); // Removing past the end
+    }
+
+    #[test]
+    fn split_off_01() {
+        let mut r = Rope::from_str(TEXT);
+
+        let r2 = r.split_off(50);
         assert_eq!(
-            " you doing? こんいちは、みんなさん！",
-            &r2.to_string()
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, "
+        );
+        assert_eq!(
+            r2,
+            "isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
         );
 
         r.assert_integrity();
@@ -877,14 +992,15 @@ mod tests {
 
     #[test]
     fn split_off_02() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(TEXT);
 
         let r2 = r.split_off(1);
-        assert_eq!("H", r);
+        assert_eq!(r, "H");
         assert_eq!(
-            "ello world! How are you doing? こんいちは、みんなさん！",
-            r2
+            r2,
+            "ello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
         );
 
         r.assert_integrity();
@@ -895,15 +1011,16 @@ mod tests {
 
     #[test]
     fn split_off_03() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(TEXT);
 
-        let r2 = r.split_off(43);
+        let r2 = r.split_off(102);
         assert_eq!(
-            "Hello world! How are you doing? こんいちは、みんなさん",
-            r
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん"
         );
-        assert_eq!("！", r2);
+        assert_eq!(r2, "！");
 
         r.assert_integrity();
         r2.assert_integrity();
@@ -913,14 +1030,15 @@ mod tests {
 
     #[test]
     fn split_off_04() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(TEXT);
 
         let r2 = r.split_off(0);
-        assert_eq!("", r);
+        assert_eq!(r, "");
         assert_eq!(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-            r2
+            r2,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
         );
 
         r.assert_integrity();
@@ -931,15 +1049,16 @@ mod tests {
 
     #[test]
     fn split_off_05() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(TEXT);
 
-        let r2 = r.split_off(44);
+        let r2 = r.split_off(103);
         assert_eq!(
-            "Hello world! How are you doing? こんいちは、みんなさん！",
-            r
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
         );
-        assert_eq!("", r2);
+        assert_eq!(r2, "");
 
         r.assert_integrity();
         r2.assert_integrity();
@@ -948,15 +1067,25 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn split_off_06() {
+        let mut r = Rope::from_str(TEXT);
+        r.split_off(104); // One past the end of the rope
+    }
+
+    #[test]
     fn append_01() {
-        let mut r = Rope::from_str("Hello world! How are");
-        let r2 = Rope::from_str(" you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't ",
+        );
+        let r2 = Rope::from_str(
+            "it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！",
+        );
 
         r.append(r2);
-        assert_eq!(
-            r,
-            "Hello world! How are you doing? こんいちは、みんなさん！"
-        );
+        assert_eq!(r, TEXT);
 
         r.assert_integrity();
         r.assert_invariants();
@@ -964,14 +1093,15 @@ mod tests {
 
     #[test]
     fn append_02() {
-        let mut r = Rope::from_str("Hello world! How are you doing? こんい");
+        let mut r = Rope::from_str(
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんに",
+        );
         let r2 = Rope::from_str("ちは、みんなさん！");
 
         r.append(r2);
-        assert_eq!(
-            r,
-            "Hello world! How are you doing? こんいちは、みんなさん！"
-        );
+        assert_eq!(r, TEXT);
 
         r.assert_integrity();
         r.assert_invariants();
@@ -979,15 +1109,15 @@ mod tests {
 
     #[test]
     fn append_03() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん");
+        let mut r = Rope::from_str(
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん",
+        );
         let r2 = Rope::from_str("！");
 
         r.append(r2);
-        assert_eq!(
-            r,
-            "Hello world! How are you doing? こんいちは、みんなさん！"
-        );
+        assert_eq!(r, TEXT);
 
         r.assert_integrity();
         r.assert_invariants();
@@ -996,14 +1126,14 @@ mod tests {
     #[test]
     fn append_04() {
         let mut r = Rope::from_str("H");
-        let r2 =
-            Rope::from_str("ello world! How are you doing? こんいちは、みんなさん！");
+        let r2 = Rope::from_str(
+            "ello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！",
+        );
 
         r.append(r2);
-        assert_eq!(
-            r,
-            "Hello world! How are you doing? こんいちは、みんなさん！"
-        );
+        assert_eq!(r, TEXT);
 
         r.assert_integrity();
         r.assert_invariants();
@@ -1011,15 +1141,11 @@ mod tests {
 
     #[test]
     fn append_05() {
-        let mut r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let mut r = Rope::from_str(TEXT);
         let r2 = Rope::from_str("");
 
         r.append(r2);
-        assert_eq!(
-            r,
-            "Hello world! How are you doing? こんいちは、みんなさん！"
-        );
+        assert_eq!(r, TEXT);
 
         r.assert_integrity();
         r.assert_invariants();
@@ -1028,14 +1154,10 @@ mod tests {
     #[test]
     fn append_06() {
         let mut r = Rope::from_str("");
-        let r2 =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let r2 = Rope::from_str(TEXT);
 
         r.append(r2);
-        assert_eq!(
-            r,
-            "Hello world! How are you doing? こんいちは、みんなさん！"
-        );
+        assert_eq!(r, TEXT);
 
         r.assert_integrity();
         r.assert_invariants();
@@ -1043,42 +1165,68 @@ mod tests {
 
     #[test]
     fn char_01() {
-        let r =
-            Rope::from_str("Hello world! How are you doing? こんいちは、みんなさん！");
+        let r = Rope::from_str(TEXT);
 
         assert_eq!(r.char(0), 'H');
-        assert_eq!(r.char(10), 'd');
+        assert_eq!(r.char(10), 'e');
         assert_eq!(r.char(18), 'r');
-        assert_eq!(r.char(43), '！');
+        assert_eq!(r.char(102), '！');
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_02() {
+        let r = Rope::from_str(TEXT);
+        r.char(103);
     }
 
     #[test]
     fn line_01() {
-        let r = Rope::from_str(
-            "Hello world!\nHow are you doing?\nこんいちは、みんなさん！",
-        );
+        let r = Rope::from_str(TEXT_LINES);
 
-        assert_eq!(r.line(0), "Hello world!\n");
-        assert_eq!(r.line(1), "How are you doing?\n");
-        assert_eq!(r.line(2), "こんいちは、みんなさん！");
+        assert_eq!(r.line(0), "Hello there!  How're you doing?\n");
+        assert_eq!(r.line(1), "It's a fine day, isn't it?\n");
+        assert_eq!(r.line(2), "Aren't you glad we're alive?\n");
+        assert_eq!(r.line(3), "こんにちは、みんなさん！");
     }
 
     #[test]
     fn line_02() {
+        let r = Rope::from_str("Hello there!  How're you doing?\n");
+
+        assert_eq!(r.line(0), "Hello there!  How're you doing?\n");
+        assert_eq!(r.line(1), "");
+    }
+
+    #[test]
+    fn line_03() {
         let r = Rope::from_str("");
 
         assert_eq!(r.line(0), "");
     }
 
     #[test]
+    #[should_panic]
+    fn line_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line(4);
+    }
+
+    #[test]
     fn line_to_char_01() {
-        let r = Rope::from_str(
-            "Hello world!\nHow are you doing?\nこんいちは、みんなさん！",
-        );
+        let r = Rope::from_str(TEXT_LINES);
 
         assert_eq!(0, r.line_to_char(0));
-        assert_eq!(13, r.line_to_char(1));
-        assert_eq!(32, r.line_to_char(2));
-        assert_eq!(44, r.line_to_char(3));
+        assert_eq!(32, r.line_to_char(1));
+        assert_eq!(59, r.line_to_char(2));
+        assert_eq!(88, r.line_to_char(3));
+        assert_eq!(100, r.line_to_char(4));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_to_char_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_to_char(5);
     }
 }
