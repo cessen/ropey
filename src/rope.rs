@@ -78,7 +78,7 @@ impl Rope {
 
     /// Creates a `Rope` from a string slice.
     pub fn from_str(text: &str) -> Rope {
-        RopeBuilder::new().finish(text)
+        RopeBuilder::new().build_at_once(text)
     }
 
     /// Creates a `Rope` from the output of a reader.
@@ -146,7 +146,7 @@ impl Rope {
                                 "stream did not contain valid UTF-8",
                             ));
                         } else {
-                            return Ok(builder.finish(""));
+                            return Ok(builder.finish());
                         }
                     }
                 }

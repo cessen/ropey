@@ -39,7 +39,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// builder.append("it goin");
 /// builder.append("g?");
 ///
-/// let rope = builder.finish("");
+/// let rope = builder.finish();
 ///
 /// assert_eq!(rope, "Hello world!\nHow's it going?");
 /// ```
@@ -75,37 +75,23 @@ impl RopeBuilder {
 
     /// Finishes the build, and returns the `Rope`.
     ///
-    /// This also takes a final text chunk, if any.  If the final chunk
-    /// has already been appended, simply pass an empty string slice instead.
-    ///
     /// Note: this method consumes the builder.  If you want to continue
     /// building other ropes with the same prefix, you can clone the builder
     /// before calling `finish()`.
-    pub fn finish(mut self, chunk: &str) -> Rope {
+    pub fn finish(mut self) -> Rope {
         // Append the last leaf
+        self.append_internal("", true);
+        self.finish_internal()
+    }
+
+    /// Builds a rope all at once from a single string slice.
+    ///
+    /// This avoids the creation and use of the internal buffer.  This is
+    /// for internal use only, because the public-facing API has
+    /// Rope::from_str(), which actually uses this for its implementation.
+    pub(crate) fn build_at_once(mut self, chunk: &str) -> Rope {
         self.append_internal(chunk, true);
-
-        // Zip up all the remaining nodes on the stack
-        let mut stack_idx = self.stack.len() - 1;
-        while stack_idx >= 1 {
-            let node = self.stack.pop().unwrap();
-            if let Node::Internal(ref mut children) = *Arc::make_mut(&mut self.stack[stack_idx - 1])
-            {
-                children.push((node.text_info(), node));
-            } else {
-                unreachable!();
-            }
-            stack_idx -= 1;
-        }
-
-        // Get root and fix any right-side nodes with too few children.
-        let mut root = self.stack.pop().unwrap();
-        Arc::make_mut(&mut root).zip_fix_right();
-
-        // Create the rope, make sure it's well-formed, and return it.
-        let mut rope = Rope { root: root };
-        rope.pull_up_singular_nodes();
-        return rope;
+        self.finish_internal()
     }
 
     //-----------------------------------------------------------------
@@ -134,6 +120,31 @@ impl RopeBuilder {
                 }
             }
         }
+    }
+
+    // Internal workings of `finish()`.
+    fn finish_internal(mut self) -> Rope {
+        // Zip up all the remaining nodes on the stack
+        let mut stack_idx = self.stack.len() - 1;
+        while stack_idx >= 1 {
+            let node = self.stack.pop().unwrap();
+            if let Node::Internal(ref mut children) = *Arc::make_mut(&mut self.stack[stack_idx - 1])
+            {
+                children.push((node.text_info(), node));
+            } else {
+                unreachable!();
+            }
+            stack_idx -= 1;
+        }
+
+        // Get root and fix any right-side nodes with too few children.
+        let mut root = self.stack.pop().unwrap();
+        Arc::make_mut(&mut root).zip_fix_right();
+
+        // Create the rope, make sure it's well-formed, and return it.
+        let mut rope = Rope { root: root };
+        rope.pull_up_singular_nodes();
+        return rope;
     }
 
     // Returns (next_leaf_text, remaining_text)
