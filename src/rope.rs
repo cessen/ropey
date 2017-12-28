@@ -9,7 +9,7 @@ use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
 use str_utils::{char_idx_to_byte_idx, seam_is_grapheme_boundary};
-use tree::{Count, Node, NodeChildren, MAX_BYTES};
+use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
@@ -198,27 +198,56 @@ impl Rope {
         );
 
         if text.len() <= MAX_BYTES {
-            // Get root for mutation
-            let root = Arc::make_mut(&mut self.root);
-
             // Do the insertion
-            let (residual, seam) = root.insert(char_idx as Count, text);
+            let mut seam = None;
+            let (l_info, residual) = Arc::make_mut(&mut self.root).edit_leaf_at_char(
+                char_idx,
+                |acc_info, _cur_info, leaf_text| {
+                    debug_assert!(acc_info.chars as usize <= char_idx);
+                    let byte_idx =
+                        char_idx_to_byte_idx(&leaf_text, char_idx - acc_info.chars as usize);
+                    if byte_idx == 0 {
+                        seam = Some(acc_info.bytes);
+                    } else if byte_idx == leaf_text.len() {
+                        let count = (leaf_text.len() + text.len()) as Count;
+                        seam = Some(acc_info.bytes + count)
+                    } else {
+                        seam = None
+                    }
+
+                    if (leaf_text.len() + text.len()) <= MAX_BYTES {
+                        leaf_text.insert_str(byte_idx, text);
+                        return (TextInfo::from_str(&leaf_text), None);
+                    } else {
+                        let r_text = leaf_text.insert_str_split(byte_idx, text);
+                        if r_text.len() > 0 {
+                            return (
+                                TextInfo::from_str(&leaf_text),
+                                Some((TextInfo::from_str(&r_text), r_text)),
+                            );
+                        } else {
+                            // Leaf couldn't be validly split, so leave it oversized
+                            return (TextInfo::from_str(&leaf_text), None);
+                        }
+                    }
+                },
+            );
 
             // Handle root splitting, if any.
-            if let Some(r_node) = residual {
-                let mut l_node = Node::new();
-                std::mem::swap(&mut l_node, root);
+            if let Some((r_info, r_node)) = residual {
+                let mut l_node = Arc::new(Node::new());
+                std::mem::swap(&mut l_node, &mut self.root);
 
                 let mut children = NodeChildren::new();
-                children.push((l_node.text_info(), Arc::new(l_node)));
-                children.push((r_node.text_info(), Arc::new(r_node)));
+                children.push((l_info, l_node));
+                children.push((r_info, r_node));
 
-                *root = Node::Internal(children);
+                *Arc::make_mut(&mut self.root) = Node::Internal(children);
             }
 
             // Handle seam, if any.
             if let Some(byte_pos) = seam {
-                root.fix_grapheme_seam(byte_pos, true);
+                Arc::make_mut(&mut self.root).fix_grapheme_seam(byte_pos, true);
             }
         } else if self.root.is_leaf() && (self.root.text_info().bytes as usize <= MAX_BYTES) {
             let mut new_rope = Rope::from_str(text);

@@ -37,39 +37,61 @@ impl Node {
         self.text_info().line_breaks as usize
     }
 
-    /// Inserts the text at the given char index.
+    /// Edits the leaf node at `char_idx` with closure `edit`.
     ///
-    /// Returns a right-side residual node if the insertion wouldn't fit
-    /// within this node.  Also returns the byte position where there may
-    /// be a grapheme seam to fix, if any.
+    /// When calling this from the root node, pass `TextInfo::new()` to
+    /// `info`.
     ///
-    /// Note: this does not handle large insertions (i.e. larger than
-    /// MAX_BYTES) well.  That is handled at Rope::insert().
-    pub fn insert(&mut self, char_pos: Count, text: &str) -> (Option<Node>, Option<Count>) {
+    /// The closure function parameters are:
+    ///
+    /// 1. The accumulated text info of the rope up to the left edge
+    ///    of the selected lead node.
+    /// 2. The current text info of the selected leaf node.
+    /// 3. The selected leaf node's text, for editing.
+    ///
+    /// The closure return values are:
+    ///
+    /// 1. The text info of the selected leaf node after the edits.
+    /// 2. An optional new leaf node to the right of the selected leaf node,
+    ///    along with its text info.
+    pub fn edit_leaf_at_char<F>(
+        &mut self,
+        char_idx: usize,
+        edit: F,
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    where
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+    {
+        match *self {
+            Node::Leaf(_) => {
+                let cur_info = self.text_info();
+                self.edit_leaf_at_char_internal(char_idx, TextInfo::new(), cur_info, edit)
+            }
+            Node::Internal(_) => {
+                self.edit_leaf_at_char_internal(char_idx, TextInfo::new(), TextInfo::new(), edit)
+            }
+        }
+    }
+
+    fn edit_leaf_at_char_internal<F>(
+        &mut self,
+        char_idx: usize,
+        acc_info: TextInfo,
+        cur_info: TextInfo,
+        mut edit: F,
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    where
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+    {
         match *self {
             // If it's a leaf
             Node::Leaf(ref mut cur_text) => {
-                let byte_pos = char_idx_to_byte_idx(cur_text, char_pos as usize);
-                let seam = if byte_pos == 0 {
-                    Some(0)
-                } else if byte_pos == cur_text.len() {
-                    let count = (cur_text.len() + text.len()) as Count;
-                    Some(count)
-                } else {
-                    None
-                };
+                let (info, residual) = edit(acc_info, cur_info, cur_text);
 
-                if (cur_text.len() + text.len()) <= MAX_BYTES {
-                    cur_text.insert_str(byte_pos, text);
-                    return (None, seam);
+                if let Some((r_info, r_text)) = residual {
+                    (info, Some((r_info, Arc::new(Node::Leaf(r_text)))))
                 } else {
-                    let r_text = cur_text.insert_str_split(byte_pos, text);
-                    if r_text.len() > 0 {
-                        return (Some(Node::Leaf(r_text)), seam);
-                    } else {
-                        // Leaf couldn't be validly split, so leave it oversized
-                        return (None, seam);
-                    }
+                    (info, None)
                 }
             }
 
@@ -86,34 +108,43 @@ impl Node {
                 // Find the child to traverse into along with its starting char
                 // offset.
                 let (child_i, start_info) =
-                    children.search_combine_info(|inf| char_pos <= inf.chars);
+                    children.search_combine_info(|inf| char_idx <= inf.chars as usize);
                 let start_char = start_info.chars;
 
                 // Navigate into the appropriate child
-                let (residual, child_seam) = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                    .insert(char_pos - start_char, text);
-                children.info_mut()[child_i] = children.nodes()[child_i].text_info();
-
-                // Calculate the seam offset relative to this node
-                let seam = child_seam.map(|byte_pos| byte_pos + start_info.bytes);
+                let tmp_acc_info = acc_info.combine(&start_info);
+                let tmp_info = children.info()[child_i];
+                let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                    .edit_leaf_at_char_internal(
+                        char_idx - start_char as usize,
+                        tmp_acc_info,
+                        tmp_info,
+                        edit,
+                    );
+                children.info_mut()[child_i] = new_info;
 
                 // Handle the new node, if any.
-                if let Some(r_node) = residual {
+                if let Some((r_info, r_node)) = residual {
                     // The new node will fit as a child of this node
                     if children.len() < MAX_CHILDREN {
-                        children.insert(child_i + 1, (r_node.text_info(), Arc::new(r_node)));
-                        return (None, seam);
+                        children.insert(child_i + 1, (r_info, r_node));
+                        return (children.combined_info(), None);
                     }
                     // The new node won't fit!  Must split.
                     else {
-                        let r_children = children
-                            .insert_split(child_i + 1, (r_node.text_info(), Arc::new(r_node)));
+                        let r_children = children.insert_split(child_i + 1, (r_info, r_node));
 
-                        return (Some(Node::Internal(r_children)), seam);
+                        return (
+                            children.combined_info(),
+                            Some((
+                                r_children.combined_info(),
+                                Arc::new(Node::Internal(r_children)),
+                            )),
+                        );
                     }
                 } else {
                     // No new node.  Easy.
-                    return (None, seam);
+                    return (children.combined_info(), None);
                 }
             }
         }
