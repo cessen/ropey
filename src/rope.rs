@@ -202,7 +202,7 @@ impl Rope {
             let mut seam = None;
             let (l_info, residual) = Arc::make_mut(&mut self.root).edit_leaf_at_char(
                 char_idx,
-                |acc_info, _cur_info, leaf_text| {
+                |acc_info, cur_info, leaf_text| {
                     debug_assert!(acc_info.chars as usize <= char_idx);
                     let byte_idx =
                         char_idx_to_byte_idx(&leaf_text, char_idx - acc_info.chars as usize);
@@ -216,8 +216,36 @@ impl Rope {
                     }
 
                     if (leaf_text.len() + text.len()) <= MAX_BYTES {
+                        // Calculate new info without doing a full re-scan of cur_text
+                        let new_info = {
+                            // Get summed info of current text and to-be-inserted text
+                            let mut info = cur_info.combine(&TextInfo::from_str(text));
+                            // Check for CRLF graphemes on the insertion seams, and
+                            // adjust line break counts accordingly
+                            if !text.is_empty() {
+                                if byte_idx > 0 && text.as_bytes()[0] == 0x0A
+                                    && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                {
+                                    info.line_breaks -= 1;
+                                }
+                                if byte_idx < leaf_text.len()
+                                    && *text.as_bytes().last().unwrap() == 0x0D
+                                    && leaf_text.as_bytes()[byte_idx] == 0x0A
+                                {
+                                    info.line_breaks -= 1;
+                                }
+                                if byte_idx > 0 && byte_idx < leaf_text.len()
+                                    && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    && leaf_text.as_bytes()[byte_idx] == 0x0A
+                                {
+                                    info.line_breaks += 1;
+                                }
+                            }
+                            info
+                        };
+                        // Insert the text and return the new info
                         leaf_text.insert_str(byte_idx, text);
-                        return (TextInfo::from_str(&leaf_text), None);
+                        return (new_info, None);
                     } else {
                         let r_text = leaf_text.insert_str_split(byte_idx, text);
                         if r_text.len() > 0 {
