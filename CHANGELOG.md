@@ -1,3 +1,14 @@
+# 0.5.3 (2016-12-28)
+
+Performance and memory:
+
+* Massive speed boost for small insertions: between %40 - %50 faster.
+* Rope::from_str() now only uses stack memory for strings smaller than ~3MB. (Aside from the resulting Rope itself, of course.)
+
+Misc:
+
+* Better unit test coverage of public APIs.  Still not 100%, but getting there!
+
 # 0.5.2 (2016-12-25)
 
 Bug fixes:
