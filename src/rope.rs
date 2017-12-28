@@ -78,9 +78,7 @@ impl Rope {
 
     /// Creates a `Rope` from a string slice.
     pub fn from_str(text: &str) -> Rope {
-        let mut builder = RopeBuilder::new();
-        builder.append(text);
-        builder.finish()
+        RopeBuilder::new().finish(text)
     }
 
     /// Creates a `Rope` from the output of a reader.
@@ -148,7 +146,7 @@ impl Rope {
                                 "stream did not contain valid UTF-8",
                             ));
                         } else {
-                            return Ok(builder.finish());
+                            return Ok(builder.finish(""));
                         }
                     }
                 }

@@ -13,7 +13,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// of text chunks.  It is useful for situations such as:
 ///
 /// - Creating a rope from a large text file without pre-loading the
-///   entire contents of the file into memory first (but see
+///   entire contents of the file into memory (but see
 ///   `Rope::from_reader()` which uses `RopeBuilder` internally for
 ///   precisely this use-case).
 /// - Creating a rope from a streaming data source.
@@ -21,8 +21,8 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 ///   conversion incrementally as you go.
 ///
 /// Unlike repeatedly calling `Rope::insert()` on the end of a rope,
-/// this API runs in time linear to the amount of data fed to it.  It
-/// also creates more memory-compact ropes.
+/// this API runs in time linear to the amount of data fed to it, and
+/// is overall much faster.  It also creates more memory-compact ropes.
 ///
 /// (The converse of this API is the [`Chunks`](iter/struct.Chunks.html)
 /// iterator.)
@@ -39,7 +39,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// builder.append("it goin");
 /// builder.append("g?");
 ///
-/// let rope = builder.finish();
+/// let rope = builder.finish("");
 ///
 /// assert_eq!(rope, "Hello world!\nHow's it going?");
 /// ```
@@ -70,41 +70,20 @@ impl RopeBuilder {
     ///
     /// `chunk` must be valid utf8 text.
     pub fn append(&mut self, chunk: &str) {
-        let mut chunk = chunk;
-
-        // Repeatedly chop text off the end of the input, creating
-        // leaf nodes out of them and appending them to the tree.
-        while !chunk.is_empty() {
-            // Get the text for the next leaf
-            let (leaf_text, remainder) = self.get_next_leaf_text(chunk);
-            chunk = remainder;
-
-            // Append the leaf to the rope
-            match leaf_text {
-                NextText::None => break,
-                NextText::UseBuffer => {
-                    let string = NodeText::from_str(&self.buffer);
-                    self.append_leaf_node(Arc::new(Node::Leaf(string)));
-                    self.buffer.clear();
-                }
-                NextText::String(s) => {
-                    self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(s))));
-                }
-            }
-        }
+        self.append_internal(chunk, false);
     }
 
     /// Finishes the build, and returns the `Rope`.
     ///
-    /// Note: this consumes the builder.  If you want to continue building
-    /// other ropes with the same prefix, you can clone the builder before
-    /// calling `finish()`.
-    pub fn finish(mut self) -> Rope {
+    /// This also takes a final text chunk, if any.  If the final chunk
+    /// has already been appended, simply pass an empty string slice instead.
+    ///
+    /// Note: this method consumes the builder.  If you want to continue
+    /// building other ropes with the same prefix, you can clone the builder
+    /// before calling `finish()`.
+    pub fn finish(mut self, chunk: &str) -> Rope {
         // Append the last leaf
-        if !self.buffer.is_empty() {
-            let string = NodeText::from_str(&self.buffer);
-            self.append_leaf_node(Arc::new(Node::Leaf(string)));
-        }
+        self.append_internal(chunk, true);
 
         // Zip up all the remaining nodes on the stack
         let mut stack_idx = self.stack.len() - 1;
@@ -123,7 +102,7 @@ impl RopeBuilder {
         let mut root = self.stack.pop().unwrap();
         Arc::make_mut(&mut root).zip_fix_right();
 
-        // Crate the rope, make sure it's well-formed, and return it.
+        // Create the rope, make sure it's well-formed, and return it.
         let mut rope = Rope { root: root };
         rope.pull_up_singular_nodes();
         return rope;
@@ -131,21 +110,53 @@ impl RopeBuilder {
 
     //-----------------------------------------------------------------
 
+    // Internal workings of `append()`.
+    fn append_internal(&mut self, chunk: &str, last_chunk: bool) {
+        let mut chunk = chunk;
+
+        // Repeatedly chop text off the end of the input, creating
+        // leaf nodes out of them and appending them to the tree.
+        while !chunk.is_empty() || (!self.buffer.is_empty() && last_chunk) {
+            // Get the text for the next leaf
+            let (leaf_text, remainder) = self.get_next_leaf_text(chunk, last_chunk);
+            chunk = remainder;
+
+            // Append the leaf to the rope
+            match leaf_text {
+                NextText::None => break,
+                NextText::UseBuffer => {
+                    let string = NodeText::from_str(&self.buffer);
+                    self.append_leaf_node(Arc::new(Node::Leaf(string)));
+                    self.buffer.clear();
+                }
+                NextText::String(s) => {
+                    self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(s))));
+                }
+            }
+        }
+    }
+
     // Returns (next_leaf_text, remaining_text)
-    fn get_next_leaf_text<'a>(&mut self, text: &'a str) -> (NextText<'a>, &'a str) {
+    fn get_next_leaf_text<'a>(
+        &mut self,
+        text: &'a str,
+        last_chunk: bool,
+    ) -> (NextText<'a>, &'a str) {
         if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
                 let split_idx = find_good_split_idx(text, MAX_BYTES);
-                if split_idx == 0 || split_idx == text.len() {
+                if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                     self.buffer.push_str(text);
                     return (NextText::None, "");
                 } else {
                     return (NextText::String(&text[..split_idx]), &text[split_idx..]);
                 }
-            } else {
+            } else if !last_chunk {
                 self.buffer.push_str(text);
                 return (NextText::None, "");
+            } else {
+                return (NextText::String(text), "");
             }
         } else if (text.len() + self.buffer.len()) > MAX_BYTES {
             let split_idx = if self.buffer.len() < MAX_BYTES {
@@ -154,16 +165,19 @@ impl RopeBuilder {
                 nearest_internal_grapheme_boundary(text, 0)
             };
 
-            if split_idx == 0 || split_idx == text.len() {
+            if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                 self.buffer.push_str(text);
                 return (NextText::None, "");
             } else {
                 self.buffer.push_str(&text[..split_idx]);
                 return (NextText::UseBuffer, &text[split_idx..]);
             }
-        } else {
+        } else if !last_chunk {
             self.buffer.push_str(text);
             return (NextText::None, "");
+        } else {
+            self.buffer.push_str(text);
+            return (NextText::UseBuffer, "");
         }
     }
 
