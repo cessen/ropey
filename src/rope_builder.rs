@@ -1,6 +1,6 @@
 use std;
 use std::sync::Arc;
-use std::collections::VecDeque;
+use smallvec::SmallVec;
 
 use rope::Rope;
 use str_utils::{is_grapheme_boundary, nearest_internal_grapheme_boundary, next_grapheme_boundary,
@@ -45,7 +45,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// ```
 #[derive(Debug, Clone)]
 pub struct RopeBuilder {
-    stack: VecDeque<Node>,
+    stack: SmallVec<[Arc<Node>; 4]>,
     buffer: String,
 }
 
@@ -54,11 +54,11 @@ impl RopeBuilder {
     pub fn new() -> RopeBuilder {
         RopeBuilder {
             stack: {
-                let mut stack = VecDeque::with_capacity(8);
-                stack.push_back(Node::new());
+                let mut stack = SmallVec::new();
+                stack.push(Arc::new(Node::new()));
                 stack
             },
-            buffer: String::with_capacity(MAX_BYTES),
+            buffer: String::new(),
         }
     }
 
@@ -84,11 +84,11 @@ impl RopeBuilder {
                 NextText::None => break,
                 NextText::UseBuffer => {
                     let string = NodeText::from_str(&self.buffer);
-                    self.append_leaf_node(Node::Leaf(string));
+                    self.append_leaf_node(Arc::new(Node::Leaf(string)));
                     self.buffer.clear();
                 }
                 NextText::String(s) => {
-                    self.append_leaf_node(Node::Leaf(NodeText::from_str(s)));
+                    self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(s))));
                 }
             }
         }
@@ -103,15 +103,16 @@ impl RopeBuilder {
         // Append the last leaf
         if !self.buffer.is_empty() {
             let string = NodeText::from_str(&self.buffer);
-            self.append_leaf_node(Node::Leaf(string));
+            self.append_leaf_node(Arc::new(Node::Leaf(string)));
         }
 
         // Zip up all the remaining nodes on the stack
         let mut stack_idx = self.stack.len() - 1;
         while stack_idx >= 1 {
-            let node = self.stack.pop_back().unwrap();
-            if let Node::Internal(ref mut children) = self.stack[stack_idx - 1] {
-                children.push((node.text_info(), Arc::new(node)));
+            let node = self.stack.pop().unwrap();
+            if let Node::Internal(ref mut children) = *Arc::make_mut(&mut self.stack[stack_idx - 1])
+            {
+                children.push((node.text_info(), node));
             } else {
                 unreachable!();
             }
@@ -119,13 +120,11 @@ impl RopeBuilder {
         }
 
         // Get root and fix any right-side nodes with too few children.
-        let mut root = self.stack.pop_back().unwrap();
-        root.zip_fix_right();
+        let mut root = self.stack.pop().unwrap();
+        Arc::make_mut(&mut root).zip_fix_right();
 
         // Crate the rope, make sure it's well-formed, and return it.
-        let mut rope = Rope {
-            root: Arc::new(root),
-        };
+        let mut rope = Rope { root: root };
         rope.pull_up_singular_nodes();
         return rope;
     }
@@ -168,44 +167,44 @@ impl RopeBuilder {
         }
     }
 
-    fn append_leaf_node(&mut self, leaf: Node) {
-        let last = self.stack.pop_back().unwrap();
-        match last {
+    fn append_leaf_node(&mut self, leaf: Arc<Node>) {
+        let last = self.stack.pop().unwrap();
+        match *last {
             Node::Leaf(_) => {
                 if last.leaf_text().is_empty() {
-                    self.stack.push_back(leaf);
+                    self.stack.push(leaf);
                 } else {
                     let mut children = NodeChildren::new();
-                    children.push((last.text_info(), Arc::new(last)));
-                    children.push((leaf.text_info(), Arc::new(leaf)));
-                    self.stack.push_back(Node::Internal(children));
+                    children.push((last.text_info(), last));
+                    children.push((leaf.text_info(), leaf));
+                    self.stack.push(Arc::new(Node::Internal(children)));
                 }
             }
 
             Node::Internal(_) => {
-                self.stack.push_back(last);
+                self.stack.push(last);
                 let mut left = leaf;
                 let mut stack_idx = (self.stack.len() - 1) as isize;
                 loop {
                     if stack_idx < 0 {
                         // We're above the root, so do a root split.
                         let mut children = NodeChildren::new();
-                        children.push((left.text_info(), Arc::new(left)));
-                        self.stack.push_front(Node::Internal(children));
+                        children.push((left.text_info(), left));
+                        self.stack.insert(0, Arc::new(Node::Internal(children)));
                         break;
                     } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
                         // There's room to add a child, so do that.
-                        self.stack[stack_idx as usize]
+                        Arc::make_mut(&mut self.stack[stack_idx as usize])
                             .children()
-                            .push((left.text_info(), Arc::new(left)));
+                            .push((left.text_info(), left));
                         break;
                     } else {
                         // Not enough room to fit a child, so split.
-                        left = Node::Internal(
-                            self.stack[stack_idx as usize]
+                        left = Arc::new(Node::Internal(
+                            Arc::make_mut(&mut self.stack[stack_idx as usize])
                                 .children()
-                                .push_split((left.text_info(), Arc::new(left))),
-                        );
+                                .push_split((left.text_info(), left)),
+                        ));
                         std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
                         stack_idx -= 1;
                     }
