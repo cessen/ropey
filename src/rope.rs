@@ -380,6 +380,14 @@ impl Rope {
 
     /// Returns the line index of the given byte.
     ///
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - If `byte_idx` is one-past-the-end, then one-past-the-end line index
+    ///   is returned.  This is mainly unintuitive for empty ropes, which will
+    ///   return a line index of 1 for a `byte_idx` of zero.  Otherwise it
+    ///   behaves as expected.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -392,7 +400,11 @@ impl Rope {
             self.len_bytes()
         );
 
-        self.root.byte_to_line(byte_idx)
+        if byte_idx == self.len_bytes() {
+            self.len_lines()
+        } else {
+            self.root.byte_to_line(byte_idx)
+        }
     }
 
     /// Returns the byte index of the given char.
@@ -414,6 +426,14 @@ impl Rope {
 
     /// Returns the line index of the given char.
     ///
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - If `char_idx` is one-past-the-end, then one-past-the-end line index
+    ///   is returned.  This is mainly unintuitive for empty ropes, which will
+    ///   return a line index of 1 for a `char_idx` of zero.  Otherwise it
+    ///   behaves as expected.
+    ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
@@ -426,16 +446,24 @@ impl Rope {
             self.len_chars()
         );
 
-        self.root.char_to_line(char_idx)
+        if char_idx == self.len_chars() {
+            self.len_lines()
+        } else {
+            self.root.char_to_line(char_idx)
+        }
     }
 
     /// Returns the byte index of the start of the given line.
     ///
-    /// Note: lines are zero-indexed.
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
+    ///   byte index.
     ///
     /// # Panics
     ///
-    /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -444,12 +472,21 @@ impl Rope {
             line_idx,
             self.len_lines()
         );
-        self.root.line_to_byte(line_idx)
+
+        if line_idx == self.len_lines() {
+            self.len_bytes()
+        } else {
+            self.root.line_to_byte(line_idx)
+        }
     }
 
     /// Returns the char index of the start of the given line.
     ///
-    /// Note: lines are zero-indexed.
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
+    ///   char index.
     ///
     /// # Panics
     ///
@@ -788,6 +825,42 @@ mod tests {
 
         r.assert_integrity();
         r.assert_invariants();
+    }
+
+    #[test]
+    fn len_bytes_01() {
+        let r = Rope::from_str(TEXT);
+        assert_eq!(r.len_bytes(), 127);
+    }
+
+    #[test]
+    fn len_bytes_02() {
+        let r = Rope::from_str("");
+        assert_eq!(r.len_bytes(), 0);
+    }
+
+    #[test]
+    fn len_chars_01() {
+        let r = Rope::from_str(TEXT);
+        assert_eq!(r.len_chars(), 103);
+    }
+
+    #[test]
+    fn len_chars_02() {
+        let r = Rope::from_str("");
+        assert_eq!(r.len_chars(), 0);
+    }
+
+    #[test]
+    fn len_lines_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(r.len_lines(), 4);
+    }
+
+    #[test]
+    fn len_lines_02() {
+        let r = Rope::from_str("");
+        assert_eq!(r.len_lines(), 1);
     }
 
     #[test]
@@ -1164,6 +1237,66 @@ mod tests {
     }
 
     #[test]
+    fn char_to_line_01() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        assert_eq!(0, r.char_to_line(0));
+        assert_eq!(0, r.char_to_line(1));
+
+        assert_eq!(0, r.char_to_line(31));
+        assert_eq!(1, r.char_to_line(32));
+        assert_eq!(1, r.char_to_line(33));
+
+        assert_eq!(1, r.char_to_line(58));
+        assert_eq!(2, r.char_to_line(59));
+        assert_eq!(2, r.char_to_line(60));
+
+        assert_eq!(2, r.char_to_line(87));
+        assert_eq!(3, r.char_to_line(88));
+        assert_eq!(3, r.char_to_line(89));
+
+        assert_eq!(4, r.char_to_line(100));
+    }
+
+    #[test]
+    fn char_to_line_02() {
+        let r = Rope::from_str("");
+        assert_eq!(1, r.char_to_line(0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_line_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.char_to_line(101);
+    }
+
+    #[test]
+    fn line_to_char_01() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        assert_eq!(0, r.line_to_char(0));
+        assert_eq!(32, r.line_to_char(1));
+        assert_eq!(59, r.line_to_char(2));
+        assert_eq!(88, r.line_to_char(3));
+        assert_eq!(100, r.line_to_char(4));
+    }
+
+    #[test]
+    fn line_to_char_02() {
+        let r = Rope::from_str("");
+        assert_eq!(0, r.line_to_char(0));
+        assert_eq!(0, r.line_to_char(1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_to_char_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_to_char(5);
+    }
+
+    #[test]
     fn char_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1178,6 +1311,13 @@ mod tests {
     fn char_02() {
         let r = Rope::from_str(TEXT);
         r.char(103);
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_03() {
+        let r = Rope::from_str("");
+        r.char(0);
     }
 
     #[test]
@@ -1213,20 +1353,82 @@ mod tests {
     }
 
     #[test]
-    fn line_to_char_01() {
-        let r = Rope::from_str(TEXT_LINES);
+    fn is_grapheme_boundary_01() {
+        let r = Rope::from_str(
+            "Hello there!  How're you doing?\r\n\
+             It's a fine day, isn't it?",
+        );
 
-        assert_eq!(0, r.line_to_char(0));
-        assert_eq!(32, r.line_to_char(1));
-        assert_eq!(59, r.line_to_char(2));
-        assert_eq!(88, r.line_to_char(3));
-        assert_eq!(100, r.line_to_char(4));
+        assert!(r.is_grapheme_boundary(0));
+        assert!(r.is_grapheme_boundary(1));
+        assert!(r.is_grapheme_boundary(31));
+        assert!(!r.is_grapheme_boundary(32));
+        assert!(r.is_grapheme_boundary(33));
+        assert!(r.is_grapheme_boundary(58));
+        assert!(r.is_grapheme_boundary(59));
     }
 
     #[test]
     #[should_panic]
-    fn line_to_char_02() {
-        let r = Rope::from_str(TEXT_LINES);
-        r.line_to_char(5);
+    fn is_grapheme_boundary_02() {
+        let r = Rope::from_str(
+            "Hello there!  How're you doing?\r\n\
+             It's a fine day, isn't it?",
+        );
+        r.is_grapheme_boundary(60);
     }
+
+    #[test]
+    fn prev_grapheme_boundary_01() {
+        let r = Rope::from_str(
+            "Hello there!  How're you doing?\r\n\
+             It's a fine day, isn't it?",
+        );
+
+        assert_eq!(0, r.prev_grapheme_boundary(0));
+        assert_eq!(0, r.prev_grapheme_boundary(1));
+        assert_eq!(30, r.prev_grapheme_boundary(31));
+        assert_eq!(31, r.prev_grapheme_boundary(32));
+        assert_eq!(31, r.prev_grapheme_boundary(33));
+        assert_eq!(57, r.prev_grapheme_boundary(58));
+        assert_eq!(58, r.prev_grapheme_boundary(59));
+    }
+
+    #[test]
+    #[should_panic]
+    fn prev_grapheme_boundary_02() {
+        let r = Rope::from_str(
+            "Hello there!  How're you doing?\r\n\
+             It's a fine day, isn't it?",
+        );
+        r.prev_grapheme_boundary(60);
+    }
+
+    #[test]
+    fn next_grapheme_boundary_01() {
+        let r = Rope::from_str(
+            "Hello there!  How're you doing?\r\n\
+             It's a fine day, isn't it?",
+        );
+
+        assert_eq!(1, r.next_grapheme_boundary(0));
+        assert_eq!(2, r.next_grapheme_boundary(1));
+        assert_eq!(33, r.next_grapheme_boundary(31));
+        assert_eq!(33, r.next_grapheme_boundary(32));
+        assert_eq!(34, r.next_grapheme_boundary(33));
+        assert_eq!(59, r.next_grapheme_boundary(58));
+        assert_eq!(59, r.next_grapheme_boundary(59));
+    }
+
+    #[test]
+    #[should_panic]
+    fn next_grapheme_boundary_02() {
+        let r = Rope::from_str(
+            "Hello there!  How're you doing?\r\n\
+             It's a fine day, isn't it?",
+        );
+        r.next_grapheme_boundary(60);
+    }
+
+    // Slicing and iterator tests are in their respective modules
 }
