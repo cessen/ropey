@@ -458,25 +458,113 @@ impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
 mod tests {
     use rope::Rope;
 
-    const TEXT: &str = "Hello there!  How're you doing?  It's a fine day, isn't it?  \
-                        Aren't you glad we're alive?";
+    // 127 bytes, 103 chars, 1 line
+    const TEXT: &str = "Hello there!  How're you doing?  It's \
+                        a fine day, isn't it?  Aren't you glad \
+                        we're alive?  こんにちは、みんなさん！";
+    // 124 bytes, 100 chars, 4 lines
+    const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
+                              a fine day, isn't it?\nAren't you glad \
+                              we're alive?\nこんにちは、みんなさん！";
+
+    #[test]
+    fn len_bytes_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(7, 98);
+        assert_eq!(s.len_bytes(), 105);
+    }
+
+    #[test]
+    fn len_bytes_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43, 43);
+        assert_eq!(s.len_bytes(), 0);
+    }
+
+    #[test]
+    fn len_chars_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(7, 98);
+        assert_eq!(s.len_chars(), 91);
+    }
+
+    #[test]
+    fn len_chars_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43, 43);
+        assert_eq!(s.len_chars(), 0);
+    }
+
+    #[test]
+    fn len_lines_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34, 98);
+        assert_eq!(s.len_lines(), 3);
+    }
+
+    #[test]
+    fn len_lines_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(43, 43);
+        assert_eq!(s.len_lines(), 1);
+    }
 
     #[test]
     fn slice_01() {
         let r = Rope::from_str(TEXT);
+        let s1 = r.slice(0, r.len_chars());
 
-        let s = r.slice(0, r.len_chars());
+        let s2 = s1.slice(0, s1.len_chars());
 
-        assert_eq!(TEXT, s);
+        assert_eq!(TEXT, s2);
     }
 
     #[test]
     fn slice_02() {
         let r = Rope::from_str(TEXT);
+        let s1 = r.slice(5, 43);
 
-        let s = r.slice(5, 21);
+        let s2 = s1.slice(3, 25);
 
-        assert_eq!(&TEXT[5..21], s);
+        assert_eq!(&TEXT[8..30], s2);
+    }
+
+    #[test]
+    fn slice_03() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(31, 97);
+
+        let s2 = s1.slice(7, 64);
+
+        assert_eq!(&TEXT[38..103], s2);
+    }
+
+    #[test]
+    fn slice_04() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(5, 43);
+
+        let s2 = s1.slice(21, 21);
+
+        assert_eq!("", s2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_05() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5, 43);
+
+        s.slice(21, 20);
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_06() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5, 43);
+
+        s.slice(37, 39);
     }
 
     #[test]

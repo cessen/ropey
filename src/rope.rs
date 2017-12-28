@@ -1430,5 +1430,55 @@ mod tests {
         r.next_grapheme_boundary(60);
     }
 
-    // Slicing and iterator tests are in their respective modules
+    #[test]
+    fn slice_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.slice(0, r.len_chars());
+
+        assert_eq!(TEXT, s);
+    }
+
+    #[test]
+    fn slice_02() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.slice(5, 21);
+
+        assert_eq!(&TEXT[5..21], s);
+    }
+
+    #[test]
+    fn slice_03() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.slice(31, 97);
+
+        assert_eq!(&TEXT[31..109], s);
+    }
+
+    #[test]
+    fn slice_04() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.slice(53, 53);
+
+        assert_eq!("", s);
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_05() {
+        let r = Rope::from_str(TEXT);
+        r.slice(53, 52);
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_06() {
+        let r = Rope::from_str(TEXT);
+        r.slice(102, 104);
+    }
+
+    // Iterator tests are in their respective modules
 }
