@@ -402,18 +402,21 @@ impl NodeChildren {
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
         assert!(self.len() > 0);
 
-        let mut accum = self.info[0];
+        let mut accum = TextInfo::new();
         let mut idx = 0;
-        for info in self.info[1..self.len()].iter() {
-            if char_idx < accum.chars as usize {
+        for info in self.info[0..(self.len() - 1)].iter() {
+            let next_accum = accum + *info;
+            if char_idx < next_accum.chars as usize {
                 break;
             }
-
-            accum += *info;
+            accum = next_accum;
             idx += 1;
         }
 
-        assert!(char_idx <= accum.chars as usize, "Index out of bounds.");
+        assert!(
+            char_idx <= (accum.chars + self.info[idx].chars) as usize,
+            "Index out of bounds."
+        );
 
         (idx, accum)
     }
@@ -559,15 +562,23 @@ mod tests {
 
         assert_eq!(0, children.search_char_idx(0).0);
         assert_eq!(0, children.search_char_idx(1).0);
+        assert_eq!(0, children.search_char_idx(0).1.chars);
+        assert_eq!(0, children.search_char_idx(1).1.chars);
 
         assert_eq!(0, children.search_char_idx(5).0);
         assert_eq!(1, children.search_char_idx(6).0);
+        assert_eq!(0, children.search_char_idx(5).1.chars);
+        assert_eq!(6, children.search_char_idx(6).1.chars);
 
         assert_eq!(1, children.search_char_idx(11).0);
         assert_eq!(2, children.search_char_idx(12).0);
+        assert_eq!(6, children.search_char_idx(11).1.chars);
+        assert_eq!(12, children.search_char_idx(12).1.chars);
 
         assert_eq!(2, children.search_char_idx(17).0);
         assert_eq!(2, children.search_char_idx(18).0);
+        assert_eq!(12, children.search_char_idx(17).1.chars);
+        assert_eq!(12, children.search_char_idx(18).1.chars);
     }
 
     #[test]
