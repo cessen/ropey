@@ -395,6 +395,69 @@ impl NodeChildren {
         panic!("Predicate is mal-formed and never evaluated true.")
     }
 
+    /// Returns the child index and accumulated text info to the left of the
+    /// child that contains the give char.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
+        assert!(self.len() > 0);
+
+        let mut accum = self.info[0];
+        let mut idx = 0;
+        for info in self.info[1..self.len()].iter() {
+            if char_idx < accum.chars as usize {
+                break;
+            }
+
+            accum = accum.combine(info);
+            idx += 1;
+        }
+
+        assert!(char_idx <= accum.chars as usize, "Index out of bounds.");
+
+        (idx, accum)
+    }
+
+    /// Returns the child indices at the start and end of the given char
+    /// range, and returns their accumulated text info as well.
+    ///
+    /// One-past-the end is valid, and corresponds to the last child.
+    pub fn search_char_idx_range(
+        &self,
+        start_idx: usize,
+        end_idx: usize,
+    ) -> ((usize, TextInfo), (usize, TextInfo)) {
+        assert!(start_idx <= end_idx);
+        assert!(self.len() > 0);
+
+        let mut accum = self.info[0];
+        let mut idx = 0;
+
+        // Find left child and info
+        for info in self.info[1..self.len()].iter() {
+            if start_idx < accum.chars as usize {
+                break;
+            }
+            accum = accum.combine(info);
+            idx += 1;
+        }
+        let l_child_i = idx;
+        let l_acc_info = accum;
+
+        // Find right child and info
+        for info in self.info[(idx + 1)..self.len()].iter() {
+            if end_idx <= accum.chars as usize {
+                break;
+            }
+            accum = accum.combine(info);
+            idx += 1;
+        }
+
+        assert!(end_idx <= accum.chars as usize, "Index out of bounds.");
+
+        ((l_child_i, l_acc_info), (idx, accum))
+    }
+
     // Debug function, to help verify tree integrity
     pub fn is_info_accurate(&self) -> bool {
         for (info, node) in self.info().iter().zip(self.nodes().iter()) {
@@ -458,5 +521,149 @@ impl Clone for NodeChildren {
         }
 
         clone_array
+    }
+}
+
+//===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use tree::{Node, NodeText, TextInfo};
+
+    #[test]
+    fn search_char_idx_01() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+        ));
+
+        children.update_child_info(0);
+        children.update_child_info(1);
+        children.update_child_info(2);
+
+        assert_eq!(0, children.search_char_idx(0).0);
+        assert_eq!(0, children.search_char_idx(1).0);
+
+        assert_eq!(0, children.search_char_idx(5).0);
+        assert_eq!(1, children.search_char_idx(6).0);
+
+        assert_eq!(1, children.search_char_idx(11).0);
+        assert_eq!(2, children.search_char_idx(12).0);
+
+        assert_eq!(2, children.search_char_idx(17).0);
+        assert_eq!(2, children.search_char_idx(18).0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn search_char_idx_02() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+        ));
+
+        children.update_child_info(0);
+        children.update_child_info(1);
+        children.update_child_info(2);
+
+        children.search_char_idx(19);
+    }
+
+    #[test]
+    fn search_char_idx_range_01() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+        ));
+
+        children.update_child_info(0);
+        children.update_child_info(1);
+        children.update_child_info(2);
+
+        let at_0_0 = children.search_char_idx_range(0, 0);
+        let at_6_6 = children.search_char_idx_range(6, 6);
+        let at_12_12 = children.search_char_idx_range(12, 12);
+        let at_18_18 = children.search_char_idx_range(18, 18);
+
+        assert_eq!(0, (at_0_0.0).0);
+        assert_eq!(0, (at_0_0.1).0);
+        assert_eq!(1, (at_6_6.0).0);
+        assert_eq!(1, (at_6_6.1).0);
+        assert_eq!(2, (at_12_12.0).0);
+        assert_eq!(2, (at_12_12.1).0);
+        assert_eq!(2, (at_18_18.0).0);
+        assert_eq!(2, (at_18_18.1).0);
+
+        let at_0_6 = children.search_char_idx_range(0, 6);
+        let at_6_12 = children.search_char_idx_range(6, 12);
+        let at_12_18 = children.search_char_idx_range(12, 18);
+
+        assert_eq!(0, (at_0_6.0).0);
+        assert_eq!(0, (at_0_6.1).0);
+        assert_eq!(1, (at_6_12.0).0);
+        assert_eq!(1, (at_6_12.1).0);
+        assert_eq!(2, (at_12_18.0).0);
+        assert_eq!(2, (at_12_18.1).0);
+
+        let at_5_7 = children.search_char_idx_range(5, 7);
+        let at_11_13 = children.search_char_idx_range(11, 13);
+
+        assert_eq!(0, (at_5_7.0).0);
+        assert_eq!(1, (at_5_7.1).0);
+        assert_eq!(1, (at_11_13.0).0);
+        assert_eq!(2, (at_11_13.1).0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn search_char_idx_range_02() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+        ));
+
+        children.update_child_info(0);
+        children.update_child_info(1);
+        children.update_child_info(2);
+
+        children.search_char_idx_range(18, 19);
     }
 }
