@@ -258,3 +258,42 @@ fn find_good_split_idx(text: &str, idx: usize) -> usize {
         }
     }
 }
+
+//===========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 127 bytes, 103 chars, 4 lines
+    const TEXT: &str = "Hello there!  How're you doing?\r\nIt's \
+                        a fine day, isn't it?\r\nAren't you glad \
+                        we're alive?\r\nこんにちは、みんなさん！";
+
+    #[test]
+    fn rope_builder_01() {
+        let mut b = RopeBuilder::new();
+
+        b.append("Hello there!  How're you doing?\r");
+        b.append("\nIt's a fine ");
+        b.append("d");
+        b.append("a");
+        b.append("y,");
+        b.append(" ");
+        b.append("isn't it?");
+        b.append("\r");
+        b.append("\nAren't you ");
+        b.append("glad we're alive?\r");
+        b.append("\n");
+        b.append("こんにち");
+        b.append("は、みんなさ");
+        b.append("ん！");
+
+        let r = b.finish();
+
+        assert_eq!(r, TEXT);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+}
