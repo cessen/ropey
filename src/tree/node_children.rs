@@ -395,7 +395,7 @@ impl NodeChildren {
         panic!("Predicate is mal-formed and never evaluated true.")
     }
 
-    /// Returns the child index and accumulated text info to the left of the
+    /// Returns the child index and left-side-accumulated text info of the
     /// child that contains the given byte.
     ///
     /// One-past-the end is valid, and will return the last child.
@@ -421,7 +421,7 @@ impl NodeChildren {
         (idx, accum)
     }
 
-    /// Returns the child index and accumulated text info to the left of the
+    /// Returns the child index and left-side-accumulated text info of the
     /// child that contains the given char.
     ///
     /// One-past-the end is valid, and will return the last child.
@@ -448,7 +448,7 @@ impl NodeChildren {
     }
 
     /// Returns the child indices at the start and end of the given char
-    /// range, and returns their accumulated text info as well.
+    /// range, and returns their left-side-accumulated text info as well.
     ///
     /// One-past-the end is valid, and corresponds to the last child.
     pub fn search_char_idx_range(
