@@ -16,10 +16,11 @@ const PTR_SIZE: usize = 4;
 #[cfg(all(not(test), target_pointer_width = "16"))]
 const PTR_SIZE: usize = 2;
 
-// Aim for nodes to be 512 - Arc counters.  This makes it easier for the
-// memory allocator to avoid fragmentation.
+// Aim for nodes to be 768 bytes - Arc counters.  Keeping the nodes
+// multiples of large powers of two makes it easier for the memory allocator
+// to avoid fragmentation.
 #[cfg(not(test))]
-const TARGET_NODE_SIZE: usize = 512 - (PTR_SIZE * 2);
+const TARGET_NODE_SIZE: usize = 768 - (PTR_SIZE * 2);
 
 // Node min/max values.
 // For testing, they're set small to trigger deeper trees.  For
