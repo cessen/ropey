@@ -1535,5 +1535,5 @@ mod tests {
         r.slice(102, 104);
     }
 
-    // Iterator tests are in their respective modules
+    // Iterator tests are in the iter module
 }
