@@ -25,22 +25,45 @@ fn string_remove(text: &mut String, char_start: usize, char_end: usize) {
     text.push_str(&text_r);
 }
 
+fn string_slice(text: &str, char_start: usize, char_end: usize) -> &str {
+    let byte_start = char_to_byte_idx(char_start, &text);
+    let byte_end = char_to_byte_idx(char_end, &text);
+    &text[byte_start..byte_end]
+}
+
+//===========================================================================
+
 #[test]
-fn qc_insert_01() {
-    fn p(ins_text: String, char_idx: usize) -> bool {
-        let mut rope = Rope::from_str(TEXT);
-        let mut text = String::from(TEXT);
-
-        let len = rope.len_chars().max(1);
-        rope.insert(char_idx % len, &ins_text);
-        string_insert(&mut text, char_idx % len, &ins_text);
-
-        assert_eq!(rope, text.as_str());
+fn qc_from_str() {
+    fn p(text: String) -> bool {
+        let rope = Rope::from_str(&text);
 
         rope.assert_integrity();
         rope.assert_invariants();
 
-        return true;
+        rope == text.as_str()
+    }
+
+    QuickCheck::new()
+        .gen(StdGen::new(thread_rng(), 1 << 16))
+        .tests(64)
+        .quickcheck(p as fn(String) -> bool);
+}
+
+#[test]
+fn qc_insert() {
+    fn p(ins_text: String, char_idx: usize) -> bool {
+        let mut rope = Rope::from_str(TEXT);
+        let mut text = String::from(TEXT);
+
+        let len = rope.len_chars();
+        rope.insert(char_idx % (len + 1), &ins_text);
+        string_insert(&mut text, char_idx % (len + 1), &ins_text);
+
+        rope.assert_integrity();
+        rope.assert_invariants();
+
+        rope == text.as_str()
     }
 
     QuickCheck::new()
@@ -49,13 +72,13 @@ fn qc_insert_01() {
 }
 
 #[test]
-fn qc_remove_01() {
-    fn p(ins: (usize, usize)) -> bool {
+fn qc_remove() {
+    fn p(range: (usize, usize)) -> bool {
         let mut rope = Rope::from_str(TEXT);
         let mut text = String::from(TEXT);
 
-        let mut idx1 = ins.0 % rope.len_chars();
-        let mut idx2 = ins.1 % rope.len_chars();
+        let mut idx1 = range.0 % (rope.len_chars() + 1);
+        let mut idx2 = range.1 % (rope.len_chars() + 1);
         if idx1 > idx2 {
             std::mem::swap(&mut idx1, &mut idx2)
         };
@@ -63,18 +86,68 @@ fn qc_remove_01() {
         rope.remove(idx1, idx2);
         string_remove(&mut text, idx1, idx2);
 
-        assert_eq!(rope, text.as_str());
-
         rope.assert_integrity();
         rope.assert_invariants();
 
-        return true;
+        rope == text.as_str()
     }
 
     QuickCheck::new()
         .gen(StdGen::new(thread_rng(), TEXT.len()))
         .quickcheck(p as fn((usize, usize)) -> bool);
 }
+
+#[test]
+fn qc_split_off_and_append() {
+    fn p(mut idx: usize) -> bool {
+        let mut rope = Rope::from_str(TEXT);
+
+        idx = idx % (rope.len_chars() + 1);
+
+        let rope2 = rope.split_off(idx);
+
+        rope.assert_integrity();
+        rope.assert_invariants();
+        rope2.assert_integrity();
+        rope2.assert_invariants();
+
+        rope.append(rope2);
+
+        rope.assert_integrity();
+        rope.assert_invariants();
+
+        rope == TEXT
+    }
+
+    QuickCheck::new()
+        .gen(StdGen::new(thread_rng(), TEXT.len()))
+        .quickcheck(p as fn(usize) -> bool);
+}
+
+#[test]
+fn qc_slice() {
+    fn p(text: String, range: (usize, usize)) -> bool {
+        let rope = Rope::from_str(&text);
+
+        let mut idx1 = range.0 % (rope.len_chars() + 1);
+        let mut idx2 = range.1 % (rope.len_chars() + 1);
+        if idx1 > idx2 {
+            std::mem::swap(&mut idx1, &mut idx2)
+        };
+
+        let slice = rope.slice(idx1, idx2);
+        let text_slice = string_slice(&text, idx1, idx2);
+
+        slice == text_slice && slice.len_bytes() == text_slice.len()
+            && slice.len_chars() == text_slice.chars().count()
+    }
+
+    QuickCheck::new()
+        .gen(StdGen::new(thread_rng(), 1 << 16))
+        .quickcheck(p as fn(String, (usize, usize)) -> bool);
+}
+
+//===========================================================================
 
 // 31138 bytes, 18021 chars, 95 lines
 // Contains many long graphemes.
