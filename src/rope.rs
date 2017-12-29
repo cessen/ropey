@@ -223,8 +223,8 @@ impl Rope {
                             // Check for CRLF graphemes on the insertion seams, and
                             // adjust line break counts accordingly
                             if !text.is_empty() {
-                                if byte_idx > 0 && text.as_bytes()[0] == 0x0A
-                                    && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                if byte_idx > 0 && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    && text.as_bytes()[0] == 0x0A
                                 {
                                     info.line_breaks -= 1;
                                 }
@@ -327,15 +327,51 @@ impl Rope {
                         seam = Some(acc_info.bytes as usize + byte_start);
                     }
 
-                    leaf_text.remove_range(byte_start, byte_end);
+                    // Remove text and calculate new info
+                    let new_info = if (byte_end - byte_start) < leaf_text.len() {
+                        let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
+                        let mut new_info = cur_info - rem_info;
 
-                    (TextInfo::from_str(&leaf_text), None)
+                        // Check for CRLF graphemes on the insertion seams, and
+                        // adjust line break counts accordingly
+                        if byte_start != byte_end {
+                            if byte_start > 0 && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_start] == 0x0A
+                            {
+                                new_info.line_breaks += 1;
+                            }
+                            if byte_end < leaf_text.len()
+                                && leaf_text.as_bytes()[byte_end - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_end] == 0x0A
+                            {
+                                new_info.line_breaks += 1;
+                            }
+                            if byte_start > 0 && byte_end < leaf_text.len()
+                                && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_end] == 0x0A
+                            {
+                                new_info.line_breaks -= 1;
+                            }
+                        }
+
+                        // Remove the text
+                        leaf_text.remove_range(byte_start, byte_end);
+
+                        new_info
+                    } else {
+                        // Remove the text
+                        leaf_text.remove_range(byte_start, byte_end);
+
+                        TextInfo::from_str(&leaf_text)
+                    };
+
+                    (new_info, None)
                 });
 
-            root.zip_fix(start);
             if let Some(seam_idx) = seam {
                 root.fix_grapheme_seam(seam_idx as Count, false);
             }
+            root.zip_fix(start);
         }
 
         self.pull_up_singular_nodes();

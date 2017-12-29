@@ -359,6 +359,23 @@ impl Node {
                 } else {
                     return (children.combined_info(), None);
                 }
+
+                // // Do the merging, if necessary.
+                // // First, merge left and right if necessary/possible.
+                // if (l_child_i + 1) < children.len()
+                //     && (children.nodes()[l_child_i].is_undersized()
+                //         || children.nodes()[l_child_i + 1].is_undersized())
+                // {
+                //     children.merge_distribute(l_child_i, l_child_i + 1);
+                // }
+                // // Second, try to merge the left child again, if necessary/possible
+                // if children.len() > 1 && children.nodes()[l_child_i].is_undersized() {
+                //     if l_child_i == 0 {
+                //         children.merge_distribute(0, 1);
+                //     } else {
+                //         children.merge_distribute(l_child_i - 1, l_child_i);
+                //     }
+                // }
             }
         }
     }
@@ -963,6 +980,9 @@ impl Node {
                 if is_root {
                     assert!(children.len() > 1);
                 } else {
+                    if !(children.len() >= MIN_CHILDREN) {
+                        println!("{} : {}", children.len(), MIN_CHILDREN);
+                    }
                     assert!(children.len() >= MIN_CHILDREN);
                 }
 

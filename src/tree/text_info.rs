@@ -1,3 +1,5 @@
+use std::ops::{Add, Sub};
+
 use str_utils::{count_chars, count_line_breaks};
 use tree::Count;
 
@@ -30,6 +32,28 @@ impl TextInfo {
             bytes: self.bytes + other.bytes,
             chars: self.chars + other.chars,
             line_breaks: self.line_breaks + other.line_breaks,
+        }
+    }
+}
+
+impl Add for TextInfo {
+    type Output = Self;
+    fn add(self, rhs: TextInfo) -> TextInfo {
+        TextInfo {
+            bytes: self.bytes + rhs.bytes,
+            chars: self.chars + rhs.chars,
+            line_breaks: self.line_breaks + rhs.line_breaks,
+        }
+    }
+}
+
+impl Sub for TextInfo {
+    type Output = Self;
+    fn sub(self, rhs: TextInfo) -> TextInfo {
+        TextInfo {
+            bytes: self.bytes - rhs.bytes,
+            chars: self.chars - rhs.chars,
+            line_breaks: self.line_breaks - rhs.line_breaks,
         }
     }
 }
