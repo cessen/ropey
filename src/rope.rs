@@ -314,11 +314,25 @@ impl Rope {
         // Scope to contain borrow of root
         {
             let root = Arc::make_mut(&mut self.root);
-            let (need_zip, seam) = root.remove(start, end);
+            let mut seam = None;
 
-            if need_zip {
-                root.zip_fix(start);
-            }
+            let (_text_info, _residual) =
+                root.edit_char_range(start, end, |acc_info, cur_info, leaf_text| {
+                    let local_start = start - (acc_info.chars as usize).min(start);
+                    let local_end = (end - acc_info.chars as usize).min(cur_info.chars as usize);
+                    let byte_start = char_idx_to_byte_idx(&leaf_text, local_start);
+                    let byte_end = char_idx_to_byte_idx(&leaf_text, local_end);
+
+                    if local_start == 0 || local_end == cur_info.chars as usize {
+                        seam = Some(acc_info.bytes as usize + byte_start);
+                    }
+
+                    leaf_text.remove_range(byte_start, byte_end);
+
+                    (TextInfo::from_str(&leaf_text), None)
+                });
+
+            root.zip_fix(start);
             if let Some(seam_idx) = seam {
                 root.fix_grapheme_seam(seam_idx as Count, false);
             }

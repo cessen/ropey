@@ -240,6 +240,7 @@ impl Node {
                 if l_child_i == r_child_i {
                     // Both indices point into the same child
                     recurse_r = false;
+                    r_child_i += 1; // To allow decrementing if l_child_i is removed
                 } else {
                     // We're dealing with more than one child.
                     // Calculate the start..end range of nodes to be removed.
@@ -260,7 +261,9 @@ impl Node {
                     }
 
                     // Update r_child index based on the removals
-                    r_child_i -= end_i - start_i;
+                    if end_i <= r_child_i {
+                        r_child_i -= end_i - start_i;
+                    }
                 }
 
                 // Recurse into right child
