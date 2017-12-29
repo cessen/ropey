@@ -109,7 +109,7 @@ impl Node {
                 let start_char = start_info.chars;
 
                 // Navigate into the appropriate child
-                let tmp_acc_info = acc_info.combine(&start_info);
+                let tmp_acc_info = acc_info + start_info;
                 let tmp_info = children.info()[child_i];
                 let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
                     .edit_leaf_at_char_internal(
@@ -268,7 +268,7 @@ impl Node {
 
                 // Recurse into right child
                 let r_residual = if recurse_r {
-                    let tmp_acc_info = acc_info.combine(&r_acc_info);
+                    let tmp_acc_info = acc_info + r_acc_info;
                     let tmp_info = children.info()[r_child_i];
                     let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[r_child_i])
                         .edit_char_range_internal(
@@ -292,7 +292,7 @@ impl Node {
 
                 // Recurse into left child
                 let l_residual = {
-                    let tmp_acc_info = acc_info.combine(&l_acc_info);
+                    let tmp_acc_info = acc_info + l_acc_info;
                     let tmp_info = children.info()[l_child_i];
                     let tmp_chars = children.info()[l_child_i].chars as usize;
                     let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[l_child_i])
@@ -1202,7 +1202,7 @@ impl Node {
                 if children.len() > 1 {
                     let (child_i, start_info) =
                         children.search_combine_info(|inf| char_idx <= inf.chars as usize);
-                    let end_info = start_info.combine(&children.info()[child_i]);
+                    let end_info = start_info + children.info()[child_i];
 
                     if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
                         let do_merge = match *children.nodes()[child_i] {
@@ -1236,7 +1236,7 @@ impl Node {
                 // Do recursion
                 let (child_i, start_info) =
                     children.search_combine_info(|inf| char_idx <= inf.chars as usize);
-                let end_info = start_info.combine(&children.info()[child_i]);
+                let end_info = start_info + children.info()[child_i];
 
                 if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
                     let tmp = children.info()[child_i].chars as usize;

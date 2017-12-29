@@ -219,7 +219,7 @@ impl Rope {
                         // Calculate new info without doing a full re-scan of cur_text
                         let new_info = {
                             // Get summed info of current text and to-be-inserted text
-                            let mut info = cur_info.combine(&TextInfo::from_str(text));
+                            let mut info = cur_info + TextInfo::from_str(text);
                             // Check for CRLF graphemes on the insertion seams, and
                             // adjust line break counts accordingly
                             if !text.is_empty() {
@@ -330,7 +330,7 @@ impl Rope {
                     // Remove text and calculate new info
                     let new_info = if (byte_end - byte_start) < leaf_text.len() {
                         let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
-                        let mut new_info = cur_info - rem_info;
+                        let mut info = cur_info - rem_info;
 
                         // Check for CRLF graphemes on the insertion seams, and
                         // adjust line break counts accordingly
@@ -338,26 +338,26 @@ impl Rope {
                             if byte_start > 0 && leaf_text.as_bytes()[byte_start - 1] == 0x0D
                                 && leaf_text.as_bytes()[byte_start] == 0x0A
                             {
-                                new_info.line_breaks += 1;
+                                info.line_breaks += 1;
                             }
                             if byte_end < leaf_text.len()
                                 && leaf_text.as_bytes()[byte_end - 1] == 0x0D
                                 && leaf_text.as_bytes()[byte_end] == 0x0A
                             {
-                                new_info.line_breaks += 1;
+                                info.line_breaks += 1;
                             }
                             if byte_start > 0 && byte_end < leaf_text.len()
                                 && leaf_text.as_bytes()[byte_start - 1] == 0x0D
                                 && leaf_text.as_bytes()[byte_end] == 0x0A
                             {
-                                new_info.line_breaks -= 1;
+                                info.line_breaks -= 1;
                             }
                         }
 
                         // Remove the text
                         leaf_text.remove_range(byte_start, byte_end);
 
-                        new_info
+                        info
                     } else {
                         // Remove the text
                         leaf_text.remove_range(byte_start, byte_end);

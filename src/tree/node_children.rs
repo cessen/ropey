@@ -380,16 +380,16 @@ impl NodeChildren {
     pub fn combined_info(&self) -> TextInfo {
         self.info[..self.len()]
             .iter()
-            .fold(TextInfo::new(), |a, b| a.combine(b))
+            .fold(TextInfo::new(), |a, b| a + *b)
     }
 
     pub fn search_combine_info<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo) {
         let mut accum = TextInfo::new();
         for (idx, inf) in self.info[..self.len()].iter().enumerate() {
-            if pred(&accum.combine(inf)) {
+            if pred(&(accum + *inf)) {
                 return (idx, accum);
             } else {
-                accum = accum.combine(inf);
+                accum += *inf;
             }
         }
         panic!("Predicate is mal-formed and never evaluated true.")
@@ -409,7 +409,7 @@ impl NodeChildren {
                 break;
             }
 
-            accum = accum.combine(info);
+            accum += *info;
             idx += 1;
         }
 
@@ -435,7 +435,7 @@ impl NodeChildren {
 
         // Find left child and info
         for info in self.info[..(self.len() - 1)].iter() {
-            let next_accum = accum.combine(info);
+            let next_accum = accum + *info;
             if start_idx < next_accum.chars as usize {
                 break;
             }
@@ -447,7 +447,7 @@ impl NodeChildren {
 
         // Find right child and info
         for info in self.info[idx..(self.len() - 1)].iter() {
-            let next_accum = accum.combine(info);
+            let next_accum = accum + *info;
             if end_idx <= next_accum.chars as usize {
                 break;
             }

@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use str_utils::{count_chars, count_line_breaks};
 use tree::Count;
@@ -26,14 +26,6 @@ impl TextInfo {
             line_breaks: count_line_breaks(text) as Count,
         }
     }
-
-    pub fn combine(&self, other: &TextInfo) -> TextInfo {
-        TextInfo {
-            bytes: self.bytes + other.bytes,
-            chars: self.chars + other.chars,
-            line_breaks: self.line_breaks + other.line_breaks,
-        }
-    }
 }
 
 impl Add for TextInfo {
@@ -47,6 +39,12 @@ impl Add for TextInfo {
     }
 }
 
+impl AddAssign for TextInfo {
+    fn add_assign(&mut self, other: TextInfo) {
+        *self = *self + other;
+    }
+}
+
 impl Sub for TextInfo {
     type Output = Self;
     fn sub(self, rhs: TextInfo) -> TextInfo {
@@ -55,5 +53,11 @@ impl Sub for TextInfo {
             chars: self.chars - rhs.chars,
             line_breaks: self.line_breaks - rhs.line_breaks,
         }
+    }
+}
+
+impl SubAssign for TextInfo {
+    fn sub_assign(&mut self, other: TextInfo) {
+        *self = *self - other;
     }
 }
