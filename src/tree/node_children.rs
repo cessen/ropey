@@ -430,30 +430,35 @@ impl NodeChildren {
         assert!(start_idx <= end_idx);
         assert!(self.len() > 0);
 
-        let mut accum = self.info[0];
+        let mut accum = TextInfo::new();
         let mut idx = 0;
 
         // Find left child and info
-        for info in self.info[1..self.len()].iter() {
-            if start_idx < accum.chars as usize {
+        for info in self.info[..(self.len() - 1)].iter() {
+            let next_accum = accum.combine(info);
+            if start_idx < next_accum.chars as usize {
                 break;
             }
-            accum = accum.combine(info);
+            accum = next_accum;
             idx += 1;
         }
         let l_child_i = idx;
         let l_acc_info = accum;
 
         // Find right child and info
-        for info in self.info[(idx + 1)..self.len()].iter() {
-            if end_idx <= accum.chars as usize {
+        for info in self.info[idx..(self.len() - 1)].iter() {
+            let next_accum = accum.combine(info);
+            if end_idx <= next_accum.chars as usize {
                 break;
             }
-            accum = accum.combine(info);
+            accum = next_accum;
             idx += 1;
         }
 
-        assert!(end_idx <= accum.chars as usize, "Index out of bounds.");
+        assert!(
+            end_idx <= (accum.chars + self.info[idx].chars) as usize,
+            "Index out of bounds."
+        );
 
         ((l_child_i, l_acc_info), (idx, accum))
     }
@@ -616,12 +621,23 @@ mod tests {
 
         assert_eq!(0, (at_0_0.0).0);
         assert_eq!(0, (at_0_0.1).0);
+        assert_eq!(0, (at_0_0.0).1.chars);
+        assert_eq!(0, (at_0_0.1).1.chars);
+
         assert_eq!(1, (at_6_6.0).0);
         assert_eq!(1, (at_6_6.1).0);
+        assert_eq!(6, (at_6_6.0).1.chars);
+        assert_eq!(6, (at_6_6.1).1.chars);
+
         assert_eq!(2, (at_12_12.0).0);
         assert_eq!(2, (at_12_12.1).0);
+        assert_eq!(12, (at_12_12.0).1.chars);
+        assert_eq!(12, (at_12_12.1).1.chars);
+
         assert_eq!(2, (at_18_18.0).0);
         assert_eq!(2, (at_18_18.1).0);
+        assert_eq!(12, (at_18_18.0).1.chars);
+        assert_eq!(12, (at_18_18.1).1.chars);
 
         let at_0_6 = children.search_char_idx_range(0, 6);
         let at_6_12 = children.search_char_idx_range(6, 12);
@@ -629,18 +645,31 @@ mod tests {
 
         assert_eq!(0, (at_0_6.0).0);
         assert_eq!(0, (at_0_6.1).0);
+        assert_eq!(0, (at_0_6.0).1.chars);
+        assert_eq!(0, (at_0_6.1).1.chars);
+
         assert_eq!(1, (at_6_12.0).0);
         assert_eq!(1, (at_6_12.1).0);
+        assert_eq!(6, (at_6_12.0).1.chars);
+        assert_eq!(6, (at_6_12.1).1.chars);
+
         assert_eq!(2, (at_12_18.0).0);
         assert_eq!(2, (at_12_18.1).0);
+        assert_eq!(12, (at_12_18.0).1.chars);
+        assert_eq!(12, (at_12_18.1).1.chars);
 
         let at_5_7 = children.search_char_idx_range(5, 7);
         let at_11_13 = children.search_char_idx_range(11, 13);
 
         assert_eq!(0, (at_5_7.0).0);
         assert_eq!(1, (at_5_7.1).0);
+        assert_eq!(0, (at_5_7.0).1.chars);
+        assert_eq!(6, (at_5_7.1).1.chars);
+
         assert_eq!(1, (at_11_13.0).0);
         assert_eq!(2, (at_11_13.1).0);
+        assert_eq!(6, (at_11_13.0).1.chars);
+        assert_eq!(12, (at_11_13.1).1.chars);
     }
 
     #[test]

@@ -39,13 +39,10 @@ impl Node {
 
     /// Edits the leaf node at `char_idx` with closure `edit`.
     ///
-    /// When calling this from the root node, pass `TextInfo::new()` to
-    /// `info`.
-    ///
     /// The closure function parameters are:
     ///
     /// 1. The accumulated text info of the rope up to the left edge
-    ///    of the selected lead node.
+    ///    of the selected leaf node.
     /// 2. The current text info of the selected leaf node.
     /// 3. The selected leaf node's text, for editing.
     ///
@@ -150,102 +147,216 @@ impl Node {
         }
     }
 
-    pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
-        if depth == 0 {
-            match *self {
-                Node::Leaf(_) => {
-                    if !other.is_leaf() {
-                        panic!("Tree-append siblings have differing types.");
-                    } else {
-                        return Some(other);
-                    }
-                }
-                Node::Internal(ref mut children_l) => {
-                    let mut other = other;
-                    if let Node::Internal(ref mut children_r) = *Arc::make_mut(&mut other) {
-                        if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
-                            for _ in 0..children_r.len() {
-                                children_l.push(children_r.remove(0));
-                            }
-                            return None;
-                        } else {
-                            children_l.distribute_with(children_r);
-                            // Return lower down, to avoid borrow-checker.
-                        }
-                    } else {
-                        panic!("Tree-append siblings have differing types.");
-                    }
-                    return Some(other);
-                }
+    /// Edits nodes in range `start_idx..end_idx`.
+    ///
+    /// Nodes completely subsumed by the range will be removed except the
+    /// leftmost node even if it is subsumed, and the remaining 1 or 2 leaf
+    /// nodes overlapping the range are passed to the given closure.
+    ///
+    /// The closure function parameters are:
+    ///
+    /// 1. The accumulated text info of the rope up to the left edge
+    ///    of the selected leaf node.
+    /// 2. The current text info of the selected leaf node.
+    /// 3. The selected leaf node's text, for editing.
+    ///
+    /// The closure return values are:
+    ///
+    /// 1. The text info of the selected leaf node after the edits.
+    /// 2. An optional new leaf node to the right of the selected leaf node,
+    ///    along with its text info.
+    pub fn edit_char_range<F>(
+        &mut self,
+        start_idx: usize,
+        end_idx: usize,
+        mut edit: F,
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    where
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+    {
+        assert!(start_idx <= end_idx);
+        assert!(end_idx <= self.text_info().chars as usize);
+
+        match *self {
+            Node::Leaf(_) => {
+                let cur_info = self.text_info();
+                self.edit_char_range_internal(
+                    start_idx,
+                    end_idx,
+                    TextInfo::new(),
+                    cur_info,
+                    &mut edit,
+                )
             }
-        } else if let Node::Internal(ref mut children) = *self {
-            let last_i = children.len() - 1;
-            let residual =
-                Arc::make_mut(&mut children.nodes_mut()[last_i]).append_at_depth(other, depth - 1);
-            children.update_child_info(last_i);
-            if let Some(extra_node) = residual {
-                if children.len() < MAX_CHILDREN {
-                    children.push((extra_node.text_info(), extra_node));
-                    return None;
-                } else {
-                    let r_children = children.push_split((extra_node.text_info(), extra_node));
-                    return Some(Arc::new(Node::Internal(r_children)));
-                }
-            } else {
-                return None;
-            }
-        } else {
-            panic!("Reached leaf before getting to target depth.");
+            Node::Internal(_) => self.edit_char_range_internal(
+                start_idx,
+                end_idx,
+                TextInfo::new(),
+                TextInfo::new(),
+                &mut edit,
+            ),
         }
     }
 
-    pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
-        if depth == 0 {
-            match *self {
-                Node::Leaf(_) => {
-                    if !other.is_leaf() {
-                        panic!("Tree-append siblings have differing types.");
-                    } else {
-                        return Some(other);
-                    }
-                }
-                Node::Internal(ref mut children_r) => {
-                    let mut other = other;
-                    if let Node::Internal(ref mut children_l) = *Arc::make_mut(&mut other) {
-                        if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
-                            for _ in 0..children_l.len() {
-                                children_r.insert(0, children_l.pop());
-                            }
-                            return None;
-                        } else {
-                            children_l.distribute_with(children_r);
-                            // Return lower down, to avoid borrow-checker.
-                        }
-                    } else {
-                        panic!("Tree-append siblings have differing types.");
-                    }
-                    return Some(other);
-                }
-            }
-        } else if let Node::Internal(ref mut children) = *self {
-            let residual =
-                Arc::make_mut(&mut children.nodes_mut()[0]).prepend_at_depth(other, depth - 1);
-            children.update_child_info(0);
-            if let Some(extra_node) = residual {
-                if children.len() < MAX_CHILDREN {
-                    children.insert(0, (extra_node.text_info(), extra_node));
-                    return None;
+    fn edit_char_range_internal<F>(
+        &mut self,
+        start_idx: usize,
+        end_idx: usize,
+        acc_info: TextInfo,
+        cur_info: TextInfo,
+        edit: &mut F,
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    where
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+    {
+        match *self {
+            // If it's a leaf
+            Node::Leaf(ref mut cur_text) => {
+                let (info, residual) = edit(acc_info, cur_info, cur_text);
+
+                if let Some((r_info, r_text)) = residual {
+                    (info, Some((r_info, Arc::new(Node::Leaf(r_text)))))
                 } else {
-                    let mut r_children =
-                        children.insert_split(0, (extra_node.text_info(), extra_node));
-                    std::mem::swap(children, &mut r_children);
-                    return Some(Arc::new(Node::Internal(r_children)));
+                    (info, None)
                 }
-            } else {
-                return None;
             }
-        } else {
-            panic!("Reached leaf before getting to target depth.");
+
+            // If it's internal, it's much more complicated
+            Node::Internal(ref mut children) => {
+                // Compact leaf children if we're close to maximum leaf
+                // fragmentation.
+                if children.len() == MAX_CHILDREN && children.nodes()[0].is_leaf()
+                    && (children.combined_info().bytes as usize) < (MAX_BYTES * (MIN_CHILDREN + 1))
+                {
+                    children.compact_leaves();
+                }
+
+                // Get child info for the two char indices
+                let ((l_child_i, l_acc_info), (mut r_child_i, r_acc_info)) =
+                    children.search_char_idx_range(start_idx, end_idx);
+
+                // Remove completely subsumed children
+                let recurse_r: bool;
+                if l_child_i == r_child_i {
+                    // Both indices point into the same child
+                    recurse_r = false;
+                } else {
+                    // We're dealing with more than one child.
+                    // Calculate the start..end range of nodes to be removed.
+                    let start_i = l_child_i + 1;
+                    let end_i = if (r_acc_info.chars + children.info()[r_child_i].chars) as usize
+                        == end_idx
+                    {
+                        recurse_r = false;
+                        r_child_i + 1
+                    } else {
+                        recurse_r = true;
+                        r_child_i
+                    };
+
+                    // Remove the children
+                    for _ in start_i..end_i {
+                        children.remove(start_i);
+                    }
+
+                    // Update r_child index based on the removals
+                    r_child_i -= end_i - start_i;
+                }
+
+                // Recurse into right child
+                let r_residual = if recurse_r {
+                    let tmp_acc_info = acc_info.combine(&r_acc_info);
+                    let tmp_info = children.info()[r_child_i];
+                    let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[r_child_i])
+                        .edit_char_range_internal(
+                            start_idx - (r_acc_info.chars as usize).min(start_idx),
+                            end_idx - r_acc_info.chars as usize,
+                            tmp_acc_info,
+                            tmp_info,
+                            edit,
+                        );
+                    if new_info.bytes == 0 {
+                        children.remove(r_child_i);
+                        assert!(residual.is_none());
+                        None
+                    } else {
+                        children.info_mut()[r_child_i] = new_info;
+                        residual
+                    }
+                } else {
+                    None
+                };
+
+                // Recurse into left child
+                let l_residual = {
+                    let tmp_acc_info = acc_info.combine(&l_acc_info);
+                    let tmp_info = children.info()[l_child_i];
+                    let tmp_chars = children.info()[l_child_i].chars as usize;
+                    let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[l_child_i])
+                        .edit_char_range_internal(
+                            start_idx - l_acc_info.chars as usize,
+                            (end_idx - l_acc_info.chars as usize).min(tmp_chars),
+                            tmp_acc_info,
+                            tmp_info,
+                            edit,
+                        );
+                    if new_info.bytes == 0 {
+                        children.remove(l_child_i);
+                        r_child_i -= 1;
+                        assert!(residual.is_none());
+                        None
+                    } else {
+                        children.info_mut()[l_child_i] = new_info;
+                        residual
+                    }
+                };
+
+                // Handle residual nodes
+                if !l_residual.is_none() && !r_residual.is_none() {
+                    let (_l_info, _l_node) = l_residual.unwrap();
+                    let (_r_info, _r_node) = r_residual.unwrap();
+                    // TODO
+                    unimplemented!()
+                } else if let Some((info, node)) = l_residual {
+                    // The new node will fit as a child of this node
+                    if children.len() < MAX_CHILDREN {
+                        children.insert(l_child_i + 1, (info, node));
+                        return (children.combined_info(), None);
+                    }
+                    // The new node won't fit!  Must split.
+                    else {
+                        let r_children = children.insert_split(l_child_i + 1, (info, node));
+
+                        return (
+                            children.combined_info(),
+                            Some((
+                                r_children.combined_info(),
+                                Arc::new(Node::Internal(r_children)),
+                            )),
+                        );
+                    }
+                } else if let Some((info, node)) = r_residual {
+                    // The new node will fit as a child of this node
+                    if children.len() < MAX_CHILDREN {
+                        children.insert(r_child_i + 1, (info, node));
+                        return (children.combined_info(), None);
+                    }
+                    // The new node won't fit!  Must split.
+                    else {
+                        let r_children = children.insert_split(r_child_i + 1, (info, node));
+
+                        return (
+                            children.combined_info(),
+                            Some((
+                                r_children.combined_info(),
+                                Arc::new(Node::Internal(r_children)),
+                            )),
+                        );
+                    }
+                } else {
+                    return (children.combined_info(), None);
+                }
+            }
         }
     }
 
@@ -381,6 +492,105 @@ impl Node {
                     seam,
                 );
             }
+        }
+    }
+
+    pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+        if depth == 0 {
+            match *self {
+                Node::Leaf(_) => {
+                    if !other.is_leaf() {
+                        panic!("Tree-append siblings have differing types.");
+                    } else {
+                        return Some(other);
+                    }
+                }
+                Node::Internal(ref mut children_l) => {
+                    let mut other = other;
+                    if let Node::Internal(ref mut children_r) = *Arc::make_mut(&mut other) {
+                        if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
+                            for _ in 0..children_r.len() {
+                                children_l.push(children_r.remove(0));
+                            }
+                            return None;
+                        } else {
+                            children_l.distribute_with(children_r);
+                            // Return lower down, to avoid borrow-checker.
+                        }
+                    } else {
+                        panic!("Tree-append siblings have differing types.");
+                    }
+                    return Some(other);
+                }
+            }
+        } else if let Node::Internal(ref mut children) = *self {
+            let last_i = children.len() - 1;
+            let residual =
+                Arc::make_mut(&mut children.nodes_mut()[last_i]).append_at_depth(other, depth - 1);
+            children.update_child_info(last_i);
+            if let Some(extra_node) = residual {
+                if children.len() < MAX_CHILDREN {
+                    children.push((extra_node.text_info(), extra_node));
+                    return None;
+                } else {
+                    let r_children = children.push_split((extra_node.text_info(), extra_node));
+                    return Some(Arc::new(Node::Internal(r_children)));
+                }
+            } else {
+                return None;
+            }
+        } else {
+            panic!("Reached leaf before getting to target depth.");
+        }
+    }
+
+    pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+        if depth == 0 {
+            match *self {
+                Node::Leaf(_) => {
+                    if !other.is_leaf() {
+                        panic!("Tree-append siblings have differing types.");
+                    } else {
+                        return Some(other);
+                    }
+                }
+                Node::Internal(ref mut children_r) => {
+                    let mut other = other;
+                    if let Node::Internal(ref mut children_l) = *Arc::make_mut(&mut other) {
+                        if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
+                            for _ in 0..children_l.len() {
+                                children_r.insert(0, children_l.pop());
+                            }
+                            return None;
+                        } else {
+                            children_l.distribute_with(children_r);
+                            // Return lower down, to avoid borrow-checker.
+                        }
+                    } else {
+                        panic!("Tree-append siblings have differing types.");
+                    }
+                    return Some(other);
+                }
+            }
+        } else if let Node::Internal(ref mut children) = *self {
+            let residual =
+                Arc::make_mut(&mut children.nodes_mut()[0]).prepend_at_depth(other, depth - 1);
+            children.update_child_info(0);
+            if let Some(extra_node) = residual {
+                if children.len() < MAX_CHILDREN {
+                    children.insert(0, (extra_node.text_info(), extra_node));
+                    return None;
+                } else {
+                    let mut r_children =
+                        children.insert_split(0, (extra_node.text_info(), extra_node));
+                    std::mem::swap(children, &mut r_children);
+                    return Some(Arc::new(Node::Internal(r_children)));
+                }
+            } else {
+                return None;
+            }
+        } else {
+            panic!("Reached leaf before getting to target depth.");
         }
     }
 
