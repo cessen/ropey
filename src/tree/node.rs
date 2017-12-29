@@ -966,33 +966,36 @@ impl Node {
             let mut did_stuff = false;
             loop {
                 // Do merging
-                let (child_i, start_info) =
-                    children.search_combine_info(|inf| char_idx <= inf.chars as usize);
-                let end_info = start_info.combine(&children.info()[child_i]);
+                if children.len() > 1 {
+                    let (child_i, start_info) =
+                        children.search_combine_info(|inf| char_idx <= inf.chars as usize);
+                    let end_info = start_info.combine(&children.info()[child_i]);
 
-                if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
-                    let do_merge = match *children.nodes()[child_i] {
-                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                    } || match *children.nodes()[child_i + 1] {
-                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                    };
+                    if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
+                        let do_merge = match *children.nodes()[child_i] {
+                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                        }
+                            || match *children.nodes()[child_i + 1] {
+                                Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                                Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                            };
 
-                    if do_merge {
-                        did_stuff |= children.merge_distribute(child_i, child_i + 1);
-                    }
-                } else {
-                    let do_merge = match *children.nodes()[child_i] {
-                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                    };
+                        if do_merge {
+                            did_stuff |= children.merge_distribute(child_i, child_i + 1);
+                        }
+                    } else {
+                        let do_merge = match *children.nodes()[child_i] {
+                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                        };
 
-                    if do_merge {
-                        if child_i == 0 {
-                            did_stuff |= children.merge_distribute(0, 1);
-                        } else {
-                            did_stuff |= children.merge_distribute(child_i - 1, child_i);
+                        if do_merge {
+                            if child_i == 0 {
+                                did_stuff |= children.merge_distribute(0, 1);
+                            } else {
+                                did_stuff |= children.merge_distribute(child_i - 1, child_i);
+                            }
                         }
                     }
                 }
