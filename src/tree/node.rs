@@ -104,8 +104,7 @@ impl Node {
 
                 // Find the child to traverse into along with its starting char
                 // offset.
-                let (child_i, start_info) =
-                    children.search_combine_info(|inf| char_idx <= inf.chars as usize);
+                let (child_i, start_info) = children.search_char_idx(char_idx);
                 let start_char = start_info.chars;
 
                 // Navigate into the appropriate child
@@ -625,8 +624,7 @@ impl Node {
                 Node::Leaf(text.split_off(byte_idx))
             }
             Node::Internal(ref mut children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                let (child_i, acc_info) = children.search_char_idx(char_idx);
                 let child_info = children.info()[child_i];
 
                 if char_idx == acc_info.chars as usize {
@@ -916,8 +914,7 @@ impl Node {
         match *self {
             Node::Leaf(ref text) => (text, byte_idx),
             Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
+                let (child_i, acc_info) = children.search_byte_idx(byte_idx);
                 children.nodes()[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
             }
         }
@@ -929,8 +926,7 @@ impl Node {
         match *self {
             Node::Leaf(ref text) => (text, char_idx),
             Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                let (child_i, acc_info) = children.search_char_idx(char_idx);
                 children.nodes()[child_i].get_chunk_at_char(char_idx - acc_info.chars as usize)
             }
         }
@@ -1029,8 +1025,7 @@ impl Node {
                         .fix_grapheme_seam(info.last().unwrap().bytes, must_be_boundary);
                 } else {
                     // Find the child to navigate into
-                    let (child_i, start_info) =
-                        children.search_combine_info(|inf| byte_pos <= inf.bytes);
+                    let (child_i, start_info) = children.search_byte_idx(byte_pos as usize);
                     let start_byte = start_info.bytes;
 
                     let pos_in_child = byte_pos - start_byte;
@@ -1234,8 +1229,7 @@ impl Node {
                 }
 
                 // Do recursion
-                let (child_i, start_info) =
-                    children.search_combine_info(|inf| char_idx <= inf.chars as usize);
+                let (child_i, start_info) = children.search_char_idx(char_idx);
                 let end_info = start_info + children.info()[child_i];
 
                 if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {

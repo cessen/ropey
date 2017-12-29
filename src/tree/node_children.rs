@@ -396,7 +396,33 @@ impl NodeChildren {
     }
 
     /// Returns the child index and accumulated text info to the left of the
-    /// child that contains the give char.
+    /// child that contains the given byte.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
+        assert!(self.len() > 0);
+
+        let mut accum = TextInfo::new();
+        let mut idx = 0;
+        for info in self.info[0..(self.len() - 1)].iter() {
+            let next_accum = accum + *info;
+            if byte_idx < next_accum.bytes as usize {
+                break;
+            }
+            accum = next_accum;
+            idx += 1;
+        }
+
+        assert!(
+            byte_idx <= (accum.bytes + self.info[idx].bytes) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
+    /// Returns the child index and accumulated text info to the left of the
+    /// child that contains the given char.
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
