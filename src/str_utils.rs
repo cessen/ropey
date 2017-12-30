@@ -365,6 +365,28 @@ pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
     return false;
 }
 
+pub fn find_good_split_idx(text: &str, idx: usize, bias_left: bool) -> usize {
+    if is_grapheme_boundary(text, idx) {
+        idx
+    } else {
+        let prev = prev_grapheme_boundary(text, idx);
+        let next = next_grapheme_boundary(text, idx);
+        if bias_left {
+            if prev > 0 {
+                prev
+            } else {
+                next
+            }
+        } else {
+            if next < text.len() {
+                next
+            } else {
+                prev
+            }
+        }
+    }
+}
+
 #[inline(always)]
 pub fn has_bytes_less_than(word: usize, n: u8) -> bool {
     const ONEMASK: usize = std::usize::MAX / 0xFF;

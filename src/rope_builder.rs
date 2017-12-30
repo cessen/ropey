@@ -3,8 +3,7 @@ use std::sync::Arc;
 use smallvec::SmallVec;
 
 use rope::Rope;
-use str_utils::{is_grapheme_boundary, nearest_internal_grapheme_boundary, next_grapheme_boundary,
-                prev_grapheme_boundary};
+use str_utils::{find_good_split_idx, nearest_internal_grapheme_boundary};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An incremental `Rope` builder.
@@ -156,7 +155,7 @@ impl RopeBuilder {
         if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
-                let split_idx = find_good_split_idx(text, MAX_BYTES);
+                let split_idx = find_good_split_idx(text, MAX_BYTES, true);
                 if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                     self.buffer.push_str(text);
                     return (NextText::None, "");
@@ -243,20 +242,6 @@ enum NextText<'a> {
     None,
     UseBuffer,
     String(&'a str),
-}
-
-fn find_good_split_idx(text: &str, idx: usize) -> usize {
-    if is_grapheme_boundary(text, idx) {
-        idx
-    } else {
-        let prev = prev_grapheme_boundary(text, idx);
-        let next = next_grapheme_boundary(text, idx);
-        if prev > 0 {
-            prev
-        } else {
-            next
-        }
-    }
 }
 
 //===========================================================================
