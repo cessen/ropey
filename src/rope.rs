@@ -317,7 +317,7 @@ impl Rope {
             let root = Arc::make_mut(&mut self.root);
             let mut seam = None;
 
-            let (_text_info, _residual) =
+            let (_text_info, _residual) = {
                 root.edit_char_range(start, end, |acc_info, cur_info, leaf_text| {
                     let local_start = start - (acc_info.chars as usize).min(start);
                     let local_end = (end - acc_info.chars as usize).min(cur_info.chars as usize);
@@ -367,7 +367,8 @@ impl Rope {
                     };
 
                     (new_info, None)
-                });
+                })
+            };
 
             if let Some(seam_idx) = seam {
                 root.fix_grapheme_seam(seam_idx as Count, false);

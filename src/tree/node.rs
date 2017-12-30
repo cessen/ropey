@@ -114,20 +114,19 @@ impl Node {
 
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
-                // Closure: shared code for handling children.
+                // Shared code for handling children.
                 let mut handle_child = |children: &mut NodeChildren,
                                         child_i: usize,
                                         c_acc_info: TextInfo|
                  -> Option<Arc<Node>> {
                     // Recurse into child
-                    let tmp_acc_info = acc_info + c_acc_info;
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
                     let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
                         .edit_char_range_internal(
                             start_idx - (c_acc_info.chars as usize).min(start_idx),
                             (end_idx - c_acc_info.chars as usize).min(tmp_chars),
-                            tmp_acc_info,
+                            acc_info + c_acc_info,
                             tmp_info,
                             edit,
                         );
@@ -153,12 +152,41 @@ impl Node {
                                     children.insert_split(child_i + 1, (info, node)),
                                 )));
                             }
-                        }
-                        // Do merging
-                        else {
-                            // TODO
+                        } else {
                             return None;
                         }
+                    }
+                };
+
+                // Shared code for merging children
+                let merge_child = |children: &mut NodeChildren,
+                                   split_node: &mut Option<Arc<Node>>,
+                                   child_i: usize|
+                 -> bool {
+                    if child_i < children.len() {
+                        if children.len() > 1 && children.nodes()[child_i].is_undersized() {
+                            if child_i == 0 {
+                                children.merge_distribute(child_i, child_i + 1)
+                            } else {
+                                children.merge_distribute(child_i - 1, child_i)
+                            }
+                        } else {
+                            false
+                        }
+                    } else if let Some(ref mut node) = *split_node {
+                        let r_children = Arc::make_mut(node).children();
+                        let child_i = child_i - children.len();
+                        if r_children.len() > 1 && r_children.nodes()[child_i].is_undersized() {
+                            if child_i == 0 {
+                                r_children.merge_distribute(child_i, child_i + 1)
+                            } else {
+                                r_children.merge_distribute(child_i - 1, child_i)
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
                     }
                 };
 
@@ -181,19 +209,21 @@ impl Node {
                 }
 
                 // Get child info for the two char indices
-                let ((l_child_i, l_acc_info), (mut r_child_i, r_acc_info)) =
+                let ((l_child_i, l_acc_info), (r_child_i, r_acc_info)) =
                     children.search_char_idx_range(start_idx, end_idx);
 
-                // Remove completely subsumed children
+                // Both indices point into the same child
                 if l_child_i == r_child_i {
-                    // Both indices point into the same child
-                    let residual = handle_child(children, l_child_i, l_acc_info);
+                    let mut residual = handle_child(children, l_child_i, l_acc_info);
+                    merge_child(children, &mut residual, l_child_i);
+
                     return (
                         children.combined_info(),
                         residual.map(|c| (c.text_info(), c)),
                     );
-                } else {
-                    // We're dealing with more than one child.
+                }
+                // We're dealing with more than one child.
+                else {
                     // Calculate the start..end range of nodes to be removed.
                     let r_child_exists: bool;
                     let start_i = l_child_i + 1;
@@ -212,20 +242,18 @@ impl Node {
                         children.remove(start_i);
                     }
 
-                    // Update r_child index based on the removals
-                    if end_i <= r_child_i {
-                        r_child_i -= end_i - start_i;
-                    }
+                    let tot_children = children.len(); // Used later during merging
 
                     // Handle right child
                     let mut split_children = if r_child_exists {
-                        handle_child(children, r_child_i, r_acc_info)
+                        handle_child(children, l_child_i + 1, r_acc_info)
                     } else {
                         None
                     };
 
                     // Handle left child
                     if split_children.is_none() {
+                        // We have to check because merging may have
                         split_children = handle_child(children, l_child_i, l_acc_info);
                     } else if l_child_i < children.len() {
                         let tmp = handle_child(children, l_child_i, l_acc_info);
@@ -239,6 +267,19 @@ impl Node {
                         assert!(tmp.is_none());
                     }
 
+                    // Handle merging
+                    let merge_extent = {
+                        let new_tot_children = children.len()
+                            + split_children
+                                .as_ref()
+                                .map(|c| c.child_count())
+                                .unwrap_or(0);
+                        1 + new_tot_children - tot_children + if r_child_exists { 1 } else { 0 }
+                    };
+                    for i in (l_child_i..(l_child_i + merge_extent)).rev() {
+                        merge_child(children, &mut split_children, i);
+                    }
+
                     // Return
                     return (
                         children.combined_info(),
@@ -248,141 +289,6 @@ impl Node {
             }
         }
     }
-
-    // // Recursive function.  The returned bool means:
-    // //
-    // // - True: there are problems below me that need zipping to fix.
-    // // - False: I'm good!  No zipping needed!
-    // pub fn remove(&mut self, start: usize, end: usize) -> (bool, Option<usize>) {
-    //     debug_assert!(start <= end);
-    //     if start == end {
-    //         return (false, None);
-    //     }
-
-    //     let mut need_zip = false;
-    //     let seam;
-
-    //     match *self {
-    //         Node::Leaf(ref mut cur_text) => {
-    //             debug_assert!(end <= count_chars(cur_text));
-    //             let start_byte = char_idx_to_byte_idx(cur_text, start);
-    //             let end_byte = char_idx_to_byte_idx(cur_text, end);
-    //             let is_on_edge = start_byte == 0 || end_byte == cur_text.len();
-    //             cur_text.remove_range(start_byte, end_byte);
-
-    //             return (
-    //                 cur_text.len() < MIN_BYTES,
-    //                 if is_on_edge { Some(start_byte) } else { None },
-    //             );
-    //         }
-
-    //         Node::Internal(ref mut children) => {
-    //             // Find the end-point nodes of the removal
-    //             let (l_child_i, l_acc_info) =
-    //                 children.search_combine_info(|inf| start as Count <= inf.chars);
-    //             let (mut r_child_i, r_acc_info) =
-    //                 children.search_combine_info(|inf| end as Count <= inf.chars);
-
-    //             // Do the removal
-    //             if l_child_i == r_child_i {
-    //                 let l_start = start - l_acc_info.chars as usize;
-    //                 let l_end = end - l_acc_info.chars as usize;
-
-    //                 let start_is_edge = l_start == 0;
-    //                 let end_is_edge = l_end == children.info()[l_child_i as usize].chars as usize;
-
-    //                 // Remove
-    //                 if start_is_edge && end_is_edge {
-    //                     children.remove(l_child_i);
-    //                     seam = Some(l_acc_info.bytes as usize);
-    //                 } else {
-    //                     // Remove the text
-    //                     let (child_need_zip, child_seam) = Arc::make_mut(
-    //                         &mut children.nodes_mut()[l_child_i as usize],
-    //                     ).remove(l_start, l_end);
-
-    //                     // Set return values
-    //                     need_zip |= child_need_zip;
-    //                     seam = child_seam.map(|idx| idx + l_acc_info.bytes as usize);
-
-    //                     // Update child info
-    //                     children.info_mut()[l_child_i] =
-    //                         children.nodes()[l_child_i as usize].text_info();
-    //                 }
-    //             } else {
-    //                 // Calculate the local char indices to remove for the left- and
-    //                 // right-most nodes that touch the removal range.
-    //                 let l_start = start - l_acc_info.chars as usize;
-    //                 let l_end = children.info()[l_child_i as usize].chars as usize;
-    //                 let r_start = 0;
-    //                 let r_end = end - r_acc_info.chars as usize;
-
-    //                 // Determine if the left-most or right-most nodes need to be
-    //                 // completely removed.
-    //                 let l_gone = l_start == 0;
-    //                 let r_gone = r_end == children.info()[r_child_i as usize].chars as usize;
-
-    //                 // Remove children that are completely encompassed
-    //                 // in the range.
-    //                 let removal_start = if l_gone { l_child_i } else { l_child_i + 1 };
-    //                 let removal_end = if r_gone { r_child_i + 1 } else { r_child_i };
-    //                 for _ in (removal_start as usize)..(removal_end as usize) {
-    //                     children.remove(removal_start);
-    //                 }
-
-    //                 // Update r_child_i based on removals
-    //                 r_child_i = if l_gone { l_child_i } else { l_child_i + 1 };
-
-    //                 // Remove the text from the left and right nodes
-    //                 // and update their text info.
-    //                 let (info, nodes) = children.info_and_nodes_mut();
-    //                 if !l_gone {
-    //                     let (child_need_zip, child_seam) =
-    //                         Arc::make_mut(&mut nodes[l_child_i as usize]).remove(l_start, l_end);
-    //                     info[l_child_i as usize] = nodes[l_child_i as usize].text_info();
-
-    //                     // Set return values
-    //                     need_zip |= child_need_zip;
-    //                     seam = child_seam.map(|idx| idx + l_acc_info.bytes as usize);
-    //                 } else {
-    //                     seam = Some(l_acc_info.bytes as usize);
-    //                 }
-
-    //                 if !r_gone {
-    //                     need_zip |= Arc::make_mut(&mut nodes[r_child_i as usize])
-    //                         .remove(r_start, r_end)
-    //                         .0;
-    //                     info[r_child_i as usize] = nodes[r_child_i as usize].text_info();
-    //                 }
-    //             }
-
-    //             // Do the merging, if necessary.
-    //             // First, merge left and right if necessary/possible.
-    //             if (l_child_i + 1) < children.len()
-    //                 && (children.nodes()[l_child_i].is_undersized()
-    //                     || children.nodes()[l_child_i + 1].is_undersized())
-    //             {
-    //                 children.merge_distribute(l_child_i, l_child_i + 1);
-    //             }
-    //             // Second, try to merge the left child again, if necessary/possible
-    //             if children.len() > 1 && children.nodes()[l_child_i].is_undersized() {
-    //                 if l_child_i == 0 {
-    //                     children.merge_distribute(0, 1);
-    //                 } else {
-    //                     children.merge_distribute(l_child_i - 1, l_child_i);
-    //                 }
-    //             }
-
-    //             debug_assert!(children.len() > 0);
-    //             return (
-    //                 need_zip
-    //                     || (l_child_i < children.len()
-    //                         && children.nodes()[l_child_i].is_undersized()),
-    //                 seam,
-    //             );
-    //         }
-    //     }
-    // }
 
     pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
@@ -846,9 +752,6 @@ impl Node {
                 if is_root {
                     assert!(children.len() > 1);
                 } else {
-                    if !(children.len() >= MIN_CHILDREN) {
-                        println!("{} : {}", children.len(), MIN_CHILDREN);
-                    }
                     assert!(children.len() >= MIN_CHILDREN);
                 }
 
