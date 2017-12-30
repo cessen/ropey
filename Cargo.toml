@@ -16,3 +16,18 @@ unicode-segmentation = "1.2"
 [dev-dependencies]
 rand = "0.3"
 quickcheck = "0.5"
+bencher = "0.1.4"
+
+#-----------------------------------------
+
+[[bench]]
+name = "insert"
+harness = false
+
+[[bench]]
+name = "remove"
+harness = false
+
+[[bench]]
+name = "queries"
+harness = false
