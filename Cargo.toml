@@ -2,7 +2,7 @@
 name = "ropey"
 version = "0.5.3"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
-description = "Efficient utf8 text buffer for Rust"
+description = "An efficient text buffer for Rust"
 documentation = "https://docs.rs/ropey"
 repository = "https://github.com/cessen/ropey"
 readme = "README.md"
