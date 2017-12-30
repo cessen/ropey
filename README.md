@@ -19,8 +19,8 @@ Ropey is fast and minimizes memory usage:
   large.  Coherent insertions (i.e. all near the same place in the text) are
   even faster, doing the same task at over 2.5 million insertions per
   second.
-- Freshly loading a file from disk only incurs about 30% memory overhead.  For
-  example, a 100 MB text file will occupy about 130 MB of memory when loaded
+- Freshly loading a file from disk only incurs about 17% memory overhead.  For
+  example, a 100 MB text file will occupy about 117 MB of memory when loaded
   by Ropey.
 - Cloning ropes is _extremely_ cheap.  Rope clones share data, so an initial
   clone only takes 8 bytes of memory.  After that, memory usage will grow

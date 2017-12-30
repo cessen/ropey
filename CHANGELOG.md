@@ -1,9 +1,28 @@
+# 0.5.4 (2016-12-28)
+
+Bug fixes:
+
+* Rope::remove() didn't always merge graphemes between chunks properly.
+
+Performance and memory:
+
+* Inserting large texts into a rope now degrades in performance more gracefully as the insertion text becomes larger, rather than hitting a sudden performance cliff.
+* `Rope::remove()` got a nice speed boost.
+* Memory overhead has been reduced across the board.  Freshly loaded files now only have ~17% overhead, and the worst-case (built up from lots of small random-location inserts) is now ~60% overhead.
+
+Misc:
+
+* 100% unit test coverage of public APIs.
+* Added randomized testing via [QuickCheck](https://crates.io/crates/quickcheck).
+* Added benchmarks to the library.
+
+
 # 0.5.3 (2016-12-28)
 
 Performance and memory:
 
 * Massive speed boost for small insertions: between %40 - %50 faster.
-* Rope::from_str() now only uses stack memory for strings smaller than ~3MB. (Aside from the resulting Rope itself, of course.)
+* `Rope::from_str()` now only uses stack memory for strings smaller than ~3MB. (Aside from the resulting Rope itself, of course.)
 
 Misc:
 
