@@ -312,6 +312,13 @@ impl Rope {
             self.len_chars()
         );
 
+        // A special case that the rest of the logic doesn't handle
+        // correctly.
+        if start == 0 && end == self.len_chars() {
+            self.root = Arc::new(Node::new());
+            return;
+        }
+
         // Scope to contain borrow of root
         {
             let root = Arc::make_mut(&mut self.root);
@@ -1114,36 +1121,48 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn remove_04() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(56, 55); // Wrong ordering of start/end
+
+        // Make sure graphemes get merged properly
+        r.remove(0, 103);
+        assert_eq!(r, "");
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
     #[should_panic]
     fn remove_05() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(102, 104); // Removing past the end
+        r.remove(56, 55); // Wrong ordering of start/end
     }
 
     #[test]
     #[should_panic]
     fn remove_06() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(103, 104); // Removing past the end
+        r.remove(102, 104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_07() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(104, 104); // Removing past the end
+        r.remove(103, 104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_08() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(104, 104); // Removing past the end
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_09() {
         let mut r = Rope::from_str(TEXT);
         r.remove(104, 105); // Removing past the end
     }

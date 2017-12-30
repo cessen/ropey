@@ -55,6 +55,9 @@ impl Node {
     /// 1. The text info of the selected leaf node after the edits.
     /// 2. An optional new leaf node to the right of the selected leaf node,
     ///    along with its text info.
+    ///
+    /// WARNING: does not correctly handle all text being removed.  That
+    /// should be special-cased in calling code.
     pub fn edit_char_range<F>(
         &mut self,
         start_idx: usize,
