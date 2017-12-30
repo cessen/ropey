@@ -11,7 +11,7 @@ const TEXT: &str = include_str!("large.txt");
 
 //----
 
-fn small_removals_random(bench: &mut Bencher) {
+fn removals_random_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -26,7 +26,7 @@ fn small_removals_random(bench: &mut Bencher) {
     })
 }
 
-fn small_removals_start(bench: &mut Bencher) {
+fn removals_start_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -41,7 +41,7 @@ fn small_removals_start(bench: &mut Bencher) {
     })
 }
 
-fn small_removals_middle(bench: &mut Bencher) {
+fn removals_middle_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -56,7 +56,7 @@ fn small_removals_middle(bench: &mut Bencher) {
     })
 }
 
-fn small_removals_end(bench: &mut Bencher) {
+fn removals_end_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -73,7 +73,7 @@ fn small_removals_end(bench: &mut Bencher) {
 
 //----
 
-fn medium_removals_random(bench: &mut Bencher) {
+fn removals_random_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -88,7 +88,7 @@ fn medium_removals_random(bench: &mut Bencher) {
     })
 }
 
-fn medium_removals_start(bench: &mut Bencher) {
+fn removals_start_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -103,7 +103,7 @@ fn medium_removals_start(bench: &mut Bencher) {
     })
 }
 
-fn medium_removals_middle(bench: &mut Bencher) {
+fn removals_middle_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -118,7 +118,7 @@ fn medium_removals_middle(bench: &mut Bencher) {
     })
 }
 
-fn medium_removals_end(bench: &mut Bencher) {
+fn removals_end_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
 
     bench.iter(|| {
@@ -137,7 +137,7 @@ fn medium_removals_end(bench: &mut Bencher) {
 
 const LEN_MUL: usize = 2;
 
-fn large_removals_random(bench: &mut Bencher) {
+fn removals_random_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     let tmp = rope.clone();
     for _ in 0..(LEN_MUL - 1) {
@@ -156,7 +156,7 @@ fn large_removals_random(bench: &mut Bencher) {
     })
 }
 
-fn large_removals_start(bench: &mut Bencher) {
+fn removals_start_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     let tmp = rope.clone();
     for _ in 0..(LEN_MUL - 1) {
@@ -175,7 +175,7 @@ fn large_removals_start(bench: &mut Bencher) {
     })
 }
 
-fn large_removals_middle(bench: &mut Bencher) {
+fn removals_middle_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     let tmp = rope.clone();
     for _ in 0..(LEN_MUL - 1) {
@@ -194,7 +194,7 @@ fn large_removals_middle(bench: &mut Bencher) {
     })
 }
 
-fn large_removals_end(bench: &mut Bencher) {
+fn removals_end_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     let tmp = rope.clone();
     for _ in 0..(LEN_MUL - 1) {
@@ -217,17 +217,17 @@ fn large_removals_end(bench: &mut Bencher) {
 
 benchmark_group!(
     benches,
-    small_removals_random,
-    small_removals_start,
-    small_removals_middle,
-    small_removals_end,
-    medium_removals_random,
-    medium_removals_start,
-    medium_removals_middle,
-    medium_removals_end,
-    large_removals_random,
-    large_removals_start,
-    large_removals_middle,
-    large_removals_end
+    removals_random_small,
+    removals_start_small,
+    removals_middle_small,
+    removals_end_small,
+    removals_random_medium,
+    removals_start_medium,
+    removals_middle_medium,
+    removals_end_medium,
+    removals_random_large,
+    removals_start_large,
+    removals_middle_large,
+    removals_end_large
 );
 benchmark_main!(benches);

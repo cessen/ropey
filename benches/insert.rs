@@ -11,7 +11,7 @@ const TEXT: &str = include_str!("large.txt");
 
 //----
 
-fn small_inserts_random(bench: &mut Bencher) {
+fn inserts_random_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -19,14 +19,14 @@ fn small_inserts_random(bench: &mut Bencher) {
     })
 }
 
-fn small_inserts_start(bench: &mut Bencher) {
+fn inserts_start_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         rope.insert(0, "a");
     })
 }
 
-fn small_inserts_middle(bench: &mut Bencher) {
+fn inserts_middle_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -34,7 +34,7 @@ fn small_inserts_middle(bench: &mut Bencher) {
     })
 }
 
-fn small_inserts_end(bench: &mut Bencher) {
+fn inserts_end_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -44,7 +44,7 @@ fn small_inserts_end(bench: &mut Bencher) {
 
 //----
 
-fn medium_inserts_random(bench: &mut Bencher) {
+fn inserts_random_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -52,14 +52,14 @@ fn medium_inserts_random(bench: &mut Bencher) {
     })
 }
 
-fn medium_inserts_start(bench: &mut Bencher) {
+fn inserts_start_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         rope.insert(0, "This is some text.");
     })
 }
 
-fn medium_inserts_middle(bench: &mut Bencher) {
+fn inserts_middle_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -67,7 +67,7 @@ fn medium_inserts_middle(bench: &mut Bencher) {
     })
 }
 
-fn medium_inserts_end(bench: &mut Bencher) {
+fn inserts_end_medium(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -79,7 +79,7 @@ fn medium_inserts_end(bench: &mut Bencher) {
 
 const INSERT_TEXT: &str = include_str!("small.txt");
 
-fn large_inserts_random(bench: &mut Bencher) {
+fn inserts_random_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -87,14 +87,14 @@ fn large_inserts_random(bench: &mut Bencher) {
     })
 }
 
-fn large_inserts_start(bench: &mut Bencher) {
+fn inserts_start_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         rope.insert(0, INSERT_TEXT);
     })
 }
 
-fn large_inserts_middle(bench: &mut Bencher) {
+fn inserts_middle_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -102,7 +102,7 @@ fn large_inserts_middle(bench: &mut Bencher) {
     })
 }
 
-fn large_inserts_end(bench: &mut Bencher) {
+fn inserts_end_large(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
         let len = rope.len_chars();
@@ -114,17 +114,17 @@ fn large_inserts_end(bench: &mut Bencher) {
 
 benchmark_group!(
     benches,
-    small_inserts_random,
-    small_inserts_start,
-    small_inserts_middle,
-    small_inserts_end,
-    medium_inserts_random,
-    medium_inserts_start,
-    medium_inserts_middle,
-    medium_inserts_end,
-    large_inserts_random,
-    large_inserts_start,
-    large_inserts_middle,
-    large_inserts_end
+    inserts_random_small,
+    inserts_start_small,
+    inserts_middle_small,
+    inserts_end_small,
+    inserts_random_medium,
+    inserts_start_medium,
+    inserts_middle_medium,
+    inserts_end_medium,
+    inserts_random_large,
+    inserts_start_large,
+    inserts_middle_large,
+    inserts_end_large
 );
 benchmark_main!(benches);
