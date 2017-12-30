@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std;
 use std::io;
 use std::sync::Arc;
@@ -482,6 +480,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    #[allow(dead_code)]
     pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -507,6 +506,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    #[allow(dead_code)]
     pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -528,6 +528,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[allow(dead_code)]
     pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -580,6 +581,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
+    #[allow(dead_code)]
     pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(

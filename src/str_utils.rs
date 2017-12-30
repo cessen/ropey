@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std;
 
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
@@ -65,7 +63,6 @@ pub fn count_line_breaks(text: &str) -> usize {
     // when determining whether to skip the full check.  This penalizes texts that use
     // a lot of code points in those ranges.  We should check the low bytes instead, to
     // better distribute the penalty.
-    const ONEMASK: usize = std::usize::MAX / 0xFF;
     let tsize: usize = std::mem::size_of::<usize>();
 
     let len = text.len();

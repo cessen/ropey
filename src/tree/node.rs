@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std;
 use std::sync::Arc;
 
@@ -195,7 +193,7 @@ impl Node {
 
                 // Compact leaf children if we're close to maximum leaf
                 // fragmentation.
-                if children.len() == MAX_CHILDREN && children.nodes()[0].is_leaf()
+                if children.is_full() && children.nodes()[0].is_leaf()
                     && (children.combined_info().bytes as usize) < (MAX_BYTES * (MIN_CHILDREN + 1))
                 {
                     children.compact_leaves();
@@ -684,18 +682,6 @@ impl Node {
         1 + match *self {
             Node::Leaf(_) => 0,
             Node::Internal(ref children) => children.nodes()[0].depth(),
-        }
-    }
-
-    /// Returns the chunk that contains the given byte, and the byte's
-    /// byte-offset within the chunk.
-    fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
-        match *self {
-            Node::Leaf(ref text) => (text, byte_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) = children.search_byte_idx(byte_idx);
-                children.nodes()[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
-            }
         }
     }
 

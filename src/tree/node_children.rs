@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std;
 use std::fmt;
 use std::iter::{Iterator, Zip};
@@ -39,7 +37,7 @@ impl NodeChildren {
 
     /// Returns whether the array is full or not.
     pub fn is_full(&self) -> bool {
-        (self.len as usize) == MAX_LEN
+        self.len() == MAX_LEN
     }
 
     /// Returns a slice to the nodes array.
@@ -318,18 +316,6 @@ impl NodeChildren {
         other
     }
 
-    /// Gets references to the nth item's node and info.
-    pub fn i(&self, n: usize) -> (&TextInfo, &Arc<Node>) {
-        assert!(n < self.len());
-        (&self.info()[n], &self.nodes()[n])
-    }
-
-    /// Gets mut references to the nth item's node and info.
-    pub fn i_mut(&mut self, n: usize) -> (&mut TextInfo, &mut Arc<Node>) {
-        assert!(n < self.len());
-        (&mut self.info[n], &mut self.nodes[n])
-    }
-
     /// Fetches two children simultaneously, returning mutable references
     /// to their info and nodes.
     ///
@@ -358,14 +344,6 @@ impl NodeChildren {
     /// Creates an iterator over the array's items.
     pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
         Iterator::zip(self.info().iter(), self.nodes().iter())
-    }
-
-    /// Creates an iterator over the array's items.
-    pub fn iter_mut(&mut self) -> Zip<slice::IterMut<TextInfo>, slice::IterMut<Arc<Node>>> {
-        Iterator::zip(
-            (&mut self.info[..(self.len as usize)]).iter_mut(),
-            (&mut self.nodes[..(self.len as usize)]).iter_mut(),
-        )
     }
 
     pub fn combined_info(&self) -> TextInfo {

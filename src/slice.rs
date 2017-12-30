@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std;
 use std::sync::Arc;
 
@@ -20,18 +18,6 @@ pub struct RopeSlice<'a> {
 }
 
 impl<'a> RopeSlice<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> RopeSlice {
-        RopeSlice {
-            node: node,
-            start_byte: 0,
-            end_byte: node.text_info().bytes,
-            start_char: 0,
-            end_char: node.text_info().chars,
-            start_line_break: 0,
-            end_line_break: node.text_info().line_breaks,
-        }
-    }
-
     pub(crate) fn new_with_range(node: &Arc<Node>, start: usize, end: usize) -> RopeSlice {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
