@@ -9,6 +9,9 @@ readme = "README.md"
 license = "MIT"
 keywords = ["rope", "text", "buffer"]
 
+[badges]
+travis-ci = { repository = "cessen/ropey" }
+
 [dependencies]
 smallvec = "0.6"
 unicode-segmentation = "1.2"
