@@ -200,7 +200,8 @@ impl Rope {
         if text.len() <= MAX_BYTES {
             // Do the insertion
             let mut seam = None;
-            let (l_info, residual) = Arc::make_mut(&mut self.root).edit_leaf_at_char(
+            let (l_info, residual) = Arc::make_mut(&mut self.root).edit_char_range(
+                char_idx,
                 char_idx,
                 |acc_info, cur_info, leaf_text| {
                     debug_assert!(acc_info.chars as usize <= char_idx);
