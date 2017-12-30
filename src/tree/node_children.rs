@@ -181,7 +181,7 @@ impl NodeChildren {
     /// If the children are leaf nodes, compacts them to take up the fewest
     /// nodes.
     pub fn compact_leaves(&mut self) {
-        if !self.nodes[0].is_leaf() || self.len() < 2 {
+        if !self.nodes()[0].is_leaf() || self.len() < 2 {
             return;
         }
 
@@ -321,19 +321,13 @@ impl NodeChildren {
     /// Gets references to the nth item's node and info.
     pub fn i(&self, n: usize) -> (&TextInfo, &Arc<Node>) {
         assert!(n < self.len());
-        (
-            &self.info[self.len as usize],
-            &self.nodes[self.len as usize],
-        )
+        (&self.info()[n], &self.nodes()[n])
     }
 
     /// Gets mut references to the nth item's node and info.
     pub fn i_mut(&mut self, n: usize) -> (&mut TextInfo, &mut Arc<Node>) {
         assert!(n < self.len());
-        (
-            &mut self.info[self.len as usize],
-            &mut self.nodes[self.len as usize],
-        )
+        (&mut self.info[n], &mut self.nodes[n])
     }
 
     /// Fetches two children simultaneously, returning mutable references
@@ -363,10 +357,7 @@ impl NodeChildren {
 
     /// Creates an iterator over the array's items.
     pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
-        Iterator::zip(
-            (&self.info[..(self.len as usize)]).iter(),
-            (&self.nodes[..(self.len as usize)]).iter(),
-        )
+        Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
     /// Creates an iterator over the array's items.
@@ -378,14 +369,12 @@ impl NodeChildren {
     }
 
     pub fn combined_info(&self) -> TextInfo {
-        self.info[..self.len()]
-            .iter()
-            .fold(TextInfo::new(), |a, b| a + *b)
+        self.info().iter().fold(TextInfo::new(), |a, b| a + *b)
     }
 
     pub fn search_combine_info<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo) {
         let mut accum = TextInfo::new();
-        for (idx, inf) in self.info[..self.len()].iter().enumerate() {
+        for (idx, inf) in self.info().iter().enumerate() {
             if pred(&(accum + *inf)) {
                 return (idx, accum);
             } else {
@@ -400,11 +389,11 @@ impl NodeChildren {
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
-        assert!(self.len() > 0);
+        debug_assert!(self.len() > 0);
 
         let mut accum = TextInfo::new();
         let mut idx = 0;
-        for info in self.info[0..(self.len() - 1)].iter() {
+        for info in self.info()[0..(self.len() - 1)].iter() {
             let next_accum = accum + *info;
             if byte_idx < next_accum.bytes as usize {
                 break;
@@ -413,8 +402,9 @@ impl NodeChildren {
             idx += 1;
         }
 
+        #[cfg(any(test, debug_assertions))]
         assert!(
-            byte_idx <= (accum.bytes + self.info[idx].bytes) as usize,
+            byte_idx <= (accum.bytes + self.info()[idx].bytes) as usize,
             "Index out of bounds."
         );
 
@@ -426,11 +416,11 @@ impl NodeChildren {
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
-        assert!(self.len() > 0);
+        debug_assert!(self.len() > 0);
 
         let mut accum = TextInfo::new();
         let mut idx = 0;
-        for info in self.info[0..(self.len() - 1)].iter() {
+        for info in self.info()[0..(self.len() - 1)].iter() {
             let next_accum = accum + *info;
             if char_idx < next_accum.chars as usize {
                 break;
@@ -439,8 +429,9 @@ impl NodeChildren {
             idx += 1;
         }
 
+        #[cfg(any(test, debug_assertions))]
         assert!(
-            char_idx <= (accum.chars + self.info[idx].chars) as usize,
+            char_idx <= (accum.chars + self.info()[idx].chars) as usize,
             "Index out of bounds."
         );
 
@@ -456,14 +447,14 @@ impl NodeChildren {
         start_idx: usize,
         end_idx: usize,
     ) -> ((usize, TextInfo), (usize, TextInfo)) {
-        assert!(start_idx <= end_idx);
-        assert!(self.len() > 0);
+        debug_assert!(start_idx <= end_idx);
+        debug_assert!(self.len() > 0);
 
         let mut accum = TextInfo::new();
         let mut idx = 0;
 
         // Find left child and info
-        for info in self.info[..(self.len() - 1)].iter() {
+        for info in self.info()[..(self.len() - 1)].iter() {
             let next_accum = accum + *info;
             if start_idx < next_accum.chars as usize {
                 break;
@@ -475,7 +466,7 @@ impl NodeChildren {
         let l_acc_info = accum;
 
         // Find right child and info
-        for info in self.info[idx..(self.len() - 1)].iter() {
+        for info in self.info()[idx..(self.len() - 1)].iter() {
             let next_accum = accum + *info;
             if end_idx <= next_accum.chars as usize {
                 break;
@@ -484,8 +475,9 @@ impl NodeChildren {
             idx += 1;
         }
 
+        #[cfg(any(test, debug_assertions))]
         assert!(
-            end_idx <= (accum.chars + self.info[idx].chars) as usize,
+            end_idx <= (accum.chars + self.info()[idx].chars) as usize,
             "Index out of bounds."
         );
 
@@ -507,8 +499,8 @@ impl fmt::Debug for NodeChildren {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("NodeChildren")
             .field("len", &self.len)
-            .field("info", &&self.info[0..self.len()])
-            .field("nodes", &&self.nodes[0..self.len()])
+            .field("info", &&self.info())
+            .field("nodes", &&self.nodes())
             .finish()
     }
 }

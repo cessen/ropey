@@ -64,8 +64,8 @@ impl Node {
     where
         F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
     {
-        assert!(start_idx <= end_idx);
-        assert!(end_idx <= self.text_info().chars as usize);
+        debug_assert!(start_idx <= end_idx);
+        debug_assert!(end_idx <= self.text_info().chars as usize);
 
         match *self {
             Node::Leaf(_) => {
@@ -257,14 +257,14 @@ impl Node {
                         split_children = handle_child(children, l_child_i, l_acc_info);
                     } else if l_child_i < children.len() {
                         let tmp = handle_child(children, l_child_i, l_acc_info);
-                        assert!(tmp.is_none());
+                        debug_assert!(tmp.is_none());
                     } else if let Some(ref mut r_children) = split_children {
                         let tmp = handle_child(
                             Arc::make_mut(r_children).children(),
                             l_child_i - children.len(),
                             l_acc_info,
                         );
-                        assert!(tmp.is_none());
+                        debug_assert!(tmp.is_none());
                     }
 
                     // Handle merging

@@ -8,7 +8,7 @@ use std::str;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 use smallvec::{Array, SmallVec};
-use str_utils::{char_idx_to_byte_idx, nearest_internal_grapheme_boundary};
+use str_utils::{char_idx_to_byte_idx, count_chars, nearest_internal_grapheme_boundary};
 use tree::MAX_BYTES;
 
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
@@ -48,12 +48,12 @@ impl NodeText {
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    pub fn insert_str(&mut self, idx: usize, string: &str) {
-        assert!(self.is_char_boundary(idx));
-        assert!(idx <= self.len());
+    pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
+        debug_assert!(self.is_char_boundary(byte_idx));
+        debug_assert!(byte_idx <= self.len());
 
         unsafe {
-            self.insert_bytes(idx, string.as_bytes());
+            self.insert_bytes(byte_idx, string.as_bytes());
         }
     }
 
@@ -115,7 +115,7 @@ impl NodeText {
     /// invalid utf8 string.
     pub fn truncate(&mut self, idx: usize) {
         assert!(self.is_char_boundary(idx));
-        assert!(idx <= self.len());
+        debug_assert!(idx <= self.len());
         self.buffer.truncate(idx);
         self.inline_if_possible();
     }
@@ -127,7 +127,7 @@ impl NodeText {
     /// invalid utf8 string.
     pub fn truncate_front(&mut self, idx: usize) {
         assert!(self.is_char_boundary(idx));
-        assert!(idx <= self.len());
+        debug_assert!(idx <= self.len());
         unsafe {
             self.remove_bytes(0, idx);
         }
@@ -140,8 +140,8 @@ impl NodeText {
     pub fn remove_range(&mut self, start: usize, end: usize) {
         assert!(self.is_char_boundary(start));
         assert!(self.is_char_boundary(end));
-        assert!(end <= self.len());
-        assert!(start <= end);
+        debug_assert!(end <= self.len());
+        debug_assert!(start <= end);
         unsafe {
             self.remove_bytes(start, end);
         }
@@ -149,7 +149,8 @@ impl NodeText {
     }
 
     pub fn remove_char_range(&mut self, start: usize, end: usize) {
-        assert!(start <= end);
+        debug_assert!(start <= end);
+        debug_assert!(end <= count_chars(self));
 
         // TODO: get both of these in a single pass
         let byte_start = char_idx_to_byte_idx(self, start);
@@ -188,6 +189,7 @@ impl NodeText {
     /// The first section of the split is stored in the original string,
     /// while the second section of the split is returned as a new string.
     pub fn split_off_at_char(&mut self, char_idx: usize) -> NodeText {
+        debug_assert!(char_idx <= count_chars(self));
         let byte_idx = char_idx_to_byte_idx(self, char_idx);
         self.split_off(byte_idx)
     }
@@ -210,7 +212,7 @@ impl NodeText {
 
     #[inline(always)]
     unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
-        debug_assert!(idx <= self.len());
+        assert!(idx <= self.len());
         let len = self.len();
         let amt = bytes.len();
         self.buffer.reserve(amt);
@@ -230,8 +232,8 @@ impl NodeText {
 
     #[inline(always)]
     unsafe fn remove_bytes(&mut self, start: usize, end: usize) {
-        debug_assert!(end >= start);
-        debug_assert!(end <= self.len());
+        assert!(start <= end);
+        assert!(end <= self.len());
         let len = self.len();
         let amt = end - start;
         ptr::copy(

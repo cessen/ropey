@@ -38,8 +38,8 @@ fn from_reader_03() {
     // Make text with a utf8-invalid byte sequence in it.
     let mut text = Vec::new();
     text.extend(TEXT.as_bytes());
-    text[6132] = 0b11000000;
-    text[6133] = 0b01000000;
+    text[6132] = 0b1100_0000;
+    text[6133] = 0b0100_0000;
 
     // Make a reader from the invalid data
     let text_reader = Cursor::new(text);

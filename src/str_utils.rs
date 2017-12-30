@@ -230,7 +230,7 @@ pub fn line_idx_to_char_idx(text: &str, line_idx: usize) -> usize {
 /// boundary or not.
 pub fn is_grapheme_boundary(text: &str, byte_idx: usize) -> bool {
     // Bounds check
-    assert!(byte_idx <= text.len());
+    debug_assert!(byte_idx <= text.len());
 
     if byte_idx == 0 || byte_idx == text.len() {
         // True if we're on the edge of the text
@@ -253,7 +253,7 @@ pub fn is_grapheme_boundary(text: &str, byte_idx: usize) -> bool {
 /// the string.
 pub fn prev_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
     // Bounds check
-    assert!(byte_idx <= text.len());
+    debug_assert!(byte_idx <= text.len());
 
     // Early out
     if byte_idx == 0 {
@@ -282,7 +282,7 @@ pub fn prev_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
 /// the string.
 pub fn next_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
     // Bounds check
-    assert!(byte_idx <= text.len());
+    debug_assert!(byte_idx <= text.len());
 
     // Early out
     if byte_idx == text.len() {
@@ -312,7 +312,7 @@ pub fn next_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
 /// then the right edge of the text is returned.
 pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
     // Bounds check
-    assert!(byte_idx <= text.len());
+    debug_assert!(byte_idx <= text.len());
 
     // Find codepoint boundary
     let mut boundary_idx = byte_idx;
@@ -342,7 +342,7 @@ pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize 
 }
 
 pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
-    assert!(!l.is_empty() && !r.is_empty());
+    debug_assert!(!l.is_empty() && !r.is_empty());
 
     let tot_len = l.len() + r.len();
     let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
@@ -368,7 +368,7 @@ pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
 #[inline(always)]
 pub fn has_bytes_less_than(word: usize, n: u8) -> bool {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
-    (((word.wrapping_sub(ONEMASK * n as usize))) & !word & (ONEMASK * 128)) != 0
+    ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
 }
 
 #[inline(always)]

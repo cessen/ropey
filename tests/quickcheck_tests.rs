@@ -13,21 +13,21 @@ fn char_to_byte_idx(idx: usize, text: &str) -> usize {
 }
 
 fn string_insert(text: &mut String, char_idx: usize, text_ins: &str) {
-    let byte_idx = char_to_byte_idx(char_idx, &text);
-    text.insert_str(byte_idx, &text_ins);
+    let byte_idx = char_to_byte_idx(char_idx, text);
+    text.insert_str(byte_idx, text_ins);
 }
 
 fn string_remove(text: &mut String, char_start: usize, char_end: usize) {
-    let byte_start = char_to_byte_idx(char_start, &text);
-    let byte_end = char_to_byte_idx(char_end, &text);
+    let byte_start = char_to_byte_idx(char_start, text);
+    let byte_end = char_to_byte_idx(char_end, text);
     let text_r = text.split_off(byte_end);
     text.truncate(byte_start);
     text.push_str(&text_r);
 }
 
 fn string_slice(text: &str, char_start: usize, char_end: usize) -> &str {
-    let byte_start = char_to_byte_idx(char_start, &text);
-    let byte_end = char_to_byte_idx(char_end, &text);
+    let byte_start = char_to_byte_idx(char_start, text);
+    let byte_end = char_to_byte_idx(char_end, text);
     &text[byte_start..byte_end]
 }
 
@@ -102,7 +102,7 @@ fn qc_split_off_and_append() {
     fn p(mut idx: usize) -> bool {
         let mut rope = Rope::from_str(TEXT);
 
-        idx = idx % (rope.len_chars() + 1);
+        idx %= rope.len_chars() + 1;
 
         let rope2 = rope.split_off(idx);
 

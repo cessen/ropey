@@ -206,7 +206,7 @@ impl Rope {
                 |acc_info, cur_info, leaf_text| {
                     debug_assert!(acc_info.chars as usize <= char_idx);
                     let byte_idx =
-                        char_idx_to_byte_idx(&leaf_text, char_idx - acc_info.chars as usize);
+                        char_idx_to_byte_idx(leaf_text, char_idx - acc_info.chars as usize);
                     if byte_idx == 0 {
                         seam = Some(acc_info.bytes);
                     } else if byte_idx == leaf_text.len() {
@@ -251,12 +251,12 @@ impl Rope {
                         let r_text = leaf_text.insert_str_split(byte_idx, text);
                         if r_text.len() > 0 {
                             return (
-                                TextInfo::from_str(&leaf_text),
+                                TextInfo::from_str(leaf_text),
                                 Some((TextInfo::from_str(&r_text), r_text)),
                             );
                         } else {
                             // Leaf couldn't be validly split, so leave it oversized
-                            return (TextInfo::from_str(&leaf_text), None);
+                            return (TextInfo::from_str(leaf_text), None);
                         }
                     }
                 },
@@ -321,8 +321,8 @@ impl Rope {
                 root.edit_char_range(start, end, |acc_info, cur_info, leaf_text| {
                     let local_start = start - (acc_info.chars as usize).min(start);
                     let local_end = (end - acc_info.chars as usize).min(cur_info.chars as usize);
-                    let byte_start = char_idx_to_byte_idx(&leaf_text, local_start);
-                    let byte_end = char_idx_to_byte_idx(&leaf_text, local_end);
+                    let byte_start = char_idx_to_byte_idx(leaf_text, local_start);
+                    let byte_end = char_idx_to_byte_idx(leaf_text, local_end);
 
                     if local_start == 0 || local_end == cur_info.chars as usize {
                         seam = Some(acc_info.bytes as usize + byte_start);
@@ -363,7 +363,7 @@ impl Rope {
                         // Remove the text
                         leaf_text.remove_range(byte_start, byte_end);
 
-                        TextInfo::from_str(&leaf_text)
+                        TextInfo::from_str(leaf_text)
                     };
 
                     (new_info, None)
