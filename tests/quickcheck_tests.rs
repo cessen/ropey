@@ -125,6 +125,63 @@ fn qc_split_off_and_append() {
 }
 
 #[test]
+fn qc_shrink_to_fit_01() {
+    fn p(char_idxs: Vec<usize>) -> bool {
+        let mut rope = Rope::new();
+
+        for idx in char_idxs.iter() {
+            let len = rope.len_chars();
+            rope.insert(idx % (len + 1), "Hello world!")
+        }
+
+        let capacity_before = rope.capacity();
+        let rope_clone = rope.clone();
+
+        rope.shrink_to_fit();
+
+        rope.assert_integrity();
+        rope.assert_invariants();
+
+        let max_leaf_bytes = 768 - 33;
+        (rope.capacity() - rope.len_bytes()) < max_leaf_bytes && rope.capacity() <= capacity_before
+            && rope == rope_clone
+    }
+
+    QuickCheck::new()
+        .gen(StdGen::new(thread_rng(), 500))
+        .quickcheck(p as fn(Vec<usize>) -> bool);
+}
+
+#[test]
+fn qc_shrink_to_fit_02() {
+    fn p(char_idxs: Vec<usize>) -> bool {
+        let mut rope = Rope::new();
+        let ins_text = "AT̴̷͚͖̜͈̪͎͔̝̫̦̹͔̻̮͂ͬͬ̌ͣ̿ͤ͌ͥ͑̀̂ͬ̚͘͜͞ô̵͚̤̯̹͖̅̌̈́̑̏̕͘͝A";
+
+        for idx in char_idxs.iter() {
+            let len = rope.len_chars();
+            rope.insert(idx % (len + 1), ins_text);
+        }
+
+        let rope_clone = rope.clone();
+
+        rope.shrink_to_fit();
+
+        rope.assert_integrity();
+        rope.assert_invariants();
+
+        let max_leaf_bytes = 768 - 33;
+        let max_diff = max_leaf_bytes + ((rope.len_bytes() / max_leaf_bytes) * ins_text.len());
+
+        (rope.capacity() - rope.len_bytes()) < max_diff && rope == rope_clone
+    }
+
+    QuickCheck::new()
+        .gen(StdGen::new(thread_rng(), 500))
+        .quickcheck(p as fn(Vec<usize>) -> bool);
+}
+
+#[test]
 fn qc_slice() {
     fn p(text: String, range: (usize, usize)) -> bool {
         let rope = Rope::from_str(&text);

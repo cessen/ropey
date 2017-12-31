@@ -6,8 +6,6 @@
 //! the data of the first and last yielded item will be truncated to
 //! match the `RopeSlice`.
 
-#![allow(dead_code)]
-
 use std::str;
 use std::sync::Arc;
 

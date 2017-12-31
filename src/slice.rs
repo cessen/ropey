@@ -370,8 +370,8 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
 
         let mut chunk_itr_1 = self.chunks();
         let mut chunk_itr_2 = other.chunks();
-        let mut chunk1 = chunk_itr_1.next().unwrap();
-        let mut chunk2 = chunk_itr_2.next().unwrap();
+        let mut chunk1 = chunk_itr_1.next().unwrap_or("");
+        let mut chunk2 = chunk_itr_2.next().unwrap_or("");
 
         loop {
             if chunk1.len() > chunk2.len() {
@@ -823,6 +823,49 @@ mod tests {
 
         assert_ne!(slice, TEXT);
         assert_ne!(TEXT, slice);
+    }
+
+    #[test]
+    fn eq_rope_slice_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43, 43);
+
+        assert_eq!(s, s);
+    }
+
+    #[test]
+    fn eq_rope_slice_02() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(43, 97);
+        let s2 = r.slice(43, 97);
+
+        assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn eq_rope_slice_03() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(43, 43);
+        let s2 = r.slice(43, 45);
+
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn eq_rope_slice_04() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(43, 45);
+        let s2 = r.slice(43, 43);
+
+        assert_ne!(s1, s2);
+    }
+
+    #[test]
+    fn eq_rope_slice_05() {
+        let r = Rope::from_str("");
+        let s = r.slice(0, 0);
+
+        assert_eq!(s, s);
     }
 
     #[test]

@@ -53,11 +53,12 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// assert_eq!(rope.line_to_char(2), 31);
 /// ```
 ///
-/// `Rope` is written to be fast and memory efficient.  All editing and
-/// query operations execute in worst-case `O(log N)` time in the length of
-/// the text.  (If they don't, file a bug!)  It is designed to work efficiently
-/// even for huge (in the gigabytes) and pathological (all on one line)
-/// texts.  It should be able to handle just about anything you can throw at it.
+/// `Rope` is written to be fast and memory efficient.  Except where otherwise
+/// documented, all editing and query operations execute in worst-case
+/// `O(log N)` time in the length of the rope.  It is designed to work
+/// efficiently even for huge (in the gigabytes) and pathological (all on one
+/// line) texts.  It should be able to handle just about anything you can throw
+/// at it.
 #[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Arc<Node>,
@@ -75,11 +76,15 @@ impl Rope {
     }
 
     /// Creates a `Rope` from a string slice.
+    ///
+    /// Runs in O(N) time.
     pub fn from_str(text: &str) -> Rope {
         RopeBuilder::new().build_at_once(text)
     }
 
     /// Creates a `Rope` from the output of a reader.
+    ///
+    /// Runs in O(N) time.
     ///
     /// # Errors
     ///
@@ -161,18 +166,39 @@ impl Rope {
     // Informational methods
 
     /// Total number of bytes in the `Rope`.
+    ///
+    /// Runs in O(1) time.
     pub fn len_bytes(&self) -> usize {
         self.root.byte_count()
     }
 
     /// Total number of chars in the `Rope`.
+    ///
+    /// Runs in O(1) time.
     pub fn len_chars(&self) -> usize {
         self.root.char_count()
     }
 
     /// Total number of lines in the `Rope`.
+    ///
+    /// Runs in O(1) time.
     pub fn len_lines(&self) -> usize {
         self.root.line_break_count() + 1
+    }
+
+    /// Text space available in the `Rope`, in bytes.
+    ///
+    /// Note: the capacity of a `Rope` is almost always larger than
+    /// `len_bytes()`, even immediately after calling `shrink_to_fit()`.
+    /// See `shrink_to_fit()`'s documentation for details.
+    ///
+    /// Runs in O(N) time.
+    pub fn capacity(&self) -> usize {
+        let mut byte_count = 0;
+        for chunk in self.chunks() {
+            byte_count += chunk.len().max(MAX_BYTES);
+        }
+        byte_count
     }
 
     //-----------------------------------------------------------------------
@@ -470,6 +496,46 @@ impl Rope {
 
             Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i, true);
         }
+    }
+
+    /// Shrinks the `Rope`'s capacity to the minimimum possible.
+    ///
+    /// This will rarely result in `capacity() == len_bytes()`.  `Rope`
+    /// stores text in a sequence of fixed-capacity chunks, so an exact fit
+    /// only happens for texts that are a precise multiple of that capacity
+    /// and that have code point and grapheme boundaries that line up
+    /// exactly with the chunk capacity boundaries.
+    ///
+    /// Typically, the difference between `capacity()` and `len_bytes()`
+    /// after calling `shrink_to_fit()` is under 1 KB.
+    ///
+    /// Runs in O(n) time.
+    pub fn shrink_to_fit(&mut self) {
+        let mut node_stack = Vec::new();
+        let mut builder = RopeBuilder::new();
+
+        node_stack.push(self.root.clone());
+        *self = Rope::new();
+
+        loop {
+            if node_stack.is_empty() {
+                break;
+            }
+
+            if node_stack.last().unwrap().is_leaf() {
+                builder.append(node_stack.last().unwrap().leaf_text());
+                node_stack.pop();
+            } else if node_stack.last().unwrap().child_count() == 0 {
+                node_stack.pop();
+            } else {
+                let (_, next_node) = Arc::make_mut(node_stack.last_mut().unwrap())
+                    .children()
+                    .remove(0);
+                node_stack.push(next_node);
+            }
+        }
+
+        *self = builder.finish();
     }
 
     //-----------------------------------------------------------------------
@@ -1367,6 +1433,35 @@ mod tests {
     }
 
     #[test]
+    fn shrink_to_fit_01() {
+        let mut r = Rope::new();
+        for _ in 0..10 {
+            let len = r.len_chars();
+            r.insert(len / 2, "こ");
+            r.insert(len / 2, "ん");
+            r.insert(len / 2, "い");
+            r.insert(len / 2, "ち");
+            r.insert(len / 2, "は");
+            r.insert(len / 2, "、");
+            r.insert(len / 2, "み");
+            r.insert(len / 2, "ん");
+            r.insert(len / 2, "な");
+            r.insert(len / 2, "さ");
+            r.insert(len / 2, "ん");
+            r.insert(len / 2, "！");
+            r.insert(len / 2, "zopter");
+        }
+
+        let r2 = r.clone();
+        r.shrink_to_fit();
+
+        assert_eq!(r, r2);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
     fn char_to_line_01() {
         let r = Rope::from_str(TEXT_LINES);
 
@@ -1608,6 +1703,30 @@ mod tests {
     fn slice_06() {
         let r = Rope::from_str(TEXT);
         r.slice(102, 104);
+    }
+
+    #[test]
+    fn eq_rope_01() {
+        let r = Rope::from_str("");
+
+        assert_eq!(r, r);
+    }
+
+    #[test]
+    fn eq_rope_02() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(r, r);
+    }
+
+    #[test]
+    fn eq_rope_03() {
+        let r1 = Rope::from_str(TEXT);
+        let mut r2 = r1.clone();
+        r2.remove(26, 27);
+        r2.insert(26, "z");
+
+        assert_ne!(r1, r2);
     }
 
     // Iterator tests are in the iter module
