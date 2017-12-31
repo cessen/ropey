@@ -1,4 +1,14 @@
-# 0.5.4 (2016-12-28)
+# 0.5.5 (2016-12-30)
+
+Bug fixes:
+
+* Comparing two empty ropes for equality would panic.
+
+New features:
+
+* Added Rope::capacity() and Rope::shrink_to_fit() methods.  Although these are probably of limited use, they may be useful in especially memory-constrained environments.
+
+# 0.5.4 (2016-12-30)
 
 Bug fixes:
 

@@ -186,11 +186,14 @@ impl Rope {
         self.root.line_break_count() + 1
     }
 
-    /// Text space available in the `Rope`, in bytes.
+    //-----------------------------------------------------------------------
+    // Memory management methods
+
+    /// Total size of the `Rope`'s text buffer space, in bytes.
     ///
-    /// Note: the capacity of a `Rope` is almost always larger than
-    /// `len_bytes()`, even immediately after calling `shrink_to_fit()`.
-    /// See `shrink_to_fit()`'s documentation for details.
+    /// This includes unoccupied text buffer space.  You can calculate
+    /// the unoccupied space with `capacity() - len_bytes()`.  In general,
+    /// there will always be some unoccupied buffer space.
     ///
     /// Runs in O(N) time.
     pub fn capacity(&self) -> usize {
@@ -199,6 +202,53 @@ impl Rope {
             byte_count += chunk.len().max(MAX_BYTES);
         }
         byte_count
+    }
+
+    /// Shrinks the `Rope`'s capacity to the minimum possible.
+    ///
+    /// This will rarely result in `capacity() == len_bytes()`.  `Rope`
+    /// stores text in a sequence of fixed-capacity chunks, so an exact fit
+    /// only happens for texts that are both a precise multiple of that
+    /// capacity _and_ have code point and grapheme boundaries that line up
+    /// exactly with the capacity boundaries.
+    ///
+    /// After calling this, the difference between `capacity()` and
+    /// `len_bytes()` is typically under 1KB per megabyte of text in the
+    /// `Rope`.
+    ///
+    /// **NOTE:** calling this on a `Rope` clone causes it to stop sharing
+    /// all data with its other clones.  In such cases you will very likely
+    /// be _increasing_ total memory usage despite shrinking the `Rope`'s
+    /// capacity.
+    ///
+    /// Runs in O(N) time, and uses O(log N) additional space during
+    /// shrinking.
+    pub fn shrink_to_fit(&mut self) {
+        let mut node_stack = Vec::new();
+        let mut builder = RopeBuilder::new();
+
+        node_stack.push(self.root.clone());
+        *self = Rope::new();
+
+        loop {
+            if node_stack.is_empty() {
+                break;
+            }
+
+            if node_stack.last().unwrap().is_leaf() {
+                builder.append(node_stack.last().unwrap().leaf_text());
+                node_stack.pop();
+            } else if node_stack.last().unwrap().child_count() == 0 {
+                node_stack.pop();
+            } else {
+                let (_, next_node) = Arc::make_mut(node_stack.last_mut().unwrap())
+                    .children()
+                    .remove(0);
+                node_stack.push(next_node);
+            }
+        }
+
+        *self = builder.finish();
     }
 
     //-----------------------------------------------------------------------
@@ -496,46 +546,6 @@ impl Rope {
 
             Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i, true);
         }
-    }
-
-    /// Shrinks the `Rope`'s capacity to the minimimum possible.
-    ///
-    /// This will rarely result in `capacity() == len_bytes()`.  `Rope`
-    /// stores text in a sequence of fixed-capacity chunks, so an exact fit
-    /// only happens for texts that are a precise multiple of that capacity
-    /// and that have code point and grapheme boundaries that line up
-    /// exactly with the chunk capacity boundaries.
-    ///
-    /// Typically, the difference between `capacity()` and `len_bytes()`
-    /// after calling `shrink_to_fit()` is under 1 KB.
-    ///
-    /// Runs in O(n) time.
-    pub fn shrink_to_fit(&mut self) {
-        let mut node_stack = Vec::new();
-        let mut builder = RopeBuilder::new();
-
-        node_stack.push(self.root.clone());
-        *self = Rope::new();
-
-        loop {
-            if node_stack.is_empty() {
-                break;
-            }
-
-            if node_stack.last().unwrap().is_leaf() {
-                builder.append(node_stack.last().unwrap().leaf_text());
-                node_stack.pop();
-            } else if node_stack.last().unwrap().child_count() == 0 {
-                node_stack.pop();
-            } else {
-                let (_, next_node) = Arc::make_mut(node_stack.last_mut().unwrap())
-                    .children()
-                    .remove(0);
-                node_stack.push(next_node);
-            }
-        }
-
-        *self = builder.finish();
     }
 
     //-----------------------------------------------------------------------
