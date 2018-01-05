@@ -956,6 +956,7 @@ impl std::fmt::Debug for Rope {
 }
 
 impl std::fmt::Display for Rope {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for chunk in self.chunks() {
             write!(f, "{}", chunk)?
@@ -965,26 +966,72 @@ impl std::fmt::Display for Rope {
 }
 
 impl std::default::Default for Rope {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl<'a> std::cmp::PartialEq<Rope> for Rope {
+    #[inline]
     fn eq(&self, other: &Rope) -> bool {
         self.to_slice() == other.to_slice()
     }
 }
 
 impl<'a> std::cmp::PartialEq<&'a str> for Rope {
+    #[inline]
     fn eq(&self, other: &&'a str) -> bool {
         self.to_slice() == *other
     }
 }
 
 impl<'a> std::cmp::PartialEq<Rope> for &'a str {
+    #[inline]
     fn eq(&self, other: &Rope) -> bool {
         *self == other.to_slice()
+    }
+}
+
+impl std::cmp::PartialEq<str> for Rope {
+    #[inline]
+    fn eq(&self, other: &str) -> bool {
+        self.to_slice() == other
+    }
+}
+
+impl std::cmp::PartialEq<Rope> for str {
+    #[inline]
+    fn eq(&self, other: &Rope) -> bool {
+        self == other.to_slice()
+    }
+}
+
+impl<'a> std::cmp::PartialEq<String> for Rope {
+    #[inline]
+    fn eq(&self, other: &String) -> bool {
+        self.to_slice() == other.as_str()
+    }
+}
+
+impl<'a> std::cmp::PartialEq<Rope> for String {
+    #[inline]
+    fn eq(&self, other: &Rope) -> bool {
+        self.as_str() == other.to_slice()
+    }
+}
+
+impl<'a> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope {
+    #[inline]
+    fn eq(&self, other: &std::borrow::Cow<'a, str>) -> bool {
+        self.to_slice() == **other
+    }
+}
+
+impl<'a> std::cmp::PartialEq<Rope> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn eq(&self, other: &Rope) -> bool {
+        **self == other.to_slice()
     }
 }
 
@@ -1737,6 +1784,41 @@ mod tests {
         r2.insert(26, "z");
 
         assert_ne!(r1, r2);
+    }
+
+    #[test]
+    fn eq_rope_04() {
+        let r = Rope::from_str("");
+
+        assert_eq!(r, "");
+        assert_eq!("", r);
+    }
+
+    #[test]
+    fn eq_rope_05() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(r, TEXT);
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn eq_rope_06() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(26, 27);
+        r.insert(26, "z");
+
+        assert_ne!(r, TEXT);
+        assert_ne!(TEXT, r);
+    }
+
+    #[test]
+    fn eq_rope_07() {
+        let r = Rope::from_str(TEXT);
+        let s: String = TEXT.into();
+
+        assert_eq!(r, s);
+        assert_eq!(s, r);
     }
 
     // Iterator tests are in the iter module
