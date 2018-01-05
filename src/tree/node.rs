@@ -757,10 +757,13 @@ impl Node {
     /// If `must_be_boundary` is true, panics if the given byte position is
     /// not on the boundary between two leaf nodes.
     ///
-    /// NOTE: theoretically can leave an internal node with few than MIN_CHILDREN
-    /// children, though that would require an insanely long grapheme.  Given how
-    /// unlikely it is, it doesn't seem worth handling.  Code shouldn't break on
-    /// such cases anyway.
+    /// TODO: theoretically this can leave an internal node with fewer than
+    /// MIN_CHILDREN children, although it is exceedingly unlikely with any
+    /// remotely sane text.  In the mean time, right now no code actually
+    /// depends on there being at least MIN_CHILDREN in an internal node.
+    /// But this should nevertheless get addressed at some point.
+    /// Probably the most straight-forward way to address this is via the
+    /// `fix_info_*` methods below, but I'm not totally sure.
     pub fn fix_grapheme_seam(
         &mut self,
         byte_pos: Count,
