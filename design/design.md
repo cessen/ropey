@@ -106,7 +106,7 @@ There are a couple of things about this that aren't great:
 - Although the children of a node are all stored contiguously in memory (good for memory locality), their number can vary from parent to parent.  Moreover, the memory allocated for leaf text also varies in size.  This can lead to memory fragmentation when holes in memory are left that are too small to use for subsequent sets of children or leaf text.
 - The leaf nodes all have an extra level of indirection to get to their actual data.
 
-Having said that, this is actually a pretty decent design!  The fragmentation is (fingers crossed) unlikely to be a major issue with a decent allocator.  And the extra level of indirection only happens at the very bottom of the tree, so you won't accumulating addition unnecessary indirection as the tree grows.
+Having said that, this is actually a pretty decent design!  The fragmentation is (fingers crossed) unlikely to be a major issue with a decent allocator.  And the extra level of indirection only happens at the very bottom of the tree, so you won't accumulate additional unnecessary indirection as the tree grows.
 
 But one of Ropey's design goals is to share data between Rope clones, in order to make cloning cheap.  This means that every child needs to be kept under something like a reference-counted smart pointer, so it can be shared between trees.  What happens if we do that?
 
