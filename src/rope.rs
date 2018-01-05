@@ -718,8 +718,9 @@ impl Rope {
             self.len_chars()
         );
 
-        // TODO: make this more efficient.
-        self.slice(char_idx, char_idx + 1).chars().nth(0).unwrap()
+        let (chunk, offset) = self.root.get_chunk_at_char(char_idx);
+        let byte_idx = char_idx_to_byte_idx(chunk, offset);
+        chunk[byte_idx..].chars().nth(0).unwrap()
     }
 
     /// Returns the line at `line_idx`.

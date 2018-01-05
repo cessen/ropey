@@ -687,7 +687,7 @@ impl Node {
 
     /// Returns the chunk that contains the given char, and the chars's
     /// char-offset within the chunk.
-    fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize) {
+    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize) {
         match *self {
             Node::Leaf(ref text) => (text, char_idx),
             Node::Internal(ref children) => {
