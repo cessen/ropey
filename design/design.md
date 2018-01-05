@@ -127,7 +127,7 @@ Suddenly things are a lot worse off:
 - We no longer have good memory locality: children and their `byte_count` metadata are all over the place.
 - We have an extra level of memory indirection _at every level of the tree_, and _two_ levels of indirection at the leaf nodes.
 
-This is bad both for performance and for compact memory usage.  Even just choosing which child to traverse into requires checking the children's metadata, which means jumping all over the place in memory:
+This is bad both for performance and for compact memory usage.  Even just choosing which child to traverse into requires jumping all over the place in memory, because you have to check the children's metadata:
 
 ![Diagram of bad jumping](images/bad_jumping.png)
 
@@ -156,9 +156,10 @@ This is essentially Ropey's design, but implemented with a bit more sophisticati
 - Ropey tracks char count and line-ending count in addition to byte count.
 - Instead of a plain byte array for text storage, Ropey uses a "small string" implementation (`NodeText`).  This is both for API convenience and because a leaf may need to spill out into a heap-allocated string for insanely large graphemes (this should be vanishingly rare--it's really just a precaution against weird pathological cases).
 - Instead of directly using raw arrays of child pointers and metadata, Ropey wraps all of that in a separate type (`NodeChildren`) that handles the fiddly unsafe book-keeping and exposes a safe API.
+- Ropey uses `Arc` instead of `Rc`, so clones can be sent between threads.
 - Ropey has a larger maximum child count and leaf text size.
 
-Other than that, Ropey's memory layout is pretty much identical to the code snippet above.
+But by-and-large, Ropey's memory layout is essentially identical to the code snippet above.
 
 One final piece of the puzzle: since the inlined leaf text and the child pointers/metadata are both crammed into the same enum, they should both be sized to take up roughly the same amount of space to minimize unused bytes.  Moreover, allocators work best with sizes in the multiples of large-ish powers of two.  That's what all the weird calculations for the `MAX_*` constants in `src/tree/mod.rs` are doing.  Note also that `Rc` and `Arc` take up two additional words of space for the strong and weak reference counts, so that is also accounted for.
 
