@@ -42,9 +42,7 @@ The structures in Ropey's rope implementation have been carefully designed to:
 2. Make it easy for memory allocators to compactly store nodes.
 3. Make it easy for memory allocators to compactly place new nodes in the space vacated by old freed nodes.
 
-These goals are the reason for the seemingly strange designs of `NodeChildren` and `NodeText`, as well as the strange way that the `MIN_*`/`MAX_*` constants are calculated in `src/tree/mod.rs`.
-
-To motivate the design a bit, let's explore what a naive implementation of a b-tree rope might look like.  And for simplicity, let's only track bytes in the rope, not chars or line endings.  It could be implemented as a single enum, like this:
+To motivate the design a bit, let's explore what a naive implementation of a b-tree rope might look like.  And for simplicity, let's only track bytes in the rope, not chars or line endings.  It could be implemented as a single `enum`, like this:
 
 ``` Rust
 enum Node {
@@ -62,12 +60,12 @@ And in memory, it looks something like this (touching boxes represent contiguous
 
 There are a couple of things about this that aren't great:
 
-- Although the children of a node are all stored contiguously in memory (good for memory locality), their number can vary from parent to parent.  Moreover, the memory allocated for leaf text also varies in size.  This can lead to memory fragmentation when holes in memory are left that are too small to use for subsequent sets of children or leaf text.
-- The leaf nodes all have an extra level of indirection to get to their actual data.
+- Leaf nodes have an extra level of indirection to get to their text data.
+- Although the children of a node are all stored contiguously in memory (good for memory locality), the size of that contiguous space varies from parent to parent because of the varying number of children.  The memory allocated for leaf text also varies in size.  This can lead to memory fragmentation when holes in memory are left that are too small to use for subsequent sets of children or leaf text.
 
 Having said that, this is actually a pretty decent design!  The fragmentation is (fingers crossed) unlikely to be a major issue with a decent allocator.  And the extra level of indirection only happens at the very bottom of the tree, so you won't accumulate additional unnecessary indirection as the tree grows.
 
-But one of Ropey's design goals is to share data between Rope clones, in order to make cloning cheap.  This means that every child needs to be kept under something like a reference-counted smart pointer, so it can be shared between trees.  What happens if we do that?
+But one of Ropey's design goals is to share data between Rope clones to make cloning cheap.  This means that every child needs to be kept under something like a reference-counted smart pointer so it can be shared between trees.  What happens if we do that?
 
 ``` Rust
 enum Node {
@@ -83,10 +81,10 @@ enum Node {
 
 Suddenly things are a lot worse off:
 
-- We no longer have good memory locality: children and their `byte_count` metadata are all over the place.
 - We have an extra level of memory indirection _at every level of the tree_, and _two_ levels of indirection at the leaf nodes.
+- We no longer have good memory locality: children are all over the place along with their meta-data.
 
-This is bad both for performance and for compact memory usage.  Even just choosing which child to traverse into requires jumping all over the place in memory, because you have to check the children's metadata:
+This is bad for both performance and compact memory usage.  Even just choosing which child to traverse into requires jumping all over the place in memory, because you have to check the children's metadata:
 
 ![Diagram of bad jumping](images/bad_jumping.png)
 
