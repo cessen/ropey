@@ -29,50 +29,9 @@ The core data structure in Ropey is a b-tree rope.  This data-structure was chos
 
 Ropey's b-tree nodes are primarily implemented in three files:
 
-- `src/tree/node_text.rs`: a small string implementation for storing text in leaf nodes.
-- `src/tree/node_children.rs`: a fixed-capacity vec implementation for storing child meta-data and child pointers in internal nodes.
-- `src/tree/node.rs`: the main `Node` implementation, which uses the types defined in the above two files as the leaf and internal variants in an `enum`.
-
-Most of the logic for traversing and modifying the tree is implemented in `node.rs`.  I've tried to limit the code in `node_text.rs` and `node_children.rs` to things that only involve the immediate node, and not any kind of tree traversal.
-
-The four main methods to pay attention to in `node.rs` are:
-
-- `Node::edit_char_range()`
-- `Node::split()`
-- `Node::prepend_at_depth()`
-- `Node::append_at_depth()`.
-
-These are by far the most complex code in Ropey, and are the core editing operations which the `Rope` type uses to implement its own editing operations.  Be very careful when modifying them and their helper methods, as there are many invariants that must be held for everything to work properly.  Ropey has a lot of unit tests, and running `cargo test` is a useful way to help minimize the chances that you break something, but don't depend on that entirely.
-
-Aside from a handful of additional helper-methods for the above editing methods, the rest of the methods are based on fairly straight-forward tree traversals.
-
-
-## Tree Invariants
-
-The invariants of the tree that must hold true for the tree to operate correctly are:
-
-- The standard b-tree invariants.
-- All child meta-data must be accurate.
-- Leaf nodes must never be empty, except for the root node when it is a leaf.
-- The constituent code points in a grapheme cluster must never be separated by a leaf node boundary.  For example, if '\r' and '\n' are next to each other but split by a leaf boundary, the code for counting line endings won't work properly.  And more generally the methods for iterating over graphemes won't work correctly if any graphemes are split.
-
-There are some hidden-from-documentation methods on `Rope` that check for and assert these invariants:
-
-- `Rope:assert_integrity()`: checks for basic child meta-data integrity.  This is _the most important_ check, as things will break in crazy ways if this isn't true.  If you get really strange behavior from the tree, this is the first thing to check.
-- `Rope::assert_invariants()`: checks that the rest of the invariants listed above hold true.  If you get panics or weird performance degradation, this is the second thing to check.
-
-(Note: these methods are for debugging while working on Ropey, and are expliclty _not_ part of Ropey's external API promise.  They are doc-hidden for a reason.)
-
-There is one final "invariant" that should _generally_ hold true, but doesn't strictly need to for correct operation and _may_ be violated under some circumstances:
-
-- Leaf nodes should _generally_ not contain less than `MIN_BYTES` of text or more than `MAX_BYTES` of text.
-
-There are two cases where this invariant might not hold true:
-
-1. When the root node is a leaf, it may contain less than `MIN_BYTES` of text.
-2. If the text contains a contiguous grapheme that is larger than `MAX_BYTES`, then the leaf node that contains it must exceed `MAX_BYTES` to avoid splitting it.
-
-In practice, case 2 is vanishingly unlikely to ever happen in real (and non-broken) text.  Nevertheless, it needs to be handled correctly by all code.
+- `src/tree/node_text.rs`: implementation of `NodeText`, a small string for storing text in leaf nodes.
+- `src/tree/node_children.rs`: implementation of `NodeChildren`, a fixed-capacity vec for storing child meta-data and child pointers in internal nodes.
+- `src/tree/node.rs`: the main `Node` implementation, which is just an `enum` with the above two types as its leaf node and internal node variants.
 
 
 ## Memory Layout
@@ -164,6 +123,50 @@ But by-and-large, Ropey's memory layout is essentially identical to the code sni
 One final piece of the puzzle: since the inlined leaf text and the child pointers/metadata are both crammed into the same enum, they should both be sized to take up roughly the same amount of space to minimize unused bytes.  Moreover, allocators work best with sizes in the multiples of large-ish powers of two.  That's what all the weird calculations for the `MAX_*` constants in `src/tree/mod.rs` are doing.  Note also that `Rc` and `Arc` take up two additional words of space for the strong and weak reference counts, so that is also accounted for.
 
 Phew!  Hopefully that all made sense.
+
+
+# Traversal and Mutation
+
+Most of the logic for traversing and modifying the tree is implemented in `node.rs` as part of `Node`.  As a general rule, code that needs to know which node is root is implemented in `Rope`, code that otherwise traverses or modifies the tree is implemented in `Node`, and code that only deals with a single node is implemented in `NodeText` and `NodeChildren`.
+
+The four main functions to really pay attention to are part of `Node`:
+
+- `Node::edit_char_range()`
+- `Node::split()`
+- `Node::prepend_at_depth()`
+- `Node::append_at_depth()`.
+
+These are by far the most complex code in Ropey, and are the core editing operations which the `Rope` type uses to implement its own editing operations.  Be very careful when modifying them and their helper methods, as there are many invariants that must be held for everything to work properly.  Ropey has a lot of unit tests, so running `cargo test` is a useful way to help minimize the chances that you break something, but don't depend on that entirely.
+
+
+## Tree Invariants
+
+The invariants of the tree that must hold true for the tree to operate correctly are:
+
+- The standard b-tree invariants:
+    - All leaf nodes must be at the same depth.
+    - Internal nodes must have at least `MIN_CHILDREN` and at most `MAX_CHILDREN`, except for the root which can have as few as two children.
+- All child meta-data must be accurate.
+- Leaf nodes must never be empty, except for the root node when it is a leaf.
+- The constituent code points in a grapheme cluster must never be separated by a leaf node boundary.  For example, if '\r' and '\n' are next to each other but split by a leaf boundary, the code for counting line endings won't work properly.  And more generally the methods for iterating over graphemes won't work correctly if any graphemes are split.
+
+There are some hidden-from-documentation methods on `Rope` that check for and assert these invariants:
+
+- `Rope:assert_integrity()`: checks for basic child meta-data integrity.  This is _the most important_ check, as things will break in crazy ways if this isn't true.  If you get really strange behavior from the tree, this is the first thing to check.
+- `Rope::assert_invariants()`: checks that the rest of the invariants listed above hold true.  If you get panics or weird performance degradation, this is the second thing to check.
+
+(Note: these methods are for debugging while working on Ropey, and are expliclty _not_ part of Ropey's external API promise.  They are doc-hidden for a reason.)
+
+There is one final "invariant" that should _generally_ hold true, but doesn't strictly need to for correct operation and _may_ be violated under some circumstances:
+
+- Leaf nodes should _generally_ not contain less than `MIN_BYTES` of text or more than `MAX_BYTES` of text.
+
+There are two cases where this invariant might not hold true:
+
+1. When the root node is a leaf, it may contain less than `MIN_BYTES` of text.
+2. If the text contains a contiguous grapheme that is larger than `MAX_BYTES`, then the leaf node that contains it must exceed `MAX_BYTES` to avoid splitting it.
+
+In practice, case 2 is vanishingly unlikely to ever happen in real (and non-broken) text.  Nevertheless, it needs to be handled correctly by all code.
 
 
 ## Rope Clones and Thread Safety
