@@ -86,6 +86,8 @@ Ropey is licensed under the MIT license (LICENSE.md or http://opensource.org/lic
 Contributions are absolutely welcome!  However, please open an issue or email me
 to discuss larger changes, to avoid doing a lot of work that may get rejected.
 
+An overview of Ropey's design can be found [here](design/design.md).
+
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in Ropey by you will be licensed as above, without any additional
 terms or conditions.
