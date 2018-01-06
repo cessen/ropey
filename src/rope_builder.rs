@@ -6,25 +6,25 @@ use rope::Rope;
 use str_utils::{find_good_split_idx, nearest_internal_grapheme_boundary};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
-/// An incremental `Rope` builder.
+/// An efficient incremental `Rope` builder.
 ///
-/// `RopeBuilder` is used to efficiently build `Rope`s from sequences
-/// of text chunks.  It is useful for situations such as:
+/// This is used to efficiently build ropes from sequences of text
+/// chunks.  It is useful for creating ropes from:
 ///
-/// - Creating a rope from a large text file without pre-loading the
-///   entire contents of the file into memory (but see
-///   `Rope::from_reader()` which uses `RopeBuilder` internally for
-///   precisely this use-case).
-/// - Creating a rope from a streaming data source.
-/// - Loading a non-utf8 text source into a rope, doing the encoding
-///   conversion incrementally as you go.
+/// - ...large text files, without pre-loading their entire contents into
+///   memory (but see `Rope::from_reader()` which uses this internally
+///   for precisely that use-case).
+/// - ...streaming data sources.
+/// - ...non-utf8 text data, doing the encoding conversion incrementally
+///   as you go.
 ///
 /// Unlike repeatedly calling `Rope::insert()` on the end of a rope,
 /// this API runs in time linear to the amount of data fed to it, and
-/// is overall much faster.  It also creates more memory-compact ropes.
+/// is overall much faster.
 ///
-/// (The converse of this API is the [`Chunks`](iter/struct.Chunks.html)
-/// iterator.)
+/// The converse of this API is the [`Chunks`](iter/struct.Chunks.html)
+/// iterator, which is useful for efficiently streaming a rope's text
+/// data _out_.
 ///
 /// # Example
 /// ```

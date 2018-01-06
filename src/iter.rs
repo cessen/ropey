@@ -227,7 +227,7 @@ impl<'a> Iterator for Lines<'a> {
 ///   incrementally as you go.
 /// - Writing custom iterators over a rope's text data.
 ///
-/// This iterator has only two API guarantees about the chunks it yields:
+/// There are only two API guarantees about the chunks this iterator yields:
 ///
 /// 1. They are in-order, non-overlapping, and complete (i.e. the entire
 ///    text is iterated over in order).
@@ -239,7 +239,8 @@ impl<'a> Iterator for Lines<'a> {
 /// theoretically be of any size (including empty), line breaks and chunk
 /// boundaries have no guaranteed relationship, etc.
 ///
-/// (The converse of this API is the [`RopeBuilder`](../struct.RopeBuilder.html).)
+/// The converse of this API is [`RopeBuilder`](../struct.RopeBuilder.html),
+/// which is useful for efficiently streaming text data _into_ a rope.
 pub struct Chunks<'a> {
     node_stack: Vec<&'a Arc<Node>>,
     start: usize,
