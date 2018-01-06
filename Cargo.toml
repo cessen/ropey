@@ -8,6 +8,7 @@ repository = "https://github.com/cessen/ropey"
 readme = "README.md"
 license = "MIT"
 keywords = ["rope", "text", "buffer"]
+categories = ["text-processing", "data-structures"]
 
 [badges]
 travis-ci = { repository = "cessen/ropey" }
