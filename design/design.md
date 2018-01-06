@@ -125,7 +125,7 @@ One final piece of the puzzle: since the inlined leaf text and the child pointer
 Phew!  Hopefully that all made sense.
 
 
-# Traversal and Mutation
+## Traversal and Mutation
 
 Most of the logic for traversing and modifying the tree is implemented in `node.rs` as part of `Node`.  As a general rule, code that needs to know which node is root is implemented in `Rope`, code that otherwise traverses or modifies the tree is implemented in `Node`, and code that only deals with a single node is implemented in `NodeText` and `NodeChildren`.
 
