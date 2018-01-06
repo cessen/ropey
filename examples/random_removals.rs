@@ -1,18 +1,19 @@
 extern crate rand;
 extern crate ropey;
 
-use ropey::Rope;
+use ropey::RopeBuilder;
 use rand::Rng;
 
 fn main() {
     let mut rng = rand::thread_rng();
-    let mut tree = Rope::new();
+    let mut builder = RopeBuilder::new();
 
     // Build up a tree
     for _ in 0..(1 << 20) {
-        let len = tree.len_chars();
-        tree.insert(len, "Hello world! How are you doing? Let's keep inserting more items.\r\nこんいちは、みんなさん！ ");
+        builder.append("Hello world! How are you doing? Let's keep inserting more items.\r\nこんいちは、みんなさん！ ");
     }
+
+    let mut tree = builder.finish();
 
     println!(
         "Document size: {:.2}MB",
