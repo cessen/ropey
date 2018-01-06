@@ -168,9 +168,15 @@ Phew!  Hopefully that all made sense.
 
 ## Rope Clones and Thread Safety
 
-[TODO]
+Ropey shares data between `Rope` clones.  The approach taken for this is very simple: all nodes are wrapped in an `Arc`, and when we need to modify a node we always use `Arc::make_mut()` to access it for mutation.  `Arc::make_mut()` will provide mutable access to the node if there is only one owner, but will make a clone of the node and have you mutate that instead if ownership is shared.  This automatically leads to a thread-safe shared-data model, where nodes have copy-on-write semantics but do the more efficient in-place mutation when their ownership is not shared.
+
+The main implication of this when working on Ropey's codebase is pretty simple: make sure to always use `Arc::make_mut()` when accessing nodes for mutation, never `Arc::get_mut()`.
 
 
 ## Unsafe Code
 
-[TODO]
+Ropey uses a fair bit of unsafe code.  The vast majority of it is in the implementations of `NodeChildren`, `NodeText`, and a handful of hot functions in `str_utils.rs`.
+
+Reducing and/or better isolating the unsafe code in Ropey would be great, and pull requests along those lines are more than welcome.  However, it shouldn't be at the expense of performance or memory overhead--at least, not significantly so.
+
+Reviews, fuzz testing, etc. of the existing unsafe code are also extremely welcome.  The more eyes and tests we have on it, the better!
