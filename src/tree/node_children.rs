@@ -1,9 +1,5 @@
-use std;
 use std::fmt;
 use std::iter::{Iterator, Zip};
-use std::mem;
-use std::mem::ManuallyDrop;
-use std::ptr;
 use std::slice;
 use std::sync::Arc;
 
@@ -14,73 +10,66 @@ use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
 
-pub(crate) struct NodeChildren {
-    nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
-    info: [TextInfo; MAX_LEN],
-    len: u8,
-}
+/// A fixed-capacity vec of child Arc-pointers and child metadata.
+///
+/// The unsafe guts of this are implemented in NodeChildrenInternal
+/// lower down in this file.
+#[derive(Clone)]
+pub(crate) struct NodeChildren(inner::NodeChildrenInternal);
 
 impl NodeChildren {
     /// Creates a new empty array.
     pub fn new() -> NodeChildren {
-        NodeChildren {
-            nodes: ManuallyDrop::new(unsafe { std::mem::uninitialized() }),
-            info: unsafe { std::mem::uninitialized() },
-            len: 0,
-        }
+        NodeChildren(inner::NodeChildrenInternal::new())
     }
 
     /// Current length of the array.
     pub fn len(&self) -> usize {
-        self.len as usize
+        self.0.len() as usize
     }
 
     /// Returns whether the array is full or not.
+    #[allow(dead_code)]
     pub fn is_full(&self) -> bool {
         self.len() == MAX_LEN
     }
 
-    /// Returns a slice to the nodes array.
+    /// Access to the nodes array.
     pub fn nodes(&self) -> &[Arc<Node>] {
-        &self.nodes[..(self.len as usize)]
+        self.0.nodes()
     }
 
-    /// Returns a mutable slice to the nodes array.
+    /// Mutable access to the nodes array.
     pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
-        &mut self.nodes[..(self.len as usize)]
+        self.0.nodes_mut()
     }
 
-    /// Returns a slice to the info array.
+    /// Access to the info array.
     pub fn info(&self) -> &[TextInfo] {
-        &self.info[..(self.len as usize)]
+        self.0.info()
     }
 
-    /// Returns a mutable slice to the info array.
+    /// Mutable access to the info array.
     pub fn info_mut(&mut self) -> &mut [TextInfo] {
-        &mut self.info[..(self.len as usize)]
+        self.0.info_mut()
     }
 
-    /// Returns mutable slices to both the nodes and info arrays.
-    pub fn info_and_nodes_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
-        (
-            &mut self.info[..(self.len as usize)],
-            &mut self.nodes[..(self.len as usize)],
-        )
+    /// Mutable access to both the info and nodes arrays simultaneously.
+    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+        self.0.data_mut()
     }
 
     /// Updates the text info of the child at `idx`.
     pub fn update_child_info(&mut self, idx: usize) {
-        self.info[idx] = self.nodes[idx].text_info();
+        let (info, nodes) = self.0.data_mut();
+        info[idx] = nodes[idx].text_info();
     }
 
     /// Pushes an item into the end of the array.
     ///
     /// Increases length by one.  Panics if already full.
     pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
-        assert!(self.len() < MAX_LEN);
-        self.info[self.len as usize] = item.0;
-        mem::forget(mem::replace(&mut self.nodes[self.len as usize], item.1));
-        self.len += 1;
+        self.0.push(item)
     }
 
     /// Pushes an element onto the end of the array, and then splits it in half,
@@ -155,11 +144,11 @@ impl NodeChildren {
 
         if remove_right {
             self.remove(idx2);
-            self.info[idx1] = self.nodes[idx1].text_info();
+            self.update_child_info(idx1);
             return true;
         } else {
-            self.info[idx1] = self.nodes[idx1].text_info();
-            self.info[idx2] = self.nodes[idx2].text_info();
+            self.update_child_info(idx1);
+            self.update_child_info(idx2);
             return false;
         }
     }
@@ -221,11 +210,7 @@ impl NodeChildren {
     ///
     /// Decreases length by one.  Panics if already empty.
     pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
-        assert!(self.len() > 0);
-        self.len -= 1;
-        (self.info[self.len as usize], unsafe {
-            ptr::read(&self.nodes[self.len as usize])
-        })
+        self.0.pop()
     }
 
     /// Inserts an item into the the array at the given index.
@@ -233,27 +218,7 @@ impl NodeChildren {
     /// Increases length by one.  Panics if already full.  Preserves ordering
     /// of the other items.
     pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
-        assert!(idx <= self.len());
-        assert!(self.len() < MAX_LEN);
-
-        let len = self.len as usize;
-        unsafe {
-            ptr::copy(
-                self.nodes.as_ptr().offset(idx as isize),
-                self.nodes.as_mut_ptr().offset((idx + 1) as isize),
-                len - idx,
-            );
-            ptr::copy(
-                self.info.as_ptr().offset(idx as isize),
-                self.info.as_mut_ptr().offset((idx + 1) as isize),
-                len - idx,
-            );
-        }
-
-        self.info[idx] = item.0;
-        mem::forget(mem::replace(&mut self.nodes[idx], item.1));
-
-        self.len += 1;
+        self.0.insert(idx, item)
     }
 
     /// Inserts an element into a the array, and then splits it in half, returning
@@ -278,27 +243,7 @@ impl NodeChildren {
     ///
     /// Decreases length by one.  Preserves ordering of the other items.
     pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
-        assert!(self.len() > 0);
-        assert!(idx < self.len());
-
-        let item = (self.info[idx], unsafe { ptr::read(&self.nodes[idx]) });
-
-        let len = self.len as usize;
-        unsafe {
-            ptr::copy(
-                self.nodes.as_ptr().offset(idx as isize + 1),
-                self.nodes.as_mut_ptr().offset(idx as isize),
-                len - idx - 1,
-            );
-            ptr::copy(
-                self.info.as_ptr().offset(idx as isize + 1),
-                self.info.as_mut_ptr().offset(idx as isize),
-                len - idx - 1,
-            );
-        }
-
-        self.len -= 1;
-        return item;
+        self.0.remove(idx)
     }
 
     /// Splits the array in two at `idx`, returning the right part of the split.
@@ -332,8 +277,9 @@ impl NodeChildren {
         assert!(idx2 < self.len());
 
         let split_idx = idx1 + 1;
-        let (info1, info2) = self.info.split_at_mut(split_idx);
-        let (nodes1, nodes2) = self.nodes.split_at_mut(split_idx);
+        let (info, nodes) = self.data_mut();
+        let (info1, info2) = info.split_at_mut(split_idx);
+        let (nodes1, nodes2) = nodes.split_at_mut(split_idx);
 
         (
             (&mut info1[idx1], &mut nodes1[idx1]),
@@ -476,55 +422,220 @@ impl NodeChildren {
 impl fmt::Debug for NodeChildren {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("NodeChildren")
-            .field("len", &self.len)
+            .field("len", &self.len())
             .field("info", &&self.info())
             .field("nodes", &&self.nodes())
             .finish()
     }
 }
 
-impl Drop for NodeChildren {
-    fn drop(&mut self) {
-        for node in &mut self.nodes[..self.len as usize] {
-            let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
-            unsafe { ptr::drop_in_place(mptr) };
-        }
+//===========================================================================
+
+/// The unsafe guts of NodeChildren, exposed through a safe API.
+///
+/// Try to keep this as small as possible, and implement functionality on
+/// NodeChildren via the safe APIs whenever possible.
+///
+/// It's split out this way because it was too easy to accidentally access the
+/// fixed size arrays directly, leading to memory-unsafety bugs when accidentally
+/// accessing elements that are semantically out of bounds.  This happened once,
+/// and it was a pain to track down--as memory safety bugs often are.
+mod inner {
+    use std::ptr;
+    use std::mem;
+    use std::mem::ManuallyDrop;
+    use std::sync::Arc;
+    use super::{Node, TextInfo, MAX_LEN};
+
+    pub(crate) struct NodeChildrenInternal {
+        nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
+        info: [TextInfo; MAX_LEN],
+        len: u8,
     }
-}
 
-impl Clone for NodeChildren {
-    fn clone(&self) -> NodeChildren {
-        let mut clone_array = NodeChildren::new();
-
-        // Copy nodes... carefully.
-        for (clone_arc, arc) in Iterator::zip(
-            clone_array.nodes[..self.len()].iter_mut(),
-            self.nodes[..self.len()].iter(),
-        ) {
-            mem::forget(mem::replace(clone_arc, Arc::clone(arc)));
-        }
-
-        // Copy TextInfo
-        for (clone_info, info) in Iterator::zip(
-            clone_array.info[..self.len()].iter_mut(),
-            self.info[..self.len()].iter(),
-        ) {
-            *clone_info = *info;
-        }
-
-        // Set length
-        clone_array.len = self.len;
-
-        // Some sanity checks for debug builds
-        #[cfg(debug_assertions)]
-        {
-            for (a, b) in Iterator::zip(clone_array.iter(), self.iter()) {
-                assert_eq!(a.0, b.0);
-                assert!(Arc::ptr_eq(a.1, b.1));
+    impl NodeChildrenInternal {
+        /// Creates a new empty array.
+        #[inline(always)]
+        pub fn new() -> NodeChildrenInternal {
+            NodeChildrenInternal {
+                nodes: ManuallyDrop::new(unsafe { mem::uninitialized() }),
+                info: unsafe { mem::uninitialized() },
+                len: 0,
             }
         }
 
-        clone_array
+        /// Current length of the array.
+        #[inline(always)]
+        pub fn len(&self) -> usize {
+            self.len as usize
+        }
+
+        /// Access to the nodes array.
+        #[inline(always)]
+        pub fn nodes(&self) -> &[Arc<Node>] {
+            &self.nodes[..(self.len())]
+        }
+
+        /// Mutable access to the nodes array.
+        #[inline(always)]
+        pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
+            &mut self.nodes[..(self.len as usize)]
+        }
+
+        /// Access to the info array.
+        #[inline(always)]
+        pub fn info(&self) -> &[TextInfo] {
+            &self.info[..(self.len())]
+        }
+
+        /// Mutable access to the info array.
+        #[inline(always)]
+        pub fn info_mut(&mut self) -> &mut [TextInfo] {
+            &mut self.info[..(self.len as usize)]
+        }
+
+        /// Mutable access to both the info and nodes arrays simultaneously.
+        #[inline(always)]
+        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+            (
+                &mut self.info[..(self.len as usize)],
+                &mut self.nodes[..(self.len as usize)],
+            )
+        }
+
+        /// Pushes an item into the end of the array.
+        ///
+        /// Increases length by one.  Panics if already full.
+        #[inline(always)]
+        pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
+            assert!(self.len() < MAX_LEN);
+            self.info[self.len()] = item.0;
+            mem::forget(mem::replace(&mut self.nodes[self.len as usize], item.1));
+            self.len += 1;
+        }
+
+        /// Pops an item off the end of the array and returns it.
+        ///
+        /// Decreases length by one.  Panics if already empty.
+        #[inline(always)]
+        pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
+            assert!(self.len() > 0);
+            self.len -= 1;
+            (self.info[self.len()], unsafe {
+                ptr::read(&self.nodes[self.len()])
+            })
+        }
+
+        /// Inserts an item into the the array at the given index.
+        ///
+        /// Increases length by one.  Panics if already full.  Preserves ordering
+        /// of the other items.
+        #[inline(always)]
+        pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
+            assert!(idx <= self.len());
+            assert!(self.len() < MAX_LEN);
+
+            let len = self.len();
+            unsafe {
+                ptr::copy(
+                    self.nodes.as_ptr().offset(idx as isize),
+                    self.nodes.as_mut_ptr().offset((idx + 1) as isize),
+                    len - idx,
+                );
+                ptr::copy(
+                    self.info.as_ptr().offset(idx as isize),
+                    self.info.as_mut_ptr().offset((idx + 1) as isize),
+                    len - idx,
+                );
+            }
+
+            self.info[idx] = item.0;
+            mem::forget(mem::replace(&mut self.nodes[idx], item.1));
+
+            self.len += 1;
+        }
+
+        /// Removes the item at the given index from the the array.
+        ///
+        /// Decreases length by one.  Preserves ordering of the other items.
+        #[inline(always)]
+        pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
+            assert!(self.len() > 0);
+            assert!(idx < self.len());
+
+            let item = (self.info[idx], unsafe { ptr::read(&self.nodes[idx]) });
+
+            let len = self.len();
+            unsafe {
+                ptr::copy(
+                    self.nodes.as_ptr().offset(idx as isize + 1),
+                    self.nodes.as_mut_ptr().offset(idx as isize),
+                    len - idx - 1,
+                );
+                ptr::copy(
+                    self.info.as_ptr().offset(idx as isize + 1),
+                    self.info.as_mut_ptr().offset(idx as isize),
+                    len - idx - 1,
+                );
+            }
+
+            self.len -= 1;
+            return item;
+        }
+    }
+
+    impl Drop for NodeChildrenInternal {
+        fn drop(&mut self) {
+            for node in &mut self.nodes[..self.len as usize] {
+                let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
+                unsafe { ptr::drop_in_place(mptr) };
+            }
+        }
+    }
+
+    impl Clone for NodeChildrenInternal {
+        fn clone(&self) -> NodeChildrenInternal {
+            let mut clone_array = NodeChildrenInternal::new();
+
+            // Copy nodes... carefully.
+            for (clone_arc, arc) in Iterator::zip(
+                clone_array.nodes[..self.len()].iter_mut(),
+                self.nodes[..self.len()].iter(),
+            ) {
+                mem::forget(mem::replace(clone_arc, Arc::clone(arc)));
+            }
+
+            // Copy TextInfo
+            for (clone_info, info) in Iterator::zip(
+                clone_array.info[..self.len()].iter_mut(),
+                self.info[..self.len()].iter(),
+            ) {
+                *clone_info = *info;
+            }
+
+            // Set length
+            clone_array.len = self.len;
+
+            // Some sanity checks for debug builds
+            #[cfg(debug_assertions)]
+            {
+                for (a, b) in Iterator::zip(
+                    (&clone_array.info[..clone_array.len()]).iter(),
+                    (&self.info[..self.len()]).iter(),
+                ) {
+                    assert_eq!(a, b);
+                }
+
+                for (a, b) in Iterator::zip(
+                    (&clone_array.nodes[..clone_array.len()]).iter(),
+                    (&self.nodes[..clone_array.len()]).iter(),
+                ) {
+                    assert!(Arc::ptr_eq(a, b));
+                }
+            }
+
+            clone_array
+        }
     }
 }
 

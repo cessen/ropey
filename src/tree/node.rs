@@ -785,7 +785,7 @@ impl Node {
                         .fix_grapheme_seam(byte_pos, must_be_boundary);
                 } else if byte_pos == children.combined_info().bytes {
                     // Special-case 2
-                    let (info, nodes) = children.info_and_nodes_mut();
+                    let (info, nodes) = children.data_mut();
                     return Arc::make_mut(nodes.last_mut().unwrap())
                         .fix_grapheme_seam(info.last().unwrap().bytes, must_be_boundary);
                 } else {
