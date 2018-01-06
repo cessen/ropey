@@ -1,4 +1,24 @@
-# 0.5.5 (2016-12-30)
+# 0.5.6 (2018-01-05)
+
+Documenation:
+
+* Added a design overview document to the repo, explaining Ropey's design.  Mainly targeted at potential contributors.
+* Added a more integrated example of usage to the front page of the library docs.
+
+Features:
+
+* Fleshed out the `PartialEq` impls.  `Rope` and `RopeSlice` can now be compared for equality with not just `&str`, but also `String` and `Cow<str>`.
+
+Performance:
+
+* `Rope::char()`, which fetches a single Unicode scalar value as a `char`, is now several times faster.
+
+Misc:
+
+* This changelog had the wrong year on some of its dates.  Heh...
+
+
+# 0.5.5 (2017-12-30)
 
 Bug fixes:
 
@@ -8,7 +28,8 @@ New features:
 
 * Added Rope::capacity() and Rope::shrink_to_fit() methods.  Although these are probably of limited use, they may be useful in especially memory-constrained environments.
 
-# 0.5.4 (2016-12-30)
+
+# 0.5.4 (2017-12-30)
 
 Bug fixes:
 
@@ -27,7 +48,7 @@ Misc:
 * Added benchmarks to the library.
 
 
-# 0.5.3 (2016-12-28)
+# 0.5.3 (2017-12-28)
 
 Performance and memory:
 
@@ -38,7 +59,8 @@ Misc:
 
 * Better unit test coverage of public APIs.  Still not 100%, but getting there!
 
-# 0.5.2 (2016-12-25)
+
+# 0.5.2 (2017-12-25)
 
 Bug fixes:
 
