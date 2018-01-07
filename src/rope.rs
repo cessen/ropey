@@ -271,7 +271,7 @@ impl Rope {
             self.len_chars()
         );
 
-        if text.len() > MAX_BYTES * 8 {
+        if text.len() > MAX_BYTES * 6 {
             // For huge insert texts, build a tree out of it and then
             // split and join.
             let text_rope = Rope::from_str(text);
