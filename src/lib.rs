@@ -76,6 +76,7 @@ mod rope;
 mod rope_builder;
 mod slice;
 mod str_utils;
+mod segmenter;
 
 pub mod iter;
 
