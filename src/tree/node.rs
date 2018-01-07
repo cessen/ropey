@@ -2,11 +2,11 @@ use std;
 use std::sync::Arc;
 
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
-                char_idx_to_line_idx, count_chars, is_grapheme_boundary, line_idx_to_byte_idx,
-                line_idx_to_char_idx, next_grapheme_boundary, prev_grapheme_boundary};
+                char_idx_to_line_idx, count_chars, line_idx_to_byte_idx, line_idx_to_char_idx};
 use tree::{Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES,
            MIN_CHILDREN};
-use tree::node_text::fix_grapheme_seam;
+use tree::node_text::fix_segment_seam;
+use segmenter::{MSeg, Segmenter};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
@@ -556,7 +556,7 @@ impl Node {
         let (chunk, offset) = self.get_chunk_at_char(char_idx);
         let byte_idx = char_idx_to_byte_idx(chunk, offset);
 
-        is_grapheme_boundary(chunk, byte_idx)
+        MSeg::is_break(byte_idx, chunk)
     }
 
     /// Returns the previous grapheme cluster boundary to the left of
@@ -579,11 +579,11 @@ impl Node {
                 return 0;
             } else {
                 let (chunk, _) = self.get_chunk_at_char(char_idx - 1);
-                let prev_byte_idx = prev_grapheme_boundary(chunk, chunk.len());
+                let prev_byte_idx = MSeg::prev_break(chunk.len(), chunk);
                 return char_idx - count_chars(&chunk[prev_byte_idx..]);
             }
         } else {
-            let prev_byte_idx = prev_grapheme_boundary(chunk, byte_idx);
+            let prev_byte_idx = MSeg::prev_break(byte_idx, chunk);
             return char_idx - count_chars(&chunk[prev_byte_idx..byte_idx]);
         }
     }
@@ -611,11 +611,11 @@ impl Node {
                 return end_char_idx;
             } else {
                 let (chunk, _) = self.get_chunk_at_char(char_idx + 1);
-                let next_byte_idx = next_grapheme_boundary(chunk, 0);
+                let next_byte_idx = MSeg::next_break(0, chunk);
                 return char_idx + count_chars(&chunk[..next_byte_idx]);
             }
         } else {
-            let next_byte_idx = next_grapheme_boundary(chunk, byte_idx);
+            let next_byte_idx = MSeg::next_break(byte_idx, chunk);
             return char_idx + count_chars(&chunk[byte_idx..next_byte_idx]);
         };
     }
@@ -814,7 +814,7 @@ impl Node {
                             let l_child_bytes = l_child.0.bytes;
                             let l_child = Arc::make_mut(&mut l_child.1);
                             let r_child = Arc::make_mut(&mut r_child.1);
-                            fix_grapheme_seam(
+                            fix_segment_seam(
                                 l_child
                                     .fix_grapheme_seam(l_child_bytes, must_be_boundary)
                                     .unwrap(),

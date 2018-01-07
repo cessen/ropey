@@ -5,10 +5,9 @@ use std::ops::Deref;
 use std::ptr;
 use std::str;
 
-use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-
 use smallvec::{Array, SmallVec};
-use str_utils::{char_idx_to_byte_idx, count_chars, nearest_internal_grapheme_boundary};
+use str_utils::{char_idx_to_byte_idx, count_chars};
+use segmenter::{MSeg, Segmenter};
 use tree::MAX_BYTES;
 
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
@@ -76,7 +75,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            nearest_internal_grapheme_boundary(self, pos)
+            MSeg::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -103,7 +102,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            nearest_internal_grapheme_boundary(self, pos)
+            MSeg::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -321,42 +320,28 @@ impl Borrow<str> for NodeText {
 
 //=======================================================================
 
-/// Takes two `NodeText`s and mends the grapheme boundary between them, if any.
+/// Takes two `NodeText`s and mends the segment break between them, if any.
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
 /// is one big grapheme.
-pub(crate) fn fix_grapheme_seam(l: &mut NodeText, r: &mut NodeText) {
-    let tot_len = l.len() + r.len();
-    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
-    let next = gc.next_boundary(r, l.len()).unwrap();
-    let prev = {
-        match gc.prev_boundary(r, l.len()) {
-            Ok(pos) => pos,
-            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
-            _ => unreachable!(),
-        }
-    };
+pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
+    // Early out, if there's nothing to do.
+    if MSeg::seam_is_break(l, r) {
+        return;
+    }
+
+    // Find the nearest breaks around the seam.
+    let l_split = MSeg::prev_break(l.len(), l);
+    let r_split = l.len() + MSeg::next_break(0, r);
 
     // Find the new split position, if any.
-    let new_split_pos = if let (Some(a), Some(b)) = (prev, next) {
-        if a == l.len() {
-            // We're on a graphem boundary, don't need to do anything
-            return;
-        }
-        if a != 0 && (b == tot_len || l.len() > r.len()) {
-            a
+    let new_split_pos = {
+        let tot_len = l.len() + r.len();
+        if l_split != 0 && (r_split == tot_len || l.len() > r.len()) {
+            l_split
         } else {
-            b
+            r_split
         }
-    } else if let Some(a) = prev {
-        if a == l.len() {
-            return;
-        }
-        a
-    } else if let Some(b) = next {
-        b
-    } else {
-        unreachable!()
     };
 
     // Move the bytes to create the new split

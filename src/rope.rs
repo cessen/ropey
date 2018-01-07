@@ -6,7 +6,8 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use str_utils::{char_idx_to_byte_idx, find_good_split_idx, seam_is_grapheme_boundary};
+use segmenter::{MSeg, Segmenter};
+use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
@@ -284,7 +285,7 @@ impl Rope {
             let mut text = text;
             while text.len() > 0 {
                 let split_idx =
-                    find_good_split_idx(text, text.len() - MAX_BYTES.min(text.len()), false);
+                    MSeg::find_good_split(text.len() - MAX_BYTES.min(text.len()), text, false);
                 let ins_text = &text[split_idx..];
                 text = &text[..split_idx];
 
@@ -909,7 +910,7 @@ impl Rope {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(seam_is_grapheme_boundary(last_chunk, chunk));
+                    assert!(MSeg::seam_is_break(last_chunk, chunk));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;
