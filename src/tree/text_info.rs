@@ -11,6 +11,7 @@ pub struct TextInfo {
 }
 
 impl TextInfo {
+    #[inline]
     pub fn new() -> TextInfo {
         TextInfo {
             bytes: 0,
@@ -19,7 +20,6 @@ impl TextInfo {
         }
     }
 
-    #[inline]
     #[inline]
     pub fn from_str(text: &str) -> TextInfo {
         TextInfo {
