@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-pub(crate) type MSeg = MainSegmenter<DefaultSegmenter>;
-
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 /// Trait for implementing segmentation strategies for [`Rope`](../struct.Rope.html).
@@ -225,6 +223,7 @@ impl Segmenter for NullSegmenter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    type MSeg = MainSegmenter<DefaultSegmenter>;
 
     #[test]
     fn crlf_segmenter_01() {

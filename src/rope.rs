@@ -8,7 +8,7 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use segmenter::{DefaultSegmenter, MSeg, Segmenter};
+use segmenter::{DefaultSegmenter, MainSegmenter, Segmenter};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -343,8 +343,11 @@ impl<S: Segmenter> Rope<S> {
             // chunks.
             let mut text = text;
             while text.len() > 0 {
-                let split_idx =
-                    MSeg::find_good_split(text.len() - MAX_BYTES.min(text.len()), text, false);
+                let split_idx = MainSegmenter::<S>::find_good_split(
+                    text.len() - MAX_BYTES.min(text.len()),
+                    text,
+                    false,
+                );
                 let ins_text = &text[split_idx..];
                 text = &text[..split_idx];
 
@@ -969,7 +972,7 @@ impl<S: Segmenter> Rope<S> {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(MSeg::seam_is_break(last_chunk, chunk));
+                    assert!(MainSegmenter::<S>::seam_is_break(last_chunk, chunk));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;

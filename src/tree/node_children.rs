@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tree;
 use tree::{Node, MAX_BYTES};
-use segmenter::{MSeg, Segmenter};
+use segmenter::{MainSegmenter, Segmenter};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -109,7 +109,7 @@ impl<S: Segmenter> NodeChildren<S> {
                         } else {
                             let split_pos = {
                                 let pos = text1.len() - (text1.len() / 2);
-                                MSeg::nearest_internal_break(pos, text1)
+                                MainSegmenter::<S>::nearest_internal_break(pos, text1)
                             };
                             *text2 = text1.split_off(split_pos);
                             if text2.len() > 0 {
@@ -191,7 +191,8 @@ impl<S: Segmenter> NodeChildren<S> {
                     let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
                     let text_l = Arc::make_mut(node_l).leaf_text_mut();
                     let text_r = Arc::make_mut(node_r).leaf_text_mut();
-                    let split_idx_r = MSeg::prev_break(MAX_BYTES - text_l.len(), text_r);
+                    let split_idx_r =
+                        MainSegmenter::<S>::prev_break(MAX_BYTES - text_l.len(), text_r);
                     text_l.push_str(&text_r[..split_idx_r]);
                     text_r.truncate_front(split_idx_r);
                 }
@@ -646,11 +647,12 @@ mod inner {
 mod tests {
     use super::*;
     use std::sync::Arc;
+    use segmenter::DefaultSegmenter;
     use tree::{Node, NodeText, TextInfo};
 
     #[test]
     fn search_char_idx_01() {
-        let mut children = NodeChildren::new();
+        let mut children = NodeChildren::<DefaultSegmenter>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -692,7 +694,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn search_char_idx_02() {
-        let mut children = NodeChildren::new();
+        let mut children = NodeChildren::<DefaultSegmenter>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -715,7 +717,7 @@ mod tests {
 
     #[test]
     fn search_char_idx_range_01() {
-        let mut children = NodeChildren::new();
+        let mut children = NodeChildren::<DefaultSegmenter>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -794,7 +796,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn search_char_idx_range_02() {
-        let mut children = NodeChildren::new();
+        let mut children = NodeChildren::<DefaultSegmenter>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
