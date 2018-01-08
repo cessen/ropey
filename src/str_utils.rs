@@ -5,6 +5,7 @@ use std;
 /// they have a consistent starting two-bit pattern.  We then
 /// subtract from the byte length of the text to get the final
 /// count.
+#[inline]
 pub fn count_chars(text: &str) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
 
@@ -56,6 +57,7 @@ pub fn count_chars(text: &str) -> usize {
 /// - u{0085}        (Next Line)
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
+#[inline]
 pub fn count_line_breaks(text: &str) -> usize {
     // TODO: right now this checks the high byte for the large line break codepoints
     // when determining whether to skip the full check.  This penalizes texts that use
@@ -131,6 +133,7 @@ pub fn count_line_breaks(text: &str) -> usize {
     count
 }
 
+#[inline]
 pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
     if byte_idx == 0 {
         return 0;
@@ -143,6 +146,7 @@ pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
     }
 }
 
+#[inline]
 pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
     let mut line_i = 1;
     for offset in LineBreakIter::new(text) {
@@ -155,6 +159,7 @@ pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
     line_i - 1
 }
 
+#[inline]
 pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
     let tsize: usize = std::mem::size_of::<usize>();
@@ -203,10 +208,12 @@ pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
     }
 }
 
+#[inline]
 pub fn char_idx_to_line_idx(text: &str, char_idx: usize) -> usize {
     byte_idx_to_line_idx(text, char_idx_to_byte_idx(text, char_idx))
 }
 
+#[inline]
 pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     if line_idx == 0 {
         0
@@ -217,6 +224,7 @@ pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     }
 }
 
+#[inline]
 pub fn line_idx_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_idx_to_char_idx(text, line_idx_to_byte_idx(text, line_idx))
 }
@@ -235,6 +243,7 @@ pub fn has_byte(word: usize, n: u8) -> bool {
     (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH) != 0
 }
 
+#[inline]
 pub fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
 }
@@ -260,6 +269,7 @@ pub(crate) struct LineBreakIter<'a> {
 }
 
 impl<'a> LineBreakIter<'a> {
+    #[inline]
     pub fn new(text: &str) -> LineBreakIter {
         LineBreakIter {
             byte_itr: text.bytes(),
@@ -271,6 +281,7 @@ impl<'a> LineBreakIter<'a> {
 impl<'a> Iterator for LineBreakIter<'a> {
     type Item = usize;
 
+    #[inline]
     fn next(&mut self) -> Option<usize> {
         while let Some(byte) = self.byte_itr.next() {
             self.byte_idx += 1;

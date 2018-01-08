@@ -33,6 +33,7 @@ impl<Seg: Segmenter> MainSegmenter<Seg> {
     ///
     /// This will return back the passed byte boundary if it is at the start
     /// of the string.
+    #[inline]
     pub(crate) fn prev_break(byte_idx: usize, text: &str) -> usize {
         // Bounds check
         debug_assert!(byte_idx <= text.len());
@@ -59,6 +60,7 @@ impl<Seg: Segmenter> MainSegmenter<Seg> {
     ///
     /// This will return back the passed byte boundary if it is at the end of
     /// the string.
+    #[inline]
     pub(crate) fn next_break(byte_idx: usize, text: &str) -> usize {
         // Bounds check
         debug_assert!(byte_idx <= text.len());
@@ -86,6 +88,7 @@ impl<Seg: Segmenter> MainSegmenter<Seg> {
     /// There is only one circumstance where the left or right edge will be
     /// returned: if the entire text is a single unbroken segment, then the
     /// right edge of the text is returned.
+    #[inline]
     pub(crate) fn nearest_internal_break(byte_idx: usize, text: &str) -> usize {
         // Bounds check
         debug_assert!(byte_idx <= text.len());
@@ -113,6 +116,7 @@ impl<Seg: Segmenter> MainSegmenter<Seg> {
         }
     }
 
+    #[inline]
     pub(crate) fn find_good_split(byte_idx: usize, text: &str, bias_left: bool) -> usize {
         if Self::is_break(byte_idx, text) {
             byte_idx
