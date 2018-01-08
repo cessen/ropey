@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tree;
 use tree::{Node, MAX_BYTES};
-use segmenter::MSeg;
+use segmenter::{MSeg, Segmenter};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -15,11 +15,11 @@ const MAX_LEN: usize = tree::MAX_CHILDREN;
 /// The unsafe guts of this are implemented in NodeChildrenInternal
 /// lower down in this file.
 #[derive(Clone)]
-pub(crate) struct NodeChildren(inner::NodeChildrenInternal);
+pub(crate) struct NodeChildren<S: Segmenter>(inner::NodeChildrenInternal<S>);
 
-impl NodeChildren {
+impl<S: Segmenter> NodeChildren<S> {
     /// Creates a new empty array.
-    pub fn new() -> NodeChildren {
+    pub fn new() -> Self {
         NodeChildren(inner::NodeChildrenInternal::new())
     }
 
@@ -35,12 +35,12 @@ impl NodeChildren {
     }
 
     /// Access to the nodes array.
-    pub fn nodes(&self) -> &[Arc<Node>] {
+    pub fn nodes(&self) -> &[Arc<Node<S>>] {
         self.0.nodes()
     }
 
     /// Mutable access to the nodes array.
-    pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
+    pub fn nodes_mut(&mut self) -> &mut [Arc<Node<S>>] {
         self.0.nodes_mut()
     }
 
@@ -55,7 +55,7 @@ impl NodeChildren {
     }
 
     /// Mutable access to both the info and nodes arrays simultaneously.
-    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node<S>>]) {
         self.0.data_mut()
     }
 
@@ -68,7 +68,7 @@ impl NodeChildren {
     /// Pushes an item into the end of the array.
     ///
     /// Increases length by one.  Panics if already full.
-    pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
+    pub fn push(&mut self, item: (TextInfo, Arc<Node<S>>)) {
         self.0.push(item)
     }
 
@@ -76,7 +76,7 @@ impl NodeChildren {
     /// returning the right half.
     ///
     /// This works even when the array is full.
-    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> NodeChildren {
+    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node<S>>)) -> Self {
         let r_count = (self.len() + 1) / 2;
         let l_count = (self.len() + 1) - r_count;
 
@@ -155,7 +155,7 @@ impl NodeChildren {
 
     /// Equi-distributes the children between the two child arrays,
     /// preserving ordering.
-    pub fn distribute_with(&mut self, other: &mut NodeChildren) {
+    pub fn distribute_with(&mut self, other: &mut Self) {
         let r_target_len = (self.len() + other.len()) / 2;
         while other.len() < r_target_len {
             other.insert(0, self.pop());
@@ -209,7 +209,7 @@ impl NodeChildren {
     /// Pops an item off the end of the array and returns it.
     ///
     /// Decreases length by one.  Panics if already empty.
-    pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
+    pub fn pop(&mut self) -> (TextInfo, Arc<Node<S>>) {
         self.0.pop()
     }
 
@@ -217,7 +217,7 @@ impl NodeChildren {
     ///
     /// Increases length by one.  Panics if already full.  Preserves ordering
     /// of the other items.
-    pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
+    pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node<S>>)) {
         self.0.insert(idx, item)
     }
 
@@ -225,7 +225,7 @@ impl NodeChildren {
     /// the right half.
     ///
     /// This works even when the array is full.
-    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> NodeChildren {
+    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node<S>>)) -> Self {
         assert!(self.len() > 0);
         assert!(idx <= self.len());
         let extra = if idx < self.len() {
@@ -242,14 +242,14 @@ impl NodeChildren {
     /// Removes the item at the given index from the the array.
     ///
     /// Decreases length by one.  Preserves ordering of the other items.
-    pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
+    pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node<S>>) {
         self.0.remove(idx)
     }
 
     /// Splits the array in two at `idx`, returning the right part of the split.
     ///
     /// TODO: implement this more efficiently.
-    pub fn split_off(&mut self, idx: usize) -> NodeChildren {
+    pub fn split_off(&mut self, idx: usize) -> Self {
         assert!(idx <= self.len());
 
         let mut other = NodeChildren::new();
@@ -270,8 +270,8 @@ impl NodeChildren {
         idx1: usize,
         idx2: usize,
     ) -> (
-        (&mut TextInfo, &mut Arc<Node>),
-        (&mut TextInfo, &mut Arc<Node>),
+        (&mut TextInfo, &mut Arc<Node<S>>),
+        (&mut TextInfo, &mut Arc<Node<S>>),
     ) {
         assert!(idx1 < idx2);
         assert!(idx2 < self.len());
@@ -288,7 +288,7 @@ impl NodeChildren {
     }
 
     /// Creates an iterator over the array's items.
-    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
+    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node<S>>>> {
         Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
@@ -419,7 +419,7 @@ impl NodeChildren {
     }
 }
 
-impl fmt::Debug for NodeChildren {
+impl<S: Segmenter> fmt::Debug for NodeChildren<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("NodeChildren")
             .field("len", &self.len())
@@ -446,17 +446,18 @@ mod inner {
     use std::mem::ManuallyDrop;
     use std::sync::Arc;
     use super::{Node, TextInfo, MAX_LEN};
+    use segmenter::Segmenter;
 
-    pub(crate) struct NodeChildrenInternal {
-        nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
+    pub(crate) struct NodeChildrenInternal<S: Segmenter> {
+        nodes: ManuallyDrop<[Arc<Node<S>>; MAX_LEN]>,
         info: [TextInfo; MAX_LEN],
         len: u8,
     }
 
-    impl NodeChildrenInternal {
+    impl<S: Segmenter> NodeChildrenInternal<S> {
         /// Creates a new empty array.
         #[inline(always)]
-        pub fn new() -> NodeChildrenInternal {
+        pub fn new() -> NodeChildrenInternal<S> {
             NodeChildrenInternal {
                 nodes: ManuallyDrop::new(unsafe { mem::uninitialized() }),
                 info: unsafe { mem::uninitialized() },
@@ -472,13 +473,13 @@ mod inner {
 
         /// Access to the nodes array.
         #[inline(always)]
-        pub fn nodes(&self) -> &[Arc<Node>] {
+        pub fn nodes(&self) -> &[Arc<Node<S>>] {
             &self.nodes[..(self.len())]
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
-        pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
+        pub fn nodes_mut(&mut self) -> &mut [Arc<Node<S>>] {
             &mut self.nodes[..(self.len as usize)]
         }
 
@@ -496,7 +497,7 @@ mod inner {
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
-        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node<S>>]) {
             (
                 &mut self.info[..(self.len as usize)],
                 &mut self.nodes[..(self.len as usize)],
@@ -507,7 +508,7 @@ mod inner {
         ///
         /// Increases length by one.  Panics if already full.
         #[inline(always)]
-        pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
+        pub fn push(&mut self, item: (TextInfo, Arc<Node<S>>)) {
             assert!(self.len() < MAX_LEN);
             self.info[self.len()] = item.0;
             mem::forget(mem::replace(&mut self.nodes[self.len as usize], item.1));
@@ -518,7 +519,7 @@ mod inner {
         ///
         /// Decreases length by one.  Panics if already empty.
         #[inline(always)]
-        pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
+        pub fn pop(&mut self) -> (TextInfo, Arc<Node<S>>) {
             assert!(self.len() > 0);
             self.len -= 1;
             (self.info[self.len()], unsafe {
@@ -531,7 +532,7 @@ mod inner {
         /// Increases length by one.  Panics if already full.  Preserves ordering
         /// of the other items.
         #[inline(always)]
-        pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
+        pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node<S>>)) {
             assert!(idx <= self.len());
             assert!(self.len() < MAX_LEN);
 
@@ -559,7 +560,7 @@ mod inner {
         ///
         /// Decreases length by one.  Preserves ordering of the other items.
         #[inline(always)]
-        pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
+        pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node<S>>) {
             assert!(self.len() > 0);
             assert!(idx < self.len());
 
@@ -584,17 +585,17 @@ mod inner {
         }
     }
 
-    impl Drop for NodeChildrenInternal {
+    impl<S: Segmenter> Drop for NodeChildrenInternal<S> {
         fn drop(&mut self) {
             for node in &mut self.nodes[..self.len as usize] {
-                let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
+                let mptr: *mut Arc<Node<S>> = node; // Make sure we have the right dereference
                 unsafe { ptr::drop_in_place(mptr) };
             }
         }
     }
 
-    impl Clone for NodeChildrenInternal {
-        fn clone(&self) -> NodeChildrenInternal {
+    impl<S: Segmenter> Clone for NodeChildrenInternal<S> {
+        fn clone(&self) -> NodeChildrenInternal<S> {
             let mut clone_array = NodeChildrenInternal::new();
 
             // Copy nodes... carefully.

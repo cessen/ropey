@@ -12,26 +12,31 @@ use std::sync::Arc;
 use unicode_segmentation;
 use unicode_segmentation::UnicodeSegmentation;
 
+use segmenter::Segmenter;
 use tree::Node;
 use slice::RopeSlice;
 
 //==========================================================
 
 /// An iterator over a `Rope`'s bytes.
-pub struct Bytes<'a> {
-    chunk_iter: Chunks<'a>,
+pub struct Bytes<'a, S: 'a + Segmenter> {
+    chunk_iter: Chunks<'a, S>,
     cur_chunk: str::Bytes<'a>,
 }
 
-impl<'a> Bytes<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Bytes {
+impl<'a, S: 'a + Segmenter> Bytes<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Bytes<S> {
         Bytes {
             chunk_iter: Chunks::new(node),
             cur_chunk: "".bytes(),
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Bytes<S> {
         Bytes {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".bytes(),
@@ -39,7 +44,7 @@ impl<'a> Bytes<'a> {
     }
 }
 
-impl<'a> Iterator for Bytes<'a> {
+impl<'a, S: 'a + Segmenter> Iterator for Bytes<'a, S> {
     type Item = u8;
 
     fn next(&mut self) -> Option<u8> {
@@ -59,20 +64,24 @@ impl<'a> Iterator for Bytes<'a> {
 //==========================================================
 
 /// An iterator over a `Rope`'s chars.
-pub struct Chars<'a> {
-    chunk_iter: Chunks<'a>,
+pub struct Chars<'a, S: 'a + Segmenter> {
+    chunk_iter: Chunks<'a, S>,
     cur_chunk: str::Chars<'a>,
 }
 
-impl<'a> Chars<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Chars {
+impl<'a, S: 'a + Segmenter> Chars<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Chars<S> {
         Chars {
             chunk_iter: Chunks::new(node),
             cur_chunk: "".chars(),
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Chars<S> {
         Chars {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".chars(),
@@ -80,7 +89,7 @@ impl<'a> Chars<'a> {
     }
 }
 
-impl<'a> Iterator for Chars<'a> {
+impl<'a, S: 'a + Segmenter> Iterator for Chars<'a, S> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
@@ -104,14 +113,14 @@ impl<'a> Iterator for Chars<'a> {
 /// The grapheme clusters returned are the extended grapheme
 /// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/).
 /// Each grapheme cluster is returned as a utf8 `&str` slice.
-pub struct Graphemes<'a> {
-    chunk_iter: Chunks<'a>,
+pub struct Graphemes<'a, S: 'a + Segmenter> {
+    chunk_iter: Chunks<'a, S>,
     cur_chunk: unicode_segmentation::Graphemes<'a>,
     extended: bool,
 }
 
-impl<'a> Graphemes<'a> {
-    pub(crate) fn new(node: &Arc<Node>, extended: bool) -> Graphemes {
+impl<'a, S: 'a + Segmenter> Graphemes<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>, extended: bool) -> Graphemes<S> {
         Graphemes {
             chunk_iter: Chunks::new(node),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
@@ -120,11 +129,11 @@ impl<'a> Graphemes<'a> {
     }
 
     pub(crate) fn new_with_range(
-        node: &Arc<Node>,
+        node: &Arc<Node<S>>,
         extended: bool,
         start_char: usize,
         end_char: usize,
-    ) -> Graphemes {
+    ) -> Graphemes<S> {
         Graphemes {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: UnicodeSegmentation::graphemes("", extended),
@@ -133,7 +142,7 @@ impl<'a> Graphemes<'a> {
     }
 }
 
-impl<'a> Iterator for Graphemes<'a> {
+impl<'a, S: 'a + Segmenter> Iterator for Graphemes<'a, S> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
@@ -158,15 +167,15 @@ impl<'a> Iterator for Graphemes<'a> {
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
-pub struct Lines<'a> {
-    node: &'a Arc<Node>,
+pub struct Lines<'a, S: 'a + Segmenter> {
+    node: &'a Arc<Node<S>>,
     start_char: usize,
     end_char: usize,
     line_idx: usize,
 }
 
-impl<'a> Lines<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Lines {
+impl<'a, S: 'a + Segmenter> Lines<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Lines<S> {
         Lines {
             node: node,
             start_char: 0,
@@ -175,7 +184,11 @@ impl<'a> Lines<'a> {
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Lines {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Lines<S> {
         Lines {
             node: node,
             start_char: start_char,
@@ -185,10 +198,10 @@ impl<'a> Lines<'a> {
     }
 }
 
-impl<'a> Iterator for Lines<'a> {
-    type Item = RopeSlice<'a>;
+impl<'a, S: 'a + Segmenter> Iterator for Lines<'a, S> {
+    type Item = RopeSlice<'a, S>;
 
-    fn next(&mut self) -> Option<RopeSlice<'a>> {
+    fn next(&mut self) -> Option<RopeSlice<'a, S>> {
         if self.line_idx > self.node.line_break_count() {
             return None;
         } else {
@@ -241,15 +254,15 @@ impl<'a> Iterator for Lines<'a> {
 ///
 /// The converse of this API is [`RopeBuilder`](../struct.RopeBuilder.html),
 /// which is useful for efficiently streaming text data _into_ a rope.
-pub struct Chunks<'a> {
-    node_stack: Vec<&'a Arc<Node>>,
+pub struct Chunks<'a, S: 'a + Segmenter> {
+    node_stack: Vec<&'a Arc<Node<S>>>,
     start: usize,
     end: usize,
     idx: usize,
 }
 
-impl<'a> Chunks<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Chunks {
+impl<'a, S: 'a + Segmenter> Chunks<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Chunks<S> {
         Chunks {
             node_stack: vec![node],
             start: 0,
@@ -258,7 +271,11 @@ impl<'a> Chunks<'a> {
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Chunks<S> {
         Chunks {
             node_stack: vec![node],
             start: node.char_to_byte(start_char),
@@ -268,7 +285,7 @@ impl<'a> Chunks<'a> {
     }
 }
 
-impl<'a> Iterator for Chunks<'a> {
+impl<'a, S: 'a + Segmenter> Iterator for Chunks<'a, S> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
@@ -324,7 +341,7 @@ impl<'a> Iterator for Chunks<'a> {
 #[cfg(test)]
 mod tests {
     use unicode_segmentation::UnicodeSegmentation;
-    use rope::Rope;
+    use Rope;
 
     const TEXT: &str = "\r\n\
                         Hello there!  How're you doing?  It's a fine day, \

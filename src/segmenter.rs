@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-pub(crate) type MSeg = MainSegmenter<GraphemeSegmenter>;
+pub(crate) type MSeg = MainSegmenter<DefaultSegmenter>;
 
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
-/// Trait for implementing segmentation strategies for `Rope`.
+/// Trait for implementing segmentation strategies for [`Rope`](../struct.Rope.html).
 pub trait Segmenter: Debug + Copy + Clone {
     fn is_break(byte_idx: usize, text: &str) -> bool;
     fn seam_is_break(left: &str, right: &str) -> bool;
@@ -161,13 +161,14 @@ impl<Seg: Segmenter> Segmenter for MainSegmenter<Seg> {
 
 //===========================================================================
 
-/// Default `Segmenter`.  Segments text according to the extended grapheme
-/// cluster rules specified in
+/// Ropey's default segmentation strategy.  Segments by grapheme cluster.
+///
+/// Uses the extended grapheme cluster rules specified in
 /// [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/)
 #[derive(Debug, Copy, Clone)]
-pub enum GraphemeSegmenter {}
+pub struct DefaultSegmenter {}
 
-impl Segmenter for GraphemeSegmenter {
+impl Segmenter for DefaultSegmenter {
     #[inline]
     fn is_break(byte_idx: usize, text: &str) -> bool {
         GraphemeCursor::new(byte_idx, text.len(), true)
@@ -199,9 +200,9 @@ impl Segmenter for GraphemeSegmenter {
     }
 }
 
-/// A `Segmenter` that will break anywhere.
+/// Segmentation strategy that allows breaks everywhere.
 #[derive(Debug, Copy, Clone)]
-pub enum NullSegmenter {}
+pub struct NullSegmenter {}
 
 impl Segmenter for NullSegmenter {
     #[inline]

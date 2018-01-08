@@ -4,6 +4,7 @@ use std::borrow::Borrow;
 use std::ops::Deref;
 use std::ptr;
 use std::str;
+use std::marker::PhantomData;
 
 use smallvec::{Array, SmallVec};
 use str_utils::{char_idx_to_byte_idx, count_chars};
@@ -14,16 +15,18 @@ use tree::MAX_BYTES;
 /// length.  Has a bunch of methods on it that are useful for the rope
 /// tree.
 #[derive(Clone, Default)]
-pub(crate) struct NodeText {
+pub(crate) struct NodeText<S: Segmenter> {
     buffer: SmallVec<BackingArray>,
+    _seg: PhantomData<S>,
 }
 
-impl NodeText {
+impl<S: Segmenter> NodeText<S> {
     /// Creates a new empty `NodeText`
     #[inline(always)]
     pub fn new() -> Self {
         NodeText {
             buffer: SmallVec::new(),
+            _seg: PhantomData,
         }
     }
 
@@ -33,6 +36,7 @@ impl NodeText {
     pub fn with_capacity(capacity: usize) -> Self {
         NodeText {
             buffer: SmallVec::with_capacity(capacity),
+            _seg: PhantomData,
         }
     }
 
@@ -166,7 +170,7 @@ impl NodeText {
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    pub fn split_off(&mut self, idx: usize) -> NodeText {
+    pub fn split_off(&mut self, idx: usize) -> Self {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
         let len = self.len();
@@ -187,7 +191,7 @@ impl NodeText {
     /// Splits a string into two strings at the char index given.
     /// The first section of the split is stored in the original string,
     /// while the second section of the split is returned as a new string.
-    pub fn split_off_at_char(&mut self, char_idx: usize) -> NodeText {
+    pub fn split_off_at_char(&mut self, char_idx: usize) -> Self {
         debug_assert!(char_idx <= count_chars(self));
         let byte_idx = char_idx_to_byte_idx(self, char_idx);
         self.split_off(byte_idx)
@@ -255,44 +259,44 @@ impl NodeText {
     }
 }
 
-impl std::cmp::PartialEq for NodeText {
+impl<S: Segmenter> std::cmp::PartialEq for NodeText<S> {
     fn eq(&self, other: &Self) -> bool {
         let (s1, s2): (&str, &str) = (self, other);
         s1 == s2
     }
 }
 
-impl<'a> PartialEq<NodeText> for &'a str {
-    fn eq(&self, other: &NodeText) -> bool {
+impl<'a, S: Segmenter> PartialEq<NodeText<S>> for &'a str {
+    fn eq(&self, other: &NodeText<S>) -> bool {
         *self == (other as &str)
     }
 }
 
-impl<'a> PartialEq<&'a str> for NodeText {
+impl<'a, S: Segmenter> PartialEq<&'a str> for NodeText<S> {
     fn eq(&self, other: &&'a str) -> bool {
         (self as &str) == *other
     }
 }
 
-impl std::fmt::Display for NodeText {
+impl<S: Segmenter> std::fmt::Display for NodeText<S> {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl std::fmt::Debug for NodeText {
+impl<S: Segmenter> std::fmt::Debug for NodeText<S> {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> std::fmt::Result {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl<'a> From<&'a str> for NodeText {
+impl<'a, S: Segmenter> From<&'a str> for NodeText<S> {
     fn from(s: &str) -> Self {
         Self::from_str(s)
     }
 }
 
-impl Deref for NodeText {
+impl<S: Segmenter> Deref for NodeText<S> {
     type Target = str;
 
     fn deref(&self) -> &str {
@@ -302,7 +306,7 @@ impl Deref for NodeText {
     }
 }
 
-impl AsRef<str> for NodeText {
+impl<S: Segmenter> AsRef<str> for NodeText<S> {
     fn as_ref(&self) -> &str {
         // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
@@ -310,7 +314,7 @@ impl AsRef<str> for NodeText {
     }
 }
 
-impl Borrow<str> for NodeText {
+impl<S: Segmenter> Borrow<str> for NodeText<S> {
     fn borrow(&self) -> &str {
         // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
@@ -324,7 +328,7 @@ impl Borrow<str> for NodeText {
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
 /// is one big grapheme.
-pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
+pub(crate) fn fix_segment_seam<S: Segmenter>(l: &mut NodeText<S>, r: &mut NodeText<S>) {
     // Early out, if there's nothing to do.
     if MSeg::seam_is_break(l, r) {
         return;
