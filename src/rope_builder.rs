@@ -6,7 +6,7 @@ use std::sync::Arc;
 use smallvec::SmallVec;
 
 use rope::Rope;
-use segmenter::{DefaultSegmenter, MainSegmenter, Segmenter};
+use segmenter::{DefaultGraphSeg, GraphemeSegmenter, MainGraphSeg};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An efficient incremental `Rope` builder.
@@ -46,15 +46,15 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// assert_eq!(rope, "Hello world!\nHow's it going?");
 /// ```
 #[derive(Debug, Clone)]
-pub struct RopeBuilder<S = DefaultSegmenter>
+pub struct RopeBuilder<S = DefaultGraphSeg>
 where
-    S: Segmenter,
+    S: GraphemeSegmenter,
 {
     stack: SmallVec<[Arc<Node<S>>; 4]>,
     buffer: String,
 }
 
-impl RopeBuilder<DefaultSegmenter> {
+impl RopeBuilder<DefaultGraphSeg> {
     /// Creates a new RopeBuilder, ready for input.
     pub fn new() -> Self {
         RopeBuilder {
@@ -68,16 +68,16 @@ impl RopeBuilder<DefaultSegmenter> {
     }
 }
 
-impl<S: Segmenter> RopeBuilder<S> {
-    /// Creates a new RopeBuilder with a custom segmenter.
+impl<S: GraphemeSegmenter> RopeBuilder<S> {
+    /// Creates a new RopeBuilder with a custom grapheme segmenter.
     ///
     /// # Example
     ///
     /// ```
     /// # use ropey::RopeBuilder;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmenter::NullGraphSeg;
     ///
-    /// let mut builder = RopeBuilder::<NullSegmenter>::with_segmenter();
+    /// let mut builder = RopeBuilder::<NullGraphSeg>::with_segmenter();
     /// ```
     pub fn with_segmenter() -> Self {
         RopeBuilder {
@@ -184,7 +184,7 @@ impl<S: Segmenter> RopeBuilder<S> {
         if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
-                let split_idx = MainSegmenter::<S>::find_good_split(MAX_BYTES, text, true);
+                let split_idx = MainGraphSeg::<S>::find_good_split(MAX_BYTES, text, true);
                 if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                     self.buffer.push_str(text);
                     return (NextText::None, "");
@@ -199,9 +199,9 @@ impl<S: Segmenter> RopeBuilder<S> {
             }
         } else if (text.len() + self.buffer.len()) > MAX_BYTES {
             let split_idx = if self.buffer.len() < MAX_BYTES {
-                MainSegmenter::<S>::nearest_internal_break(MAX_BYTES - self.buffer.len(), text)
+                MainGraphSeg::<S>::nearest_internal_break(MAX_BYTES - self.buffer.len(), text)
             } else {
-                MainSegmenter::<S>::nearest_internal_break(0, text)
+                MainGraphSeg::<S>::nearest_internal_break(0, text)
             };
 
             if (split_idx == 0 || split_idx == text.len()) && !last_chunk {

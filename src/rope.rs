@@ -8,7 +8,7 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use segmenter::{DefaultSegmenter, MainSegmenter, Segmenter};
+use segmenter::{DefaultGraphSeg, GraphemeSegmenter, MainGraphSeg};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -63,14 +63,14 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// line) texts.  It should be able to handle just about anything you can throw
 /// at it.
 #[derive(Clone)]
-pub struct Rope<S = DefaultSegmenter>
+pub struct Rope<S = DefaultGraphSeg>
 where
-    S: Segmenter,
+    S: GraphemeSegmenter,
 {
     pub(crate) root: Arc<Node<S>>,
 }
 
-impl Rope<DefaultSegmenter> {
+impl Rope<DefaultGraphSeg> {
     /// Creates an empty `Rope`.
     pub fn new() -> Self {
         Rope {
@@ -104,19 +104,19 @@ impl Rope<DefaultSegmenter> {
     }
 }
 
-impl<S: Segmenter> Rope<S> {
+impl<S: GraphemeSegmenter> Rope<S> {
     //-----------------------------------------------------------------------
     // Constructors
 
-    /// Creates an empty `Rope` with a custom segmenter.
+    /// Creates an empty `Rope` with a custom grapheme segmenter.
     ///
     /// # Example
     ///
     /// ```
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmenter::NullGraphSeg;
     ///
-    /// let rope = Rope::<NullSegmenter>::with_segmenter();
+    /// let rope = Rope::<NullGraphSeg>::with_segmenter();
     /// ```
     pub fn with_segmenter() -> Rope<S> {
         Rope {
@@ -124,21 +124,21 @@ impl<S: Segmenter> Rope<S> {
         }
     }
 
-    /// Creates a `Rope` with a custom segmenter from a string slice.
+    /// Creates a `Rope` with a custom grapheme segmenter from a string slice.
     ///
     /// # Example
     ///
     /// ```
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmenter::NullGraphSeg;
     ///
-    /// let rope = Rope::<NullSegmenter>::from_str_with_segmenter("Hello world!");
+    /// let rope = Rope::<NullGraphSeg>::from_str_with_segmenter("Hello world!");
     /// ```
     pub fn from_str_with_segmenter(text: &str) -> Self {
         RopeBuilder::with_segmenter().build_at_once(text)
     }
 
-    /// Creates a `Rope` with a custom segmenter from the output of a reader.
+    /// Creates a `Rope` with a custom grapheme segmenter from the output of a reader.
     ///
     /// # Example
     ///
@@ -146,10 +146,10 @@ impl<S: Segmenter> Rope<S> {
     /// # use std::fs::File;
     /// # use std::io::{Result, BufReader};
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmenter::NullGraphSeg;
     ///
     /// # fn do_stuff() -> Result<()> {
-    /// let rope = Rope::<NullSegmenter>::from_reader_with_segmenter(
+    /// let rope = Rope::<NullGraphSeg>::from_reader_with_segmenter(
     ///     BufReader::new(File::open("my_great_book.txt")?)
     /// )?;
     /// # Ok(())
@@ -343,7 +343,7 @@ impl<S: Segmenter> Rope<S> {
             // chunks.
             let mut text = text;
             while text.len() > 0 {
-                let split_idx = MainSegmenter::<S>::find_good_split(
+                let split_idx = MainGraphSeg::<S>::find_good_split(
                     text.len() - MAX_BYTES.min(text.len()),
                     text,
                     false,
@@ -972,7 +972,7 @@ impl<S: Segmenter> Rope<S> {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(MainSegmenter::<S>::seam_is_break(last_chunk, chunk));
+                    assert!(MainGraphSeg::<S>::seam_is_break(last_chunk, chunk));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;
@@ -1013,13 +1013,13 @@ impl<S: Segmenter> Rope<S> {
 
 //==============================================================
 
-impl<S: Segmenter> std::fmt::Debug for Rope<S> {
+impl<S: GraphemeSegmenter> std::fmt::Debug for Rope<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_list().entries(self.chunks()).finish()
     }
 }
 
-impl<S: Segmenter> std::fmt::Display for Rope<S> {
+impl<S: GraphemeSegmenter> std::fmt::Display for Rope<S> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for chunk in self.chunks() {
@@ -1029,70 +1029,70 @@ impl<S: Segmenter> std::fmt::Display for Rope<S> {
     }
 }
 
-impl<S: Segmenter> std::default::Default for Rope<S> {
+impl<S: GraphemeSegmenter> std::default::Default for Rope<S> {
     #[inline]
     fn default() -> Self {
         Self::with_segmenter()
     }
 }
 
-impl<'a, S1: Segmenter, S2: Segmenter> std::cmp::PartialEq<Rope<S2>> for Rope<S1> {
+impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<Rope<S2>> for Rope<S1> {
     #[inline]
     fn eq(&self, other: &Rope<S2>) -> bool {
         self.to_slice() == other.to_slice()
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<&'a str> for Rope<S> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<&'a str> for Rope<S> {
     #[inline]
     fn eq(&self, other: &&'a str) -> bool {
         self.to_slice() == *other
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<Rope<S>> for &'a str {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for &'a str {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
         *self == other.to_slice()
     }
 }
 
-impl<S: Segmenter> std::cmp::PartialEq<str> for Rope<S> {
+impl<S: GraphemeSegmenter> std::cmp::PartialEq<str> for Rope<S> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         self.to_slice() == other
     }
 }
 
-impl<S: Segmenter> std::cmp::PartialEq<Rope<S>> for str {
+impl<S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for str {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
         self == other.to_slice()
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<String> for Rope<S> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<String> for Rope<S> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.to_slice() == other.as_str()
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<Rope<S>> for String {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for String {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
         self.as_str() == other.to_slice()
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope<S> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope<S> {
     #[inline]
     fn eq(&self, other: &std::borrow::Cow<'a, str>) -> bool {
         self.to_slice() == **other
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<Rope<S>> for std::borrow::Cow<'a, str> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for std::borrow::Cow<'a, str> {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
         **self == other.to_slice()

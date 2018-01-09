@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
-/// Trait for implementing segmentation strategies for [`Rope`](../struct.Rope.html).
-pub trait Segmenter: Debug + Copy + Clone {
+/// Trait for implementing grapheme segmentation strategies for [`Rope`](../struct.Rope.html).
+pub trait GraphemeSegmenter: Debug + Copy + Clone {
     fn is_break(byte_idx: usize, text: &str) -> bool;
     fn seam_is_break(left: &str, right: &str) -> bool;
 }
@@ -13,7 +13,7 @@ pub trait Segmenter: Debug + Copy + Clone {
 
 /// Internal-only segmenter that takes another segmenter and adds on top of
 /// its segmentation that CRLF should never be broken.
-/// Used by Rope to ensure that CRLF is never broken regardless of the
+/// Used by Ropey to ensure that CRLF is never broken regardless of the
 /// segmenter passed.
 ///
 /// This also ensures that special cases like left/right edge or empty
@@ -21,11 +21,11 @@ pub trait Segmenter: Debug + Copy + Clone {
 /// other methods that are used throughout Ropey when dealing with
 /// segmentation.
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct MainSegmenter<Seg: Segmenter> {
+pub(crate) struct MainGraphSeg<Seg: GraphemeSegmenter> {
     _seg: PhantomData<Seg>,
 }
 
-impl<Seg: Segmenter> MainSegmenter<Seg> {
+impl<S: GraphemeSegmenter> MainGraphSeg<S> {
     /// Returns the segment break before (but not including) the given byte
     /// boundary.
     ///
@@ -138,7 +138,7 @@ impl<Seg: Segmenter> MainSegmenter<Seg> {
     }
 }
 
-impl<Seg: Segmenter> Segmenter for MainSegmenter<Seg> {
+impl<S: GraphemeSegmenter> GraphemeSegmenter for MainGraphSeg<S> {
     #[inline]
     fn is_break(byte_idx: usize, text: &str) -> bool {
         debug_assert!(byte_idx <= text.len());
@@ -149,7 +149,7 @@ impl<Seg: Segmenter> Segmenter for MainSegmenter<Seg> {
         } else {
             let bytes = text.as_bytes();
             let crlf_break = (bytes[byte_idx - 1] != 0x0D) | (bytes[byte_idx] != 0x0A);
-            crlf_break && Seg::is_break(byte_idx, text)
+            crlf_break && S::is_break(byte_idx, text)
         }
     }
 
@@ -157,20 +157,20 @@ impl<Seg: Segmenter> Segmenter for MainSegmenter<Seg> {
     fn seam_is_break(left: &str, right: &str) -> bool {
         debug_assert!(!left.is_empty() && !right.is_empty());
         let crlf_break = (left.as_bytes()[left.len() - 1] != 0x0D) | (right.as_bytes()[0] != 0x0A);
-        crlf_break && Seg::seam_is_break(left, right)
+        crlf_break && S::seam_is_break(left, right)
     }
 }
 
 //===========================================================================
 
-/// Ropey's default segmentation strategy.  Segments by grapheme cluster.
+/// Ropey's default grapheme segmenter.
 ///
 /// Uses the extended grapheme cluster rules specified in
 /// [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/)
 #[derive(Debug, Copy, Clone)]
-pub struct DefaultSegmenter {}
+pub struct DefaultGraphSeg {}
 
-impl Segmenter for DefaultSegmenter {
+impl GraphemeSegmenter for DefaultGraphSeg {
     #[inline]
     fn is_break(byte_idx: usize, text: &str) -> bool {
         GraphemeCursor::new(byte_idx, text.len(), true)
@@ -202,11 +202,12 @@ impl Segmenter for DefaultSegmenter {
     }
 }
 
-/// Segmentation strategy that allows breaks everywhere.
+/// Grapheme segmenter that ignores graphemes completely and treats each
+/// code point as an individual segment.
 #[derive(Debug, Copy, Clone)]
-pub struct NullSegmenter {}
+pub struct NullGraphSeg {}
 
-impl Segmenter for NullSegmenter {
+impl GraphemeSegmenter for NullGraphSeg {
     #[inline]
     fn is_break(_byte_idx: usize, _text: &str) -> bool {
         true
@@ -223,18 +224,18 @@ impl Segmenter for NullSegmenter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    type MSeg = MainSegmenter<DefaultSegmenter>;
+    type MSeg = MainGraphSeg<DefaultGraphSeg>;
 
     #[test]
     fn crlf_segmenter_01() {
         let text = "Hello world!\r\nHow's it going?";
 
-        assert!(MainSegmenter::<NullSegmenter>::is_break(0, ""));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(0, text));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(12, text));
-        assert!(!MainSegmenter::<NullSegmenter>::is_break(13, text));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(14, text));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(19, text));
+        assert!(MainGraphSeg::<NullGraphSeg>::is_break(0, ""));
+        assert!(MainGraphSeg::<NullGraphSeg>::is_break(0, text));
+        assert!(MainGraphSeg::<NullGraphSeg>::is_break(12, text));
+        assert!(!MainGraphSeg::<NullGraphSeg>::is_break(13, text));
+        assert!(MainGraphSeg::<NullGraphSeg>::is_break(14, text));
+        assert!(MainGraphSeg::<NullGraphSeg>::is_break(19, text));
     }
 
     #[test]
@@ -242,12 +243,12 @@ mod tests {
         let l = "Hello world!\r";
         let r = "\nHow's it going?";
 
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break(l, r));
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break(l, "\n"));
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break("\r", r));
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break("\r", "\n"));
-        assert!(MainSegmenter::<NullSegmenter>::seam_is_break(r, l));
-        assert!(MainSegmenter::<NullSegmenter>::seam_is_break("\n", "\r"));
+        assert!(!MainGraphSeg::<NullGraphSeg>::seam_is_break(l, r));
+        assert!(!MainGraphSeg::<NullGraphSeg>::seam_is_break(l, "\n"));
+        assert!(!MainGraphSeg::<NullGraphSeg>::seam_is_break("\r", r));
+        assert!(!MainGraphSeg::<NullGraphSeg>::seam_is_break("\r", "\n"));
+        assert!(MainGraphSeg::<NullGraphSeg>::seam_is_break(r, l));
+        assert!(MainGraphSeg::<NullGraphSeg>::seam_is_break("\n", "\r"));
     }
 
     #[test]

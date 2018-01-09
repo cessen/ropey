@@ -2,13 +2,13 @@ use std;
 use std::sync::Arc;
 
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
-use segmenter::Segmenter;
+use segmenter::GraphemeSegmenter;
 use tree::{Count, Node};
 use rope::Rope;
 
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
-pub struct RopeSlice<'a, S: 'a + Segmenter> {
+pub struct RopeSlice<'a, S: 'a + GraphemeSegmenter> {
     node: &'a Arc<Node<S>>,
     start_byte: Count,
     end_byte: Count,
@@ -18,7 +18,7 @@ pub struct RopeSlice<'a, S: 'a + Segmenter> {
     end_line_break: Count,
 }
 
-impl<'a, S: 'a + Segmenter> RopeSlice<'a, S> {
+impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
     pub(crate) fn new_with_range(node: &'a Arc<Node<S>>, start: usize, end: usize) -> Self {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
@@ -348,13 +348,13 @@ impl<'a, S: 'a + Segmenter> RopeSlice<'a, S> {
 
 //==============================================================
 
-impl<'a, S: Segmenter> std::fmt::Debug for RopeSlice<'a, S> {
+impl<'a, S: GraphemeSegmenter> std::fmt::Debug for RopeSlice<'a, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_list().entries(self.chunks()).finish()
     }
 }
 
-impl<'a, S: Segmenter> std::fmt::Display for RopeSlice<'a, S> {
+impl<'a, S: GraphemeSegmenter> std::fmt::Display for RopeSlice<'a, S> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for chunk in self.chunks() {
@@ -364,7 +364,7 @@ impl<'a, S: Segmenter> std::fmt::Display for RopeSlice<'a, S> {
     }
 }
 
-impl<'a, 'b, S1: Segmenter, S2: Segmenter> std::cmp::PartialEq<RopeSlice<'b, S2>>
+impl<'a, 'b, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'b, S2>>
     for RopeSlice<'a, S1> {
     #[inline]
     fn eq(&self, other: &RopeSlice<'b, S2>) -> bool {
@@ -413,7 +413,7 @@ impl<'a, 'b, S1: Segmenter, S2: Segmenter> std::cmp::PartialEq<RopeSlice<'b, S2>
     }
 }
 
-impl<'a, 'b, S: Segmenter> std::cmp::PartialEq<&'b str> for RopeSlice<'a, S> {
+impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<&'b str> for RopeSlice<'a, S> {
     #[inline]
     fn eq(&self, other: &&'b str) -> bool {
         if self.len_bytes() != other.len() {
@@ -432,63 +432,67 @@ impl<'a, 'b, S: Segmenter> std::cmp::PartialEq<&'b str> for RopeSlice<'a, S> {
     }
 }
 
-impl<'a, 'b, S: Segmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for &'b str {
+impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for &'b str {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
         other == self
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<str> for RopeSlice<'a, S> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<str> for RopeSlice<'a, S> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         std::cmp::PartialEq::<&str>::eq(self, &other)
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for str {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for str {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
         std::cmp::PartialEq::<&str>::eq(other, &self)
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<String> for RopeSlice<'a, S> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<String> for RopeSlice<'a, S> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self == other.as_str()
     }
 }
 
-impl<'a, S: Segmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for String {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for String {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
         self.as_str() == other
     }
 }
 
-impl<'a, 'b, S: Segmenter> std::cmp::PartialEq<std::borrow::Cow<'b, str>> for RopeSlice<'a, S> {
+impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<std::borrow::Cow<'b, str>>
+    for RopeSlice<'a, S> {
     #[inline]
     fn eq(&self, other: &std::borrow::Cow<'b, str>) -> bool {
         *self == **other
     }
 }
 
-impl<'a, 'b, S: Segmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for std::borrow::Cow<'b, str> {
+impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>>
+    for std::borrow::Cow<'b, str> {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
         **self == *other
     }
 }
 
-impl<'a, S1: Segmenter, S2: Segmenter> std::cmp::PartialEq<Rope<S2>> for RopeSlice<'a, S1> {
+impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<Rope<S2>>
+    for RopeSlice<'a, S1> {
     #[inline]
     fn eq(&self, other: &Rope<S2>) -> bool {
         *self == other.to_slice()
     }
 }
 
-impl<'a, S1: Segmenter, S2: Segmenter> std::cmp::PartialEq<RopeSlice<'a, S2>> for Rope<S1> {
+impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S2>>
+    for Rope<S1> {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a, S2>) -> bool {
         self.to_slice() == *other

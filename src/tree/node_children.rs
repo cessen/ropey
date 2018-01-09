@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tree;
 use tree::{Node, MAX_BYTES};
-use segmenter::{MainSegmenter, Segmenter};
+use segmenter::{GraphemeSegmenter, MainGraphSeg};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -15,9 +15,9 @@ const MAX_LEN: usize = tree::MAX_CHILDREN;
 /// The unsafe guts of this are implemented in NodeChildrenInternal
 /// lower down in this file.
 #[derive(Clone)]
-pub(crate) struct NodeChildren<S: Segmenter>(inner::NodeChildrenInternal<S>);
+pub(crate) struct NodeChildren<S: GraphemeSegmenter>(inner::NodeChildrenInternal<S>);
 
-impl<S: Segmenter> NodeChildren<S> {
+impl<S: GraphemeSegmenter> NodeChildren<S> {
     /// Creates a new empty array.
     pub fn new() -> Self {
         NodeChildren(inner::NodeChildrenInternal::new())
@@ -109,7 +109,7 @@ impl<S: Segmenter> NodeChildren<S> {
                         } else {
                             let split_pos = {
                                 let pos = text1.len() - (text1.len() / 2);
-                                MainSegmenter::<S>::nearest_internal_break(pos, text1)
+                                MainGraphSeg::<S>::nearest_internal_break(pos, text1)
                             };
                             *text2 = text1.split_off(split_pos);
                             if text2.len() > 0 {
@@ -192,7 +192,7 @@ impl<S: Segmenter> NodeChildren<S> {
                     let text_l = Arc::make_mut(node_l).leaf_text_mut();
                     let text_r = Arc::make_mut(node_r).leaf_text_mut();
                     let split_idx_r =
-                        MainSegmenter::<S>::prev_break(MAX_BYTES - text_l.len(), text_r);
+                        MainGraphSeg::<S>::prev_break(MAX_BYTES - text_l.len(), text_r);
                     text_l.push_str(&text_r[..split_idx_r]);
                     text_r.truncate_front(split_idx_r);
                 }
@@ -420,7 +420,7 @@ impl<S: Segmenter> NodeChildren<S> {
     }
 }
 
-impl<S: Segmenter> fmt::Debug for NodeChildren<S> {
+impl<S: GraphemeSegmenter> fmt::Debug for NodeChildren<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("NodeChildren")
             .field("len", &self.len())
@@ -447,15 +447,15 @@ mod inner {
     use std::mem::ManuallyDrop;
     use std::sync::Arc;
     use super::{Node, TextInfo, MAX_LEN};
-    use segmenter::Segmenter;
+    use segmenter::GraphemeSegmenter;
 
-    pub(crate) struct NodeChildrenInternal<S: Segmenter> {
+    pub(crate) struct NodeChildrenInternal<S: GraphemeSegmenter> {
         nodes: ManuallyDrop<[Arc<Node<S>>; MAX_LEN]>,
         info: [TextInfo; MAX_LEN],
         len: u8,
     }
 
-    impl<S: Segmenter> NodeChildrenInternal<S> {
+    impl<S: GraphemeSegmenter> NodeChildrenInternal<S> {
         /// Creates a new empty array.
         #[inline(always)]
         pub fn new() -> NodeChildrenInternal<S> {
@@ -586,7 +586,7 @@ mod inner {
         }
     }
 
-    impl<S: Segmenter> Drop for NodeChildrenInternal<S> {
+    impl<S: GraphemeSegmenter> Drop for NodeChildrenInternal<S> {
         fn drop(&mut self) {
             for node in &mut self.nodes[..self.len as usize] {
                 let mptr: *mut Arc<Node<S>> = node; // Make sure we have the right dereference
@@ -595,7 +595,7 @@ mod inner {
         }
     }
 
-    impl<S: Segmenter> Clone for NodeChildrenInternal<S> {
+    impl<S: GraphemeSegmenter> Clone for NodeChildrenInternal<S> {
         fn clone(&self) -> NodeChildrenInternal<S> {
             let mut clone_array = NodeChildrenInternal::new();
 
@@ -647,12 +647,12 @@ mod inner {
 mod tests {
     use super::*;
     use std::sync::Arc;
-    use segmenter::DefaultSegmenter;
+    use segmenter::DefaultGraphSeg;
     use tree::{Node, NodeText, TextInfo};
 
     #[test]
     fn search_char_idx_01() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::<DefaultGraphSeg>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -694,7 +694,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn search_char_idx_02() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::<DefaultGraphSeg>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -717,7 +717,7 @@ mod tests {
 
     #[test]
     fn search_char_idx_range_01() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::<DefaultGraphSeg>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -796,7 +796,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn search_char_idx_range_02() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::<DefaultGraphSeg>::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
