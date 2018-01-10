@@ -8,7 +8,7 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use segmenter::{DefaultGraphSeg, GraphemeSegmenter, MainGraphSeg};
+use segmenter::{DefaultSegmenter, GraphemeSegmenter, MainSegmenter};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -63,14 +63,14 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// line) texts.  It should be able to handle just about anything you can throw
 /// at it.
 #[derive(Clone)]
-pub struct Rope<S = DefaultGraphSeg>
+pub struct Rope<S = DefaultSegmenter>
 where
     S: GraphemeSegmenter,
 {
     pub(crate) root: Arc<Node<S>>,
 }
 
-impl Rope<DefaultGraphSeg> {
+impl Rope<DefaultSegmenter> {
     /// Creates an empty `Rope`.
     pub fn new() -> Self {
         Rope {
@@ -114,9 +114,9 @@ impl<S: GraphemeSegmenter> Rope<S> {
     ///
     /// ```
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullGraphSeg;
+    /// use ropey::segmenter::NullSegmenter;
     ///
-    /// let rope = Rope::<NullGraphSeg>::with_segmenter();
+    /// let rope = Rope::<NullSegmenter>::with_segmenter();
     /// ```
     pub fn with_segmenter() -> Rope<S> {
         Rope {
@@ -130,9 +130,9 @@ impl<S: GraphemeSegmenter> Rope<S> {
     ///
     /// ```
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullGraphSeg;
+    /// use ropey::segmenter::NullSegmenter;
     ///
-    /// let rope = Rope::<NullGraphSeg>::from_str_with_segmenter("Hello world!");
+    /// let rope = Rope::<NullSegmenter>::from_str_with_segmenter("Hello world!");
     /// ```
     pub fn from_str_with_segmenter(text: &str) -> Self {
         RopeBuilder::with_segmenter().build_at_once(text)
@@ -146,10 +146,10 @@ impl<S: GraphemeSegmenter> Rope<S> {
     /// # use std::fs::File;
     /// # use std::io::{Result, BufReader};
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullGraphSeg;
+    /// use ropey::segmenter::NullSegmenter;
     ///
     /// # fn do_stuff() -> Result<()> {
-    /// let rope = Rope::<NullGraphSeg>::from_reader_with_segmenter(
+    /// let rope = Rope::<NullSegmenter>::from_reader_with_segmenter(
     ///     BufReader::new(File::open("my_great_book.txt")?)
     /// )?;
     /// # Ok(())
@@ -343,7 +343,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
             // chunks.
             let mut text = text;
             while text.len() > 0 {
-                let split_idx = MainGraphSeg::<S>::find_good_split(
+                let split_idx = MainSegmenter::<S>::find_good_split(
                     text.len() - MAX_BYTES.min(text.len()),
                     text,
                     false,
@@ -972,7 +972,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(MainGraphSeg::<S>::seam_is_break(last_chunk, chunk));
+                    assert!(MainSegmenter::<S>::seam_is_break(last_chunk, chunk));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;
