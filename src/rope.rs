@@ -1,5 +1,3 @@
-#![doc(hidden)]
-
 use std;
 use std::io;
 use std::sync::Arc;
@@ -8,7 +6,7 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use segmenter::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
+use segmentation::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -108,13 +106,14 @@ impl<S: GraphemeSegmenter> Rope<S> {
     //-----------------------------------------------------------------------
     // Constructors
 
-    /// Creates an empty `Rope` with a custom grapheme segmenter.
+    /// Creates an empty `Rope` with a custom
+    /// [grapheme segmenter](segmentation/index.html).
     ///
     /// # Example
     ///
     /// ```
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmentation::NullSegmenter;
     ///
     /// let rope = Rope::<NullSegmenter>::with_segmenter();
     /// ```
@@ -124,13 +123,14 @@ impl<S: GraphemeSegmenter> Rope<S> {
         }
     }
 
-    /// Creates a `Rope` with a custom grapheme segmenter from a string slice.
+    /// Creates a `Rope` with a custom [grapheme segmenter](segmentation/index.html)
+    /// from a string slice.
     ///
     /// # Example
     ///
     /// ```
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmentation::NullSegmenter;
     ///
     /// let rope = Rope::<NullSegmenter>::from_str_with_segmenter("Hello world!");
     /// ```
@@ -138,7 +138,8 @@ impl<S: GraphemeSegmenter> Rope<S> {
         RopeBuilder::with_segmenter().build_at_once(text)
     }
 
-    /// Creates a `Rope` with a custom grapheme segmenter from the output of a reader.
+    /// Creates a `Rope` with a custom [grapheme segmenter](segmentation/index.html)
+    /// from the output of a reader.
     ///
     /// # Example
     ///
@@ -146,7 +147,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
     /// # use std::fs::File;
     /// # use std::io::{Result, BufReader};
     /// # use ropey::Rope;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmentation::NullSegmenter;
     ///
     /// # fn do_stuff() -> Result<()> {
     /// let rope = Rope::<NullSegmenter>::from_reader_with_segmenter(
@@ -315,6 +316,9 @@ impl<S: GraphemeSegmenter> Rope<S> {
     // Edit methods
 
     /// Inserts `text` at char index `char_idx`.
+    ///
+    /// Runs in O(M + log N) time, where N is the length of the `Rope` and M
+    /// is the length of `text`.
     ///
     /// # Panics
     ///

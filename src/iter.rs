@@ -9,7 +9,7 @@
 use std::str;
 use std::sync::Arc;
 
-use segmenter::{GraphemeSegmenter, SegmenterUtils};
+use segmentation::{GraphemeSegmenter, SegmenterUtils};
 use tree::Node;
 use slice::RopeSlice;
 
@@ -107,8 +107,8 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chars<'a, S> {
 
 /// An iterator over a `Rope`'s grapheme clusters.
 ///
-/// The grapheme clusters returned are based on the `Rope`'s [grapheme segmenter](segmenter/index.html),
-/// which by default is [`DefaultSegmenter`](segmenter/struct.DefaultSegmenter.html).
+/// The grapheme clusters returned are based on the `Rope`'s [grapheme segmenter](segmentation/index.html),
+/// which by default is [`DefaultSegmenter`](segmentation/struct.DefaultSegmenter.html).
 pub struct Graphemes<'a, S: 'a + GraphemeSegmenter> {
     chunk_iter: Chunks<'a, S>,
     cur_chunk: &'a str,

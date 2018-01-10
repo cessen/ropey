@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tree;
 use tree::{Node, MAX_BYTES};
-use segmenter::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
+use segmentation::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -447,7 +447,7 @@ mod inner {
     use std::mem::ManuallyDrop;
     use std::sync::Arc;
     use super::{Node, TextInfo, MAX_LEN};
-    use segmenter::GraphemeSegmenter;
+    use segmentation::GraphemeSegmenter;
 
     pub(crate) struct NodeChildrenInternal<S: GraphemeSegmenter> {
         nodes: ManuallyDrop<[Arc<Node<S>>; MAX_LEN]>,
@@ -647,7 +647,7 @@ mod inner {
 mod tests {
     use super::*;
     use std::sync::Arc;
-    use segmenter::DefaultSegmenter;
+    use segmentation::DefaultSegmenter;
     use tree::{Node, NodeText, TextInfo};
 
     #[test]

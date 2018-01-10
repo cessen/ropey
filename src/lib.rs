@@ -78,7 +78,7 @@ mod slice;
 mod str_utils;
 
 pub mod iter;
-pub mod segmenter;
+pub mod segmentation;
 
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;

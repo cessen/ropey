@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use smallvec::{Array, SmallVec};
 use str_utils::{char_idx_to_byte_idx, count_chars};
-use segmenter::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
+use segmentation::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::MAX_BYTES;
 
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
@@ -382,7 +382,7 @@ unsafe impl Array for BackingArray {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use segmenter::DefaultSegmenter;
+    use segmentation::DefaultSegmenter;
 
     #[test]
     fn remove_bytes_01() {

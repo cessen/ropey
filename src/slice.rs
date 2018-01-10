@@ -2,7 +2,7 @@ use std;
 use std::sync::Arc;
 
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
-use segmenter::GraphemeSegmenter;
+use segmentation::GraphemeSegmenter;
 use tree::{Count, Node};
 use rope::Rope;
 

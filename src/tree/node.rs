@@ -6,7 +6,7 @@ use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx
 use tree::{Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES,
            MIN_CHILDREN};
 use tree::node_text::fix_segment_seam;
-use segmenter::{GraphemeSegmenter, SegmenterUtils};
+use segmentation::{GraphemeSegmenter, SegmenterUtils};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node<S: GraphemeSegmenter> {

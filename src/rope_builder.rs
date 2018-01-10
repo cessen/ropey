@@ -1,12 +1,10 @@
-#![doc(hidden)]
-
 use std;
 use std::sync::Arc;
 
 use smallvec::SmallVec;
 
 use rope::Rope;
-use segmenter::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
+use segmentation::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An efficient incremental `Rope` builder.
@@ -69,13 +67,14 @@ impl RopeBuilder<DefaultSegmenter> {
 }
 
 impl<S: GraphemeSegmenter> RopeBuilder<S> {
-    /// Creates a new RopeBuilder with a custom grapheme segmenter.
+    /// Creates a new RopeBuilder with a custom
+    /// [grapheme segmenter](segmentation/index.html).
     ///
     /// # Example
     ///
     /// ```
     /// # use ropey::RopeBuilder;
-    /// use ropey::segmenter::NullSegmenter;
+    /// use ropey::segmentation::NullSegmenter;
     ///
     /// let mut builder = RopeBuilder::<NullSegmenter>::with_segmenter();
     /// ```

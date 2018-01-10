@@ -1,12 +1,128 @@
+//! Facilities for customizing grapheme cluster segmentation.
+//!
+//! (**Note:** the functionality in this module is niche.  Unless you
+//! have a specific use-case you can safely ignore it and just use
+//! the default `Rope` configuration.)
+//!
+//! Although the default grapheme cluster segmentation in Ropey works
+//! for the vast majority of use-cases, there are some niche cases that
+//! may require a custom grapheme cluster definition.  This module
+//! allows such customization through the
+//! [`GraphemeSegmenter`](trait.GraphemeSegmenter.html) trait.
+//!
+//! For example, if you want a grapheme cluster definition that considers
+//! the "ch" pair and _only_ the "ch" pair to be a grapheme cluster, you
+//! can implement it like this:
+//!
+//! ```
+//! use ropey::segmentation::GraphemeSegmenter;
+//!
+//! #[derive(Debug, Copy, Clone)]
+//! struct ChSegmenter {}
+//!
+//! impl GraphemeSegmenter for ChSegmenter {
+//!     fn seam_is_break(left: &str, right: &str) -> bool {
+//!         let left_ends_in_c
+//!             = *left.as_bytes().last().unwrap() == 'c' as u8;
+//!         let right_starts_with_h
+//!             = right.as_bytes()[0] == 'h' as u8;
+//!         !(left_ends_in_c && right_starts_with_h)
+//!     }
+//! }
+//! ```
+//!
+//! (Note: types implementing `GraphemeSegmenter` are never actually
+//! instantiated by Ropey.  They're just a way to statically pass the needed
+//! functions to `Rope` and ensure that grapheme-incompatible `Rope`s aren't
+//! mixed in incorrect ways.)
+//!
+//! To create a `Rope` that uses our "ch" grapheme segmenter we can use one
+//! of the `*_with_segmenter()` methods on `Rope` or `RopeBuilder`.  For
+//! example:
+//!
+//! ```
+//! # use ropey::segmentation::GraphemeSegmenter;
+//! #
+//! # #[derive(Debug, Copy, Clone)]
+//! # struct ChSegmenter {}
+//! #
+//! # impl GraphemeSegmenter for ChSegmenter {
+//! #     fn seam_is_break(left: &str, right: &str) -> bool {
+//! #         let left_ends_in_c = *left.as_bytes().last().unwrap() == 'c' as u8;
+//! #         let right_starts_with_h = right.as_bytes()[0] == 'h' as u8;
+//! #         !(left_ends_in_c && right_starts_with_h)
+//! #     }
+//! # }
+//! #
+//! use ropey::Rope;
+//!
+//! // Create a rope with our custom "ch" segmenter.
+//! let mut rope = Rope::<ChSegmenter>::from_str_with_segmenter("Hi chap!");
+//!
+//! // Verify that it works.
+//! let mut itr = rope.graphemes();
+//! assert_eq!(itr.next(), Some("H"));
+//! assert_eq!(itr.next(), Some("i"));
+//! assert_eq!(itr.next(), Some(" "));
+//! assert_eq!(itr.next(), Some("ch"));  // <- Grapheme!
+//! assert_eq!(itr.next(), Some("a"));
+//! assert_eq!(itr.next(), Some("p"));
+//! assert_eq!(itr.next(), Some("!"));
+//! assert_eq!(itr.next(), None);
+//! ```
+//!
+//! If rather than completely replacing the default grapheme segmenter you
+//! instead want to add more graphemes on top of it, you can this (using
+//! "ch" as an example again):
+//!
+//! ```
+//! use ropey::segmentation::{GraphemeSegmenter, DefaultSegmenter};
+//!
+//! #[derive(Debug, Copy, Clone)]
+//! struct ChSegmenter {}
+//!
+//! impl GraphemeSegmenter for ChSegmenter {
+//!     fn seam_is_break(left: &str, right: &str) -> bool {
+//!         let default
+//!             = DefaultSegmenter::seam_is_break(left, right);
+//!         let left_ends_in_c
+//!             = *left.as_bytes().last().unwrap() == 'c' as u8;
+//!         let right_starts_with_h
+//!             = right.as_bytes()[0] == 'h' as u8;
+//!
+//!         default && !(left_ends_in_c && right_starts_with_h)
+//!     }
+//! }
+//! ```
+
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 /// Trait for implementing grapheme segmentation strategies for [`Rope`](../struct.Rope.html).
+///
+/// See the documentation of the [`segmentation`](index.html) module for details.
 pub trait GraphemeSegmenter: Debug + Copy + Clone {
-    fn is_break(byte_idx: usize, text: &str) -> bool;
+    /// Returns true if the boundary between the two given strings is a
+    /// grapheme cluster boundary, and false otherwise.
+    ///
+    /// Ropey only calls this with valid and non-empty left and right
+    /// strings.
     fn seam_is_break(left: &str, right: &str) -> bool;
+
+    /// Returns whether the given byte index in the given string is a
+    /// grapheme cluster boundary.
+    ///
+    /// Ropey only calls this on valid utf8 code point boundaries, and never
+    /// on the start or end of the string.
+    ///
+    /// This function's default implementation simply calls
+    /// `seam_is_break()`, passing it the text split at `char_idx`.  If you
+    /// have a more efficient approach, go ahead and implement this manually.
+    fn is_break(byte_idx: usize, text: &str) -> bool {
+        Self::seam_is_break(&text[..byte_idx], &text[byte_idx..])
+    }
 }
 
 /// Additional functions for GraphemeSegmenters.
