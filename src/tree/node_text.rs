@@ -4,27 +4,29 @@ use std::borrow::Borrow;
 use std::ops::Deref;
 use std::ptr;
 use std::str;
-
-use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
+use std::marker::PhantomData;
 
 use smallvec::{Array, SmallVec};
-use str_utils::{char_idx_to_byte_idx, count_chars, nearest_internal_grapheme_boundary};
+use str_utils::{char_idx_to_byte_idx, count_chars};
+use segmentation::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::MAX_BYTES;
 
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
 /// length.  Has a bunch of methods on it that are useful for the rope
 /// tree.
 #[derive(Clone, Default)]
-pub(crate) struct NodeText {
+pub(crate) struct NodeText<S: GraphemeSegmenter> {
     buffer: SmallVec<BackingArray>,
+    _seg: PhantomData<S>,
 }
 
-impl NodeText {
+impl<S: GraphemeSegmenter> NodeText<S> {
     /// Creates a new empty `NodeText`
     #[inline(always)]
     pub fn new() -> Self {
         NodeText {
             buffer: SmallVec::new(),
+            _seg: PhantomData,
         }
     }
 
@@ -34,6 +36,7 @@ impl NodeText {
     pub fn with_capacity(capacity: usize) -> Self {
         NodeText {
             buffer: SmallVec::with_capacity(capacity),
+            _seg: PhantomData,
         }
     }
 
@@ -76,7 +79,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            nearest_internal_grapheme_boundary(self, pos)
+            CRLFSegmenter::<S>::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -103,7 +106,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            nearest_internal_grapheme_boundary(self, pos)
+            CRLFSegmenter::<S>::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -167,7 +170,7 @@ impl NodeText {
     ///
     /// Panics if `idx` is not a char boundary, as that would result in an
     /// invalid utf8 string.
-    pub fn split_off(&mut self, idx: usize) -> NodeText {
+    pub fn split_off(&mut self, idx: usize) -> Self {
         assert!(self.is_char_boundary(idx));
         assert!(idx <= self.len());
         let len = self.len();
@@ -188,7 +191,7 @@ impl NodeText {
     /// Splits a string into two strings at the char index given.
     /// The first section of the split is stored in the original string,
     /// while the second section of the split is returned as a new string.
-    pub fn split_off_at_char(&mut self, char_idx: usize) -> NodeText {
+    pub fn split_off_at_char(&mut self, char_idx: usize) -> Self {
         debug_assert!(char_idx <= count_chars(self));
         let byte_idx = char_idx_to_byte_idx(self, char_idx);
         self.split_off(byte_idx)
@@ -256,44 +259,44 @@ impl NodeText {
     }
 }
 
-impl std::cmp::PartialEq for NodeText {
+impl<S: GraphemeSegmenter> std::cmp::PartialEq for NodeText<S> {
     fn eq(&self, other: &Self) -> bool {
         let (s1, s2): (&str, &str) = (self, other);
         s1 == s2
     }
 }
 
-impl<'a> PartialEq<NodeText> for &'a str {
-    fn eq(&self, other: &NodeText) -> bool {
+impl<'a, S: GraphemeSegmenter> PartialEq<NodeText<S>> for &'a str {
+    fn eq(&self, other: &NodeText<S>) -> bool {
         *self == (other as &str)
     }
 }
 
-impl<'a> PartialEq<&'a str> for NodeText {
+impl<'a, S: GraphemeSegmenter> PartialEq<&'a str> for NodeText<S> {
     fn eq(&self, other: &&'a str) -> bool {
         (self as &str) == *other
     }
 }
 
-impl std::fmt::Display for NodeText {
+impl<S: GraphemeSegmenter> std::fmt::Display for NodeText<S> {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl std::fmt::Debug for NodeText {
+impl<S: GraphemeSegmenter> std::fmt::Debug for NodeText<S> {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> std::fmt::Result {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl<'a> From<&'a str> for NodeText {
+impl<'a, S: GraphemeSegmenter> From<&'a str> for NodeText<S> {
     fn from(s: &str) -> Self {
         Self::from_str(s)
     }
 }
 
-impl Deref for NodeText {
+impl<S: GraphemeSegmenter> Deref for NodeText<S> {
     type Target = str;
 
     fn deref(&self) -> &str {
@@ -303,7 +306,7 @@ impl Deref for NodeText {
     }
 }
 
-impl AsRef<str> for NodeText {
+impl<S: GraphemeSegmenter> AsRef<str> for NodeText<S> {
     fn as_ref(&self) -> &str {
         // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
@@ -311,7 +314,7 @@ impl AsRef<str> for NodeText {
     }
 }
 
-impl Borrow<str> for NodeText {
+impl<S: GraphemeSegmenter> Borrow<str> for NodeText<S> {
     fn borrow(&self) -> &str {
         // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
@@ -321,42 +324,28 @@ impl Borrow<str> for NodeText {
 
 //=======================================================================
 
-/// Takes two `NodeText`s and mends the grapheme boundary between them, if any.
+/// Takes two `NodeText`s and mends the segment break between them, if any.
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
 /// is one big grapheme.
-pub(crate) fn fix_grapheme_seam(l: &mut NodeText, r: &mut NodeText) {
-    let tot_len = l.len() + r.len();
-    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
-    let next = gc.next_boundary(r, l.len()).unwrap();
-    let prev = {
-        match gc.prev_boundary(r, l.len()) {
-            Ok(pos) => pos,
-            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
-            _ => unreachable!(),
-        }
-    };
+pub(crate) fn fix_segment_seam<S: GraphemeSegmenter>(l: &mut NodeText<S>, r: &mut NodeText<S>) {
+    // Early out, if there's nothing to do.
+    if CRLFSegmenter::<S>::seam_is_break_checked(l, r) {
+        return;
+    }
+
+    // Find the nearest breaks around the seam.
+    let l_split = CRLFSegmenter::<S>::prev_break(l.len(), l);
+    let r_split = l.len() + CRLFSegmenter::<S>::next_break(0, r);
 
     // Find the new split position, if any.
-    let new_split_pos = if let (Some(a), Some(b)) = (prev, next) {
-        if a == l.len() {
-            // We're on a graphem boundary, don't need to do anything
-            return;
-        }
-        if a != 0 && (b == tot_len || l.len() > r.len()) {
-            a
+    let new_split_pos = {
+        let tot_len = l.len() + r.len();
+        if l_split != 0 && (r_split == tot_len || l.len() > r.len()) {
+            l_split
         } else {
-            b
+            r_split
         }
-    } else if let Some(a) = prev {
-        if a == l.len() {
-            return;
-        }
-        a
-    } else if let Some(b) = next {
-        b
-    } else {
-        unreachable!()
     };
 
     // Move the bytes to create the new split
@@ -393,10 +382,11 @@ unsafe impl Array for BackingArray {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use segmentation::DefaultSegmenter;
 
     #[test]
     fn remove_bytes_01() {
-        let mut s = NodeText::new();
+        let mut s = NodeText::<DefaultSegmenter>::new();
         s.push_str("Hello there, everyone!  How's it going?");
         unsafe {
             s.remove_bytes(11, 21);

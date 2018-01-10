@@ -6,7 +6,8 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use str_utils::{char_idx_to_byte_idx, find_good_split_idx, seam_is_grapheme_boundary};
+use segmentation::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
+use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
@@ -60,16 +61,16 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// line) texts.  It should be able to handle just about anything you can throw
 /// at it.
 #[derive(Clone)]
-pub struct Rope {
-    pub(crate) root: Arc<Node>,
+pub struct Rope<S = DefaultSegmenter>
+where
+    S: GraphemeSegmenter,
+{
+    pub(crate) root: Arc<Node<S>>,
 }
 
-impl Rope {
-    //-----------------------------------------------------------------------
-    // Constructors
-
+impl Rope<DefaultSegmenter> {
     /// Creates an empty `Rope`.
-    pub fn new() -> Rope {
+    pub fn new() -> Self {
         Rope {
             root: Arc::new(Node::new()),
         }
@@ -78,7 +79,7 @@ impl Rope {
     /// Creates a `Rope` from a string slice.
     ///
     /// Runs in O(N) time.
-    pub fn from_str(text: &str) -> Rope {
+    pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
     }
 
@@ -95,9 +96,69 @@ impl Rope {
     ///
     /// Note: some data from the reader is likely consumed even if there is
     /// an error.
-    pub fn from_reader<T: io::Read>(mut reader: T) -> io::Result<Rope> {
+    #[allow(unused_mut)]
+    pub fn from_reader<T: io::Read>(mut reader: T) -> io::Result<Self> {
+        Rope::from_reader_with_segmenter(reader)
+    }
+}
+
+impl<S: GraphemeSegmenter> Rope<S> {
+    //-----------------------------------------------------------------------
+    // Constructors
+
+    /// Creates an empty `Rope` with a custom
+    /// [grapheme segmenter](segmentation/index.html).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// use ropey::segmentation::NullSegmenter;
+    ///
+    /// let rope = Rope::<NullSegmenter>::with_segmenter();
+    /// ```
+    pub fn with_segmenter() -> Rope<S> {
+        Rope {
+            root: Arc::new(Node::new()),
+        }
+    }
+
+    /// Creates a `Rope` with a custom [grapheme segmenter](segmentation/index.html)
+    /// from a string slice.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// use ropey::segmentation::NullSegmenter;
+    ///
+    /// let rope = Rope::<NullSegmenter>::from_str_with_segmenter("Hello world!");
+    /// ```
+    pub fn from_str_with_segmenter(text: &str) -> Self {
+        RopeBuilder::with_segmenter().build_at_once(text)
+    }
+
+    /// Creates a `Rope` with a custom [grapheme segmenter](segmentation/index.html)
+    /// from the output of a reader.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use std::fs::File;
+    /// # use std::io::{Result, BufReader};
+    /// # use ropey::Rope;
+    /// use ropey::segmentation::NullSegmenter;
+    ///
+    /// # fn do_stuff() -> Result<()> {
+    /// let rope = Rope::<NullSegmenter>::from_reader_with_segmenter(
+    ///     BufReader::new(File::open("my_great_book.txt")?)
+    /// )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_reader_with_segmenter<T: io::Read>(mut reader: T) -> io::Result<Self> {
         const BUFFER_SIZE: usize = MAX_BYTES * 2;
-        let mut builder = RopeBuilder::new();
+        let mut builder = RopeBuilder::with_segmenter();
         let mut buffer = [0u8; BUFFER_SIZE];
         let mut fill_idx = 0; // How much `buffer` is currently filled with valid data
         loop {
@@ -225,10 +286,10 @@ impl Rope {
     /// shrinking.
     pub fn shrink_to_fit(&mut self) {
         let mut node_stack = Vec::new();
-        let mut builder = RopeBuilder::new();
+        let mut builder = RopeBuilder::with_segmenter();
 
         node_stack.push(self.root.clone());
-        *self = Rope::new();
+        *self = Rope::with_segmenter();
 
         loop {
             if node_stack.is_empty() {
@@ -256,6 +317,9 @@ impl Rope {
 
     /// Inserts `text` at char index `char_idx`.
     ///
+    /// Runs in O(M + log N) time, where N is the length of the `Rope` and M
+    /// is the length of `text`.
+    ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
@@ -274,7 +338,7 @@ impl Rope {
         if text.len() > MAX_BYTES * 6 {
             // For huge insert texts, build a tree out of it and then
             // split and join.
-            let text_rope = Rope::from_str(text);
+            let text_rope = Rope::from_str_with_segmenter(text);
             let right = self.split_off(char_idx);
             self.append(text_rope);
             self.append(right);
@@ -283,8 +347,11 @@ impl Rope {
             // chunks.
             let mut text = text;
             while text.len() > 0 {
-                let split_idx =
-                    find_good_split_idx(text, text.len() - MAX_BYTES.min(text.len()), false);
+                let split_idx = CRLFSegmenter::<S>::find_good_split(
+                    text.len() - MAX_BYTES.min(text.len()),
+                    text,
+                    false,
+                );
                 let ins_text = &text[split_idx..];
                 text = &text[..split_idx];
 
@@ -468,7 +535,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    pub fn split_off(&mut self, char_idx: usize) -> Rope {
+    pub fn split_off(&mut self, char_idx: usize) -> Self {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
@@ -479,12 +546,12 @@ impl Rope {
 
         if char_idx == 0 {
             // Special case 1
-            let mut new_rope = Rope::new();
+            let mut new_rope = Rope::with_segmenter();
             std::mem::swap(self, &mut new_rope);
             new_rope
         } else if char_idx == self.len_chars() {
             // Special case 2
-            Rope::new()
+            Rope::with_segmenter()
         } else {
             // Do the split
             let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(char_idx));
@@ -512,7 +579,7 @@ impl Rope {
     }
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
-    pub fn append(&mut self, other: Rope) {
+    pub fn append(&mut self, other: Self) {
         if self.len_chars() == 0 {
             let mut other = other;
             std::mem::swap(self, &mut other);
@@ -730,7 +797,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
-    pub fn line(&self, line_idx: usize) -> RopeSlice {
+    pub fn line(&self, line_idx: usize) -> RopeSlice<S> {
         // Bounds check
         assert!(
             line_idx < self.len_lines(),
@@ -816,7 +883,7 @@ impl Rope {
     ///
     /// Panics if `start` is greater than `end` or `end` is out of bounds
     /// (i.e. `end > len_chars()`).
-    pub fn slice(&self, start: usize, end: usize) -> RopeSlice {
+    pub fn slice(&self, start: usize, end: usize) -> RopeSlice<S> {
         // Bounds check
         assert!(start <= end);
         assert!(
@@ -833,27 +900,27 @@ impl Rope {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `Rope`.
-    pub fn bytes(&self) -> Bytes {
+    pub fn bytes(&self) -> Bytes<S> {
         Bytes::new(&self.root)
     }
 
     /// Creates an iterator over the chars of the `Rope`.
-    pub fn chars(&self) -> Chars {
+    pub fn chars(&self) -> Chars<S> {
         Chars::new(&self.root)
     }
 
     /// Creates an iterator over the grapheme clusters of the `Rope`.
-    pub fn graphemes(&self) -> Graphemes {
-        Graphemes::new(&self.root, true)
+    pub fn graphemes(&self) -> Graphemes<S> {
+        Graphemes::new(&self.root)
     }
 
     /// Creates an iterator over the lines of the `Rope`.
-    pub fn lines(&self) -> Lines {
+    pub fn lines(&self) -> Lines<S> {
         Lines::new(&self.root)
     }
 
     /// Creates an iterator over the chunks of the `Rope`.
-    pub fn chunks(&self) -> Chunks {
+    pub fn chunks(&self) -> Chunks<S> {
         Chunks::new(&self.root)
     }
 
@@ -874,7 +941,7 @@ impl Rope {
     ///
     /// Mainly just a convenience method, since the `RangeArgument` trait
     /// isn't stabilized yet.
-    pub fn to_slice(&self) -> RopeSlice {
+    pub fn to_slice(&self) -> RopeSlice<S> {
         self.slice(0, self.len_chars())
     }
 
@@ -909,7 +976,7 @@ impl Rope {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(seam_is_grapheme_boundary(last_chunk, chunk));
+                    assert!(CRLFSegmenter::<S>::seam_is_break_checked(last_chunk, chunk));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;
@@ -950,13 +1017,13 @@ impl Rope {
 
 //==============================================================
 
-impl std::fmt::Debug for Rope {
+impl<S: GraphemeSegmenter> std::fmt::Debug for Rope<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_list().entries(self.chunks()).finish()
     }
 }
 
-impl std::fmt::Display for Rope {
+impl<S: GraphemeSegmenter> std::fmt::Display for Rope<S> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for chunk in self.chunks() {
@@ -966,72 +1033,72 @@ impl std::fmt::Display for Rope {
     }
 }
 
-impl std::default::Default for Rope {
+impl<S: GraphemeSegmenter> std::default::Default for Rope<S> {
     #[inline]
     fn default() -> Self {
-        Self::new()
+        Self::with_segmenter()
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for Rope {
+impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<Rope<S2>> for Rope<S1> {
     #[inline]
-    fn eq(&self, other: &Rope) -> bool {
+    fn eq(&self, other: &Rope<S2>) -> bool {
         self.to_slice() == other.to_slice()
     }
 }
 
-impl<'a> std::cmp::PartialEq<&'a str> for Rope {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<&'a str> for Rope<S> {
     #[inline]
     fn eq(&self, other: &&'a str) -> bool {
         self.to_slice() == *other
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for &'a str {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for &'a str {
     #[inline]
-    fn eq(&self, other: &Rope) -> bool {
+    fn eq(&self, other: &Rope<S>) -> bool {
         *self == other.to_slice()
     }
 }
 
-impl std::cmp::PartialEq<str> for Rope {
+impl<S: GraphemeSegmenter> std::cmp::PartialEq<str> for Rope<S> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         self.to_slice() == other
     }
 }
 
-impl std::cmp::PartialEq<Rope> for str {
+impl<S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for str {
     #[inline]
-    fn eq(&self, other: &Rope) -> bool {
+    fn eq(&self, other: &Rope<S>) -> bool {
         self == other.to_slice()
     }
 }
 
-impl<'a> std::cmp::PartialEq<String> for Rope {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<String> for Rope<S> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.to_slice() == other.as_str()
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for String {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for String {
     #[inline]
-    fn eq(&self, other: &Rope) -> bool {
+    fn eq(&self, other: &Rope<S>) -> bool {
         self.as_str() == other.to_slice()
     }
 }
 
-impl<'a> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope<S> {
     #[inline]
     fn eq(&self, other: &std::borrow::Cow<'a, str>) -> bool {
         self.to_slice() == **other
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for std::borrow::Cow<'a, str> {
+impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for std::borrow::Cow<'a, str> {
     #[inline]
-    fn eq(&self, other: &Rope) -> bool {
+    fn eq(&self, other: &Rope<S>) -> bool {
         **self == other.to_slice()
     }
 }

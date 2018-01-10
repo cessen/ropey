@@ -2,21 +2,21 @@ use std;
 use std::sync::Arc;
 
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
-                char_idx_to_line_idx, count_chars, is_grapheme_boundary, line_idx_to_byte_idx,
-                line_idx_to_char_idx, next_grapheme_boundary, prev_grapheme_boundary};
+                char_idx_to_line_idx, count_chars, line_idx_to_byte_idx, line_idx_to_char_idx};
 use tree::{Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES,
            MIN_CHILDREN};
-use tree::node_text::fix_grapheme_seam;
+use tree::node_text::fix_segment_seam;
+use segmentation::{GraphemeSegmenter, SegmenterUtils};
 
 #[derive(Debug, Clone)]
-pub(crate) enum Node {
-    Leaf(NodeText),
-    Internal(NodeChildren),
+pub(crate) enum Node<S: GraphemeSegmenter> {
+    Leaf(NodeText<S>),
+    Internal(NodeChildren<S>),
 }
 
-impl Node {
+impl<S: GraphemeSegmenter> Node<S> {
     /// Creates an empty node.
-    pub fn new() -> Node {
+    pub fn new() -> Self {
         Node::Leaf(NodeText::from_str(""))
     }
 
@@ -61,9 +61,9 @@ impl Node {
         start_idx: usize,
         end_idx: usize,
         mut edit: F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node<S>>)>)
     where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+        F: FnMut(TextInfo, TextInfo, &mut NodeText<S>) -> (TextInfo, Option<(TextInfo, NodeText<S>)>),
     {
         debug_assert!(start_idx <= end_idx);
         debug_assert!(end_idx <= self.text_info().chars as usize);
@@ -97,9 +97,9 @@ impl Node {
         acc_info: TextInfo,
         cur_info: TextInfo,
         edit: &mut F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node<S>>)>)
     where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+        F: FnMut(TextInfo, TextInfo, &mut NodeText<S>) -> (TextInfo, Option<(TextInfo, NodeText<S>)>),
     {
         match *self {
             // If it's a leaf
@@ -116,10 +116,10 @@ impl Node {
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
                 // Shared code for handling children.
-                let mut handle_child = |children: &mut NodeChildren,
+                let mut handle_child = |children: &mut NodeChildren<S>,
                                         child_i: usize,
                                         c_acc_info: TextInfo|
-                 -> Option<Arc<Node>> {
+                 -> Option<Arc<Node<S>>> {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
@@ -160,8 +160,8 @@ impl Node {
                 };
 
                 // Shared code for merging children
-                let merge_child = |children: &mut NodeChildren,
-                                   split_node: &mut Option<Arc<Node>>,
+                let merge_child = |children: &mut NodeChildren<S>,
+                                   split_node: &mut Option<Arc<Node<S>>>,
                                    child_i: usize|
                  -> bool {
                     if child_i < children.len() {
@@ -291,7 +291,7 @@ impl Node {
         }
     }
 
-    pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+    pub fn append_at_depth(&mut self, other: Arc<Node<S>>, depth: usize) -> Option<Arc<Node<S>>> {
         if depth == 0 {
             match *self {
                 Node::Leaf(_) => {
@@ -340,7 +340,7 @@ impl Node {
         }
     }
 
-    pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+    pub fn prepend_at_depth(&mut self, other: Arc<Node<S>>, depth: usize) -> Option<Arc<Node<S>>> {
         if depth == 0 {
             match *self {
                 Node::Leaf(_) => {
@@ -392,7 +392,7 @@ impl Node {
 
     /// Splits the `Node` at char index `char_idx`, returning
     /// the right side of the split.
-    pub fn split(&mut self, char_idx: usize) -> Node {
+    pub fn split(&mut self, char_idx: usize) -> Node<S> {
         debug_assert!(char_idx != 0);
         debug_assert!(char_idx != (self.text_info().chars as usize));
         match *self {
@@ -556,7 +556,7 @@ impl Node {
         let (chunk, offset) = self.get_chunk_at_char(char_idx);
         let byte_idx = char_idx_to_byte_idx(chunk, offset);
 
-        is_grapheme_boundary(chunk, byte_idx)
+        S::is_break_checked(byte_idx, chunk)
     }
 
     /// Returns the previous grapheme cluster boundary to the left of
@@ -579,11 +579,11 @@ impl Node {
                 return 0;
             } else {
                 let (chunk, _) = self.get_chunk_at_char(char_idx - 1);
-                let prev_byte_idx = prev_grapheme_boundary(chunk, chunk.len());
+                let prev_byte_idx = S::prev_break(chunk.len(), chunk);
                 return char_idx - count_chars(&chunk[prev_byte_idx..]);
             }
         } else {
-            let prev_byte_idx = prev_grapheme_boundary(chunk, byte_idx);
+            let prev_byte_idx = S::prev_break(byte_idx, chunk);
             return char_idx - count_chars(&chunk[prev_byte_idx..byte_idx]);
         }
     }
@@ -611,11 +611,11 @@ impl Node {
                 return end_char_idx;
             } else {
                 let (chunk, _) = self.get_chunk_at_char(char_idx + 1);
-                let next_byte_idx = next_grapheme_boundary(chunk, 0);
+                let next_byte_idx = S::next_break(0, chunk);
                 return char_idx + count_chars(&chunk[..next_byte_idx]);
             }
         } else {
-            let next_byte_idx = next_grapheme_boundary(chunk, byte_idx);
+            let next_byte_idx = S::next_break(byte_idx, chunk);
             return char_idx + count_chars(&chunk[byte_idx..next_byte_idx]);
         };
     }
@@ -637,7 +637,7 @@ impl Node {
         }
     }
 
-    pub fn children(&mut self) -> &mut NodeChildren {
+    pub fn children(&mut self) -> &mut NodeChildren<S> {
         match *self {
             Node::Internal(ref mut children) => children,
             _ => panic!(),
@@ -652,7 +652,7 @@ impl Node {
         }
     }
 
-    pub fn leaf_text_mut(&mut self) -> &mut NodeText {
+    pub fn leaf_text_mut(&mut self) -> &mut NodeText<S> {
         if let Node::Leaf(ref mut text) = *self {
             text
         } else {
@@ -768,7 +768,7 @@ impl Node {
         &mut self,
         byte_pos: Count,
         must_be_boundary: bool,
-    ) -> Option<&mut NodeText> {
+    ) -> Option<&mut NodeText<S>> {
         match *self {
             Node::Leaf(ref mut text) => {
                 if (!must_be_boundary) || byte_pos == 0 || byte_pos == text.len() as Count {
@@ -814,7 +814,7 @@ impl Node {
                             let l_child_bytes = l_child.0.bytes;
                             let l_child = Arc::make_mut(&mut l_child.1);
                             let r_child = Arc::make_mut(&mut r_child.1);
-                            fix_grapheme_seam(
+                            fix_segment_seam(
                                 l_child
                                     .fix_grapheme_seam(l_child_bytes, must_be_boundary)
                                     .unwrap(),
@@ -841,7 +841,7 @@ impl Node {
                         {
                             let raw_text = Arc::make_mut(&mut children.nodes_mut()[child_i])
                                 .fix_grapheme_seam(pos_in_child, must_be_boundary)
-                                .map(|text| text as *mut NodeText);
+                                .map(|text| text as *mut NodeText<S>);
 
                             // This is the bit we have to work arround.  If raw_text
                             // weren't cast to a raw_point, it's &mut would keep us
@@ -1022,7 +1022,7 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use rope::Rope;
+    use Rope;
 
     // 133 chars, 209 bytes
     const TEXT: &str = "\r\nHello there!  How're you doing?  It's a fine day, \

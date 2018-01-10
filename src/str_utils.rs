@@ -1,12 +1,11 @@
 use std;
 
-use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-
 /// Uses bit-fiddling magic to count utf8 chars really quickly.
 /// We actually count the number of non-starting utf8 bytes, since
 /// they have a consistent starting two-bit pattern.  We then
 /// subtract from the byte length of the text to get the final
 /// count.
+#[inline]
 pub fn count_chars(text: &str) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
 
@@ -58,6 +57,7 @@ pub fn count_chars(text: &str) -> usize {
 /// - u{0085}        (Next Line)
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
+#[inline]
 pub fn count_line_breaks(text: &str) -> usize {
     // TODO: right now this checks the high byte for the large line break codepoints
     // when determining whether to skip the full check.  This penalizes texts that use
@@ -133,6 +133,7 @@ pub fn count_line_breaks(text: &str) -> usize {
     count
 }
 
+#[inline]
 pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
     if byte_idx == 0 {
         return 0;
@@ -145,6 +146,7 @@ pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
     }
 }
 
+#[inline]
 pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
     let mut line_i = 1;
     for offset in LineBreakIter::new(text) {
@@ -157,6 +159,7 @@ pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
     line_i - 1
 }
 
+#[inline]
 pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
     let tsize: usize = std::mem::size_of::<usize>();
@@ -205,10 +208,12 @@ pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
     }
 }
 
+#[inline]
 pub fn char_idx_to_line_idx(text: &str, char_idx: usize) -> usize {
     byte_idx_to_line_idx(text, char_idx_to_byte_idx(text, char_idx))
 }
 
+#[inline]
 pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     if line_idx == 0 {
         0
@@ -219,169 +224,9 @@ pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     }
 }
 
+#[inline]
 pub fn line_idx_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_idx_to_char_idx(text, line_idx_to_byte_idx(text, line_idx))
-}
-
-/// Returns whether the given byte boundary in the text is a grapheme cluster
-/// boundary or not.
-pub fn is_grapheme_boundary(text: &str, byte_idx: usize) -> bool {
-    // Bounds check
-    debug_assert!(byte_idx <= text.len());
-
-    if byte_idx == 0 || byte_idx == text.len() {
-        // True if we're on the edge of the text
-        true
-    } else if !text.is_char_boundary(byte_idx) {
-        // False if we're not even on a codepoint boundary
-        false
-    } else {
-        // Full check
-        GraphemeCursor::new(byte_idx, text.len(), true)
-            .is_boundary(text, 0)
-            .unwrap()
-    }
-}
-
-/// Returns the grapheme cluster boundary before (but not including) the given
-/// byte boundary.
-///
-/// This will return back the passed byte boundary if it is at the start of
-/// the string.
-pub fn prev_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
-    // Bounds check
-    debug_assert!(byte_idx <= text.len());
-
-    // Early out
-    if byte_idx == 0 {
-        return byte_idx;
-    }
-
-    // Find codepoint boundary
-    let mut boundary_idx = byte_idx;
-    while !text.is_char_boundary(boundary_idx) {
-        boundary_idx += 1;
-    }
-
-    // Find the next grapheme cluster boundary
-    let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
-    if boundary_idx < byte_idx && gc.is_boundary(text, 0).unwrap() {
-        return boundary_idx;
-    } else {
-        return gc.prev_boundary(text, 0).unwrap().unwrap();
-    }
-}
-
-/// Returns the grapheme cluster boundary after (but not including) the given
-/// byte boundary.
-///
-/// This will return back the passed byte boundary if it is at the end of
-/// the string.
-pub fn next_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
-    // Bounds check
-    debug_assert!(byte_idx <= text.len());
-
-    // Early out
-    if byte_idx == text.len() {
-        return byte_idx;
-    }
-
-    // Find codepoint boundary
-    let mut boundary_idx = byte_idx;
-    while !text.is_char_boundary(boundary_idx) {
-        boundary_idx -= 1;
-    }
-
-    // Find the next grapheme cluster boundary
-    let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
-    if byte_idx < boundary_idx && gc.is_boundary(text, 0).unwrap() {
-        return boundary_idx;
-    } else {
-        return gc.next_boundary(text, 0).unwrap().unwrap();
-    }
-}
-
-/// Finds the nearest grapheme boundary near the given byte that is
-/// not the left or right edge of the text.
-///
-/// There is only one circumstance where the left or right edge will
-/// be returned: if the entire text is a single grapheme cluster,
-/// then the right edge of the text is returned.
-pub fn nearest_internal_grapheme_boundary(text: &str, byte_idx: usize) -> usize {
-    // Bounds check
-    debug_assert!(byte_idx <= text.len());
-
-    // Find codepoint boundary
-    let mut boundary_idx = byte_idx;
-    while !text.is_char_boundary(boundary_idx) {
-        boundary_idx -= 1;
-    }
-
-    // Find the two nearest grapheme boundaries
-    let mut gc = GraphemeCursor::new(boundary_idx, text.len(), true);
-    let next = gc.next_boundary(text, 0)
-        .unwrap()
-        .unwrap_or_else(|| text.len());
-    let prev = gc.prev_boundary(text, 0).unwrap().unwrap_or(0);
-
-    // If the given byte was already on an internal grapheme boundary
-    if prev == byte_idx && byte_idx != 0 {
-        return byte_idx;
-    }
-
-    // Otherwise, return the closest of prev and next that isn't the
-    // start or end of the string
-    if prev == 0 || (next != text.len() && (byte_idx - prev) >= (next - byte_idx)) {
-        return next;
-    } else {
-        return prev;
-    }
-}
-
-pub fn seam_is_grapheme_boundary(l: &str, r: &str) -> bool {
-    debug_assert!(!l.is_empty() && !r.is_empty());
-
-    let tot_len = l.len() + r.len();
-    let mut gc = GraphemeCursor::new(l.len(), tot_len, true);
-
-    gc.next_boundary(r, l.len()).unwrap();
-    let prev = {
-        match gc.prev_boundary(r, l.len()) {
-            Ok(pos) => pos,
-            Err(GraphemeIncomplete::PrevChunk) => gc.prev_boundary(l, 0).unwrap(),
-            _ => unreachable!(),
-        }
-    };
-
-    if let Some(a) = prev {
-        if a == l.len() {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-pub fn find_good_split_idx(text: &str, idx: usize, bias_left: bool) -> usize {
-    if is_grapheme_boundary(text, idx) {
-        idx
-    } else {
-        let prev = prev_grapheme_boundary(text, idx);
-        let next = next_grapheme_boundary(text, idx);
-        if bias_left {
-            if prev > 0 {
-                prev
-            } else {
-                next
-            }
-        } else {
-            if next < text.len() {
-                next
-            } else {
-                prev
-            }
-        }
-    }
 }
 
 #[inline(always)]
@@ -398,6 +243,7 @@ pub fn has_byte(word: usize, n: u8) -> bool {
     (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH) != 0
 }
 
+#[inline]
 pub fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
 }
@@ -423,6 +269,7 @@ pub(crate) struct LineBreakIter<'a> {
 }
 
 impl<'a> LineBreakIter<'a> {
+    #[inline]
     pub fn new(text: &str) -> LineBreakIter {
         LineBreakIter {
             byte_itr: text.bytes(),
@@ -434,6 +281,7 @@ impl<'a> LineBreakIter<'a> {
 impl<'a> Iterator for LineBreakIter<'a> {
     type Item = usize;
 
+    #[inline]
     fn next(&mut self) -> Option<usize> {
         while let Some(byte) = self.byte_itr.next() {
             self.byte_idx += 1;
@@ -482,67 +330,6 @@ mod tests {
             "Hello せかい! Hello せかい! Hello せかい! Hello せかい! Hello せかい!";
 
         assert_eq!(54, count_chars(text));
-    }
-
-    #[test]
-    fn nearest_internal_grapheme_boundary_01() {
-        let text = "Hello world!";
-        assert_eq!(1, nearest_internal_grapheme_boundary(text, 0));
-        assert_eq!(6, nearest_internal_grapheme_boundary(text, 6));
-        assert_eq!(11, nearest_internal_grapheme_boundary(text, 12));
-    }
-
-    #[test]
-    fn nearest_internal_grapheme_boundary_02() {
-        let text = "Hello\r\n world!";
-        assert_eq!(5, nearest_internal_grapheme_boundary(text, 5));
-        assert_eq!(7, nearest_internal_grapheme_boundary(text, 6));
-        assert_eq!(7, nearest_internal_grapheme_boundary(text, 7));
-    }
-
-    #[test]
-    fn nearest_internal_grapheme_boundary_03() {
-        let text = "\r\nHello world!\r\n";
-        assert_eq!(2, nearest_internal_grapheme_boundary(text, 0));
-        assert_eq!(2, nearest_internal_grapheme_boundary(text, 1));
-        assert_eq!(2, nearest_internal_grapheme_boundary(text, 2));
-        assert_eq!(14, nearest_internal_grapheme_boundary(text, 14));
-        assert_eq!(14, nearest_internal_grapheme_boundary(text, 15));
-        assert_eq!(14, nearest_internal_grapheme_boundary(text, 16));
-    }
-
-    #[test]
-    fn nearest_internal_grapheme_boundary_04() {
-        let text = "\r\n";
-        assert_eq!(2, nearest_internal_grapheme_boundary(text, 0));
-        assert_eq!(2, nearest_internal_grapheme_boundary(text, 1));
-        assert_eq!(2, nearest_internal_grapheme_boundary(text, 2));
-    }
-
-    #[test]
-    fn is_grapheme_boundary_01() {
-        let text = "\n\r\n\r\n\r\n\r\n\r\n\r";
-
-        assert!(is_grapheme_boundary(text, 0));
-        assert!(is_grapheme_boundary(text, 12));
-        assert!(is_grapheme_boundary(text, 3));
-        assert!(!is_grapheme_boundary(text, 6));
-    }
-
-    #[test]
-    fn seam_is_grapheme_boundary_01() {
-        let text1 = "\r\n\r\n\r\n";
-        let text2 = "\r\n\r\n";
-
-        assert!(seam_is_grapheme_boundary(text1, text2));
-    }
-
-    #[test]
-    fn seam_is_grapheme_boundary_02() {
-        let text1 = "\r\n\r\n\r";
-        let text2 = "\n\r\n\r\n";
-
-        assert!(!seam_is_grapheme_boundary(text1, text2));
     }
 
     #[test]

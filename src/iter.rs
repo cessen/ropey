@@ -9,29 +9,31 @@
 use std::str;
 use std::sync::Arc;
 
-use unicode_segmentation;
-use unicode_segmentation::UnicodeSegmentation;
-
+use segmentation::{GraphemeSegmenter, SegmenterUtils};
 use tree::Node;
 use slice::RopeSlice;
 
 //==========================================================
 
 /// An iterator over a `Rope`'s bytes.
-pub struct Bytes<'a> {
-    chunk_iter: Chunks<'a>,
+pub struct Bytes<'a, S: 'a + GraphemeSegmenter> {
+    chunk_iter: Chunks<'a, S>,
     cur_chunk: str::Bytes<'a>,
 }
 
-impl<'a> Bytes<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Bytes {
+impl<'a, S: 'a + GraphemeSegmenter> Bytes<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Bytes<S> {
         Bytes {
             chunk_iter: Chunks::new(node),
             cur_chunk: "".bytes(),
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Bytes<S> {
         Bytes {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".bytes(),
@@ -39,7 +41,7 @@ impl<'a> Bytes<'a> {
     }
 }
 
-impl<'a> Iterator for Bytes<'a> {
+impl<'a, S: 'a + GraphemeSegmenter> Iterator for Bytes<'a, S> {
     type Item = u8;
 
     fn next(&mut self) -> Option<u8> {
@@ -59,20 +61,24 @@ impl<'a> Iterator for Bytes<'a> {
 //==========================================================
 
 /// An iterator over a `Rope`'s chars.
-pub struct Chars<'a> {
-    chunk_iter: Chunks<'a>,
+pub struct Chars<'a, S: 'a + GraphemeSegmenter> {
+    chunk_iter: Chunks<'a, S>,
     cur_chunk: str::Chars<'a>,
 }
 
-impl<'a> Chars<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Chars {
+impl<'a, S: 'a + GraphemeSegmenter> Chars<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Chars<S> {
         Chars {
             chunk_iter: Chunks::new(node),
             cur_chunk: "".chars(),
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Chars<S> {
         Chars {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".chars(),
@@ -80,7 +86,7 @@ impl<'a> Chars<'a> {
     }
 }
 
-impl<'a> Iterator for Chars<'a> {
+impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chars<'a, S> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
@@ -101,47 +107,45 @@ impl<'a> Iterator for Chars<'a> {
 
 /// An iterator over a `Rope`'s grapheme clusters.
 ///
-/// The grapheme clusters returned are the extended grapheme
-/// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/).
-/// Each grapheme cluster is returned as a utf8 `&str` slice.
-pub struct Graphemes<'a> {
-    chunk_iter: Chunks<'a>,
-    cur_chunk: unicode_segmentation::Graphemes<'a>,
-    extended: bool,
+/// The grapheme clusters returned are based on the `Rope`'s [grapheme segmenter](segmentation/index.html),
+/// which by default is [`DefaultSegmenter`](segmentation/struct.DefaultSegmenter.html).
+pub struct Graphemes<'a, S: 'a + GraphemeSegmenter> {
+    chunk_iter: Chunks<'a, S>,
+    cur_chunk: &'a str,
 }
 
-impl<'a> Graphemes<'a> {
-    pub(crate) fn new(node: &Arc<Node>, extended: bool) -> Graphemes {
+impl<'a, S: 'a + GraphemeSegmenter> Graphemes<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Graphemes<S> {
         Graphemes {
             chunk_iter: Chunks::new(node),
-            cur_chunk: UnicodeSegmentation::graphemes("", extended),
-            extended: extended,
+            cur_chunk: "",
         }
     }
 
     pub(crate) fn new_with_range(
-        node: &Arc<Node>,
-        extended: bool,
+        node: &Arc<Node<S>>,
         start_char: usize,
         end_char: usize,
-    ) -> Graphemes {
+    ) -> Graphemes<S> {
         Graphemes {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
-            cur_chunk: UnicodeSegmentation::graphemes("", extended),
-            extended: extended,
+            cur_chunk: "",
         }
     }
 }
 
-impl<'a> Iterator for Graphemes<'a> {
+impl<'a, S: 'a + GraphemeSegmenter> Iterator for Graphemes<'a, S> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
         loop {
-            if let Some(g) = self.cur_chunk.next() {
+            if !self.cur_chunk.is_empty() {
+                let next_idx = S::next_break(0, self.cur_chunk);
+                let g = &self.cur_chunk[..next_idx];
+                self.cur_chunk = &self.cur_chunk[next_idx..];
                 return Some(g);
             } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = UnicodeSegmentation::graphemes(chunk, self.extended);
+                self.cur_chunk = chunk;
                 continue;
             } else {
                 return None;
@@ -158,15 +162,15 @@ impl<'a> Iterator for Graphemes<'a> {
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
-pub struct Lines<'a> {
-    node: &'a Arc<Node>,
+pub struct Lines<'a, S: 'a + GraphemeSegmenter> {
+    node: &'a Arc<Node<S>>,
     start_char: usize,
     end_char: usize,
     line_idx: usize,
 }
 
-impl<'a> Lines<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Lines {
+impl<'a, S: 'a + GraphemeSegmenter> Lines<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Lines<S> {
         Lines {
             node: node,
             start_char: 0,
@@ -175,7 +179,11 @@ impl<'a> Lines<'a> {
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Lines {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Lines<S> {
         Lines {
             node: node,
             start_char: start_char,
@@ -185,10 +193,10 @@ impl<'a> Lines<'a> {
     }
 }
 
-impl<'a> Iterator for Lines<'a> {
-    type Item = RopeSlice<'a>;
+impl<'a, S: 'a + GraphemeSegmenter> Iterator for Lines<'a, S> {
+    type Item = RopeSlice<'a, S>;
 
-    fn next(&mut self) -> Option<RopeSlice<'a>> {
+    fn next(&mut self) -> Option<RopeSlice<'a, S>> {
         if self.line_idx > self.node.line_break_count() {
             return None;
         } else {
@@ -241,15 +249,15 @@ impl<'a> Iterator for Lines<'a> {
 ///
 /// The converse of this API is [`RopeBuilder`](../struct.RopeBuilder.html),
 /// which is useful for efficiently streaming text data _into_ a rope.
-pub struct Chunks<'a> {
-    node_stack: Vec<&'a Arc<Node>>,
+pub struct Chunks<'a, S: 'a + GraphemeSegmenter> {
+    node_stack: Vec<&'a Arc<Node<S>>>,
     start: usize,
     end: usize,
     idx: usize,
 }
 
-impl<'a> Chunks<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Chunks {
+impl<'a, S: 'a + GraphemeSegmenter> Chunks<'a, S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Chunks<S> {
         Chunks {
             node_stack: vec![node],
             start: 0,
@@ -258,7 +266,11 @@ impl<'a> Chunks<'a> {
         }
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+    pub(crate) fn new_with_range(
+        node: &Arc<Node<S>>,
+        start_char: usize,
+        end_char: usize,
+    ) -> Chunks<S> {
         Chunks {
             node_stack: vec![node],
             start: node.char_to_byte(start_char),
@@ -268,7 +280,7 @@ impl<'a> Chunks<'a> {
     }
 }
 
-impl<'a> Iterator for Chunks<'a> {
+impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chunks<'a, S> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
@@ -324,7 +336,7 @@ impl<'a> Iterator for Chunks<'a> {
 #[cfg(test)]
 mod tests {
     use unicode_segmentation::UnicodeSegmentation;
-    use rope::Rope;
+    use Rope;
 
     const TEXT: &str = "\r\n\
                         Hello there!  How're you doing?  It's a fine day, \

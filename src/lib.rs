@@ -71,13 +71,14 @@
 extern crate smallvec;
 extern crate unicode_segmentation;
 
-mod tree;
-mod rope;
 mod rope_builder;
+mod rope;
+mod tree;
 mod slice;
 mod str_utils;
 
 pub mod iter;
+pub mod segmentation;
 
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;

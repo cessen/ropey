@@ -1,9 +1,10 @@
 use std;
 use std::sync::Arc;
+
 use smallvec::SmallVec;
 
 use rope::Rope;
-use str_utils::{find_good_split_idx, nearest_internal_grapheme_boundary};
+use segmentation::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An efficient incremental `Rope` builder.
@@ -43,14 +44,41 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// assert_eq!(rope, "Hello world!\nHow's it going?");
 /// ```
 #[derive(Debug, Clone)]
-pub struct RopeBuilder {
-    stack: SmallVec<[Arc<Node>; 4]>,
+pub struct RopeBuilder<S = DefaultSegmenter>
+where
+    S: GraphemeSegmenter,
+{
+    stack: SmallVec<[Arc<Node<S>>; 4]>,
     buffer: String,
 }
 
-impl RopeBuilder {
+impl RopeBuilder<DefaultSegmenter> {
     /// Creates a new RopeBuilder, ready for input.
-    pub fn new() -> RopeBuilder {
+    pub fn new() -> Self {
+        RopeBuilder {
+            stack: {
+                let mut stack = SmallVec::new();
+                stack.push(Arc::new(Node::new()));
+                stack
+            },
+            buffer: String::new(),
+        }
+    }
+}
+
+impl<S: GraphemeSegmenter> RopeBuilder<S> {
+    /// Creates a new RopeBuilder with a custom
+    /// [grapheme segmenter](segmentation/index.html).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::RopeBuilder;
+    /// use ropey::segmentation::NullSegmenter;
+    ///
+    /// let mut builder = RopeBuilder::<NullSegmenter>::with_segmenter();
+    /// ```
+    pub fn with_segmenter() -> Self {
         RopeBuilder {
             stack: {
                 let mut stack = SmallVec::new();
@@ -77,7 +105,7 @@ impl RopeBuilder {
     /// Note: this method consumes the builder.  If you want to continue
     /// building other ropes with the same prefix, you can clone the builder
     /// before calling `finish()`.
-    pub fn finish(mut self) -> Rope {
+    pub fn finish(mut self) -> Rope<S> {
         // Append the last leaf
         self.append_internal("", true);
         self.finish_internal()
@@ -88,7 +116,7 @@ impl RopeBuilder {
     /// This avoids the creation and use of the internal buffer.  This is
     /// for internal use only, because the public-facing API has
     /// Rope::from_str(), which actually uses this for its implementation.
-    pub(crate) fn build_at_once(mut self, chunk: &str) -> Rope {
+    pub(crate) fn build_at_once(mut self, chunk: &str) -> Rope<S> {
         self.append_internal(chunk, true);
         self.finish_internal()
     }
@@ -122,7 +150,7 @@ impl RopeBuilder {
     }
 
     // Internal workings of `finish()`.
-    fn finish_internal(mut self) -> Rope {
+    fn finish_internal(mut self) -> Rope<S> {
         // Zip up all the remaining nodes on the stack
         let mut stack_idx = self.stack.len() - 1;
         while stack_idx >= 1 {
@@ -155,7 +183,7 @@ impl RopeBuilder {
         if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
-                let split_idx = find_good_split_idx(text, MAX_BYTES, true);
+                let split_idx = CRLFSegmenter::<S>::find_good_split(MAX_BYTES, text, true);
                 if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                     self.buffer.push_str(text);
                     return (NextText::None, "");
@@ -170,9 +198,9 @@ impl RopeBuilder {
             }
         } else if (text.len() + self.buffer.len()) > MAX_BYTES {
             let split_idx = if self.buffer.len() < MAX_BYTES {
-                nearest_internal_grapheme_boundary(text, MAX_BYTES - self.buffer.len())
+                CRLFSegmenter::<S>::nearest_internal_break(MAX_BYTES - self.buffer.len(), text)
             } else {
-                nearest_internal_grapheme_boundary(text, 0)
+                CRLFSegmenter::<S>::nearest_internal_break(0, text)
             };
 
             if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
@@ -191,7 +219,7 @@ impl RopeBuilder {
         }
     }
 
-    fn append_leaf_node(&mut self, leaf: Arc<Node>) {
+    fn append_leaf_node(&mut self, leaf: Arc<Node<S>>) {
         let last = self.stack.pop().unwrap();
         match *last {
             Node::Leaf(_) => {

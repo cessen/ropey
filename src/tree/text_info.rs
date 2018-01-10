@@ -11,6 +11,7 @@ pub struct TextInfo {
 }
 
 impl TextInfo {
+    #[inline]
     pub fn new() -> TextInfo {
         TextInfo {
             bytes: 0,
@@ -19,6 +20,7 @@ impl TextInfo {
         }
     }
 
+    #[inline]
     pub fn from_str(text: &str) -> TextInfo {
         TextInfo {
             bytes: text.len() as Count,
@@ -30,6 +32,7 @@ impl TextInfo {
 
 impl Add for TextInfo {
     type Output = Self;
+    #[inline]
     fn add(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             bytes: self.bytes + rhs.bytes,
@@ -40,6 +43,7 @@ impl Add for TextInfo {
 }
 
 impl AddAssign for TextInfo {
+    #[inline]
     fn add_assign(&mut self, other: TextInfo) {
         *self = *self + other;
     }
@@ -47,6 +51,7 @@ impl AddAssign for TextInfo {
 
 impl Sub for TextInfo {
     type Output = Self;
+    #[inline]
     fn sub(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             bytes: self.bytes - rhs.bytes,
@@ -57,6 +62,7 @@ impl Sub for TextInfo {
 }
 
 impl SubAssign for TextInfo {
+    #[inline]
     fn sub_assign(&mut self, other: TextInfo) {
         *self = *self - other;
     }
