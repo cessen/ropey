@@ -9,10 +9,7 @@
 use std::str;
 use std::sync::Arc;
 
-use unicode_segmentation;
-use unicode_segmentation::UnicodeSegmentation;
-
-use segmenter::GraphemeSegmenter;
+use segmenter::{GraphemeSegmenter, SegmenterUtils};
 use tree::Node;
 use slice::RopeSlice;
 
@@ -110,34 +107,29 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chars<'a, S> {
 
 /// An iterator over a `Rope`'s grapheme clusters.
 ///
-/// The grapheme clusters returned are the extended grapheme
-/// clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/).
-/// Each grapheme cluster is returned as a utf8 `&str` slice.
+/// The grapheme clusters returned are based on the `Rope`'s [grapheme segmenter](segmenter/index.html),
+/// which by default is [`DefaultSegmenter`](segmenter/struct.DefaultSegmenter.html).
 pub struct Graphemes<'a, S: 'a + GraphemeSegmenter> {
     chunk_iter: Chunks<'a, S>,
-    cur_chunk: unicode_segmentation::Graphemes<'a>,
-    extended: bool,
+    cur_chunk: &'a str,
 }
 
 impl<'a, S: 'a + GraphemeSegmenter> Graphemes<'a, S> {
-    pub(crate) fn new(node: &Arc<Node<S>>, extended: bool) -> Graphemes<S> {
+    pub(crate) fn new(node: &Arc<Node<S>>) -> Graphemes<S> {
         Graphemes {
             chunk_iter: Chunks::new(node),
-            cur_chunk: UnicodeSegmentation::graphemes("", extended),
-            extended: extended,
+            cur_chunk: "",
         }
     }
 
     pub(crate) fn new_with_range(
         node: &Arc<Node<S>>,
-        extended: bool,
         start_char: usize,
         end_char: usize,
     ) -> Graphemes<S> {
         Graphemes {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
-            cur_chunk: UnicodeSegmentation::graphemes("", extended),
-            extended: extended,
+            cur_chunk: "",
         }
     }
 }
@@ -147,10 +139,13 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Graphemes<'a, S> {
 
     fn next(&mut self) -> Option<&'a str> {
         loop {
-            if let Some(g) = self.cur_chunk.next() {
+            if !self.cur_chunk.is_empty() {
+                let next_idx = S::next_break(0, self.cur_chunk);
+                let g = &self.cur_chunk[..next_idx];
+                self.cur_chunk = &self.cur_chunk[next_idx..];
                 return Some(g);
             } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = UnicodeSegmentation::graphemes(chunk, self.extended);
+                self.cur_chunk = chunk;
                 continue;
             } else {
                 return None;

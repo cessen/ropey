@@ -6,7 +6,7 @@ use std::sync::Arc;
 use smallvec::SmallVec;
 
 use rope::Rope;
-use segmenter::{DefaultSegmenter, GraphemeSegmenter, MainSegmenter};
+use segmenter::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An efficient incremental `Rope` builder.
@@ -184,7 +184,7 @@ impl<S: GraphemeSegmenter> RopeBuilder<S> {
         if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
-                let split_idx = MainSegmenter::<S>::find_good_split(MAX_BYTES, text, true);
+                let split_idx = CRLFSegmenter::<S>::find_good_split(MAX_BYTES, text, true);
                 if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                     self.buffer.push_str(text);
                     return (NextText::None, "");
@@ -199,9 +199,9 @@ impl<S: GraphemeSegmenter> RopeBuilder<S> {
             }
         } else if (text.len() + self.buffer.len()) > MAX_BYTES {
             let split_idx = if self.buffer.len() < MAX_BYTES {
-                MainSegmenter::<S>::nearest_internal_break(MAX_BYTES - self.buffer.len(), text)
+                CRLFSegmenter::<S>::nearest_internal_break(MAX_BYTES - self.buffer.len(), text)
             } else {
-                MainSegmenter::<S>::nearest_internal_break(0, text)
+                CRLFSegmenter::<S>::nearest_internal_break(0, text)
             };
 
             if (split_idx == 0 || split_idx == text.len()) && !last_chunk {

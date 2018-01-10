@@ -8,7 +8,7 @@ use std::ptr;
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
 use slice::RopeSlice;
-use segmenter::{DefaultSegmenter, GraphemeSegmenter, MainSegmenter};
+use segmenter::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -343,7 +343,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
             // chunks.
             let mut text = text;
             while text.len() > 0 {
-                let split_idx = MainSegmenter::<S>::find_good_split(
+                let split_idx = CRLFSegmenter::<S>::find_good_split(
                     text.len() - MAX_BYTES.min(text.len()),
                     text,
                     false,
@@ -907,7 +907,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
 
     /// Creates an iterator over the grapheme clusters of the `Rope`.
     pub fn graphemes(&self) -> Graphemes<S> {
-        Graphemes::new(&self.root, true)
+        Graphemes::new(&self.root)
     }
 
     /// Creates an iterator over the lines of the `Rope`.
@@ -972,7 +972,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(MainSegmenter::<S>::seam_is_break(last_chunk, chunk));
+                    assert!(CRLFSegmenter::<S>::seam_is_break_checked(last_chunk, chunk));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;

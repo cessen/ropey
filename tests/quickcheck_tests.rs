@@ -1,10 +1,12 @@
 extern crate quickcheck;
 extern crate rand;
+extern crate unicode_segmentation;
 
 extern crate ropey;
 
 use rand::thread_rng;
 use quickcheck::{QuickCheck, StdGen};
+use unicode_segmentation::UnicodeSegmentation;
 use ropey::Rope;
 
 // Helper function used in the tests below
@@ -31,6 +33,12 @@ fn string_slice(text: &str, char_start: usize, char_end: usize) -> &str {
     &text[byte_start..byte_end]
 }
 
+fn graphemes_match(rope: &Rope, text: &str) -> bool {
+    rope.graphemes()
+        .zip(UnicodeSegmentation::graphemes(text, true))
+        .all(|(a, b)| a == b)
+}
+
 //===========================================================================
 
 #[test]
@@ -40,6 +48,7 @@ fn qc_from_str() {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert!(graphemes_match(&rope, text.as_str()));
 
         rope == text.as_str()
     }
@@ -62,6 +71,7 @@ fn qc_insert() {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert!(graphemes_match(&rope, text.as_str()));
 
         rope == text.as_str()
     }
@@ -88,6 +98,7 @@ fn qc_remove() {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert!(graphemes_match(&rope, text.as_str()));
 
         rope == text.as_str()
     }
@@ -115,6 +126,7 @@ fn qc_split_off_and_append() {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert!(graphemes_match(&rope, TEXT));
 
         rope == TEXT
     }
@@ -141,6 +153,7 @@ fn qc_shrink_to_fit_01() {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert!(graphemes_match(&rope, TEXT));
 
         let max_leaf_bytes = 768 - 33;
         (rope.capacity() - rope.len_bytes()) < max_leaf_bytes && rope.capacity() <= capacity_before
@@ -169,6 +182,7 @@ fn qc_shrink_to_fit_02() {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert!(graphemes_match(&rope, TEXT));
 
         let max_leaf_bytes = 768 - 33;
         let max_diff = max_leaf_bytes + ((rope.len_bytes() / max_leaf_bytes) * ins_text.len());

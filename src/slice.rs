@@ -295,12 +295,7 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
 
     /// Creates an iterator over the grapheme clusters of the `RopeSlice`.
     pub fn graphemes(&self) -> Graphemes<'a, S> {
-        Graphemes::new_with_range(
-            self.node,
-            true,
-            self.start_char as usize,
-            self.end_char as usize,
-        )
+        Graphemes::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the lines of the `RopeSlice`.

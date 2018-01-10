@@ -9,30 +9,34 @@ pub trait GraphemeSegmenter: Debug + Copy + Clone {
     fn seam_is_break(left: &str, right: &str) -> bool;
 }
 
-//===========================================================================
+/// Additional functions for GraphemeSegmenters.
+pub(crate) trait SegmenterUtils: GraphemeSegmenter {
+    /// Makes sure that special cases are handled correctly.
+    #[inline]
+    fn is_break_checked(byte_idx: usize, text: &str) -> bool {
+        if !text.is_char_boundary(byte_idx) {
+            false
+        } else if byte_idx == 0 || byte_idx == text.len() {
+            true
+        } else {
+            Self::is_break(byte_idx, text)
+        }
+    }
 
-/// Internal-only segmenter that takes another segmenter and adds on top of
-/// its segmentation that CRLF should never be broken.
-/// Used by Ropey to ensure that CRLF is never broken regardless of the
-/// segmenter passed.
-///
-/// This also ensures that special cases like left/right edge or empty
-/// `&str` slices get handled consistently, and it provides a bunch of
-/// other methods that are used throughout Ropey when dealing with
-/// segmentation.
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct MainSegmenter<Seg: GraphemeSegmenter> {
-    _seg: PhantomData<Seg>,
-}
+    /// Makes sure that special cases are handled correctly.
+    #[inline]
+    fn seam_is_break_checked(left: &str, right: &str) -> bool {
+        debug_assert!(!left.is_empty() && !right.is_empty());
+        Self::seam_is_break(left, right)
+    }
 
-impl<S: GraphemeSegmenter> MainSegmenter<S> {
     /// Returns the segment break before (but not including) the given byte
     /// boundary.
     ///
     /// This will return back the passed byte boundary if it is at the start
     /// of the string.
     #[inline]
-    pub(crate) fn prev_break(byte_idx: usize, text: &str) -> usize {
+    fn prev_break(byte_idx: usize, text: &str) -> usize {
         // Bounds check
         debug_assert!(byte_idx <= text.len());
 
@@ -45,7 +49,7 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
             }
 
             // Check if it's a segment break
-            if Self::is_break(boundary_idx, text) {
+            if Self::is_break_checked(boundary_idx, text) {
                 break;
             }
         }
@@ -59,7 +63,7 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
     /// This will return back the passed byte boundary if it is at the end of
     /// the string.
     #[inline]
-    pub(crate) fn next_break(byte_idx: usize, text: &str) -> usize {
+    fn next_break(byte_idx: usize, text: &str) -> usize {
         // Bounds check
         debug_assert!(byte_idx <= text.len());
 
@@ -72,7 +76,7 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
             }
 
             // Check if it's a segment break
-            if Self::is_break(boundary_idx, text) {
+            if Self::is_break_checked(boundary_idx, text) {
                 break;
             }
         }
@@ -87,7 +91,7 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
     /// returned: if the entire text is a single unbroken segment, then the
     /// right edge of the text is returned.
     #[inline]
-    pub(crate) fn nearest_internal_break(byte_idx: usize, text: &str) -> usize {
+    fn nearest_internal_break(byte_idx: usize, text: &str) -> usize {
         // Bounds check
         debug_assert!(byte_idx <= text.len());
 
@@ -98,7 +102,7 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
         }
 
         // Find the two nearest segment boundaries
-        let left = if Self::is_break(boundary_idx, text) && boundary_idx != text.len() {
+        let left = if Self::is_break_checked(boundary_idx, text) && boundary_idx != text.len() {
             boundary_idx
         } else {
             Self::prev_break(boundary_idx, text)
@@ -115,8 +119,8 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
     }
 
     #[inline]
-    pub(crate) fn find_good_split(byte_idx: usize, text: &str, bias_left: bool) -> usize {
-        if Self::is_break(byte_idx, text) {
+    fn find_good_split(byte_idx: usize, text: &str, bias_left: bool) -> usize {
+        if Self::is_break_checked(byte_idx, text) {
             byte_idx
         } else {
             let prev = Self::prev_break(byte_idx, text);
@@ -138,24 +142,31 @@ impl<S: GraphemeSegmenter> MainSegmenter<S> {
     }
 }
 
-impl<S: GraphemeSegmenter> GraphemeSegmenter for MainSegmenter<S> {
+impl<T: GraphemeSegmenter> SegmenterUtils for T {}
+
+//===========================================================================
+
+/// Internal-only segmenter that takes another segmenter and adds on top of
+/// its segmentation that CRLF should never be broken.
+/// Used by Ropey to ensure that CRLF is never broken regardless of the
+/// segmenter passed.
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct CRLFSegmenter<Seg: GraphemeSegmenter> {
+    _seg: PhantomData<Seg>,
+}
+
+impl<S: GraphemeSegmenter> GraphemeSegmenter for CRLFSegmenter<S> {
     #[inline]
     fn is_break(byte_idx: usize, text: &str) -> bool {
         debug_assert!(byte_idx <= text.len());
-        if !text.is_char_boundary(byte_idx) {
-            false
-        } else if byte_idx == 0 || byte_idx == text.len() {
-            true
-        } else {
-            let bytes = text.as_bytes();
-            let crlf_break = (bytes[byte_idx - 1] != 0x0D) | (bytes[byte_idx] != 0x0A);
-            crlf_break && S::is_break(byte_idx, text)
-        }
+
+        let bytes = text.as_bytes();
+        let crlf_break = (bytes[byte_idx - 1] != 0x0D) | (bytes[byte_idx] != 0x0A);
+        crlf_break && S::is_break(byte_idx, text)
     }
 
     #[inline]
     fn seam_is_break(left: &str, right: &str) -> bool {
-        debug_assert!(!left.is_empty() && !right.is_empty());
         let crlf_break = (left.as_bytes()[left.len() - 1] != 0x0D) | (right.as_bytes()[0] != 0x0A);
         crlf_break && S::seam_is_break(left, right)
     }
@@ -224,18 +235,18 @@ impl GraphemeSegmenter for NullSegmenter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    type MSeg = MainSegmenter<DefaultSegmenter>;
+    type MSeg = CRLFSegmenter<DefaultSegmenter>;
 
     #[test]
     fn crlf_segmenter_01() {
         let text = "Hello world!\r\nHow's it going?";
 
-        assert!(MainSegmenter::<NullSegmenter>::is_break(0, ""));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(0, text));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(12, text));
-        assert!(!MainSegmenter::<NullSegmenter>::is_break(13, text));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(14, text));
-        assert!(MainSegmenter::<NullSegmenter>::is_break(19, text));
+        assert!(CRLFSegmenter::<NullSegmenter>::is_break_checked(0, ""));
+        assert!(CRLFSegmenter::<NullSegmenter>::is_break_checked(0, text));
+        assert!(CRLFSegmenter::<NullSegmenter>::is_break_checked(12, text));
+        assert!(!CRLFSegmenter::<NullSegmenter>::is_break_checked(13, text));
+        assert!(CRLFSegmenter::<NullSegmenter>::is_break_checked(14, text));
+        assert!(CRLFSegmenter::<NullSegmenter>::is_break_checked(19, text));
     }
 
     #[test]
@@ -243,12 +254,24 @@ mod tests {
         let l = "Hello world!\r";
         let r = "\nHow's it going?";
 
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break(l, r));
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break(l, "\n"));
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break("\r", r));
-        assert!(!MainSegmenter::<NullSegmenter>::seam_is_break("\r", "\n"));
-        assert!(MainSegmenter::<NullSegmenter>::seam_is_break(r, l));
-        assert!(MainSegmenter::<NullSegmenter>::seam_is_break("\n", "\r"));
+        assert!(!CRLFSegmenter::<NullSegmenter>::seam_is_break_checked(l, r));
+        assert!(!CRLFSegmenter::<NullSegmenter>::seam_is_break_checked(
+            l,
+            "\n"
+        ));
+        assert!(!CRLFSegmenter::<NullSegmenter>::seam_is_break_checked(
+            "\r",
+            r
+        ));
+        assert!(!CRLFSegmenter::<NullSegmenter>::seam_is_break_checked(
+            "\r",
+            "\n"
+        ));
+        assert!(CRLFSegmenter::<NullSegmenter>::seam_is_break_checked(r, l));
+        assert!(CRLFSegmenter::<NullSegmenter>::seam_is_break_checked(
+            "\n",
+            "\r"
+        ));
     }
 
     #[test]
@@ -290,10 +313,10 @@ mod tests {
     fn is_break_01() {
         let text = "\n\r\n\r\n\r\n\r\n\r\n\r";
 
-        assert!(MSeg::is_break(0, text));
-        assert!(MSeg::is_break(12, text));
-        assert!(MSeg::is_break(3, text));
-        assert!(!MSeg::is_break(6, text));
+        assert!(MSeg::is_break_checked(0, text));
+        assert!(MSeg::is_break_checked(12, text));
+        assert!(MSeg::is_break_checked(3, text));
+        assert!(!MSeg::is_break_checked(6, text));
     }
 
     #[test]

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use tree;
 use tree::{Node, MAX_BYTES};
-use segmenter::{GraphemeSegmenter, MainSegmenter};
+use segmenter::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -109,7 +109,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
                         } else {
                             let split_pos = {
                                 let pos = text1.len() - (text1.len() / 2);
-                                MainSegmenter::<S>::nearest_internal_break(pos, text1)
+                                CRLFSegmenter::<S>::nearest_internal_break(pos, text1)
                             };
                             *text2 = text1.split_off(split_pos);
                             if text2.len() > 0 {
@@ -192,7 +192,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
                     let text_l = Arc::make_mut(node_l).leaf_text_mut();
                     let text_r = Arc::make_mut(node_r).leaf_text_mut();
                     let split_idx_r =
-                        MainSegmenter::<S>::prev_break(MAX_BYTES - text_l.len(), text_r);
+                        CRLFSegmenter::<S>::prev_break(MAX_BYTES - text_l.len(), text_r);
                     text_l.push_str(&text_r[..split_idx_r]);
                     text_r.truncate_front(split_idx_r);
                 }

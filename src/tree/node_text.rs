@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use smallvec::{Array, SmallVec};
 use str_utils::{char_idx_to_byte_idx, count_chars};
-use segmenter::{GraphemeSegmenter, MainSegmenter};
+use segmenter::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::MAX_BYTES;
 
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
@@ -79,7 +79,7 @@ impl<S: GraphemeSegmenter> NodeText<S> {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            MainSegmenter::<S>::nearest_internal_break(pos, self)
+            CRLFSegmenter::<S>::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -106,7 +106,7 @@ impl<S: GraphemeSegmenter> NodeText<S> {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            MainSegmenter::<S>::nearest_internal_break(pos, self)
+            CRLFSegmenter::<S>::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -330,13 +330,13 @@ impl<S: GraphemeSegmenter> Borrow<str> for NodeText<S> {
 /// is one big grapheme.
 pub(crate) fn fix_segment_seam<S: GraphemeSegmenter>(l: &mut NodeText<S>, r: &mut NodeText<S>) {
     // Early out, if there's nothing to do.
-    if MainSegmenter::<S>::seam_is_break(l, r) {
+    if CRLFSegmenter::<S>::seam_is_break_checked(l, r) {
         return;
     }
 
     // Find the nearest breaks around the seam.
-    let l_split = MainSegmenter::<S>::prev_break(l.len(), l);
-    let r_split = l.len() + MainSegmenter::<S>::next_break(0, r);
+    let l_split = CRLFSegmenter::<S>::prev_break(l.len(), l);
+    let r_split = l.len() + CRLFSegmenter::<S>::next_break(0, r);
 
     // Find the new split position, if any.
     let new_split_pos = {
