@@ -1,3 +1,8 @@
+# 0.6.1 (2018-01-11)
+
+No functional changes.  Just updated the readme to render properly on crates.io.
+
+
 # 0.6.0 (2018-01-11)
 
 New features:
