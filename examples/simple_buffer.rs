@@ -1,9 +1,12 @@
+#![allow(dead_code)]
+
 extern crate ropey;
 
 use std::fs::File;
 use std::io;
 
 use ropey::{Rope, RopeSlice};
+use ropey::iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 
 struct TextBuffer {
     text: Rope,
@@ -23,6 +26,26 @@ impl TextBuffer {
 
     fn get_line<'a>(&'a self, idx: usize) -> RopeSlice<'a> {
         self.text.line(idx)
+    }
+
+    fn bytes<'a>(&'a self) -> Bytes<'a> {
+        self.text.bytes()
+    }
+
+    fn chars<'a>(&'a self) -> Chars<'a> {
+        self.text.chars()
+    }
+
+    fn graphemes<'a>(&'a self) -> Graphemes<'a> {
+        self.text.graphemes()
+    }
+
+    fn lines<'a>(&'a self) -> Lines<'a> {
+        self.text.lines()
+    }
+
+    fn chunks<'a>(&'a self) -> Chunks<'a> {
+        self.text.chunks()
     }
 
     fn edit(&mut self, start: usize, end: usize, text: &str) {
@@ -52,5 +75,4 @@ fn main() {
 
     buf.edit(3, 5, "Hello!");
     println!("{}", buf.get_line(2));
-    println!("{}", buf.path);
 }
