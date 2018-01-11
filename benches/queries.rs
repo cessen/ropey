@@ -82,7 +82,7 @@ fn slice(bench: &mut Bencher) {
         if start > end {
             std::mem::swap(&mut start, &mut end);
         }
-        rope.slice(start, end);
+        rope.slice(start..end);
     })
 }
 
