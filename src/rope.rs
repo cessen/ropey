@@ -441,10 +441,23 @@ impl<S: GraphemeSegmenter> Rope<S> {
 
     /// Removes the text in the given char index range.
     ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
+    /// indices.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// let mut rope = Rope::from_str("Hello world!");
+    /// rope.remove(5..);
+    ///
+    /// assert_eq!("Hello", rope);
+    /// ```
+    ///
     /// # Panics
     ///
-    /// Panics if the start of the range is greater than the end, or the end
-    /// is out of bounds (i.e. `end > len_chars()`).
+    /// Panics if the start of the range is greater than the end, or if the
+    /// end is out of bounds (i.e. `end > len_chars()`).
     pub fn remove<R: CharIdxRange>(&mut self, range: R) {
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());
@@ -880,13 +893,25 @@ impl<S: GraphemeSegmenter> Rope<S> {
     //-----------------------------------------------------------------------
     // Slicing
 
-    /// Returns an immutable slice of the `Rope` in the given char index
-    /// range.
+    /// Gets an immutable slice of the `Rope`.
+    ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
+    /// indices.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// let rope = Rope::from_str("Hello world!");
+    /// let slice = rope.slice(..5);
+    ///
+    /// assert_eq!("Hello", slice);
+    /// ```
     ///
     /// # Panics
     ///
-    /// Panics if the start of the range is greater than the end, or the end
-    /// is out of bounds (i.e. `end > len_chars()`).
+    /// Panics if the start of the range is greater than the end, or if the
+    /// end is out of bounds (i.e. `end > len_chars()`).
     pub fn slice<R: CharIdxRange>(&self, range: R) -> RopeSlice<S> {
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());
