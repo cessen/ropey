@@ -1,3 +1,15 @@
+# 0.6.0 (2018-01-11)
+
+New features:
+
+* Grapheme segmentation can now be customized if needed.
+
+API changes:
+
+* `Rope::remove()`, `Rope::slice()`, and `RopeSlice::slice()` now take range syntax to specify
+  their ranges.
+
+
 # 0.5.6 (2018-01-05)
 
 Documenation:

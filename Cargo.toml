@@ -1,13 +1,13 @@
 [package]
 name = "ropey"
-version = "0.5.6"
+version = "0.6.0"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
-description = "An efficient text buffer for Rust"
+description = "An efficient editable text buffer for Rust"
 documentation = "https://docs.rs/ropey"
 repository = "https://github.com/cessen/ropey"
 readme = "README.md"
 license = "MIT"
-keywords = ["rope", "text", "buffer"]
+keywords = ["rope", "text", "edit", "buffer"]
 categories = ["text-processing", "data-structures"]
 
 [badges]
