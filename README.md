@@ -15,10 +15,10 @@ Internally it's implemented as a b-tree
 ```Rust
 // Load a text file.
 let mut text = ropey::Rope::from_reader(
-    BufReader::new(File::open("my_great_book.txt")?)
+    File::open("my_great_book.txt")?
 )?;
 
-// Print the 516th line (zero-indexed) from the file.
+// Print the 516th line (zero-indexed).
 println!("{}", text.line(515));
 
 // Get the start/end char indices of the line.
@@ -37,7 +37,7 @@ let end_idx = text.line_to_char(516);
 println!("{}", text.slice(start_idx..end_idx));
 
 // Write the file back out to disk using the efficient `Chunks` iterator.
-let mut file = BufWriter::new(File::create("my_great_book.txt")?);
+let mut file = File::create("my_great_book.txt")?;
 for chunk in text.chunks() {
     file.write(chunk.as_bytes())?;
 }
