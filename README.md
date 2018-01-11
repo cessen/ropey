@@ -10,6 +10,38 @@ without trouble.
 Internally it's implemented as a b-tree
 [rope](https://en.wikipedia.org/wiki/Rope_(data_structure)).
 
+## Example Usage
+
+```Rust
+// Load a text file.
+let mut text = ropey::Rope::from_reader(
+    BufReader::new(File::open("my_great_book.txt")?)
+)?;
+
+// Print the 516th line (zero-indexed) from the file.
+println!("{}", text.line(515));
+
+// Get the start/end char indices of the line.
+let start_idx = text.line_to_char(515);
+let end_idx = text.line_to_char(516);
+
+// Remove the line...
+text.remove(start_idx..end_idx);
+
+// ...and replace it with something better.
+text.insert(start_idx, "The flowers are... so... dunno.\n");
+
+// Print the changes, along with the previous few lines for context.
+let start_idx = text.line_to_char(511);
+let end_idx = text.line_to_char(516);
+println!("{}", text.slice(start_idx..end_idx));
+
+// Write the file back out to disk using the efficient `Chunks` iterator.
+let mut file = BufWriter::new(File::create("my_great_book.txt")?);
+for chunk in text.chunks() {
+    file.write(chunk.as_bytes())?;
+}
+```
 
 ## Features
 
