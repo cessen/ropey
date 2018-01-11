@@ -443,8 +443,8 @@ impl<S: GraphemeSegmenter> Rope<S> {
     ///
     /// # Panics
     ///
-    /// Panics if `start` is greater than `end` or `end` is out of bounds
-    /// (i.e. `end > len_chars()`).
+    /// Panics if the start of the range is greater than the end, or the end
+    /// is out of bounds (i.e. `end > len_chars()`).
     pub fn remove<R: CharIdxRange>(&mut self, range: R) {
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());
@@ -880,12 +880,13 @@ impl<S: GraphemeSegmenter> Rope<S> {
     //-----------------------------------------------------------------------
     // Slicing
 
-    /// Returns an immutable slice of the `Rope` in the char range `start..end`.
+    /// Returns an immutable slice of the `Rope` in the given char index
+    /// range.
     ///
     /// # Panics
     ///
-    /// Panics if `start` is greater than `end` or `end` is out of bounds
-    /// (i.e. `end > len_chars()`).
+    /// Panics if the start of the range is greater than the end, or the end
+    /// is out of bounds (i.e. `end > len_chars()`).
     pub fn slice<R: CharIdxRange>(&self, range: R) -> RopeSlice<S> {
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());

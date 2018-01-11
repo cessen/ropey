@@ -258,12 +258,12 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
     //-----------------------------------------------------------------------
     // Slicing
 
-    /// Returns an immutable slice of the `RopeSlice` in the char range `start..end`.
+    /// Returns a sub-slice of the `RopeSlice` in the given char index range.
     ///
     /// # Panics
     ///
-    /// Panics if `start` is greater than `end` or `end` is out of bounds
-    /// (i.e. `end > len_chars()`).
+    /// Panics if the start of the range is greater than the end, or the end
+    /// is out of bounds (i.e. `end > len_chars()`).
     pub fn slice<R: CharIdxRange>(&self, range: R) -> Self {
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());
