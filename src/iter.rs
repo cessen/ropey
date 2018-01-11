@@ -9,14 +9,17 @@
 use std::str;
 use std::sync::Arc;
 
-use segmentation::{GraphemeSegmenter, SegmenterUtils};
+use segmentation::{DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::Node;
 use slice::RopeSlice;
 
 //==========================================================
 
 /// An iterator over a `Rope`'s bytes.
-pub struct Bytes<'a, S: 'a + GraphemeSegmenter> {
+pub struct Bytes<'a, S = DefaultSegmenter>
+where
+    S: 'a + GraphemeSegmenter,
+{
     chunk_iter: Chunks<'a, S>,
     cur_chunk: str::Bytes<'a>,
 }
@@ -61,7 +64,10 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Bytes<'a, S> {
 //==========================================================
 
 /// An iterator over a `Rope`'s chars.
-pub struct Chars<'a, S: 'a + GraphemeSegmenter> {
+pub struct Chars<'a, S = DefaultSegmenter>
+where
+    S: 'a + GraphemeSegmenter,
+{
     chunk_iter: Chunks<'a, S>,
     cur_chunk: str::Chars<'a>,
 }
@@ -109,7 +115,10 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chars<'a, S> {
 ///
 /// The grapheme clusters returned are based on the `Rope`'s [grapheme segmenter](segmentation/index.html),
 /// which by default is [`DefaultSegmenter`](segmentation/struct.DefaultSegmenter.html).
-pub struct Graphemes<'a, S: 'a + GraphemeSegmenter> {
+pub struct Graphemes<'a, S = DefaultSegmenter>
+where
+    S: 'a + GraphemeSegmenter,
+{
     chunk_iter: Chunks<'a, S>,
     cur_chunk: &'a str,
 }
@@ -162,7 +171,10 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Graphemes<'a, S> {
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
-pub struct Lines<'a, S: 'a + GraphemeSegmenter> {
+pub struct Lines<'a, S = DefaultSegmenter>
+where
+    S: 'a + GraphemeSegmenter,
+{
     node: &'a Arc<Node<S>>,
     start_char: usize,
     end_char: usize,
@@ -249,7 +261,10 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Lines<'a, S> {
 ///
 /// The converse of this API is [`RopeBuilder`](../struct.RopeBuilder.html),
 /// which is useful for efficiently streaming text data _into_ a rope.
-pub struct Chunks<'a, S: 'a + GraphemeSegmenter> {
+pub struct Chunks<'a, S = DefaultSegmenter>
+where
+    S: 'a + GraphemeSegmenter,
+{
     node_stack: Vec<&'a Arc<Node<S>>>,
     start: usize,
     end: usize,

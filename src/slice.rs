@@ -3,13 +3,16 @@ use std::sync::Arc;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
-use segmentation::GraphemeSegmenter;
+use segmentation::{DefaultSegmenter, GraphemeSegmenter};
 use tree::{Count, Node};
 use rope::Rope;
 
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
-pub struct RopeSlice<'a, S: 'a + GraphemeSegmenter> {
+pub struct RopeSlice<'a, S = DefaultSegmenter>
+where
+    S: 'a + GraphemeSegmenter,
+{
     node: &'a Arc<Node<S>>,
     start_byte: Count,
     end_byte: Count,
