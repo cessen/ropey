@@ -16,7 +16,7 @@ before_script:
 script:
   - cargo build --verbose
   - cargo test --verbose
-  - cargo bench --bench
+  - cargo bench --no-run --verbose
   - travis-cargo --only stable doc
 after_success:
   - travis-cargo --only stable doc-upload
