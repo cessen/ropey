@@ -1,3 +1,11 @@
+# 0.6.2 (2018-01-11)
+
+Fixes:
+
+* 0.6.0 and 0.6.1 had an API regression where you now had to specify the
+  segmenter in the type parameters of RopeSlice and the various iterators.
+
+
 # 0.6.1 (2018-01-11)
 
 No functional changes.  Just updated the readme to render properly on crates.io.
