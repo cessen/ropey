@@ -1,8 +1,8 @@
 language: rust
 rust:
-- stable
-- beta
-- nightly
+  - stable
+  - beta
+  - nightly
 matrix:
   allow_failures:
   - rust: nightly
@@ -14,12 +14,13 @@ before_script:
   pip install 'travis-cargo<0.2' --user &&
   export PATH=$HOME/.local/bin:$PATH
 script:
-- |
-  travis-cargo build &&
-  travis-cargo test &&
+  - |
+  cargo build --verbose &&
+  cargo test --verbose &&
+  cargo bench --bench &&
   travis-cargo --only stable doc
 after_success:
-- travis-cargo --only stable doc-upload
+  - travis-cargo --only stable doc-upload
 cache:
   pip: true
   cargo: true
