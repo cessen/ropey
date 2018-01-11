@@ -491,7 +491,7 @@ mod tests {
         let s_start_byte = r.char_to_byte(s_start);
         let s_end_byte = r.char_to_byte(s_end);
 
-        let s1 = r.slice(s_start, s_end);
+        let s1 = r.slice(s_start..s_end);
         let s2 = &TEXT[s_start_byte..s_end_byte];
 
         for (br, bt) in s1.bytes().zip(s2.bytes()) {
@@ -508,7 +508,7 @@ mod tests {
         let s_start_byte = r.char_to_byte(s_start);
         let s_end_byte = r.char_to_byte(s_end);
 
-        let s1 = r.slice(s_start, s_end);
+        let s1 = r.slice(s_start..s_end);
         let s2 = &TEXT[s_start_byte..s_end_byte];
 
         for (cr, ct) in s1.chars().zip(s2.chars()) {
@@ -525,7 +525,7 @@ mod tests {
         let s_start_byte = r.char_to_byte(s_start);
         let s_end_byte = r.char_to_byte(s_end);
 
-        let s1 = r.slice(s_start, s_end);
+        let s1 = r.slice(s_start..s_end);
         let s2 = &TEXT[s_start_byte..s_end_byte];
 
         for (gr, gt) in s1.graphemes().zip(UnicodeSegmentation::graphemes(s2, true)) {
@@ -538,7 +538,7 @@ mod tests {
         let text = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n";
         let r = Rope::from_str(text);
 
-        let s1 = r.slice(5, 11);
+        let s1 = r.slice(5..11);
         let s2 = &text[5..11];
 
         assert_eq!(4, s1.graphemes().count());
@@ -557,7 +557,7 @@ mod tests {
         let s_start_byte = r.char_to_byte(s_start);
         let s_end_byte = r.char_to_byte(s_end);
 
-        let s1 = r.slice(s_start, s_end);
+        let s1 = r.slice(s_start..s_end);
         let s2 = &TEXT[s_start_byte..s_end_byte];
 
         for (liner, linet) in s1.lines().zip(s2.lines()) {
@@ -574,7 +574,7 @@ mod tests {
         let s_start_byte = r.char_to_byte(s_start);
         let s_end_byte = r.char_to_byte(s_end);
 
-        let s1 = r.slice(s_start, s_end);
+        let s1 = r.slice(s_start..s_end);
         let s2 = &TEXT[s_start_byte..s_end_byte];
 
         let mut idx = 0;

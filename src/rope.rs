@@ -5,7 +5,7 @@ use std::ptr;
 
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use rope_builder::RopeBuilder;
-use slice::RopeSlice;
+use slice::{CharIdxRange, RopeSlice};
 use segmentation::{CRLFSegmenter, DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
@@ -25,7 +25,7 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// # use ropey::Rope;
 /// #
 /// let mut rope = Rope::from_str("Hello みんなさん!");
-/// rope.remove(6, 11);
+/// rope.remove(6..11);
 /// rope.insert(6, "world");
 ///
 /// assert_eq!(rope, "Hello world!");
@@ -439,13 +439,16 @@ impl<S: GraphemeSegmenter> Rope<S> {
         }
     }
 
-    /// Removes the text in char range `start..end`.
+    /// Removes the text in the given char index range.
     ///
     /// # Panics
     ///
     /// Panics if `start` is greater than `end` or `end` is out of bounds
     /// (i.e. `end > len_chars()`).
-    pub fn remove(&mut self, start: usize, end: usize) {
+    pub fn remove<R: CharIdxRange>(&mut self, range: R) {
+        let start = range.start().unwrap_or(0);
+        let end = range.end().unwrap_or_else(|| self.len_chars());
+
         // Bounds check
         assert!(start <= end);
         assert!(
@@ -809,7 +812,7 @@ impl<S: GraphemeSegmenter> Rope<S> {
         let start = self.line_to_char(line_idx);
         let end = self.line_to_char(line_idx + 1);
 
-        self.slice(start, end)
+        self.slice(start..end)
     }
 
     //-----------------------------------------------------------------------
@@ -883,7 +886,10 @@ impl<S: GraphemeSegmenter> Rope<S> {
     ///
     /// Panics if `start` is greater than `end` or `end` is out of bounds
     /// (i.e. `end > len_chars()`).
-    pub fn slice(&self, start: usize, end: usize) -> RopeSlice<S> {
+    pub fn slice<R: CharIdxRange>(&self, range: R) -> RopeSlice<S> {
+        let start = range.start().unwrap_or(0);
+        let end = range.end().unwrap_or_else(|| self.len_chars());
+
         // Bounds check
         assert!(start <= end);
         assert!(
@@ -935,14 +941,6 @@ impl<S: GraphemeSegmenter> Rope<S> {
             text.push_str(chunk);
         }
         text
-    }
-
-    /// Returns a slice to the entire contents of the `Rope`.
-    ///
-    /// Mainly just a convenience method, since the `RangeArgument` trait
-    /// isn't stabilized yet.
-    pub fn to_slice(&self) -> RopeSlice<S> {
-        self.slice(0, self.len_chars())
     }
 
     //-----------------------------------------------------------------------
@@ -1043,63 +1041,63 @@ impl<S: GraphemeSegmenter> std::default::Default for Rope<S> {
 impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<Rope<S2>> for Rope<S1> {
     #[inline]
     fn eq(&self, other: &Rope<S2>) -> bool {
-        self.to_slice() == other.to_slice()
+        self.slice(..) == other.slice(..)
     }
 }
 
 impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<&'a str> for Rope<S> {
     #[inline]
     fn eq(&self, other: &&'a str) -> bool {
-        self.to_slice() == *other
+        self.slice(..) == *other
     }
 }
 
 impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for &'a str {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
-        *self == other.to_slice()
+        *self == other.slice(..)
     }
 }
 
 impl<S: GraphemeSegmenter> std::cmp::PartialEq<str> for Rope<S> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
-        self.to_slice() == other
+        self.slice(..) == other
     }
 }
 
 impl<S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for str {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
-        self == other.to_slice()
+        self == other.slice(..)
     }
 }
 
 impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<String> for Rope<S> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        self.to_slice() == other.as_str()
+        self.slice(..) == other.as_str()
     }
 }
 
 impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for String {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
-        self.as_str() == other.to_slice()
+        self.as_str() == other.slice(..)
     }
 }
 
 impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope<S> {
     #[inline]
     fn eq(&self, other: &std::borrow::Cow<'a, str>) -> bool {
-        self.to_slice() == **other
+        self.slice(..) == **other
     }
 }
 
 impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<Rope<S>> for std::borrow::Cow<'a, str> {
     #[inline]
     fn eq(&self, other: &Rope<S>) -> bool {
-        **self == other.to_slice()
+        **self == other.slice(..)
     }
 }
 
@@ -1275,10 +1273,10 @@ mod tests {
     fn remove_01() {
         let mut r = Rope::from_str(TEXT);
 
-        r.remove(5, 11);
-        r.remove(24, 31);
-        r.remove(19, 25);
-        r.remove(75, 79);
+        r.remove(5..11);
+        r.remove(24..31);
+        r.remove(19..25);
+        r.remove(75..79);
         assert_eq!(
             r,
             "Hello!  How're you \
@@ -1296,7 +1294,7 @@ mod tests {
 
         // Make sure graphemes get merged properly, via
         // assert_invariants() below.
-        r.remove(3, 6);
+        r.remove(3..6);
         assert_eq!(r, "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
 
         r.assert_integrity();
@@ -1308,7 +1306,7 @@ mod tests {
         let mut r = Rope::from_str(TEXT);
 
         // Make sure graphemes get merged properly
-        r.remove(45, 45);
+        r.remove(45..45);
         assert_eq!(r, TEXT);
 
         r.assert_integrity();
@@ -1320,7 +1318,7 @@ mod tests {
         let mut r = Rope::from_str(TEXT);
 
         // Make sure graphemes get merged properly
-        r.remove(0, 103);
+        r.remove(0..103);
         assert_eq!(r, "");
 
         r.assert_integrity();
@@ -1331,35 +1329,35 @@ mod tests {
     #[should_panic]
     fn remove_05() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(56, 55); // Wrong ordering of start/end
+        r.remove(56..55); // Wrong ordering of start/end
     }
 
     #[test]
     #[should_panic]
     fn remove_06() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(102, 104); // Removing past the end
+        r.remove(102..104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_07() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(103, 104); // Removing past the end
+        r.remove(103..104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_08() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(104, 104); // Removing past the end
+        r.remove(104..104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_09() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(104, 105); // Removing past the end
+        r.remove(104..105); // Removing past the end
     }
 
     #[test]
@@ -1784,7 +1782,7 @@ mod tests {
     fn slice_01() {
         let r = Rope::from_str(TEXT);
 
-        let s = r.slice(0, r.len_chars());
+        let s = r.slice(0..r.len_chars());
 
         assert_eq!(TEXT, s);
     }
@@ -1793,7 +1791,7 @@ mod tests {
     fn slice_02() {
         let r = Rope::from_str(TEXT);
 
-        let s = r.slice(5, 21);
+        let s = r.slice(5..21);
 
         assert_eq!(&TEXT[5..21], s);
     }
@@ -1802,7 +1800,7 @@ mod tests {
     fn slice_03() {
         let r = Rope::from_str(TEXT);
 
-        let s = r.slice(31, 97);
+        let s = r.slice(31..97);
 
         assert_eq!(&TEXT[31..109], s);
     }
@@ -1811,7 +1809,7 @@ mod tests {
     fn slice_04() {
         let r = Rope::from_str(TEXT);
 
-        let s = r.slice(53, 53);
+        let s = r.slice(53..53);
 
         assert_eq!("", s);
     }
@@ -1820,14 +1818,14 @@ mod tests {
     #[should_panic]
     fn slice_05() {
         let r = Rope::from_str(TEXT);
-        r.slice(53, 52);
+        r.slice(53..52);
     }
 
     #[test]
     #[should_panic]
     fn slice_06() {
         let r = Rope::from_str(TEXT);
-        r.slice(102, 104);
+        r.slice(102..104);
     }
 
     #[test]
@@ -1848,7 +1846,7 @@ mod tests {
     fn eq_rope_03() {
         let r1 = Rope::from_str(TEXT);
         let mut r2 = r1.clone();
-        r2.remove(26, 27);
+        r2.remove(26..27);
         r2.insert(26, "z");
 
         assert_ne!(r1, r2);
@@ -1873,7 +1871,7 @@ mod tests {
     #[test]
     fn eq_rope_06() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(26, 27);
+        r.remove(26..27);
         r.insert(26, "z");
 
         assert_ne!(r, TEXT);

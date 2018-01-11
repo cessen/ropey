@@ -28,7 +28,7 @@ fn do_stuff() -> Result<()> {
         let end_idx = text.line_to_char(516);
 
         // Remove that terrible writing!
-        text.remove(start_idx, end_idx);
+        text.remove(start_idx..end_idx);
 
         // ...and replace it with something better.
         text.insert(start_idx, "The flowers are... so... dunno.\n");
@@ -37,7 +37,7 @@ fn do_stuff() -> Result<()> {
         // for context.  Gotta make sure the writing works!
         let start_idx = text.line_to_char(511);
         let end_idx = text.line_to_char(516);
-        println!("{}", text.slice(start_idx, end_idx));
+        println!("{}", text.slice(start_idx..end_idx));
     }
 
     // Write the file back out to disk.  We use the `Chunks` iterator

@@ -93,7 +93,7 @@ fn qc_remove() {
             std::mem::swap(&mut idx1, &mut idx2)
         };
 
-        rope.remove(idx1, idx2);
+        rope.remove(idx1..idx2);
         string_remove(&mut text, idx1, idx2);
 
         rope.assert_integrity();
@@ -204,7 +204,7 @@ fn qc_slice() {
             std::mem::swap(&mut idx1, &mut idx2)
         };
 
-        let slice = rope.slice(idx1, idx2);
+        let slice = rope.slice(idx1..idx2);
         let text_slice = string_slice(&text, idx1, idx2);
 
         slice == text_slice && slice.len_bytes() == text_slice.len()

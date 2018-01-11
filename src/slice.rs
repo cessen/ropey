@@ -1,5 +1,6 @@
 use std;
 use std::sync::Arc;
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
 use segmentation::GraphemeSegmenter;
@@ -150,7 +151,7 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
         );
 
         // TODO: make this more efficient.
-        self.slice(char_idx, char_idx + 1).chars().nth(0).unwrap()
+        self.slice(char_idx..(char_idx + 1)).chars().nth(0).unwrap()
     }
 
     /// Returns the line at `line_idx`.
@@ -172,7 +173,7 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
         let start = self.line_to_char(line_idx);
         let end = self.line_to_char(line_idx + 1);
 
-        self.slice(start, end)
+        self.slice(start..end)
     }
 
     //-----------------------------------------------------------------------
@@ -263,7 +264,10 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
     ///
     /// Panics if `start` is greater than `end` or `end` is out of bounds
     /// (i.e. `end > len_chars()`).
-    pub fn slice(&self, start: usize, end: usize) -> Self {
+    pub fn slice<R: CharIdxRange>(&self, range: R) -> Self {
+        let start = range.start().unwrap_or(0);
+        let end = range.end().unwrap_or_else(|| self.len_chars());
+
         // Bounds check
         assert!(start <= end);
         assert!(
@@ -482,7 +486,7 @@ impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<Rope<
     for RopeSlice<'a, S1> {
     #[inline]
     fn eq(&self, other: &Rope<S2>) -> bool {
-        *self == other.to_slice()
+        *self == other.slice(..)
     }
 }
 
@@ -490,7 +494,52 @@ impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<RopeS
     for Rope<S1> {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a, S2>) -> bool {
-        self.to_slice() == *other
+        self.slice(..) == *other
+    }
+}
+
+//===========================================================
+
+/// Trait to generalize over the various `Range` types for `a..b` syntax when
+/// expressing char ranges.
+pub trait CharIdxRange {
+    fn start(&self) -> Option<usize>;
+    fn end(&self) -> Option<usize>;
+}
+
+impl CharIdxRange for Range<usize> {
+    fn start(&self) -> Option<usize> {
+        Some(self.start)
+    }
+    fn end(&self) -> Option<usize> {
+        Some(self.end)
+    }
+}
+
+impl CharIdxRange for RangeTo<usize> {
+    fn start(&self) -> Option<usize> {
+        None
+    }
+    fn end(&self) -> Option<usize> {
+        Some(self.end)
+    }
+}
+
+impl CharIdxRange for RangeFrom<usize> {
+    fn start(&self) -> Option<usize> {
+        Some(self.start)
+    }
+    fn end(&self) -> Option<usize> {
+        None
+    }
+}
+
+impl CharIdxRange for RangeFull {
+    fn start(&self) -> Option<usize> {
+        None
+    }
+    fn end(&self) -> Option<usize> {
+        None
     }
 }
 
@@ -512,49 +561,49 @@ mod tests {
     #[test]
     fn len_bytes_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(7, 98);
+        let s = r.slice(7..98);
         assert_eq!(s.len_bytes(), 105);
     }
 
     #[test]
     fn len_bytes_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
         assert_eq!(s.len_bytes(), 0);
     }
 
     #[test]
     fn len_chars_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(7, 98);
+        let s = r.slice(7..98);
         assert_eq!(s.len_chars(), 91);
     }
 
     #[test]
     fn len_chars_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
         assert_eq!(s.len_chars(), 0);
     }
 
     #[test]
     fn len_lines_01() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 98);
+        let s = r.slice(34..98);
         assert_eq!(s.len_lines(), 3);
     }
 
     #[test]
     fn len_lines_02() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
         assert_eq!(s.len_lines(), 1);
     }
 
     #[test]
     fn char_to_line_01() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 96);
+        let s = r.slice(34..96);
 
         // 's a fine day, isn't it?\nAren't you glad \
         // we're alive?\nこんにちは、みん
@@ -576,7 +625,7 @@ mod tests {
     #[test]
     fn char_to_line_02() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
 
         assert_eq!(1, s.char_to_line(0));
     }
@@ -585,7 +634,7 @@ mod tests {
     #[should_panic]
     fn char_to_line_03() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 96);
+        let s = r.slice(34..96);
 
         s.char_to_line(63);
     }
@@ -593,7 +642,7 @@ mod tests {
     #[test]
     fn line_to_char_01() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 96);
+        let s = r.slice(34..96);
 
         assert_eq!(0, s.line_to_char(0));
         assert_eq!(25, s.line_to_char(1));
@@ -604,7 +653,7 @@ mod tests {
     #[test]
     fn line_to_char_02() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
 
         assert_eq!(0, s.line_to_char(0));
         assert_eq!(0, s.line_to_char(1));
@@ -614,7 +663,7 @@ mod tests {
     #[should_panic]
     fn line_to_char_03() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 96);
+        let s = r.slice(34..96);
 
         s.line_to_char(4);
     }
@@ -622,7 +671,7 @@ mod tests {
     #[test]
     fn char_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(34, 100);
+        let s = r.slice(34..100);
 
         // t's \
         // a fine day, isn't it?  Aren't you glad \
@@ -638,7 +687,7 @@ mod tests {
     #[should_panic]
     fn char_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(34, 100);
+        let s = r.slice(34..100);
         s.char(66);
     }
 
@@ -646,14 +695,14 @@ mod tests {
     #[should_panic]
     fn char_03() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
         s.char(0);
     }
 
     #[test]
     fn line_01() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 96);
+        let s = r.slice(34..96);
         // "'s a fine day, isn't it?\nAren't you glad \
         //  we're alive?\nこんにちは、みん"
 
@@ -665,7 +714,7 @@ mod tests {
     #[test]
     fn line_02() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 59);
+        let s = r.slice(34..59);
         // "'s a fine day, isn't it?\n"
 
         assert_eq!(s.line(0), "'s a fine day, isn't it?\n");
@@ -675,7 +724,7 @@ mod tests {
     #[test]
     fn line_03() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
 
         assert_eq!(s.line(0), "");
     }
@@ -684,7 +733,7 @@ mod tests {
     #[should_panic]
     fn line_04() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34, 96);
+        let s = r.slice(34..96);
         s.line(3);
     }
 
@@ -694,7 +743,7 @@ mod tests {
             "Hello there!\r\nHow're you doing?\r\n\
              It's a fine day,\r\nisn't it?",
         );
-        let s = r.slice(13, 50);
+        let s = r.slice(13..50);
         // "\nHow're you doing?\r\n\
         //  It's a fine day,\r"
 
@@ -714,7 +763,7 @@ mod tests {
             "Hello there!\r\nHow're you doing?\r\n\
              It's a fine day,\r\nisn't it?",
         );
-        let s = r.slice(13, 50);
+        let s = r.slice(13..50);
         // "\nHow're you doing?\r\n\
         //  It's a fine day,\r"
 
@@ -727,7 +776,7 @@ mod tests {
             "Hello there!\r\nHow're you doing?\r\n\
              It's a fine day,\r\nisn't it?",
         );
-        let s = r.slice(13, 50);
+        let s = r.slice(13..50);
         // "\nHow're you doing?\r\n\
         //  It's a fine day,\r"
 
@@ -747,7 +796,7 @@ mod tests {
             "Hello there!\r\nHow're you doing?\r\n\
              It's a fine day,\r\nisn't it?",
         );
-        let s = r.slice(13, 50);
+        let s = r.slice(13..50);
         // "\nHow're you doing?\r\n\
         //  It's a fine day,\r"
 
@@ -760,7 +809,7 @@ mod tests {
             "Hello there!\r\nHow're you doing?\r\n\
              It's a fine day,\r\nisn't it?",
         );
-        let s = r.slice(13, 50);
+        let s = r.slice(13..50);
         // "\nHow're you doing?\r\n\
         //  It's a fine day,\r"
 
@@ -780,7 +829,7 @@ mod tests {
             "Hello there!\r\nHow're you doing?\r\n\
              It's a fine day,\r\nisn't it?",
         );
-        let s = r.slice(13, 50);
+        let s = r.slice(13..50);
         // "\nHow're you doing?\r\n\
         //  It's a fine day,\r"
 
@@ -790,9 +839,9 @@ mod tests {
     #[test]
     fn slice_01() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(0, r.len_chars());
+        let s1 = r.slice(..);
 
-        let s2 = s1.slice(0, s1.len_chars());
+        let s2 = s1.slice(..);
 
         assert_eq!(TEXT, s2);
     }
@@ -800,9 +849,9 @@ mod tests {
     #[test]
     fn slice_02() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(5, 43);
+        let s1 = r.slice(5..43);
 
-        let s2 = s1.slice(3, 25);
+        let s2 = s1.slice(3..25);
 
         assert_eq!(&TEXT[8..30], s2);
     }
@@ -810,9 +859,9 @@ mod tests {
     #[test]
     fn slice_03() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(31, 97);
+        let s1 = r.slice(31..97);
 
-        let s2 = s1.slice(7, 64);
+        let s2 = s1.slice(7..64);
 
         assert_eq!(&TEXT[38..103], s2);
     }
@@ -820,9 +869,9 @@ mod tests {
     #[test]
     fn slice_04() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(5, 43);
+        let s1 = r.slice(5..43);
 
-        let s2 = s1.slice(21, 21);
+        let s2 = s1.slice(21..21);
 
         assert_eq!("", s2);
     }
@@ -831,24 +880,24 @@ mod tests {
     #[should_panic]
     fn slice_05() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5, 43);
+        let s = r.slice(5..43);
 
-        s.slice(21, 20);
+        s.slice(21..20);
     }
 
     #[test]
     #[should_panic]
     fn slice_06() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5, 43);
+        let s = r.slice(5..43);
 
-        s.slice(37, 39);
+        s.slice(37..39);
     }
 
     #[test]
     fn eq_str_01() {
         let r = Rope::from_str(TEXT);
-        let slice = r.to_slice();
+        let slice = r.slice(..);
 
         assert_eq!(slice, TEXT);
         assert_eq!(TEXT, slice);
@@ -857,7 +906,7 @@ mod tests {
     #[test]
     fn eq_str_02() {
         let r = Rope::from_str(TEXT);
-        let slice = r.slice(0, 20);
+        let slice = r.slice(0..20);
 
         assert_ne!(slice, TEXT);
         assert_ne!(TEXT, slice);
@@ -866,9 +915,9 @@ mod tests {
     #[test]
     fn eq_str_03() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(20, 21);
+        r.remove(20..21);
         r.insert(20, "z");
-        let slice = r.to_slice();
+        let slice = r.slice(..);
 
         assert_ne!(slice, TEXT);
         assert_ne!(TEXT, slice);
@@ -877,7 +926,7 @@ mod tests {
     #[test]
     fn eq_str_04() {
         let r = Rope::from_str(TEXT);
-        let slice = r.to_slice();
+        let slice = r.slice(..);
         let s: String = TEXT.into();
 
         assert_eq!(slice, s);
@@ -887,7 +936,7 @@ mod tests {
     #[test]
     fn eq_rope_slice_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(43, 43);
+        let s = r.slice(43..43);
 
         assert_eq!(s, s);
     }
@@ -895,8 +944,8 @@ mod tests {
     #[test]
     fn eq_rope_slice_02() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(43, 97);
-        let s2 = r.slice(43, 97);
+        let s1 = r.slice(43..97);
+        let s2 = r.slice(43..97);
 
         assert_eq!(s1, s2);
     }
@@ -904,8 +953,8 @@ mod tests {
     #[test]
     fn eq_rope_slice_03() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(43, 43);
-        let s2 = r.slice(43, 45);
+        let s1 = r.slice(43..43);
+        let s2 = r.slice(43..45);
 
         assert_ne!(s1, s2);
     }
@@ -913,8 +962,8 @@ mod tests {
     #[test]
     fn eq_rope_slice_04() {
         let r = Rope::from_str(TEXT);
-        let s1 = r.slice(43, 45);
-        let s2 = r.slice(43, 43);
+        let s1 = r.slice(43..45);
+        let s2 = r.slice(43..43);
 
         assert_ne!(s1, s2);
     }
@@ -922,7 +971,7 @@ mod tests {
     #[test]
     fn eq_rope_slice_05() {
         let r = Rope::from_str("");
-        let s = r.slice(0, 0);
+        let s = r.slice(0..0);
 
         assert_eq!(s, s);
     }
@@ -930,7 +979,7 @@ mod tests {
     #[test]
     fn to_rope_01() {
         let r1 = Rope::from_str(TEXT);
-        let s = r1.to_slice();
+        let s = r1.slice(..);
         let r2 = s.to_rope();
 
         assert_eq!(r1, r2);
@@ -940,7 +989,7 @@ mod tests {
     #[test]
     fn to_rope_02() {
         let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(0, 24);
+        let s = r1.slice(0..24);
         let r2 = s.to_rope();
 
         assert_eq!(s, r2);
@@ -949,7 +998,7 @@ mod tests {
     #[test]
     fn to_rope_03() {
         let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(13, 89);
+        let s = r1.slice(13..89);
         let r2 = s.to_rope();
 
         assert_eq!(s, r2);
@@ -958,7 +1007,7 @@ mod tests {
     #[test]
     fn to_rope_04() {
         let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(13, 41);
+        let s = r1.slice(13..41);
         let r2 = s.to_rope();
 
         assert_eq!(s, r2);
