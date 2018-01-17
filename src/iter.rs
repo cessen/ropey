@@ -252,8 +252,10 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Lines<'a, S> {
 /// 1. They are in-order, non-overlapping, and complete (i.e. the entire
 ///    text is iterated over in order).
 /// 2. Grapheme clusters are _never_ split between chunks.  (Grapheme
-///    clusters in this case are defined as the extended grapheme
-///    clusters in [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/))
+///    clusters in this case are defined by whatever
+///    [grapheme segmenter](../segmentation/index.html) is used.  By default,
+///    they are the extended grapheme clusters in
+///    [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/))
 ///
 /// There are no other API guarantees.  For example, chunks can
 /// theoretically be of any size (including empty), line breaks and chunk
