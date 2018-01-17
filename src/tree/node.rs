@@ -434,15 +434,6 @@ impl<S: GraphemeSegmenter> Node<S> {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
 
-                // Shortcuts
-                if byte_idx == 0 {
-                    return 0;
-                } else if byte_idx
-                    == acc_info.bytes as usize + children.info()[child_i].bytes as usize
-                {
-                    return acc_info.chars as usize + children.info()[child_i].chars as usize;
-                }
-
                 acc_info.chars as usize
                     + children.nodes()[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
             }
@@ -456,16 +447,6 @@ impl<S: GraphemeSegmenter> Node<S> {
             Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
-
-                // Shortcuts
-                if byte_idx == 0 {
-                    return 0;
-                } else if byte_idx
-                    == acc_info.bytes as usize + children.info()[child_i].bytes as usize
-                {
-                    return acc_info.line_breaks as usize
-                        + children.info()[child_i].line_breaks as usize;
-                }
 
                 acc_info.line_breaks as usize
                     + children.nodes()[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
@@ -481,15 +462,6 @@ impl<S: GraphemeSegmenter> Node<S> {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| char_idx as Count <= inf.chars);
 
-                // Shortcuts
-                if char_idx == 0 {
-                    return 0;
-                } else if char_idx
-                    == acc_info.chars as usize + children.info()[child_i].chars as usize
-                {
-                    return acc_info.bytes as usize + children.info()[child_i].bytes as usize;
-                }
-
                 acc_info.bytes as usize
                     + children.nodes()[child_i].char_to_byte(char_idx - acc_info.chars as usize)
             }
@@ -503,16 +475,6 @@ impl<S: GraphemeSegmenter> Node<S> {
             Node::Internal(ref children) => {
                 let (child_i, acc_info) =
                     children.search_combine_info(|inf| char_idx as Count <= inf.chars);
-
-                // Shortcuts
-                if char_idx == 0 {
-                    return 0;
-                } else if char_idx
-                    == acc_info.chars as usize + children.info()[child_i].chars as usize
-                {
-                    return acc_info.line_breaks as usize
-                        + children.info()[child_i].line_breaks as usize;
-                }
 
                 acc_info.line_breaks as usize
                     + children.nodes()[child_i].char_to_line(char_idx - acc_info.chars as usize)
