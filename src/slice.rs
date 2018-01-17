@@ -3,9 +3,10 @@ use std::sync::Arc;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
-use segmentation::{DefaultSegmenter, GraphemeSegmenter};
-use tree::{Count, Node};
 use rope::Rope;
+use segmentation::{DefaultSegmenter, GraphemeSegmenter};
+use str_utils::char_idx_to_byte_idx;
+use tree::{Count, Node};
 
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
@@ -153,8 +154,10 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
             self.len_chars()
         );
 
-        // TODO: make this more efficient.
-        self.slice(char_idx..(char_idx + 1)).chars().nth(0).unwrap()
+        let (chunk, offset) = self.node
+            .get_chunk_at_char(char_idx + self.start_char as usize);
+        let byte_idx = char_idx_to_byte_idx(chunk, offset);
+        chunk[byte_idx..].chars().nth(0).unwrap()
     }
 
     /// Returns the line at `line_idx`.
