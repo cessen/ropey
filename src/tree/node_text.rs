@@ -155,9 +155,8 @@ impl<S: GraphemeSegmenter> NodeText<S> {
         debug_assert!(start <= end);
         debug_assert!(end <= count_chars(self));
 
-        // TODO: get both of these in a single pass
         let byte_start = char_idx_to_byte_idx(self, start);
-        let byte_end = char_idx_to_byte_idx(self, end);
+        let byte_end = char_idx_to_byte_idx(&self[start..], end - start);
 
         unsafe { self.remove_bytes(byte_start, byte_end) }
         self.inline_if_possible();
