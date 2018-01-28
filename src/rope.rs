@@ -439,6 +439,19 @@ impl<S: GraphemeSegmenter> Rope<S> {
         }
     }
 
+    /// Inserts a single char `ch` at char index `char_idx`.
+    ///
+    /// Runs in O(log N) time, where N is the length of the `Rope`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
+    pub fn insert_char(&mut self, char_idx: usize, ch: char) {
+        let mut buf = [0u8; 4];
+        self.insert(char_idx, ch.encode_utf8(&mut buf));
+    }
+
     /// Removes the text in the given char index range.
     ///
     /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
@@ -1290,6 +1303,46 @@ mod tests {
         r.insert(11, "！");
         r.insert(7, "zopter");
         assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_char_01() {
+        let mut r = Rope::from_str(TEXT);
+        r.insert_char(3, 'A');
+        r.insert_char(12, '!');
+        r.insert_char(12, '!');
+
+        assert_eq!(
+            r,
+            "HelAlo there!!!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_char_02() {
+        let mut r = Rope::new();
+
+        r.insert_char(0, '！');
+        r.insert_char(0, 'こ');
+        r.insert_char(1, 'ん');
+        r.insert_char(2, 'い');
+        r.insert_char(3, 'ち');
+        r.insert_char(4, 'は');
+        r.insert_char(5, '、');
+        r.insert_char(6, 'み');
+        r.insert_char(7, 'ん');
+        r.insert_char(8, 'な');
+        r.insert_char(9, 'さ');
+        r.insert_char(10, 'ん');
+        assert_eq!("こんいちは、みんなさん！", r);
 
         r.assert_integrity();
         r.assert_invariants();
