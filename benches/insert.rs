@@ -11,6 +11,39 @@ const TEXT: &str = include_str!("large.txt");
 
 //----
 
+fn inserts_random_char(bench: &mut Bencher) {
+    let mut rope = Rope::from_str(TEXT);
+    bench.iter(|| {
+        let len = rope.len_chars();
+        rope.insert_char(random::<usize>() % len, 'a');
+    })
+}
+
+fn inserts_start_char(bench: &mut Bencher) {
+    let mut rope = Rope::from_str(TEXT);
+    bench.iter(|| {
+        rope.insert_char(0, 'a');
+    })
+}
+
+fn inserts_middle_char(bench: &mut Bencher) {
+    let mut rope = Rope::from_str(TEXT);
+    bench.iter(|| {
+        let len = rope.len_chars();
+        rope.insert_char(len / 2, 'a');
+    })
+}
+
+fn inserts_end_char(bench: &mut Bencher) {
+    let mut rope = Rope::from_str(TEXT);
+    bench.iter(|| {
+        let len = rope.len_chars();
+        rope.insert_char(len, 'a');
+    })
+}
+
+//----
+
 fn inserts_random_small(bench: &mut Bencher) {
     let mut rope = Rope::from_str(TEXT);
     bench.iter(|| {
@@ -114,6 +147,10 @@ fn inserts_end_large(bench: &mut Bencher) {
 
 benchmark_group!(
     benches,
+    inserts_random_char,
+    inserts_start_char,
+    inserts_middle_char,
+    inserts_end_char,
     inserts_random_small,
     inserts_start_small,
     inserts_middle_small,
