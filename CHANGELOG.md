@@ -1,3 +1,14 @@
+# 0.6.3 (2018-01-28)
+
+Features:
+
+* Added a new `Rope::insert_char()` convenience method for inserting a single Unicode scalar value.
+
+Documentation:
+
+* Updated the Chunks iterator docs to accurately reflect the new segmentation API in 0.6.x.
+
+
 # 0.6.2 (2018-01-11)
 
 Fixes:
