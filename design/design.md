@@ -144,7 +144,7 @@ The invariants of the tree that must hold true for the tree to operate correctly
     - Internal nodes must have at least `MIN_CHILDREN` and at most `MAX_CHILDREN`, except for the root which can have as few as two children.
 - All child meta-data must be accurate.
 - Leaf nodes must never be empty, except for the root node when it is a leaf.
-- The constituent code points in a grapheme cluster must never be separated by a leaf node boundary.  For example, if '\r' and '\n' are next to each other but split by a leaf boundary, the code for counting line endings won't work properly.  And more generally the methods for iterating over graphemes won't work correctly if any graphemes are split.
+- CRLF pairs must never be split by a leaf node boundary.  Otherwise the code for counting line endings won't work properly.
 
 There are some hidden-from-documentation methods on `Rope` that check for and assert these invariants:
 
@@ -160,7 +160,7 @@ There is one final "invariant" that should _generally_ hold true, but doesn't st
 There are two cases where this invariant might not hold true:
 
 1. When the root node is a leaf, it may contain less than `MIN_BYTES` of text.
-2. If the text contains a contiguous grapheme that is larger than `MAX_BYTES`, then the leaf node that contains it must exceed `MAX_BYTES` to avoid splitting it.
+2. If the text begins or ends with a CRLF pair that just pushed it over the edge in specific circumstances, then the leaf node that contains it must exceed `MAX_BYTES` to avoid splitting it.  This should be extremely rare.
 
 In practice, case 2 is vanishingly unlikely to ever happen in real (and non-broken) text.  Nevertheless, it needs to be handled correctly by all code.
 

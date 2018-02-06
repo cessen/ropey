@@ -70,14 +70,6 @@ atomic unit of text.  Indexing and edits are all done in terms of Unicode
 scalar values, making the APIs intuitive and making it impossible to
 accidentally create invalid utf8 data.
 
-Ropey also ensures that [grapheme clusters](https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
-are never split in its internal representation, and thus can always be
-accessed as `&str` slices.  This is particularly helpful when printing text
-to screen because consuming code doesn't have to worry about finding split
-graphemes that should be printed as single visual characters. Moreover, Ropey
-provides APIs for iterating over graphemes and querying about grapheme
-boundaries.
-
 
 ### Line-aware
 

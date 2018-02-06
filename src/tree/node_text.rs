@@ -65,9 +65,9 @@ impl NodeText {
     /// Inserts a `&str` and splits the resulting string in half, returning
     /// the right half.
     ///
-    /// Only splits on grapheme boundaries, so if the whole string is a
-    /// single grapheme, the split will fail and the returned string
-    /// will be empty.
+    /// Only splits on code point boundaries and will never split CRLF pairs,
+    /// grapheme boundaries, so if the whole string is a single code point or
+    /// CRLF pair, the split will fail and the returned string will be empty.
     ///
     /// TODO: make this work without allocations when possible.
     pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
@@ -92,9 +92,9 @@ impl NodeText {
     /// Appends a `&str` and splits the resulting string in half, returning
     /// the right half.
     ///
-    /// Only splits on grapheme boundaries, so if the whole string is a
-    /// single grapheme, the split will fail and the returned string
-    /// will be empty.
+    /// Only splits on code point boundaries and will never split CRLF pairs,
+    /// grapheme boundaries, so if the whole string is a single code point or
+    /// CRLF pair, the split will fail and the returned string will be empty.
     ///
     /// TODO: make this work without allocations when possible.
     pub fn push_str_split(&mut self, string: &str) -> Self {

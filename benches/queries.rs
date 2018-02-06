@@ -47,32 +47,6 @@ fn get_line(bench: &mut Bencher) {
 
 //----
 
-fn is_grapheme_boundary(bench: &mut Bencher) {
-    let rope = Rope::from_str(TEXT);
-    let len = rope.len_chars();
-    bench.iter(|| {
-        rope.is_grapheme_boundary(random::<usize>() % (len + 1));
-    })
-}
-
-fn prev_grapheme_boundary(bench: &mut Bencher) {
-    let rope = Rope::from_str(TEXT);
-    let len = rope.len_chars();
-    bench.iter(|| {
-        rope.prev_grapheme_boundary(random::<usize>() % (len + 1));
-    })
-}
-
-fn next_grapheme_boundary(bench: &mut Bencher) {
-    let rope = Rope::from_str(TEXT);
-    let len = rope.len_chars();
-    bench.iter(|| {
-        rope.next_grapheme_boundary(random::<usize>() % (len + 1));
-    })
-}
-
-//----
-
 fn slice(bench: &mut Bencher) {
     let rope = Rope::from_str(TEXT);
     let len = rope.len_chars();
@@ -94,9 +68,6 @@ benchmark_group!(
     line_to_char,
     get_char,
     get_line,
-    is_grapheme_boundary,
-    prev_grapheme_boundary,
-    next_grapheme_boundary,
     slice
 );
 benchmark_main!(benches);
