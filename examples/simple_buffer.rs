@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io;
 
 use ropey::{Rope, RopeSlice};
-use ropey::iter::{Bytes, Chars, Chunks, Graphemes, Lines};
+use ropey::iter::{Bytes, Chars, Chunks, Lines};
 
 struct TextBuffer {
     text: Rope,
@@ -34,10 +34,6 @@ impl TextBuffer {
 
     fn chars<'a>(&'a self) -> Chars<'a> {
         self.text.chars()
-    }
-
-    fn graphemes<'a>(&'a self) -> Graphemes<'a> {
-        self.text.graphemes()
     }
 
     fn lines<'a>(&'a self) -> Lines<'a> {

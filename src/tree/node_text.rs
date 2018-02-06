@@ -4,29 +4,26 @@ use std::borrow::Borrow;
 use std::ops::Deref;
 use std::ptr;
 use std::str;
-use std::marker::PhantomData;
 
+use crlf;
 use smallvec::{Array, SmallVec};
 use str_utils::{char_idx_to_byte_idx, count_chars};
-use segmentation::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::MAX_BYTES;
 
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
 /// length.  Has a bunch of methods on it that are useful for the rope
 /// tree.
 #[derive(Clone, Default)]
-pub(crate) struct NodeText<S: GraphemeSegmenter> {
+pub(crate) struct NodeText {
     buffer: SmallVec<BackingArray>,
-    _seg: PhantomData<S>,
 }
 
-impl<S: GraphemeSegmenter> NodeText<S> {
+impl NodeText {
     /// Creates a new empty `NodeText`
     #[inline(always)]
     pub fn new() -> Self {
         NodeText {
             buffer: SmallVec::new(),
-            _seg: PhantomData,
         }
     }
 
@@ -36,7 +33,6 @@ impl<S: GraphemeSegmenter> NodeText<S> {
     pub fn with_capacity(capacity: usize) -> Self {
         NodeText {
             buffer: SmallVec::with_capacity(capacity),
-            _seg: PhantomData,
         }
     }
 
@@ -79,7 +75,7 @@ impl<S: GraphemeSegmenter> NodeText<S> {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            CRLFSegmenter::<S>::nearest_internal_break(pos, self)
+            crlf::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -106,7 +102,7 @@ impl<S: GraphemeSegmenter> NodeText<S> {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            CRLFSegmenter::<S>::nearest_internal_break(pos, self)
+            crlf::nearest_internal_break(pos, self)
         };
 
         self.split_off(split_pos)
@@ -258,44 +254,44 @@ impl<S: GraphemeSegmenter> NodeText<S> {
     }
 }
 
-impl<S: GraphemeSegmenter> std::cmp::PartialEq for NodeText<S> {
+impl std::cmp::PartialEq for NodeText {
     fn eq(&self, other: &Self) -> bool {
         let (s1, s2): (&str, &str) = (self, other);
         s1 == s2
     }
 }
 
-impl<'a, S: GraphemeSegmenter> PartialEq<NodeText<S>> for &'a str {
-    fn eq(&self, other: &NodeText<S>) -> bool {
+impl<'a> PartialEq<NodeText> for &'a str {
+    fn eq(&self, other: &NodeText) -> bool {
         *self == (other as &str)
     }
 }
 
-impl<'a, S: GraphemeSegmenter> PartialEq<&'a str> for NodeText<S> {
+impl<'a> PartialEq<&'a str> for NodeText {
     fn eq(&self, other: &&'a str) -> bool {
         (self as &str) == *other
     }
 }
 
-impl<S: GraphemeSegmenter> std::fmt::Display for NodeText<S> {
+impl std::fmt::Display for NodeText {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl<S: GraphemeSegmenter> std::fmt::Debug for NodeText<S> {
+impl std::fmt::Debug for NodeText {
     fn fmt(&self, fm: &mut std::fmt::Formatter) -> std::fmt::Result {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl<'a, S: GraphemeSegmenter> From<&'a str> for NodeText<S> {
+impl<'a> From<&'a str> for NodeText {
     fn from(s: &str) -> Self {
         Self::from_str(s)
     }
 }
 
-impl<S: GraphemeSegmenter> Deref for NodeText<S> {
+impl Deref for NodeText {
     type Target = str;
 
     fn deref(&self) -> &str {
@@ -305,7 +301,7 @@ impl<S: GraphemeSegmenter> Deref for NodeText<S> {
     }
 }
 
-impl<S: GraphemeSegmenter> AsRef<str> for NodeText<S> {
+impl AsRef<str> for NodeText {
     fn as_ref(&self) -> &str {
         // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
@@ -313,7 +309,7 @@ impl<S: GraphemeSegmenter> AsRef<str> for NodeText<S> {
     }
 }
 
-impl<S: GraphemeSegmenter> Borrow<str> for NodeText<S> {
+impl Borrow<str> for NodeText {
     fn borrow(&self) -> &str {
         // NodeText's methods don't allow `buffer` to become invalid utf8,
         // so this is safe.
@@ -327,15 +323,15 @@ impl<S: GraphemeSegmenter> Borrow<str> for NodeText<S> {
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
 /// is one big grapheme.
-pub(crate) fn fix_segment_seam<S: GraphemeSegmenter>(l: &mut NodeText<S>, r: &mut NodeText<S>) {
+pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
     // Early out, if there's nothing to do.
-    if CRLFSegmenter::<S>::seam_is_break_checked(l, r) {
+    if crlf::seam_is_break_checked(l, r) {
         return;
     }
 
     // Find the nearest breaks around the seam.
-    let l_split = CRLFSegmenter::<S>::prev_break(l.len(), l);
-    let r_split = l.len() + CRLFSegmenter::<S>::next_break(0, r);
+    let l_split = crlf::prev_break(l.len(), l);
+    let r_split = l.len() + crlf::next_break(0, r);
 
     // Find the new split position, if any.
     let new_split_pos = {
@@ -381,11 +377,10 @@ unsafe impl Array for BackingArray {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use segmentation::DefaultSegmenter;
 
     #[test]
     fn remove_bytes_01() {
-        let mut s = NodeText::<DefaultSegmenter>::new();
+        let mut s = NodeText::new();
         s.push_str("Hello there, everyone!  How's it going?");
         unsafe {
             s.remove_bytes(11, 21);

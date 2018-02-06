@@ -9,34 +9,26 @@
 use std::str;
 use std::sync::Arc;
 
-use segmentation::{DefaultSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::Node;
 use slice::RopeSlice;
 
 //==========================================================
 
 /// An iterator over a `Rope`'s bytes.
-pub struct Bytes<'a, S = DefaultSegmenter>
-where
-    S: 'a + GraphemeSegmenter,
-{
-    chunk_iter: Chunks<'a, S>,
+pub struct Bytes<'a> {
+    chunk_iter: Chunks<'a>,
     cur_chunk: str::Bytes<'a>,
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Bytes<'a, S> {
-    pub(crate) fn new(node: &Arc<Node<S>>) -> Bytes<S> {
+impl<'a> Bytes<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Bytes {
         Bytes {
             chunk_iter: Chunks::new(node),
             cur_chunk: "".bytes(),
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node<S>>,
-        start_char: usize,
-        end_char: usize,
-    ) -> Bytes<S> {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
         Bytes {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".bytes(),
@@ -44,7 +36,7 @@ impl<'a, S: 'a + GraphemeSegmenter> Bytes<'a, S> {
     }
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Iterator for Bytes<'a, S> {
+impl<'a> Iterator for Bytes<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<u8> {
@@ -64,27 +56,20 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Bytes<'a, S> {
 //==========================================================
 
 /// An iterator over a `Rope`'s chars.
-pub struct Chars<'a, S = DefaultSegmenter>
-where
-    S: 'a + GraphemeSegmenter,
-{
-    chunk_iter: Chunks<'a, S>,
+pub struct Chars<'a> {
+    chunk_iter: Chunks<'a>,
     cur_chunk: str::Chars<'a>,
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Chars<'a, S> {
-    pub(crate) fn new(node: &Arc<Node<S>>) -> Chars<S> {
+impl<'a> Chars<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Chars {
         Chars {
             chunk_iter: Chunks::new(node),
             cur_chunk: "".chars(),
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node<S>>,
-        start_char: usize,
-        end_char: usize,
-    ) -> Chars<S> {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
         Chars {
             chunk_iter: Chunks::new_with_range(node, start_char, end_char),
             cur_chunk: "".chars(),
@@ -92,7 +77,7 @@ impl<'a, S: 'a + GraphemeSegmenter> Chars<'a, S> {
     }
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chars<'a, S> {
+impl<'a> Iterator for Chars<'a> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
@@ -111,78 +96,21 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chars<'a, S> {
 
 //==========================================================
 
-/// An iterator over a `Rope`'s grapheme clusters.
-///
-/// The grapheme clusters returned are based on the `Rope`'s [grapheme segmenter](segmentation/index.html),
-/// which by default is [`DefaultSegmenter`](segmentation/struct.DefaultSegmenter.html).
-pub struct Graphemes<'a, S = DefaultSegmenter>
-where
-    S: 'a + GraphemeSegmenter,
-{
-    chunk_iter: Chunks<'a, S>,
-    cur_chunk: &'a str,
-}
-
-impl<'a, S: 'a + GraphemeSegmenter> Graphemes<'a, S> {
-    pub(crate) fn new(node: &Arc<Node<S>>) -> Graphemes<S> {
-        Graphemes {
-            chunk_iter: Chunks::new(node),
-            cur_chunk: "",
-        }
-    }
-
-    pub(crate) fn new_with_range(
-        node: &Arc<Node<S>>,
-        start_char: usize,
-        end_char: usize,
-    ) -> Graphemes<S> {
-        Graphemes {
-            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
-            cur_chunk: "",
-        }
-    }
-}
-
-impl<'a, S: 'a + GraphemeSegmenter> Iterator for Graphemes<'a, S> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<&'a str> {
-        loop {
-            if !self.cur_chunk.is_empty() {
-                let next_idx = S::next_break(0, self.cur_chunk);
-                let g = &self.cur_chunk[..next_idx];
-                self.cur_chunk = &self.cur_chunk[next_idx..];
-                return Some(g);
-            } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = chunk;
-                continue;
-            } else {
-                return None;
-            }
-        }
-    }
-}
-
-//==========================================================
-
 /// An iterator over a `Rope`'s lines.
 ///
 /// The returned lines include the line-break at the end.
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
-pub struct Lines<'a, S = DefaultSegmenter>
-where
-    S: 'a + GraphemeSegmenter,
-{
-    node: &'a Arc<Node<S>>,
+pub struct Lines<'a> {
+    node: &'a Arc<Node>,
     start_char: usize,
     end_char: usize,
     line_idx: usize,
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Lines<'a, S> {
-    pub(crate) fn new(node: &Arc<Node<S>>) -> Lines<S> {
+impl<'a> Lines<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Lines {
         Lines {
             node: node,
             start_char: 0,
@@ -191,11 +119,7 @@ impl<'a, S: 'a + GraphemeSegmenter> Lines<'a, S> {
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node<S>>,
-        start_char: usize,
-        end_char: usize,
-    ) -> Lines<S> {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Lines {
         Lines {
             node: node,
             start_char: start_char,
@@ -205,10 +129,10 @@ impl<'a, S: 'a + GraphemeSegmenter> Lines<'a, S> {
     }
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Iterator for Lines<'a, S> {
-    type Item = RopeSlice<'a, S>;
+impl<'a> Iterator for Lines<'a> {
+    type Item = RopeSlice<'a>;
 
-    fn next(&mut self) -> Option<RopeSlice<'a, S>> {
+    fn next(&mut self) -> Option<RopeSlice<'a>> {
         if self.line_idx > self.node.line_break_count() {
             return None;
         } else {
@@ -247,34 +171,21 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Lines<'a, S> {
 ///   incrementally as you go.
 /// - Writing custom iterators over a rope's text data.
 ///
-/// There are only two API guarantees about the chunks this iterator yields:
-///
-/// 1. They are in-order, non-overlapping, and complete (i.e. the entire
-///    text is iterated over in order).
-/// 2. Grapheme clusters are _never_ split between chunks.  (Grapheme
-///    clusters in this case are defined by whatever
-///    [grapheme segmenter](../segmentation/index.html) is used.  By default,
-///    they are the extended grapheme clusters in
-///    [Unicode Standard Annex #29](https://www.unicode.org/reports/tr29/))
-///
-/// There are no other API guarantees.  For example, chunks can
-/// theoretically be of any size (including empty), line breaks and chunk
-/// boundaries have no guaranteed relationship, etc.
+/// There are no guarantees about the size of yielded chunks, or where they
+/// are split.  For example, they may be zero-sized, they don't necessarily
+/// align with line breaks, etc.
 ///
 /// The converse of this API is [`RopeBuilder`](../struct.RopeBuilder.html),
 /// which is useful for efficiently streaming text data _into_ a rope.
-pub struct Chunks<'a, S = DefaultSegmenter>
-where
-    S: 'a + GraphemeSegmenter,
-{
-    node_stack: Vec<&'a Arc<Node<S>>>,
+pub struct Chunks<'a> {
+    node_stack: Vec<&'a Arc<Node>>,
     start: usize,
     end: usize,
     idx: usize,
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Chunks<'a, S> {
-    pub(crate) fn new(node: &Arc<Node<S>>) -> Chunks<S> {
+impl<'a> Chunks<'a> {
+    pub(crate) fn new(node: &Arc<Node>) -> Chunks {
         Chunks {
             node_stack: vec![node],
             start: 0,
@@ -283,11 +194,7 @@ impl<'a, S: 'a + GraphemeSegmenter> Chunks<'a, S> {
         }
     }
 
-    pub(crate) fn new_with_range(
-        node: &Arc<Node<S>>,
-        start_char: usize,
-        end_char: usize,
-    ) -> Chunks<S> {
+    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
         Chunks {
             node_stack: vec![node],
             start: node.char_to_byte(start_char),
@@ -297,7 +204,7 @@ impl<'a, S: 'a + GraphemeSegmenter> Chunks<'a, S> {
     }
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chunks<'a, S> {
+impl<'a> Iterator for Chunks<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<&'a str> {
@@ -352,7 +259,6 @@ impl<'a, S: 'a + GraphemeSegmenter> Iterator for Chunks<'a, S> {
 
 #[cfg(test)]
 mod tests {
-    use unicode_segmentation::UnicodeSegmentation;
     use Rope;
 
     const TEXT: &str = "\r\n\
@@ -439,16 +345,6 @@ mod tests {
     }
 
     #[test]
-    fn graphemes_01() {
-        let r = Rope::from_str(TEXT);
-        for (gr, gt) in r.graphemes()
-            .zip(UnicodeSegmentation::graphemes(TEXT, true))
-        {
-            assert_eq!(gr, gt);
-        }
-    }
-
-    #[test]
     fn lines_01() {
         let r = Rope::from_str(TEXT);
 
@@ -530,38 +426,6 @@ mod tests {
 
         for (cr, ct) in s1.chars().zip(s2.chars()) {
             assert_eq!(cr, ct);
-        }
-    }
-
-    #[test]
-    fn graphemes_sliced_01() {
-        let r = Rope::from_str(TEXT);
-
-        let s_start = 116;
-        let s_end = 331;
-        let s_start_byte = r.char_to_byte(s_start);
-        let s_end_byte = r.char_to_byte(s_end);
-
-        let s1 = r.slice(s_start..s_end);
-        let s2 = &TEXT[s_start_byte..s_end_byte];
-
-        for (gr, gt) in s1.graphemes().zip(UnicodeSegmentation::graphemes(s2, true)) {
-            assert_eq!(gr, gt);
-        }
-    }
-
-    #[test]
-    fn graphemes_sliced_02() {
-        let text = "\r\n\r\n\r\n\r\n\r\n\r\n\r\n";
-        let r = Rope::from_str(text);
-
-        let s1 = r.slice(5..11);
-        let s2 = &text[5..11];
-
-        assert_eq!(4, s1.graphemes().count());
-
-        for (gr, gt) in s1.graphemes().zip(UnicodeSegmentation::graphemes(s2, true)) {
-            assert_eq!(gr, gt);
         }
     }
 

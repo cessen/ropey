@@ -2,19 +2,18 @@ use std;
 use std::sync::Arc;
 
 use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
-                char_idx_to_line_idx, count_chars, line_idx_to_byte_idx, line_idx_to_char_idx};
+                char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx};
 use tree::{Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES,
            MIN_CHILDREN};
 use tree::node_text::fix_segment_seam;
-use segmentation::{GraphemeSegmenter, SegmenterUtils};
 
 #[derive(Debug, Clone)]
-pub(crate) enum Node<S: GraphemeSegmenter> {
-    Leaf(NodeText<S>),
-    Internal(NodeChildren<S>),
+pub(crate) enum Node {
+    Leaf(NodeText),
+    Internal(NodeChildren),
 }
 
-impl<S: GraphemeSegmenter> Node<S> {
+impl Node {
     /// Creates an empty node.
     pub fn new() -> Self {
         Node::Leaf(NodeText::from_str(""))
@@ -61,9 +60,9 @@ impl<S: GraphemeSegmenter> Node<S> {
         start_idx: usize,
         end_idx: usize,
         mut edit: F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node<S>>)>)
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
     where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText<S>) -> (TextInfo, Option<(TextInfo, NodeText<S>)>),
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
     {
         debug_assert!(start_idx <= end_idx);
         debug_assert!(end_idx <= self.text_info().chars as usize);
@@ -97,9 +96,9 @@ impl<S: GraphemeSegmenter> Node<S> {
         acc_info: TextInfo,
         cur_info: TextInfo,
         edit: &mut F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node<S>>)>)
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
     where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText<S>) -> (TextInfo, Option<(TextInfo, NodeText<S>)>),
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
     {
         match *self {
             // If it's a leaf
@@ -116,10 +115,10 @@ impl<S: GraphemeSegmenter> Node<S> {
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
                 // Shared code for handling children.
-                let mut handle_child = |children: &mut NodeChildren<S>,
+                let mut handle_child = |children: &mut NodeChildren,
                                         child_i: usize,
                                         c_acc_info: TextInfo|
-                 -> Option<Arc<Node<S>>> {
+                 -> Option<Arc<Node>> {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
@@ -160,8 +159,8 @@ impl<S: GraphemeSegmenter> Node<S> {
                 };
 
                 // Shared code for merging children
-                let merge_child = |children: &mut NodeChildren<S>,
-                                   split_node: &mut Option<Arc<Node<S>>>,
+                let merge_child = |children: &mut NodeChildren,
+                                   split_node: &mut Option<Arc<Node>>,
                                    child_i: usize|
                  -> bool {
                     if child_i < children.len() {
@@ -291,7 +290,7 @@ impl<S: GraphemeSegmenter> Node<S> {
         }
     }
 
-    pub fn append_at_depth(&mut self, other: Arc<Node<S>>, depth: usize) -> Option<Arc<Node<S>>> {
+    pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
             match *self {
                 Node::Leaf(_) => {
@@ -340,7 +339,7 @@ impl<S: GraphemeSegmenter> Node<S> {
         }
     }
 
-    pub fn prepend_at_depth(&mut self, other: Arc<Node<S>>, depth: usize) -> Option<Arc<Node<S>>> {
+    pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
         if depth == 0 {
             match *self {
                 Node::Leaf(_) => {
@@ -392,7 +391,7 @@ impl<S: GraphemeSegmenter> Node<S> {
 
     /// Splits the `Node` at char index `char_idx`, returning
     /// the right side of the split.
-    pub fn split(&mut self, char_idx: usize) -> Node<S> {
+    pub fn split(&mut self, char_idx: usize) -> Node {
         debug_assert!(char_idx != 0);
         debug_assert!(char_idx != (self.text_info().chars as usize));
         match *self {
@@ -512,76 +511,6 @@ impl<S: GraphemeSegmenter> Node<S> {
         }
     }
 
-    /// Returns whether the given char index is a grapheme cluster
-    /// boundary or not.
-    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
-        let (chunk, offset) = self.get_chunk_at_char(char_idx);
-        let byte_idx = char_idx_to_byte_idx(chunk, offset);
-
-        S::is_break_checked(byte_idx, chunk)
-    }
-
-    /// Returns the previous grapheme cluster boundary to the left of
-    /// the given char index (excluding the given char index itself).
-    ///
-    /// If `char_idx` is at the beginning of the rope, returns 0.
-    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
-        // Take care of special case
-        if char_idx == 0 {
-            return 0;
-        }
-
-        let (chunk, offset) = self.get_chunk_at_char(char_idx);
-        let byte_idx = char_idx_to_byte_idx(chunk, offset);
-        if byte_idx == 0 {
-            if char_idx == 1 {
-                // Weird special-case: if the previous chunk is only
-                // one char long and is also the first chunk of the
-                // rope.
-                return 0;
-            } else {
-                let (chunk, _) = self.get_chunk_at_char(char_idx - 1);
-                let prev_byte_idx = S::prev_break(chunk.len(), chunk);
-                return char_idx - count_chars(&chunk[prev_byte_idx..]);
-            }
-        } else {
-            let prev_byte_idx = S::prev_break(byte_idx, chunk);
-            return char_idx - count_chars(&chunk[prev_byte_idx..byte_idx]);
-        }
-    }
-
-    /// Returns the next grapheme cluster boundary to the right of
-    /// the given char index (excluding the given char index itself).
-    ///
-    /// If `char_idx` is at the end of the rope, returns the end
-    /// position.
-    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
-        let end_char_idx = self.text_info().chars as usize;
-
-        // Take care of special case
-        if char_idx == end_char_idx {
-            return end_char_idx;
-        }
-
-        let (chunk, offset) = self.get_chunk_at_char(char_idx);
-        let byte_idx = char_idx_to_byte_idx(chunk, offset);
-        if byte_idx == chunk.len() {
-            if char_idx == end_char_idx - 1 {
-                // Weird special-case: if the next chunk is only
-                // one char long and is also the last chunk of the
-                // rope.
-                return end_char_idx;
-            } else {
-                let (chunk, _) = self.get_chunk_at_char(char_idx + 1);
-                let next_byte_idx = S::next_break(0, chunk);
-                return char_idx + count_chars(&chunk[..next_byte_idx]);
-            }
-        } else {
-            let next_byte_idx = S::next_break(byte_idx, chunk);
-            return char_idx + count_chars(&chunk[byte_idx..next_byte_idx]);
-        };
-    }
-
     pub fn text_info(&self) -> TextInfo {
         match *self {
             Node::Leaf(ref text) => TextInfo::from_str(text),
@@ -599,7 +528,7 @@ impl<S: GraphemeSegmenter> Node<S> {
         }
     }
 
-    pub fn children(&mut self) -> &mut NodeChildren<S> {
+    pub fn children(&mut self) -> &mut NodeChildren {
         match *self {
             Node::Internal(ref mut children) => children,
             _ => panic!(),
@@ -614,7 +543,7 @@ impl<S: GraphemeSegmenter> Node<S> {
         }
     }
 
-    pub fn leaf_text_mut(&mut self) -> &mut NodeText<S> {
+    pub fn leaf_text_mut(&mut self) -> &mut NodeText {
         if let Node::Leaf(ref mut text) = *self {
             text
         } else {
@@ -730,7 +659,7 @@ impl<S: GraphemeSegmenter> Node<S> {
         &mut self,
         byte_pos: Count,
         must_be_boundary: bool,
-    ) -> Option<&mut NodeText<S>> {
+    ) -> Option<&mut NodeText> {
         match *self {
             Node::Leaf(ref mut text) => {
                 if (!must_be_boundary) || byte_pos == 0 || byte_pos == text.len() as Count {
@@ -803,7 +732,7 @@ impl<S: GraphemeSegmenter> Node<S> {
                         {
                             let raw_text = Arc::make_mut(&mut children.nodes_mut()[child_i])
                                 .fix_grapheme_seam(pos_in_child, must_be_boundary)
-                                .map(|text| text as *mut NodeText<S>);
+                                .map(|text| text as *mut NodeText);
 
                             // This is the bit we have to work arround.  If raw_text
                             // weren't cast to a raw_point, it's &mut would keep us
@@ -1012,50 +941,5 @@ mod tests {
         assert_eq!(2, r.line_to_char(1));
         assert_eq!(93, r.line_to_char(2));
         assert_eq!(133, r.line_to_char(3));
-    }
-
-    #[test]
-    fn is_grapheme_boundary_01() {
-        let r = Rope::from_str(TEXT);
-
-        assert!(r.is_grapheme_boundary(0));
-        assert!(r.is_grapheme_boundary(133));
-        assert!(r.is_grapheme_boundary(91));
-        assert!(r.is_grapheme_boundary(93));
-        assert!(r.is_grapheme_boundary(125));
-
-        assert!(!r.is_grapheme_boundary(1));
-        assert!(!r.is_grapheme_boundary(132));
-        assert!(!r.is_grapheme_boundary(92));
-    }
-
-    #[test]
-    fn prev_grapheme_boundary_01() {
-        let r = Rope::from_str(TEXT);
-
-        assert_eq!(0, r.prev_grapheme_boundary(0));
-        assert_eq!(131, r.prev_grapheme_boundary(133));
-        assert_eq!(90, r.prev_grapheme_boundary(91));
-        assert_eq!(91, r.prev_grapheme_boundary(93));
-        assert_eq!(124, r.prev_grapheme_boundary(125));
-
-        assert_eq!(0, r.prev_grapheme_boundary(1));
-        assert_eq!(131, r.prev_grapheme_boundary(132));
-        assert_eq!(91, r.prev_grapheme_boundary(92));
-    }
-
-    #[test]
-    fn next_grapheme_boundary_01() {
-        let r = Rope::from_str(TEXT);
-
-        assert_eq!(2, r.next_grapheme_boundary(0));
-        assert_eq!(133, r.next_grapheme_boundary(133));
-        assert_eq!(93, r.next_grapheme_boundary(91));
-        assert_eq!(94, r.next_grapheme_boundary(93));
-        assert_eq!(126, r.next_grapheme_boundary(125));
-
-        assert_eq!(2, r.next_grapheme_boundary(1));
-        assert_eq!(133, r.next_grapheme_boundary(132));
-        assert_eq!(93, r.next_grapheme_boundary(92));
     }
 }

@@ -3,9 +3,9 @@ use std::iter::{Iterator, Zip};
 use std::slice;
 use std::sync::Arc;
 
+use crlf;
 use tree;
 use tree::{Node, MAX_BYTES};
-use segmentation::{CRLFSegmenter, GraphemeSegmenter, SegmenterUtils};
 use tree::TextInfo;
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
@@ -15,9 +15,9 @@ const MAX_LEN: usize = tree::MAX_CHILDREN;
 /// The unsafe guts of this are implemented in NodeChildrenInternal
 /// lower down in this file.
 #[derive(Clone)]
-pub(crate) struct NodeChildren<S: GraphemeSegmenter>(inner::NodeChildrenInternal<S>);
+pub(crate) struct NodeChildren(inner::NodeChildrenInternal);
 
-impl<S: GraphemeSegmenter> NodeChildren<S> {
+impl NodeChildren {
     /// Creates a new empty array.
     pub fn new() -> Self {
         NodeChildren(inner::NodeChildrenInternal::new())
@@ -35,12 +35,12 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     }
 
     /// Access to the nodes array.
-    pub fn nodes(&self) -> &[Arc<Node<S>>] {
+    pub fn nodes(&self) -> &[Arc<Node>] {
         self.0.nodes()
     }
 
     /// Mutable access to the nodes array.
-    pub fn nodes_mut(&mut self) -> &mut [Arc<Node<S>>] {
+    pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
         self.0.nodes_mut()
     }
 
@@ -55,7 +55,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     }
 
     /// Mutable access to both the info and nodes arrays simultaneously.
-    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node<S>>]) {
+    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
         self.0.data_mut()
     }
 
@@ -68,7 +68,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     /// Pushes an item into the end of the array.
     ///
     /// Increases length by one.  Panics if already full.
-    pub fn push(&mut self, item: (TextInfo, Arc<Node<S>>)) {
+    pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
         self.0.push(item)
     }
 
@@ -76,7 +76,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     /// returning the right half.
     ///
     /// This works even when the array is full.
-    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node<S>>)) -> Self {
+    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> Self {
         let r_count = (self.len() + 1) / 2;
         let l_count = (self.len() + 1) - r_count;
 
@@ -109,7 +109,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
                         } else {
                             let split_pos = {
                                 let pos = text1.len() - (text1.len() / 2);
-                                CRLFSegmenter::<S>::nearest_internal_break(pos, text1)
+                                crlf::nearest_internal_break(pos, text1)
                             };
                             *text2 = text1.split_off(split_pos);
                             if text2.len() > 0 {
@@ -191,8 +191,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
                     let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
                     let text_l = Arc::make_mut(node_l).leaf_text_mut();
                     let text_r = Arc::make_mut(node_r).leaf_text_mut();
-                    let split_idx_r =
-                        CRLFSegmenter::<S>::prev_break(MAX_BYTES - text_l.len(), text_r);
+                    let split_idx_r = crlf::prev_break(MAX_BYTES - text_l.len(), text_r);
                     text_l.push_str(&text_r[..split_idx_r]);
                     text_r.truncate_front(split_idx_r);
                 }
@@ -210,7 +209,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     /// Pops an item off the end of the array and returns it.
     ///
     /// Decreases length by one.  Panics if already empty.
-    pub fn pop(&mut self) -> (TextInfo, Arc<Node<S>>) {
+    pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
         self.0.pop()
     }
 
@@ -218,7 +217,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     ///
     /// Increases length by one.  Panics if already full.  Preserves ordering
     /// of the other items.
-    pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node<S>>)) {
+    pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
         self.0.insert(idx, item)
     }
 
@@ -226,7 +225,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     /// the right half.
     ///
     /// This works even when the array is full.
-    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node<S>>)) -> Self {
+    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> Self {
         assert!(self.len() > 0);
         assert!(idx <= self.len());
         let extra = if idx < self.len() {
@@ -243,7 +242,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     /// Removes the item at the given index from the the array.
     ///
     /// Decreases length by one.  Preserves ordering of the other items.
-    pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node<S>>) {
+    pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
         self.0.remove(idx)
     }
 
@@ -271,8 +270,8 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
         idx1: usize,
         idx2: usize,
     ) -> (
-        (&mut TextInfo, &mut Arc<Node<S>>),
-        (&mut TextInfo, &mut Arc<Node<S>>),
+        (&mut TextInfo, &mut Arc<Node>),
+        (&mut TextInfo, &mut Arc<Node>),
     ) {
         assert!(idx1 < idx2);
         assert!(idx2 < self.len());
@@ -289,7 +288,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     }
 
     /// Creates an iterator over the array's items.
-    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node<S>>>> {
+    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
         Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
@@ -420,7 +419,7 @@ impl<S: GraphemeSegmenter> NodeChildren<S> {
     }
 }
 
-impl<S: GraphemeSegmenter> fmt::Debug for NodeChildren<S> {
+impl fmt::Debug for NodeChildren {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("NodeChildren")
             .field("len", &self.len())
@@ -447,18 +446,17 @@ mod inner {
     use std::mem::ManuallyDrop;
     use std::sync::Arc;
     use super::{Node, TextInfo, MAX_LEN};
-    use segmentation::GraphemeSegmenter;
 
-    pub(crate) struct NodeChildrenInternal<S: GraphemeSegmenter> {
-        nodes: ManuallyDrop<[Arc<Node<S>>; MAX_LEN]>,
+    pub(crate) struct NodeChildrenInternal {
+        nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
         info: [TextInfo; MAX_LEN],
         len: u8,
     }
 
-    impl<S: GraphemeSegmenter> NodeChildrenInternal<S> {
+    impl NodeChildrenInternal {
         /// Creates a new empty array.
         #[inline(always)]
-        pub fn new() -> NodeChildrenInternal<S> {
+        pub fn new() -> NodeChildrenInternal {
             NodeChildrenInternal {
                 nodes: ManuallyDrop::new(unsafe { mem::uninitialized() }),
                 info: unsafe { mem::uninitialized() },
@@ -474,13 +472,13 @@ mod inner {
 
         /// Access to the nodes array.
         #[inline(always)]
-        pub fn nodes(&self) -> &[Arc<Node<S>>] {
+        pub fn nodes(&self) -> &[Arc<Node>] {
             &self.nodes[..(self.len())]
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
-        pub fn nodes_mut(&mut self) -> &mut [Arc<Node<S>>] {
+        pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
             &mut self.nodes[..(self.len as usize)]
         }
 
@@ -498,7 +496,7 @@ mod inner {
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
-        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node<S>>]) {
+        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
             (
                 &mut self.info[..(self.len as usize)],
                 &mut self.nodes[..(self.len as usize)],
@@ -509,7 +507,7 @@ mod inner {
         ///
         /// Increases length by one.  Panics if already full.
         #[inline(always)]
-        pub fn push(&mut self, item: (TextInfo, Arc<Node<S>>)) {
+        pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
             assert!(self.len() < MAX_LEN);
             self.info[self.len()] = item.0;
             mem::forget(mem::replace(&mut self.nodes[self.len as usize], item.1));
@@ -520,7 +518,7 @@ mod inner {
         ///
         /// Decreases length by one.  Panics if already empty.
         #[inline(always)]
-        pub fn pop(&mut self) -> (TextInfo, Arc<Node<S>>) {
+        pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
             assert!(self.len() > 0);
             self.len -= 1;
             (self.info[self.len()], unsafe {
@@ -533,7 +531,7 @@ mod inner {
         /// Increases length by one.  Panics if already full.  Preserves ordering
         /// of the other items.
         #[inline(always)]
-        pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node<S>>)) {
+        pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
             assert!(idx <= self.len());
             assert!(self.len() < MAX_LEN);
 
@@ -561,7 +559,7 @@ mod inner {
         ///
         /// Decreases length by one.  Preserves ordering of the other items.
         #[inline(always)]
-        pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node<S>>) {
+        pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
             assert!(self.len() > 0);
             assert!(idx < self.len());
 
@@ -586,17 +584,17 @@ mod inner {
         }
     }
 
-    impl<S: GraphemeSegmenter> Drop for NodeChildrenInternal<S> {
+    impl Drop for NodeChildrenInternal {
         fn drop(&mut self) {
             for node in &mut self.nodes[..self.len as usize] {
-                let mptr: *mut Arc<Node<S>> = node; // Make sure we have the right dereference
+                let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
                 unsafe { ptr::drop_in_place(mptr) };
             }
         }
     }
 
-    impl<S: GraphemeSegmenter> Clone for NodeChildrenInternal<S> {
-        fn clone(&self) -> NodeChildrenInternal<S> {
+    impl Clone for NodeChildrenInternal {
+        fn clone(&self) -> NodeChildrenInternal {
             let mut clone_array = NodeChildrenInternal::new();
 
             // Copy nodes... carefully.
@@ -647,12 +645,11 @@ mod inner {
 mod tests {
     use super::*;
     use std::sync::Arc;
-    use segmentation::DefaultSegmenter;
     use tree::{Node, NodeText, TextInfo};
 
     #[test]
     fn search_char_idx_01() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -694,7 +691,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn search_char_idx_02() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -717,7 +714,7 @@ mod tests {
 
     #[test]
     fn search_char_idx_range_01() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
@@ -796,7 +793,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn search_char_idx_range_02() {
-        let mut children = NodeChildren::<DefaultSegmenter>::new();
+        let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
             Arc::new(Node::Leaf(NodeText::from_str("Hello "))),

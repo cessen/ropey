@@ -2,19 +2,15 @@ use std;
 use std::sync::Arc;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
-use iter::{Bytes, Chars, Chunks, Graphemes, Lines};
+use iter::{Bytes, Chars, Chunks, Lines};
 use rope::Rope;
-use segmentation::{DefaultSegmenter, GraphemeSegmenter};
 use str_utils::char_idx_to_byte_idx;
 use tree::{Count, Node};
 
 /// An immutable view into part of a `Rope`.
 #[derive(Copy, Clone)]
-pub struct RopeSlice<'a, S = DefaultSegmenter>
-where
-    S: 'a + GraphemeSegmenter,
-{
-    node: &'a Arc<Node<S>>,
+pub struct RopeSlice<'a> {
+    node: &'a Arc<Node>,
     start_byte: Count,
     end_byte: Count,
     start_char: Count,
@@ -23,8 +19,8 @@ where
     end_line_break: Count,
 }
 
-impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
-    pub(crate) fn new_with_range(node: &'a Arc<Node<S>>, start: usize, end: usize) -> Self {
+impl<'a> RopeSlice<'a> {
+    pub(crate) fn new_with_range(node: &'a Arc<Node>, start: usize, end: usize) -> Self {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
 
@@ -33,7 +29,7 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
         let mut n_end = end;
         let mut node = node;
         'outer: loop {
-            match *(node as &Node<S>) {
+            match *(node as &Node) {
                 Node::Leaf(_) => break,
 
                 Node::Internal(ref children) => {
@@ -167,7 +163,7 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
-    pub fn line(&self, line_idx: usize) -> RopeSlice<'a, S> {
+    pub fn line(&self, line_idx: usize) -> RopeSlice<'a> {
         // Bounds check
         assert!(
             line_idx < self.len_lines(),
@@ -180,85 +176,6 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
         let end = self.line_to_char(line_idx + 1);
 
         self.slice(start..end)
-    }
-
-    //-----------------------------------------------------------------------
-    // Grapheme methods
-
-    /// Returns whether `char_idx` is a grapheme cluster boundary or not.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    pub fn is_grapheme_boundary(&self, char_idx: usize) -> bool {
-        // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to index past end of slice: char index {}, slice char length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        if char_idx == 0 || char_idx == self.len_chars() {
-            true
-        } else {
-            self.node
-                .is_grapheme_boundary(self.start_char as usize + char_idx)
-        }
-    }
-
-    /// Returns the char index of the grapheme cluster boundary to the left
-    /// of `char_idx`.
-    ///
-    /// This excludes any boundary that might be at `char_idx` itself, unless
-    /// `char_idx` is at the beginning of the rope.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    pub fn prev_grapheme_boundary(&self, char_idx: usize) -> usize {
-        // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to index past end of slice: char index {}, slice char length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        let boundary_idx = self.node
-            .prev_grapheme_boundary(self.start_char as usize + char_idx);
-        if boundary_idx < self.start_char as usize {
-            0
-        } else {
-            boundary_idx - self.start_char as usize
-        }
-    }
-
-    /// Returns the char index of the grapheme cluster boundary to the right
-    /// of `char_idx`.
-    ///
-    /// This excludes any boundary that might be at `char_idx` itself, unless
-    /// `char_idx` is at the end of the rope.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    pub fn next_grapheme_boundary(&self, char_idx: usize) -> usize {
-        // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to index past end of slice: char index {}, slice char length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        let boundary_idx = self.node
-            .next_grapheme_boundary(self.start_char as usize + char_idx);
-        if boundary_idx >= self.end_char as usize {
-            self.len_chars()
-        } else {
-            boundary_idx - self.start_char as usize
-        }
     }
 
     //-----------------------------------------------------------------------
@@ -294,27 +211,22 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `RopeSlice`.
-    pub fn bytes(&self) -> Bytes<'a, S> {
+    pub fn bytes(&self) -> Bytes<'a> {
         Bytes::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the chars of the `RopeSlice`.
-    pub fn chars(&self) -> Chars<'a, S> {
+    pub fn chars(&self) -> Chars<'a> {
         Chars::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
-    /// Creates an iterator over the grapheme clusters of the `RopeSlice`.
-    pub fn graphemes(&self) -> Graphemes<'a, S> {
-        Graphemes::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
-    }
-
     /// Creates an iterator over the lines of the `RopeSlice`.
-    pub fn lines(&self) -> Lines<'a, S> {
+    pub fn lines(&self) -> Lines<'a> {
         Lines::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
     /// Creates an iterator over the chunks of the `RopeSlice`.
-    pub fn chunks(&self) -> Chunks<'a, S> {
+    pub fn chunks(&self) -> Chunks<'a> {
         Chunks::new_with_range(self.node, self.start_char as usize, self.end_char as usize)
     }
 
@@ -331,7 +243,7 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
     }
 
     /// Creates a new `Rope` from the contents of the `RopeSlice`.
-    pub fn to_rope(&self) -> Rope<S> {
+    pub fn to_rope(&self) -> Rope {
         let mut rope = Rope {
             root: Arc::clone(self.node),
         };
@@ -353,13 +265,13 @@ impl<'a, S: 'a + GraphemeSegmenter> RopeSlice<'a, S> {
 
 //==============================================================
 
-impl<'a, S: GraphemeSegmenter> std::fmt::Debug for RopeSlice<'a, S> {
+impl<'a> std::fmt::Debug for RopeSlice<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_list().entries(self.chunks()).finish()
     }
 }
 
-impl<'a, S: GraphemeSegmenter> std::fmt::Display for RopeSlice<'a, S> {
+impl<'a> std::fmt::Display for RopeSlice<'a> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for chunk in self.chunks() {
@@ -369,10 +281,9 @@ impl<'a, S: GraphemeSegmenter> std::fmt::Display for RopeSlice<'a, S> {
     }
 }
 
-impl<'a, 'b, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'b, S2>>
-    for RopeSlice<'a, S1> {
+impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
     #[inline]
-    fn eq(&self, other: &RopeSlice<'b, S2>) -> bool {
+    fn eq(&self, other: &RopeSlice<'b>) -> bool {
         if self.len_bytes() != other.len_bytes() {
             return false;
         }
@@ -418,7 +329,7 @@ impl<'a, 'b, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<R
     }
 }
 
-impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<&'b str> for RopeSlice<'a, S> {
+impl<'a, 'b> std::cmp::PartialEq<&'b str> for RopeSlice<'a> {
     #[inline]
     fn eq(&self, other: &&'b str) -> bool {
         if self.len_bytes() != other.len() {
@@ -437,69 +348,65 @@ impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<&'b str> for RopeSlice<'a
     }
 }
 
-impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for &'b str {
+impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'a>> for &'b str {
     #[inline]
-    fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
         other == self
     }
 }
 
-impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<str> for RopeSlice<'a, S> {
+impl<'a> std::cmp::PartialEq<str> for RopeSlice<'a> {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         std::cmp::PartialEq::<&str>::eq(self, &other)
     }
 }
 
-impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for str {
+impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for str {
     #[inline]
-    fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
         std::cmp::PartialEq::<&str>::eq(other, &self)
     }
 }
 
-impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<String> for RopeSlice<'a, S> {
+impl<'a> std::cmp::PartialEq<String> for RopeSlice<'a> {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self == other.as_str()
     }
 }
 
-impl<'a, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>> for String {
+impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for String {
     #[inline]
-    fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
         self.as_str() == other
     }
 }
 
-impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<std::borrow::Cow<'b, str>>
-    for RopeSlice<'a, S> {
+impl<'a, 'b> std::cmp::PartialEq<std::borrow::Cow<'b, str>> for RopeSlice<'a> {
     #[inline]
     fn eq(&self, other: &std::borrow::Cow<'b, str>) -> bool {
         *self == **other
     }
 }
 
-impl<'a, 'b, S: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S>>
-    for std::borrow::Cow<'b, str> {
+impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'a>> for std::borrow::Cow<'b, str> {
     #[inline]
-    fn eq(&self, other: &RopeSlice<'a, S>) -> bool {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
         **self == *other
     }
 }
 
-impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<Rope<S2>>
-    for RopeSlice<'a, S1> {
+impl<'a> std::cmp::PartialEq<Rope> for RopeSlice<'a> {
     #[inline]
-    fn eq(&self, other: &Rope<S2>) -> bool {
+    fn eq(&self, other: &Rope) -> bool {
         *self == other.slice(..)
     }
 }
 
-impl<'a, S1: GraphemeSegmenter, S2: GraphemeSegmenter> std::cmp::PartialEq<RopeSlice<'a, S2>>
-    for Rope<S1> {
+impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
     #[inline]
-    fn eq(&self, other: &RopeSlice<'a, S2>) -> bool {
+    fn eq(&self, other: &RopeSlice<'a>) -> bool {
         self.slice(..) == *other
     }
 }
@@ -741,105 +648,6 @@ mod tests {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
         s.line(3);
-    }
-
-    #[test]
-    fn is_grapheme_boundary_01() {
-        let r = Rope::from_str(
-            "Hello there!\r\nHow're you doing?\r\n\
-             It's a fine day,\r\nisn't it?",
-        );
-        let s = r.slice(13..50);
-        // "\nHow're you doing?\r\n\
-        //  It's a fine day,\r"
-
-        assert!(s.is_grapheme_boundary(0));
-        assert!(s.is_grapheme_boundary(1));
-        assert!(s.is_grapheme_boundary(18));
-        assert!(!s.is_grapheme_boundary(19));
-        assert!(s.is_grapheme_boundary(20));
-        assert!(s.is_grapheme_boundary(36));
-        assert!(s.is_grapheme_boundary(37));
-    }
-
-    #[test]
-    #[should_panic]
-    fn is_grapheme_boundary_03() {
-        let r = Rope::from_str(
-            "Hello there!\r\nHow're you doing?\r\n\
-             It's a fine day,\r\nisn't it?",
-        );
-        let s = r.slice(13..50);
-        // "\nHow're you doing?\r\n\
-        //  It's a fine day,\r"
-
-        s.is_grapheme_boundary(38);
-    }
-
-    #[test]
-    fn prev_grapheme_boundary_01() {
-        let r = Rope::from_str(
-            "Hello there!\r\nHow're you doing?\r\n\
-             It's a fine day,\r\nisn't it?",
-        );
-        let s = r.slice(13..50);
-        // "\nHow're you doing?\r\n\
-        //  It's a fine day,\r"
-
-        assert_eq!(0, s.prev_grapheme_boundary(0));
-        assert_eq!(0, s.prev_grapheme_boundary(1));
-        assert_eq!(17, s.prev_grapheme_boundary(18));
-        assert_eq!(18, s.prev_grapheme_boundary(19));
-        assert_eq!(18, s.prev_grapheme_boundary(20));
-        assert_eq!(35, s.prev_grapheme_boundary(36));
-        assert_eq!(36, s.prev_grapheme_boundary(37));
-    }
-
-    #[test]
-    #[should_panic]
-    fn prev_grapheme_boundary_02() {
-        let r = Rope::from_str(
-            "Hello there!\r\nHow're you doing?\r\n\
-             It's a fine day,\r\nisn't it?",
-        );
-        let s = r.slice(13..50);
-        // "\nHow're you doing?\r\n\
-        //  It's a fine day,\r"
-
-        s.prev_grapheme_boundary(38);
-    }
-
-    #[test]
-    fn next_grapheme_boundary_01() {
-        let r = Rope::from_str(
-            "Hello there!\r\nHow're you doing?\r\n\
-             It's a fine day,\r\nisn't it?",
-        );
-        let s = r.slice(13..50);
-        // "\nHow're you doing?\r\n\
-        //  It's a fine day,\r"
-
-        assert_eq!(1, s.next_grapheme_boundary(0));
-        assert_eq!(2, s.next_grapheme_boundary(1));
-        assert_eq!(20, s.next_grapheme_boundary(18));
-        assert_eq!(20, s.next_grapheme_boundary(19));
-        assert_eq!(21, s.next_grapheme_boundary(20));
-        assert_eq!(37, s.next_grapheme_boundary(36));
-        assert_eq!(37, s.next_grapheme_boundary(37));
-    }
-
-    #[test]
-    #[should_panic]
-    fn next_grapheme_boundary_02() {
-        let r = Rope::from_str(
-            "Hello there!\r\nHow're you doing?\r\n\
-             It's a fine day,\r\nisn't it?",
-        );
-        let s = r.slice(13..50);
-        // "\nHow're you doing?\r\n\
-        //  It's a fine day,\r"
-
-        s.next_grapheme_boundary(38);
     }
 
     #[test]
