@@ -156,7 +156,7 @@ impl RopeBuilder {
         if self.buffer.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
-                let split_idx = crlf::find_good_split(MAX_BYTES, text, true);
+                let split_idx = crlf::find_good_split(MAX_BYTES, text.as_bytes(), true);
                 if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
                     self.buffer.push_str(text);
                     return (NextText::None, "");
@@ -171,9 +171,9 @@ impl RopeBuilder {
             }
         } else if (text.len() + self.buffer.len()) > MAX_BYTES {
             let split_idx = if self.buffer.len() < MAX_BYTES {
-                crlf::nearest_internal_break(MAX_BYTES - self.buffer.len(), text)
+                crlf::nearest_internal_break(MAX_BYTES - self.buffer.len(), text.as_bytes())
             } else {
-                crlf::nearest_internal_break(0, text)
+                crlf::nearest_internal_break(0, text.as_bytes())
             };
 
             if (split_idx == 0 || split_idx == text.len()) && !last_chunk {

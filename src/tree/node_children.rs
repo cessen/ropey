@@ -109,7 +109,7 @@ impl NodeChildren {
                         } else {
                             let split_pos = {
                                 let pos = text1.len() - (text1.len() / 2);
-                                crlf::nearest_internal_break(pos, text1)
+                                crlf::nearest_internal_break(pos, text1.as_bytes())
                             };
                             *text2 = text1.split_off(split_pos);
                             if text2.len() > 0 {
@@ -191,7 +191,7 @@ impl NodeChildren {
                     let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
                     let text_l = Arc::make_mut(node_l).leaf_text_mut();
                     let text_r = Arc::make_mut(node_r).leaf_text_mut();
-                    let split_idx_r = crlf::prev_break(MAX_BYTES - text_l.len(), text_r);
+                    let split_idx_r = crlf::prev_break(MAX_BYTES - text_l.len(), text_r.as_bytes());
                     text_l.push_str(&text_r[..split_idx_r]);
                     text_r.truncate_front(split_idx_r);
                 }

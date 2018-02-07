@@ -75,7 +75,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            crlf::nearest_internal_break(pos, self)
+            crlf::nearest_internal_break(pos, self.as_bytes())
         };
 
         self.split_off(split_pos)
@@ -102,7 +102,7 @@ impl NodeText {
 
         let split_pos = {
             let pos = self.len() - (self.len() / 2);
-            crlf::nearest_internal_break(pos, self)
+            crlf::find_good_split(pos, self.as_bytes(), false)
         };
 
         self.split_off(split_pos)
@@ -325,13 +325,13 @@ impl Borrow<str> for NodeText {
 /// is one big grapheme.
 pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
     // Early out, if there's nothing to do.
-    if crlf::seam_is_break_checked(l, r) {
+    if crlf::seam_is_break(l.as_bytes(), r.as_bytes()) {
         return;
     }
 
     // Find the nearest breaks around the seam.
-    let l_split = crlf::prev_break(l.len(), l);
-    let r_split = l.len() + crlf::next_break(0, r);
+    let l_split = crlf::prev_break(l.len(), l.as_bytes());
+    let r_split = l.len() + crlf::next_break(0, r.as_bytes());
 
     // Find the new split position, if any.
     let new_split_pos = {

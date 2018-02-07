@@ -288,8 +288,11 @@ impl Rope {
             // chunks.
             let mut text = text;
             while text.len() > 0 {
-                let split_idx =
-                    crlf::find_good_split(text.len() - MAX_BYTES.min(text.len()), text, false);
+                let split_idx = crlf::find_good_split(
+                    text.len() - MAX_BYTES.min(text.len()),
+                    text.as_bytes(),
+                    false,
+                );
                 let ins_text = &text[split_idx..];
                 text = &text[..split_idx];
 
@@ -884,7 +887,7 @@ impl Rope {
             let mut last_chunk = itr.next().unwrap();
             for chunk in itr {
                 if !chunk.is_empty() && !last_chunk.is_empty() {
-                    assert!(crlf::seam_is_break_checked(last_chunk, chunk));
+                    assert!(crlf::seam_is_break(last_chunk.as_bytes(), chunk.as_bytes()));
                     last_chunk = chunk;
                 } else if last_chunk.is_empty() {
                     last_chunk = chunk;
