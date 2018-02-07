@@ -38,6 +38,7 @@ impl NodeText {
 
     /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
+        debug_assert!(string.len() <= MAX_BYTES);
         let mut nodetext = NodeText::with_capacity(string.len());
         unsafe { nodetext.insert_bytes(0, string.as_bytes()) };
         nodetext
@@ -50,6 +51,7 @@ impl NodeText {
     pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
         debug_assert!(self.is_char_boundary(byte_idx));
         debug_assert!(byte_idx <= self.len());
+        debug_assert!((self.len() + string.len()) <= MAX_BYTES);
 
         unsafe {
             self.insert_bytes(byte_idx, string.as_bytes());
@@ -58,6 +60,7 @@ impl NodeText {
 
     /// Inserts the given text into the given string at the given char index.
     pub fn insert_str_at_char(&mut self, text: &str, char_idx: usize) {
+        debug_assert!((self.len() + text.len()) <= MAX_BYTES);
         let byte_idx = char_idx_to_byte_idx(self, char_idx);
         self.insert_str(byte_idx, text);
     }
@@ -123,6 +126,7 @@ impl NodeText {
 
     /// Appends a `&str` to end the of the `NodeText`.
     pub fn push_str(&mut self, string: &str) {
+        debug_assert!((self.len() + string.len()) <= MAX_BYTES);
         let len = self.len();
         unsafe {
             self.insert_bytes(len, string.as_bytes());
@@ -138,14 +142,8 @@ impl NodeText {
     ///
     /// TODO: make this work without allocations when possible.
     pub fn push_str_split(&mut self, string: &str) -> Self {
-        self.push_str(string);
-
-        let split_pos = {
-            let pos = self.len() - (self.len() / 2);
-            crlf::find_good_split(pos, self.as_bytes(), false)
-        };
-
-        self.split_off(split_pos)
+        let len = self.len();
+        self.insert_str_split(len, string)
     }
 
     /// Drops the text after byte index `idx`.
@@ -251,6 +249,8 @@ impl NodeText {
     #[inline(always)]
     unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
         assert!(idx <= self.len());
+        debug_assert!((self.len() + bytes.len()) <= MAX_BYTES);
+
         let len = self.len();
         let amt = bytes.len();
         self.buffer.reserve(amt);
@@ -421,10 +421,10 @@ mod tests {
     #[test]
     fn remove_bytes_01() {
         let mut s = NodeText::new();
-        s.push_str("Hello there, everyone!  How's it going?");
+        s.push_str("Hello!");
         unsafe {
-            s.remove_bytes(11, 21);
+            s.remove_bytes(2, 4);
         }
-        assert_eq!("Hello there!  How's it going?", s);
+        assert_eq!("Heo!", s);
     }
 }

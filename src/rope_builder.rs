@@ -46,7 +46,8 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 #[derive(Debug, Clone)]
 pub struct RopeBuilder {
     stack: SmallVec<[Arc<Node>; 4]>,
-    buffer: String,
+    buffer1: String,
+    buffer2: String,
 }
 
 impl RopeBuilder {
@@ -58,7 +59,8 @@ impl RopeBuilder {
                 stack.push(Arc::new(Node::new()));
                 stack
             },
-            buffer: String::new(),
+            buffer1: String::new(),
+            buffer2: String::new(),
         }
     }
 
@@ -102,7 +104,7 @@ impl RopeBuilder {
 
         // Repeatedly chop text off the end of the input, creating
         // leaf nodes out of them and appending them to the tree.
-        while !chunk.is_empty() || (!self.buffer.is_empty() && last_chunk) {
+        while !chunk.is_empty() || (!self.buffer1.is_empty() && last_chunk) {
             // Get the text for the next leaf
             let (leaf_text, remainder) = self.get_next_leaf_text(chunk, last_chunk);
             chunk = remainder;
@@ -111,9 +113,10 @@ impl RopeBuilder {
             match leaf_text {
                 NextText::None => break,
                 NextText::UseBuffer => {
-                    let string = NodeText::from_str(&self.buffer);
+                    let string = NodeText::from_str(&self.buffer1);
                     self.append_leaf_node(Arc::new(Node::Leaf(string)));
-                    self.buffer.clear();
+                    self.buffer1.clear();
+                    std::mem::swap(&mut self.buffer1, &mut self.buffer2);
                 }
                 NextText::String(s) => {
                     self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(s))));
@@ -153,41 +156,53 @@ impl RopeBuilder {
         text: &'a str,
         last_chunk: bool,
     ) -> (NextText<'a>, &'a str) {
-        if self.buffer.is_empty() {
+        if self.buffer1.is_empty() {
             if text.len() > MAX_BYTES {
                 // Simplest case: just chop off the end of `text`
                 let split_idx = crlf::find_good_split(MAX_BYTES, text.as_bytes(), true);
                 if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
-                    self.buffer.push_str(text);
+                    self.buffer1.push_str(text);
                     return (NextText::None, "");
                 } else {
                     return (NextText::String(&text[..split_idx]), &text[split_idx..]);
                 }
             } else if !last_chunk {
-                self.buffer.push_str(text);
+                self.buffer1.push_str(text);
                 return (NextText::None, "");
             } else {
                 return (NextText::String(text), "");
             }
-        } else if (text.len() + self.buffer.len()) > MAX_BYTES {
-            let split_idx = if self.buffer.len() < MAX_BYTES {
-                crlf::nearest_internal_break(MAX_BYTES - self.buffer.len(), text.as_bytes())
+        } else if (text.len() + self.buffer1.len()) > MAX_BYTES {
+            if self.buffer1.len() > MAX_BYTES {
+                let split_idx = crlf::find_good_split(MAX_BYTES, self.buffer1.as_bytes(), true);
+                self.buffer2.push_str(&self.buffer1[split_idx..]);
+                self.buffer1.truncate(split_idx);
+                return (NextText::UseBuffer, text);
             } else {
-                crlf::nearest_internal_break(0, text.as_bytes())
-            };
-
-            if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
-                self.buffer.push_str(text);
-                return (NextText::None, "");
-            } else {
-                self.buffer.push_str(&text[..split_idx]);
-                return (NextText::UseBuffer, &text[split_idx..]);
+                let split_idx =
+                    crlf::find_good_split(MAX_BYTES - self.buffer1.len(), text.as_bytes(), true);
+                if split_idx <= (MAX_BYTES - self.buffer1.len())
+                    && (split_idx > 0
+                        || crlf::seam_is_break(self.buffer1.as_bytes(), text.as_bytes()))
+                {
+                    self.buffer1.push_str(&text[..split_idx]);
+                    return (NextText::UseBuffer, &text[split_idx..]);
+                } else {
+                    let split_idx = crlf::find_good_split(
+                        self.buffer1.len() - 1,
+                        self.buffer1.as_bytes(),
+                        true,
+                    );
+                    self.buffer2.push_str(&self.buffer1[split_idx..]);
+                    self.buffer1.truncate(split_idx);
+                    return (NextText::UseBuffer, text);
+                }
             }
         } else if !last_chunk {
-            self.buffer.push_str(text);
+            self.buffer1.push_str(text);
             return (NextText::None, "");
         } else {
-            self.buffer.push_str(text);
+            self.buffer1.push_str(text);
             return (NextText::UseBuffer, "");
         }
     }

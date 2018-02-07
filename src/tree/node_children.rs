@@ -102,22 +102,13 @@ impl NodeChildren {
             match *node1 {
                 Node::Leaf(ref mut text1) => {
                     if let Node::Leaf(ref mut text2) = *node2 {
-                        text1.push_str(text2);
-
-                        if text1.len() <= tree::MAX_BYTES {
+                        if (text1.len() + text2.len()) <= tree::MAX_BYTES {
+                            text1.push_str(text2);
                             true
                         } else {
-                            let split_pos = {
-                                let pos = text1.len() - (text1.len() / 2);
-                                crlf::nearest_internal_break(pos, text1.as_bytes())
-                            };
-                            *text2 = text1.split_off(split_pos);
-                            if text2.len() > 0 {
-                                text1.shrink_to_fit();
-                                false
-                            } else {
-                                true
-                            }
+                            let right = text1.push_str_split(&text2);
+                            *text2 = right;
+                            false
                         }
                     } else {
                         panic!("Siblings have different node types");
