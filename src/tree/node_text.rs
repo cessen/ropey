@@ -68,17 +68,57 @@ impl NodeText {
     /// Only splits on code point boundaries and will never split CRLF pairs,
     /// grapheme boundaries, so if the whole string is a single code point or
     /// CRLF pair, the split will fail and the returned string will be empty.
-    ///
-    /// TODO: make this work without allocations when possible.
     pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
-        self.insert_str(idx, string);
+        debug_assert!(self.is_char_boundary(idx));
+        debug_assert!((self.len() + string.len()) <= (MAX_BYTES * 2 - 4));
 
-        let split_pos = {
-            let pos = self.len() - (self.len() / 2);
-            crlf::nearest_internal_break(pos, self.as_bytes())
+        let tot_len = self.len() + string.len();
+        let mid_idx = tot_len / 2;
+        let a = idx;
+        let b = idx + string.len();
+
+        // Figure out the split index, accounting for code point
+        // boundaries and CRLF pairs.
+        // We first copy the bytes in the area of the proposed split point into
+        // a small 8-byte buffer.  We then use that buffer to look for the
+        // real split point.
+        let split_idx = {
+            let mut buf = [0u8; 8];
+            let start = mid_idx - 4.min(mid_idx);
+            let end = (mid_idx + 4).min(tot_len);
+            for i in start..end {
+                buf[i - start] = if i < a {
+                    self.as_bytes()[i]
+                } else if i < b {
+                    string.as_bytes()[i - a]
+                } else {
+                    self.as_bytes()[i - string.len()]
+                };
+            }
+
+            crlf::nearest_internal_break(mid_idx - start, &buf[..(end - start)]) + start
         };
 
-        self.split_off(split_pos)
+        debug_assert!(split_idx <= MAX_BYTES);
+
+        let mut right = NodeText::new();
+        if split_idx <= a {
+            right.push_str(&self[split_idx..a]);
+            right.push_str(string);
+            right.push_str(&self[a..]);
+            self.truncate(split_idx);
+        } else if split_idx <= b {
+            right.push_str(&string[(split_idx - a)..]);
+            right.push_str(&self[a..]);
+            self.truncate(a);
+            self.push_str(&string[..(split_idx - a)]);
+        } else {
+            right.push_str(&self[(split_idx - string.len())..]);
+            self.truncate(split_idx - string.len());
+            self.insert_str(a, string);
+        }
+
+        right
     }
 
     /// Appends a `&str` to end the of the `NodeText`.

@@ -289,7 +289,7 @@ impl Rope {
             let mut text = text;
             while text.len() > 0 {
                 let split_idx = crlf::find_good_split(
-                    text.len() - MAX_BYTES.min(text.len()),
+                    text.len() - (MAX_BYTES - 4).min(text.len()),
                     text.as_bytes(),
                     false,
                 );
