@@ -18,7 +18,7 @@ smallvec = "0.6"
 
 [dev-dependencies]
 rand = "0.3"
-quickcheck = "0.5"
+proptest = "0.4"
 bencher = "0.1.4"
 
 #-----------------------------------------
