@@ -81,6 +81,42 @@ impl<'a> RopeSlice<'a> {
     //-----------------------------------------------------------------------
     // Index conversion methods
 
+    /// Returns the char index of the given byte.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    #[allow(dead_code)]
+    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        self.node.byte_to_char(self.start_byte as usize + byte_idx) - (self.start_char as usize)
+    }
+
+    /// Returns the byte index of the given char.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[allow(dead_code)]
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        self.node.char_to_byte(self.start_char as usize + char_idx) - (self.start_byte as usize)
+    }
+
     /// Returns the line index of the given char.
     ///
     /// # Panics
@@ -182,6 +218,9 @@ impl<'a> RopeSlice<'a> {
     // Slicing
 
     /// Returns a sub-slice of the `RopeSlice` in the given char index range.
+    ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
+    /// indices.
     ///
     /// # Panics
     ///
@@ -511,6 +550,48 @@ mod tests {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
         assert_eq!(s.len_lines(), 1);
+    }
+
+    #[test]
+    fn byte_to_char_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(88..102);
+
+        // ?  こんにちは、みんなさん
+
+        assert_eq!(0, s.byte_to_char(0));
+        assert_eq!(1, s.byte_to_char(1));
+        assert_eq!(2, s.byte_to_char(2));
+
+        assert_eq!(3, s.byte_to_char(3));
+        assert_eq!(3, s.byte_to_char(4));
+        assert_eq!(3, s.byte_to_char(5));
+
+        assert_eq!(4, s.byte_to_char(6));
+        assert_eq!(4, s.byte_to_char(7));
+        assert_eq!(4, s.byte_to_char(8));
+
+        assert_eq!(13, s.byte_to_char(33));
+        assert_eq!(13, s.byte_to_char(34));
+        assert_eq!(13, s.byte_to_char(35));
+        assert_eq!(14, s.byte_to_char(36));
+    }
+
+    #[test]
+    fn char_to_byte_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(88..102);
+
+        // ?  こんにちは、みんなさん
+
+        assert_eq!(0, s.char_to_byte(0));
+        assert_eq!(1, s.char_to_byte(1));
+        assert_eq!(2, s.char_to_byte(2));
+
+        assert_eq!(3, s.char_to_byte(3));
+        assert_eq!(6, s.char_to_byte(4));
+        assert_eq!(33, s.char_to_byte(13));
+        assert_eq!(36, s.char_to_byte(14));
     }
 
     #[test]

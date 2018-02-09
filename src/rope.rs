@@ -594,7 +594,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[allow(dead_code)]
-    pub(crate) fn byte_to_char(&self, byte_idx: usize) -> usize {
+    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
@@ -642,7 +642,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[allow(dead_code)]
-    pub(crate) fn char_to_byte(&self, char_idx: usize) -> usize {
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
@@ -651,7 +651,7 @@ impl Rope {
             self.len_chars()
         );
 
-        self.root.char_to_byte(char_idx) as usize
+        self.root.char_to_byte(char_idx)
     }
 
     /// Returns the line index of the given char.
@@ -1523,6 +1523,45 @@ mod tests {
 
         r.assert_integrity();
         r.assert_invariants();
+    }
+
+    #[test]
+    fn byte_to_char_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(0, r.byte_to_char(0));
+        assert_eq!(1, r.byte_to_char(1));
+        assert_eq!(2, r.byte_to_char(2));
+
+        assert_eq!(91, r.byte_to_char(91));
+        assert_eq!(91, r.byte_to_char(92));
+        assert_eq!(91, r.byte_to_char(93));
+
+        assert_eq!(92, r.byte_to_char(94));
+        assert_eq!(92, r.byte_to_char(95));
+        assert_eq!(92, r.byte_to_char(96));
+
+        assert_eq!(102, r.byte_to_char(124));
+        assert_eq!(102, r.byte_to_char(125));
+        assert_eq!(102, r.byte_to_char(126));
+        assert_eq!(103, r.byte_to_char(127));
+    }
+
+    #[test]
+    fn char_to_byte_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(0, r.char_to_byte(0));
+        assert_eq!(1, r.char_to_byte(1));
+        assert_eq!(2, r.char_to_byte(2));
+
+        assert_eq!(91, r.char_to_byte(91));
+        assert_eq!(94, r.char_to_byte(92));
+        assert_eq!(97, r.char_to_byte(93));
+        assert_eq!(100, r.char_to_byte(94));
+
+        assert_eq!(124, r.char_to_byte(102));
+        assert_eq!(127, r.char_to_byte(103));
     }
 
     #[test]
