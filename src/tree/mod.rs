@@ -3,18 +3,16 @@ mod node_children;
 mod node_text;
 mod text_info;
 
+#[cfg(not(test))]
+use std::mem::size_of;
+
 pub(crate) use self::node::Node;
 pub(crate) use self::node_children::NodeChildren;
 pub(crate) use self::node_text::NodeText;
 pub(crate) use self::text_info::TextInfo;
 
-// Once size_of() is a const fn, remove this and use size_of() instead.
-#[cfg(all(not(test), target_pointer_width = "64"))]
-const PTR_SIZE: usize = 8;
-#[cfg(all(not(test), target_pointer_width = "32"))]
-const PTR_SIZE: usize = 4;
-#[cfg(all(not(test), target_pointer_width = "16"))]
-const PTR_SIZE: usize = 2;
+#[cfg(not(test))]
+const PTR_SIZE: usize = size_of::<&u8>();
 
 // Aim for nodes to be 768 bytes - Arc counters.  Keeping the nodes
 // multiples of large powers of two makes it easier for the memory allocator
