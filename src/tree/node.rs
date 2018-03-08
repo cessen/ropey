@@ -942,4 +942,60 @@ mod tests {
         assert_eq!(93, r.line_to_char(2));
         assert_eq!(133, r.line_to_char(3));
     }
+
+    #[test]
+    fn crlf_corner_case_01() {
+        use std::iter;
+        use std::sync::Arc;
+        use super::Node;
+        use tree::{NodeChildren, NodeText, MAX_BYTES};
+
+        // Construct the corner case
+        let nodel = Node::Leaf(NodeText::from_str(&iter::repeat("\n")
+            .take(MAX_BYTES - 1)
+            .collect::<String>()));
+        let noder = Node::Leaf(NodeText::from_str(&iter::repeat("\n")
+            .take(MAX_BYTES)
+            .collect::<String>()));
+        let mut children = NodeChildren::new();
+        children.push((nodel.text_info(), Arc::new(nodel)));
+        children.push((noder.text_info(), Arc::new(noder)));
+        let root = Node::Internal(children);
+        let mut rope = Rope {
+            root: Arc::new(root),
+        };
+        assert_eq!(rope.char(0), '\n');
+        assert_eq!(rope.len_chars(), MAX_BYTES * 2 - 1);
+
+        // Do the potentially problematic insertion
+        rope.insert(MAX_BYTES - 1, "\r");
+    }
+
+    #[test]
+    fn crlf_corner_case_02() {
+        use std::iter;
+        use std::sync::Arc;
+        use super::Node;
+        use tree::{NodeChildren, NodeText, MAX_BYTES};
+
+        // Construct the corner case
+        let nodel = Node::Leaf(NodeText::from_str(&iter::repeat("\r")
+            .take(MAX_BYTES)
+            .collect::<String>()));
+        let noder = Node::Leaf(NodeText::from_str(&iter::repeat("\r")
+            .take(MAX_BYTES - 1)
+            .collect::<String>()));
+        let mut children = NodeChildren::new();
+        children.push((nodel.text_info(), Arc::new(nodel)));
+        children.push((noder.text_info(), Arc::new(noder)));
+        let root = Node::Internal(children);
+        let mut rope = Rope {
+            root: Arc::new(root),
+        };
+        assert_eq!(rope.char(0), '\r');
+        assert_eq!(rope.len_chars(), MAX_BYTES * 2 - 1);
+
+        // Do the potentially problematic insertion
+        rope.insert(MAX_BYTES, "\n");
+    }
 }
