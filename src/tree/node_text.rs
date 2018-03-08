@@ -69,8 +69,8 @@ impl NodeText {
     /// the right half.
     ///
     /// Only splits on code point boundaries and will never split CRLF pairs,
-    /// grapheme boundaries, so if the whole string is a single code point or
-    /// CRLF pair, the split will fail and the returned string will be empty.
+    /// so if the whole string is a single code point or CRLF pair, the split
+    /// will fail and the returned string will be empty.
     pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
         debug_assert!(self.is_char_boundary(idx));
         debug_assert!((self.len() + string.len()) <= (MAX_BYTES * 2 - 4));
