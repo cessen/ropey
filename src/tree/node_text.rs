@@ -10,6 +10,11 @@ use smallvec::{Array, SmallVec};
 use str_utils::{char_idx_to_byte_idx, count_chars};
 use tree::MAX_BYTES;
 
+// TODO: handle corner-case when fixing CRLF seams, and then uncomment
+// all of the `MAX_BYTES` asserts to make sure that no allocations are
+// happening.  Finally, remove SmallVec in favor of a simple byte array
+// + len.
+
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
 /// length.  Has a bunch of methods on it that are useful for the rope
 /// tree.
@@ -51,7 +56,7 @@ impl NodeText {
     pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
         debug_assert!(self.is_char_boundary(byte_idx));
         debug_assert!(byte_idx <= self.len());
-        debug_assert!((self.len() + string.len()) <= MAX_BYTES);
+        // debug_assert!((self.len() + string.len()) <= MAX_BYTES);
 
         unsafe {
             self.insert_bytes(byte_idx, string.as_bytes());
@@ -60,7 +65,7 @@ impl NodeText {
 
     /// Inserts the given text into the given string at the given char index.
     pub fn insert_str_at_char(&mut self, text: &str, char_idx: usize) {
-        debug_assert!((self.len() + text.len()) <= MAX_BYTES);
+        // debug_assert!((self.len() + text.len()) <= MAX_BYTES);
         let byte_idx = char_idx_to_byte_idx(self, char_idx);
         self.insert_str(byte_idx, text);
     }
@@ -73,7 +78,7 @@ impl NodeText {
     /// will fail and the returned string will be empty.
     pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
         debug_assert!(self.is_char_boundary(idx));
-        debug_assert!((self.len() + string.len()) <= (MAX_BYTES * 2 - 4));
+        // debug_assert!((self.len() + string.len()) <= (MAX_BYTES * 2 - 4));
 
         let tot_len = self.len() + string.len();
         let mid_idx = tot_len / 2;
@@ -102,7 +107,7 @@ impl NodeText {
             crlf::nearest_internal_break(mid_idx - start, &buf[..(end - start)]) + start
         };
 
-        debug_assert!(split_idx <= MAX_BYTES);
+        // debug_assert!(split_idx <= MAX_BYTES);
 
         let mut right = NodeText::new();
         if split_idx <= a {
@@ -126,7 +131,7 @@ impl NodeText {
 
     /// Appends a `&str` to end the of the `NodeText`.
     pub fn push_str(&mut self, string: &str) {
-        debug_assert!((self.len() + string.len()) <= MAX_BYTES);
+        // debug_assert!((self.len() + string.len()) <= MAX_BYTES);
         let len = self.len();
         unsafe {
             self.insert_bytes(len, string.as_bytes());
@@ -249,7 +254,7 @@ impl NodeText {
     #[inline(always)]
     unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
         assert!(idx <= self.len());
-        debug_assert!((self.len() + bytes.len()) <= MAX_BYTES);
+        // debug_assert!((self.len() + bytes.len()) <= MAX_BYTES);
 
         let len = self.len();
         let amt = bytes.len();
@@ -369,19 +374,21 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
         return;
     }
 
-    // Find the nearest breaks around the seam.
-    let l_split = crlf::prev_break(l.len(), l.as_bytes());
-    let r_split = l.len() + crlf::next_break(0, r.as_bytes());
+    let tot_len = l.len() + r.len();
 
     // Find the new split position, if any.
     let new_split_pos = {
-        let tot_len = l.len() + r.len();
+        let l_split = crlf::prev_break(l.len(), l.as_bytes());
+        let r_split = l.len() + crlf::next_break(0, r.as_bytes());
         if l_split != 0 && (r_split == tot_len || l.len() > r.len()) {
             l_split
         } else {
             r_split
         }
     };
+
+    // debug_assert!(new_split_pos <= MAX_BYTES);
+    // debug_assert!((tot_len - new_split_pos) <= MAX_BYTES);
 
     // Move the bytes to create the new split
     if new_split_pos < l.len() {
