@@ -20,6 +20,7 @@ smallvec = "0.6"
 rand = "0.3"
 proptest = "0.4"
 bencher = "0.1.4"
+unicode-segmentation = "1.2.0"
 
 #-----------------------------------------
 
