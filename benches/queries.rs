@@ -8,6 +8,7 @@ use ropey::Rope;
 use rand::random;
 
 const TEXT: &str = include_str!("large.txt");
+const SMALL_TEXT: &str = include_str!("small.txt");
 
 //----
 
@@ -60,6 +61,19 @@ fn slice(bench: &mut Bencher) {
     })
 }
 
+fn slice_from_small(bench: &mut Bencher) {
+    let rope = Rope::from_str(SMALL_TEXT);
+    let len = rope.len_chars();
+    bench.iter(|| {
+        let mut start = random::<usize>() % (len + 1);
+        let mut end = random::<usize>() % (len + 1);
+        if start > end {
+            std::mem::swap(&mut start, &mut end);
+        }
+        rope.slice(start..end);
+    })
+}
+
 //----
 
 benchmark_group!(
@@ -68,6 +82,7 @@ benchmark_group!(
     line_to_char,
     get_char,
     get_line,
-    slice
+    slice,
+    slice_from_small
 );
 benchmark_main!(benches);
