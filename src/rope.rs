@@ -620,7 +620,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[allow(dead_code)]
-    pub(crate) fn byte_to_line(&self, byte_idx: usize) -> usize {
+    pub fn byte_to_line(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
