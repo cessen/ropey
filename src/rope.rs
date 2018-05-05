@@ -593,7 +593,6 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
-    #[allow(dead_code)]
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -619,7 +618,6 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
-    #[allow(dead_code)]
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -641,7 +639,6 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    #[allow(dead_code)]
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -694,8 +691,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
-    #[allow(dead_code)]
-    pub(crate) fn line_to_byte(&self, line_idx: usize) -> usize {
+    pub fn line_to_byte(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
             line_idx <= self.len_lines(),
