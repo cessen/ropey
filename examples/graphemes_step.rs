@@ -90,7 +90,7 @@ fn is_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> bool {
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
 
-    // Find the next grapheme cluster boundary.
+    // Determine if the given position is a grapheme cluster boundary.
     loop {
         match gc.is_boundary(chunk, chunk_start_idx) {
             Ok(n) => return n,
