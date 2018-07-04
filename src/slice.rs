@@ -232,11 +232,11 @@ impl<'a> RopeSlice<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
         // Bounds check
         assert!(
-            byte_idx < self.len_bytes(),
+            byte_idx <= self.len_bytes(),
             "Attempt to index past end of slice: byte index {}, slice byte length {}",
             byte_idx,
             self.len_bytes()
@@ -275,11 +275,11 @@ impl<'a> RopeSlice<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize) {
         // Bounds check
         assert!(
-            char_idx < self.len_chars(),
+            char_idx <= self.len_chars(),
             "Attempt to index past end of slice: char index {}, slice char length {}",
             char_idx,
             self.len_chars()

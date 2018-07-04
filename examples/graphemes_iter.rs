@@ -1,7 +1,7 @@
 extern crate ropey;
 extern crate unicode_segmentation;
 
-use ropey::{iter::Chunks, Rope, RopeSlice};
+use ropey::{iter::Chunks, RopeSlice};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 fn main() {}
@@ -66,6 +66,7 @@ impl<'a> Iterator for RopeGraphemes<'a> {
 #[cfg_attr(rustfmt, rustfmt_skip)] // Because of the crazy long graphemes
 mod tests {
     use super::*;
+    use ropey::Rope;
 
     #[test]
     fn iter_huge_graphemes() {
