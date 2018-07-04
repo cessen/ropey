@@ -4,8 +4,8 @@ extern crate rand;
 extern crate ropey;
 
 use bencher::Bencher;
-use ropey::Rope;
 use rand::random;
+use ropey::Rope;
 
 const TEXT: &str = include_str!("large.txt");
 

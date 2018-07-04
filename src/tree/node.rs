@@ -1,11 +1,14 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx,
-                char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx};
-use tree::{Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES,
-           MIN_CHILDREN};
+use str_utils::{
+    byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx, char_idx_to_line_idx,
+    line_idx_to_byte_idx, line_idx_to_char_idx,
+};
 use tree::node_text::fix_segment_seam;
+use tree::{
+    Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
@@ -192,7 +195,8 @@ impl Node {
 
                 // Compact leaf children if we're close to maximum leaf
                 // fragmentation.
-                if children.is_full() && children.nodes()[0].is_leaf()
+                if children.is_full()
+                    && children.nodes()[0].is_leaf()
                     && (children.combined_info().bytes as usize) < (MAX_BYTES * (MIN_CHILDREN + 1))
                 {
                     children.compact_leaves();
@@ -957,9 +961,9 @@ mod tests {
 
     #[test]
     fn crlf_corner_case_01() {
+        use super::Node;
         use std::iter;
         use std::sync::Arc;
-        use super::Node;
         use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
@@ -985,9 +989,9 @@ mod tests {
 
     #[test]
     fn crlf_corner_case_02() {
+        use super::Node;
         use std::iter;
         use std::sync::Arc;
-        use super::Node;
         use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case

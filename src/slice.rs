@@ -1,6 +1,6 @@
 use std;
-use std::sync::Arc;
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
+use std::sync::Arc;
 
 use iter::{Bytes, Chars, Chunks, Lines};
 use rope::Rope;

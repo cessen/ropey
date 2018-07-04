@@ -1,8 +1,8 @@
 extern crate rand;
 extern crate ropey;
 
-use ropey::RopeBuilder;
 use rand::Rng;
+use ropey::RopeBuilder;
 
 fn main() {
     let mut rng = rand::thread_rng();

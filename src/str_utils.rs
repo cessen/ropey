@@ -99,11 +99,10 @@ pub fn count_line_breaks(text: &str) -> usize {
             else if byte == 0xE2 {
                 let next1 = unsafe { ptr.offset(1) };
                 let next2 = unsafe { ptr.offset(2) };
-                if next1 < end_ptr && next2 < end_ptr && unsafe { *next1 } == 0x80 && (unsafe {
-                    *next2
-                }
-                    >> 1)
-                    == 0x54
+                if next1 < end_ptr
+                    && next2 < end_ptr
+                    && unsafe { *next1 } == 0x80
+                    && (unsafe { *next2 } >> 1) == 0x54
                 {
                     count += 1;
                 }

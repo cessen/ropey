@@ -9,8 +9,8 @@
 use std::str;
 use std::sync::Arc;
 
-use tree::Node;
 use slice::RopeSlice;
+use tree::Node;
 
 //==========================================================
 

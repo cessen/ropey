@@ -71,11 +71,11 @@
 extern crate smallvec;
 
 mod crlf;
-mod rope_builder;
 mod rope;
-mod tree;
+mod rope_builder;
 mod slice;
 mod str_utils;
+mod tree;
 
 pub mod iter;
 

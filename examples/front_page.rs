@@ -2,9 +2,9 @@ extern crate ropey;
 
 use std::io::Result;
 
+use ropey::Rope;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
-use ropey::Rope;
 
 /// This is the example from the front page of Ropey's documentation.
 fn main() {

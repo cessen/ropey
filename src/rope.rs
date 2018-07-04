@@ -1,7 +1,7 @@
 use std;
 use std::io;
-use std::sync::Arc;
 use std::ptr;
+use std::sync::Arc;
 
 use crlf;
 use iter::{Bytes, Chars, Chunks, Lines};
@@ -322,7 +322,8 @@ impl Rope {
                                 // Check for CRLF graphemes on the insertion seams, and
                                 // adjust line break counts accordingly
                                 if !ins_text.is_empty() {
-                                    if byte_idx > 0 && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    if byte_idx > 0
+                                        && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
                                         && ins_text.as_bytes()[0] == 0x0A
                                     {
                                         info.line_breaks -= 1;
@@ -333,7 +334,8 @@ impl Rope {
                                     {
                                         info.line_breaks -= 1;
                                     }
-                                    if byte_idx > 0 && byte_idx < leaf_text.len()
+                                    if byte_idx > 0
+                                        && byte_idx < leaf_text.len()
                                         && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
                                         && leaf_text.as_bytes()[byte_idx] == 0x0A
                                     {
@@ -456,7 +458,8 @@ impl Rope {
                         // Check for CRLF graphemes on the insertion seams, and
                         // adjust line break counts accordingly
                         if byte_start != byte_end {
-                            if byte_start > 0 && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                            if byte_start > 0
+                                && leaf_text.as_bytes()[byte_start - 1] == 0x0D
                                 && leaf_text.as_bytes()[byte_start] == 0x0A
                             {
                                 info.line_breaks += 1;
@@ -467,7 +470,8 @@ impl Rope {
                             {
                                 info.line_breaks += 1;
                             }
-                            if byte_start > 0 && byte_end < leaf_text.len()
+                            if byte_start > 0
+                                && byte_end < leaf_text.len()
                                 && leaf_text.as_bytes()[byte_start - 1] == 0x0D
                                 && leaf_text.as_bytes()[byte_end] == 0x0A
                             {

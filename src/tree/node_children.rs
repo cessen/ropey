@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use crlf;
 use tree;
-use tree::{Node, MAX_BYTES};
 use tree::TextInfo;
+use tree::{Node, MAX_BYTES};
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
 
@@ -432,11 +432,11 @@ impl fmt::Debug for NodeChildren {
 /// accessing elements that are semantically out of bounds.  This happened once,
 /// and it was a pain to track down--as memory safety bugs often are.
 mod inner {
-    use std::ptr;
+    use super::{Node, TextInfo, MAX_LEN};
     use std::mem;
     use std::mem::ManuallyDrop;
+    use std::ptr;
     use std::sync::Arc;
-    use super::{Node, TextInfo, MAX_LEN};
 
     pub(crate) struct NodeChildrenInternal {
         nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,

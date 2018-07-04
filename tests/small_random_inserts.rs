@@ -1,8 +1,8 @@
 extern crate rand;
 extern crate ropey;
 
-use ropey::Rope;
 use rand::Rng;
+use ropey::Rope;
 
 #[test]
 fn small_random_inserts() {

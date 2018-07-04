@@ -1,8 +1,8 @@
 extern crate ropey;
 extern crate unicode_segmentation;
 
+use ropey::{iter::Chunks, Rope, RopeSlice};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-use ropey::{Rope, RopeSlice, iter::Chunks};
 
 fn main() {}
 

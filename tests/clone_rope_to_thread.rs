@@ -1,7 +1,7 @@
 extern crate ropey;
 
-use std::thread;
 use std::sync::mpsc;
+use std::thread;
 
 use std::iter::Iterator;
 

@@ -5,8 +5,8 @@ extern crate ropey;
 use std::fs::File;
 use std::io;
 
-use ropey::{Rope, RopeSlice};
 use ropey::iter::{Bytes, Chars, Chunks, Lines};
+use ropey::{Rope, RopeSlice};
 
 struct TextBuffer {
     text: Rope,
