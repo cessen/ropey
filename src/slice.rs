@@ -24,6 +24,19 @@ impl<'a> RopeSlice<'a> {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
 
+        // Early-out shortcut for taking a slice of the full thing.
+        if start == 0 && end == node.char_count() {
+            return RopeSlice {
+                node: node,
+                start_byte: 0,
+                end_byte: node.byte_count() as Count,
+                start_char: 0,
+                end_char: node.char_count() as Count,
+                start_line_break: 0,
+                end_line_break: node.line_break_count() as Count,
+            };
+        }
+
         // Find the deepest node that still contains the full range given.
         let mut n_start = start;
         let mut n_end = end;
@@ -294,6 +307,11 @@ impl<'a> RopeSlice<'a> {
     /// Panics if the start of the range is greater than the end, or the end
     /// is out of bounds (i.e. `end > len_chars()`).
     pub fn slice<R: CharIdxRange>(&self, range: R) -> Self {
+        // Early-out shortcut for taking a slice of the full thing.
+        if range.start() == None && range.end() == None {
+            return *self;
+        }
+
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());
 

@@ -74,6 +74,22 @@ fn slice_from_small(bench: &mut Bencher) {
     })
 }
 
+fn slice_whole_rope(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    bench.iter(|| {
+        rope.slice(..);
+    })
+}
+
+fn slice_whole_slice(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_chars();
+    let slice = rope.slice(1..len - 1);
+    bench.iter(|| {
+        slice.slice(..);
+    })
+}
+
 //----
 
 benchmark_group!(
@@ -83,6 +99,8 @@ benchmark_group!(
     get_char,
     get_line,
     slice,
-    slice_from_small
+    slice_from_small,
+    slice_whole_rope,
+    slice_whole_slice
 );
 benchmark_main!(benches);
