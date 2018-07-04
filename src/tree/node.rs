@@ -576,6 +576,18 @@ impl Node {
         }
     }
 
+    /// Returns the chunk that contains the given byte, and the byte's
+    /// byte-offset within the chunk.
+    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
+        match *self {
+            Node::Leaf(ref text) => (text, byte_idx),
+            Node::Internal(ref children) => {
+                let (child_i, acc_info) = children.search_byte_idx(byte_idx);
+                children.nodes()[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
+            }
+        }
+    }
+
     /// Returns the chunk that contains the given char, and the chars's
     /// char-offset within the chunk.
     pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize) {

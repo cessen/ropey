@@ -778,6 +778,49 @@ impl Rope {
         self.slice(start..end)
     }
 
+    /// Returns the chunk containing the given byte index, along with
+    /// the byte offset of that byte within the chunk.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
+    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
+        // Bounds check
+        assert!(
+            byte_idx < self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        self.root.get_chunk_at_byte(byte_idx)
+    }
+
+    /// Returns the chunk containing the given char index, along with
+    /// the char and byte offset of that char within the chunk.
+    ///
+    /// The return is organized as (chunk, char_offset, byte_offset).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
+    pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize) {
+        // Bounds check
+        assert!(
+            char_idx < self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        // TODO: get the byte offset at the same time, as part of the
+        // chunk traversal, to be more efficient.
+        let (chunk, char_offset) = self.root.get_chunk_at_char(char_idx);
+        let byte_offset = char_idx_to_byte_idx(chunk, char_offset);
+
+        (chunk, char_offset, byte_offset)
+    }
+
     //-----------------------------------------------------------------------
     // Slicing
 
