@@ -56,7 +56,16 @@ impl<'a> RopeSlice<'a> {
         let mut node = node;
         'outer: loop {
             match *(node as &Node) {
-                Node::Leaf(_) => break,
+                Node::Leaf(ref text) => {
+                    let start_byte = char_idx_to_byte_idx(&text, n_start);
+                    let end_byte =
+                        start_byte + char_idx_to_byte_idx(&text[start_byte..], n_end - n_start);
+                    return RopeSlice(RSEnum::Light {
+                        text: &text[start_byte..end_byte],
+                        char_count: (n_end - n_start) as Count,
+                        line_break_count: count_line_breaks(&text[start_byte..end_byte]) as Count,
+                    });
+                }
 
                 Node::Internal(ref children) => {
                     let mut start_char = 0;
@@ -86,6 +95,18 @@ impl<'a> RopeSlice<'a> {
         })
     }
 
+    /// Creates a `RopeSlice` directly from a string slice.
+    ///
+    /// The resulting `RopeSlice` is very lightweight, and simply refers
+    /// directly to the string slice.
+    ///
+    /// This is primarily intended for avoiding overhead when working with
+    /// small slices (e.g. characters or words).  Using this for large slices
+    /// may actually decrease performance, depending on usage.  
+    ///
+    /// A good example of its usage is in `graphemes_iter.rs` in the `examples`
+    /// directory of this crate, where its use significantly speeds up the
+    /// graphemes iterator.
     pub fn from_str(text: &str) -> RopeSlice {
         RopeSlice(RSEnum::Light {
             text: text,
@@ -396,7 +417,7 @@ impl<'a> RopeSlice<'a> {
     /// Note that this method will typically fail, since the contents of a
     /// rope is generally not contiguous in memory.
     ///
-    /// This is intended for optimizing cases where the slice is a very small
+    /// This is intended for optimizing cases where the slice is a small
     /// part of the text (on the order of a few characters or less) and
     /// therefore has a high chance of being contiguous in memory.
     pub fn as_str(&self) -> Option<&str> {

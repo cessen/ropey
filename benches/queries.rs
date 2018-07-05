@@ -61,7 +61,20 @@ fn slice(bench: &mut Bencher) {
     })
 }
 
-fn slice_from_small(bench: &mut Bencher) {
+fn slice_small(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_chars();
+    bench.iter(|| {
+        let mut start = random::<usize>() % (len + 1);
+        if start > (len - 65) {
+            start = len - 65;
+        }
+        let end = start + 64;
+        rope.slice(start..end);
+    })
+}
+
+fn slice_from_small_rope(bench: &mut Bencher) {
     let rope = Rope::from_str(SMALL_TEXT);
     let len = rope.len_chars();
     bench.iter(|| {
@@ -99,7 +112,8 @@ benchmark_group!(
     get_char,
     get_line,
     slice,
-    slice_from_small,
+    slice_small,
+    slice_from_small_rope,
     slice_whole_rope,
     slice_whole_slice
 );
