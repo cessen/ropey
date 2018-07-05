@@ -608,19 +608,26 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
 impl<'a, 'b> std::cmp::PartialEq<&'b str> for RopeSlice<'a> {
     #[inline]
     fn eq(&self, other: &&'b str) -> bool {
-        if self.len_bytes() != other.len() {
-            return false;
-        }
+        match *self {
+            RopeSlice(RSEnum::Full { .. }) => {
+                if self.len_bytes() != other.len() {
+                    return false;
+                }
 
-        let mut idx = 0;
-        for chunk in self.chunks() {
-            if chunk != &other[idx..(idx + chunk.len())] {
-                return false;
+                let mut idx = 0;
+                for chunk in self.chunks() {
+                    if chunk != &other[idx..(idx + chunk.len())] {
+                        return false;
+                    }
+                    idx += chunk.len();
+                }
+
+                return true;
             }
-            idx += chunk.len();
+            RopeSlice(RSEnum::Light { text, .. }) => {
+                return text == *other;
+            }
         }
-
-        return true;
     }
 }
 
