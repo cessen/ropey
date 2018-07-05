@@ -390,6 +390,23 @@ impl<'a> RopeSlice<'a> {
         (chunk, char_offset, byte_offset)
     }
 
+    /// Returns the entire contents of the `RopeSlice` as a `str` slice if
+    /// possible.
+    ///
+    /// Note that this method will typically fail, since the contents of a
+    /// rope is generally not contiguous in memory.
+    ///
+    /// This is intended for optimizing cases where the slice is a very small
+    /// part of the text (on the order of a few characters or less) and
+    /// therefore has a high chance of being contiguous in memory.
+    pub fn as_str(&self) -> Option<&str> {
+        // TODO: can we make this work well for the `Full` variant as well?
+        match *self {
+            RopeSlice(RSEnum::Full { .. }) => None,
+            RopeSlice(RSEnum::Light { text, .. }) => Some(text),
+        }
+    }
+
     //-----------------------------------------------------------------------
     // Slicing
 
