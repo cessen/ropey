@@ -302,8 +302,9 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Full {
                 node, start_char, ..
             }) => {
-                let (chunk, offset) = node.get_chunk_at_char(char_idx + start_char as usize);
-                let byte_idx = char_idx_to_byte_idx(chunk, offset);
+                let char_idx = char_idx + start_char as usize;
+                let (chunk, _, chunk_char_idx) = node.get_chunk_at_char(char_idx);
+                let byte_idx = char_idx_to_byte_idx(chunk, char_idx - chunk_char_idx);
                 chunk[byte_idx..].chars().nth(0).unwrap()
             }
             RopeSlice(RSEnum::Light { text, .. }) => {
@@ -336,12 +337,14 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Returns the chunk containing the given byte index, along with
-    /// the byte offset of that byte within the chunk.
+    /// the byte and char indices of the beginning of the chunk.
+    ///
+    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
     ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
-    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
+    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize) {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
@@ -355,40 +358,40 @@ impl<'a> RopeSlice<'a> {
                 node,
                 start_byte,
                 end_byte,
+                start_char,
                 ..
             }) => {
                 // Get the chunk.
-                let (chunk, byte_offset) = node.get_chunk_at_byte(byte_idx + start_byte as usize);
+                let (chunk, chunk_byte_idx, chunk_char_idx) =
+                    node.get_chunk_at_byte(byte_idx + start_byte as usize);
 
                 // Calculate clipped start/end byte indices within the chunk.
-                let chunk_start_idx = if byte_offset > byte_idx {
-                    byte_offset - byte_idx
+                let chunk_start_byte_idx = if chunk_byte_idx < start_byte as usize {
+                    start_byte as usize - chunk_byte_idx
                 } else {
                     0
                 };
-                let chunk_end_idx = {
-                    let tmp = byte_idx + start_byte as usize + chunk.len() - byte_offset;
-                    if tmp > end_byte as usize {
-                        tmp - end_byte as usize
-                    } else {
-                        chunk.len()
-                    }
+                let chunk_end_byte_idx = if (chunk_byte_idx + chunk.len()) > end_byte as usize {
+                    end_byte as usize - chunk_byte_idx
+                } else {
+                    chunk.len()
                 };
 
                 // Return the clipped chunk and byte offset.
                 (
-                    &chunk[chunk_start_idx..chunk_end_idx],
-                    byte_offset - chunk_start_idx,
+                    &chunk[chunk_start_byte_idx..chunk_end_byte_idx],
+                    chunk_byte_idx + chunk_start_byte_idx,
+                    chunk_char_idx.max(start_char as usize),
                 )
             }
-            RopeSlice(RSEnum::Light { text, .. }) => (text, byte_idx),
+            RopeSlice(RSEnum::Light { text, .. }) => (text, 0, 0),
         }
     }
 
     /// Returns the chunk containing the given char index, along with
-    /// the char and byte offset of that char within the chunk.
+    /// the byte and char indices of the beginning of the chunk.
     ///
-    /// The return is organized as (chunk, char_offset, byte_offset).
+    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
     ///
     /// # Panics
     ///
@@ -402,13 +405,39 @@ impl<'a> RopeSlice<'a> {
             self.len_chars()
         );
 
-        // TODO: get the chunk with byte and char index in one go,
-        // to avoid traversing the rope tree twice.
-        let byte_idx = self.char_to_byte(char_idx);
-        let (chunk, byte_offset) = self.chunk_at_byte(byte_idx);
-        let char_offset = byte_idx_to_char_idx(chunk, byte_offset);
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_byte,
+                end_byte,
+                start_char,
+                ..
+            }) => {
+                // Get the chunk.
+                let (chunk, chunk_byte_idx, chunk_char_idx) =
+                    node.get_chunk_at_char(char_idx + start_char as usize);
 
-        (chunk, char_offset, byte_offset)
+                // Calculate clipped start/end byte indices within the chunk.
+                let chunk_start_byte_idx = if chunk_byte_idx < start_byte as usize {
+                    start_byte as usize - chunk_byte_idx
+                } else {
+                    0
+                };
+                let chunk_end_byte_idx = if (chunk_byte_idx + chunk.len()) > end_byte as usize {
+                    end_byte as usize - chunk_byte_idx
+                } else {
+                    chunk.len()
+                };
+
+                // Return the clipped chunk and byte offset.
+                (
+                    &chunk[chunk_start_byte_idx..chunk_end_byte_idx],
+                    chunk_byte_idx + chunk_start_byte_idx,
+                    chunk_char_idx.max(start_char as usize),
+                )
+            }
+            RopeSlice(RSEnum::Light { text, .. }) => (text, 0, 0),
+        }
     }
 
     /// Returns the entire contents of the `RopeSlice` as a `str` slice if

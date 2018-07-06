@@ -580,26 +580,46 @@ impl Node {
         }
     }
 
-    /// Returns the chunk that contains the given byte, and the byte's
-    /// byte-offset within the chunk.
-    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
-        match *self {
-            Node::Leaf(ref text) => (text, byte_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) = children.search_byte_idx(byte_idx);
-                children.nodes()[child_i].get_chunk_at_byte(byte_idx - acc_info.bytes as usize)
+    /// Returns the chunk that contains the given byte, and the chunk's starting
+    /// byte and char indices.
+    ///
+    /// Return takes the form of (chunk, chunk_char_idx, chunk_byte_idx).
+    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize) {
+        let mut node = self;
+        let mut byte_idx = byte_idx;
+        let mut info = TextInfo::new();
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return (text, info.bytes as usize, info.chars as usize),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) = children.search_byte_idx(byte_idx);
+                    info += acc_info;
+                    node = &*children.nodes()[child_i];
+                    byte_idx -= acc_info.bytes as usize;
+                }
             }
         }
     }
 
-    /// Returns the chunk that contains the given char, and the chars's
-    /// char-offset within the chunk.
-    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize) {
-        match *self {
-            Node::Leaf(ref text) => (text, char_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) = children.search_char_idx(char_idx);
-                children.nodes()[child_i].get_chunk_at_char(char_idx - acc_info.chars as usize)
+    /// Returns the chunk that contains the given char, and the chunk's starting
+    /// byte and char indices.
+    ///
+    /// Return takes the form of (chunk, chunk_char_idx, chunk_byte_idx).
+    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize) {
+        let mut node = self;
+        let mut char_idx = char_idx;
+        let mut info = TextInfo::new();
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return (text, info.bytes as usize, info.chars as usize),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) = children.search_char_idx(char_idx);
+                    info += acc_info;
+                    node = &*children.nodes()[child_i];
+                    char_idx -= acc_info.chars as usize;
+                }
             }
         }
     }

@@ -14,25 +14,28 @@ fn prev_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
     // We work with bytes for this, so convert.
     let byte_idx = slice.char_to_byte(char_idx);
 
-    // Get the chunk with our byte index in it, and calculate its starting
-    // byte within the total rope slice.
-    let (mut chunk, byte_offset) = slice.chunk_at_byte(byte_idx);
-    let mut chunk_start_idx = byte_idx - byte_offset;
+    // Get the chunk with our byte index in it.
+    let (mut chunk, mut chunk_byte_idx, mut chunk_char_idx) = slice.chunk_at_byte(byte_idx);
 
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
 
     // Find the previous grapheme cluster boundary.
     loop {
-        match gc.prev_boundary(chunk, chunk_start_idx) {
+        match gc.prev_boundary(chunk, chunk_byte_idx) {
             Ok(None) => return 0,
-            Ok(Some(n)) => return slice.byte_to_char(n),
+            Ok(Some(n)) => {
+                let tmp = chunk[..(n - chunk_byte_idx)].chars().count();
+                return chunk_char_idx + tmp;
+            }
             Err(GraphemeIncomplete::PrevChunk) => {
-                chunk = slice.chunk_at_byte(chunk_start_idx - 1).0;
-                chunk_start_idx -= chunk.len();
+                let (a, b, c) = slice.chunk_at_byte(chunk_byte_idx - 1);
+                chunk = a;
+                chunk_byte_idx = b;
+                chunk_char_idx = c;
             }
             Err(GraphemeIncomplete::PreContext(n)) => {
-                let (ctx_chunk, _) = slice.chunk_at_byte(n - 1);
+                let ctx_chunk = slice.chunk_at_byte(n - 1).0;
                 gc.provide_context(ctx_chunk, n - ctx_chunk.len());
             }
             _ => unreachable!(),
@@ -48,25 +51,28 @@ fn next_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
     // We work with bytes for this, so convert.
     let byte_idx = slice.char_to_byte(char_idx);
 
-    // Get the chunk with our byte index in it, and calculate its starting
-    // byte within the total rope slice.
-    let (mut chunk, byte_offset) = slice.chunk_at_byte(byte_idx);
-    let mut chunk_start_idx = byte_idx - byte_offset;
+    // Get the chunk with our byte index in it.
+    let (mut chunk, mut chunk_byte_idx, mut chunk_char_idx) = slice.chunk_at_byte(byte_idx);
 
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
 
     // Find the next grapheme cluster boundary.
     loop {
-        match gc.next_boundary(chunk, chunk_start_idx) {
+        match gc.next_boundary(chunk, chunk_byte_idx) {
             Ok(None) => return slice.len_chars(),
-            Ok(Some(n)) => return slice.byte_to_char(n),
+            Ok(Some(n)) => {
+                let tmp = chunk[..(n - chunk_byte_idx)].chars().count();
+                return chunk_char_idx + tmp;
+            }
             Err(GraphemeIncomplete::NextChunk) => {
-                chunk_start_idx += chunk.len();
-                chunk = slice.chunk_at_byte(chunk_start_idx).0;
+                chunk_byte_idx += chunk.len();
+                let (a, _, c) = slice.chunk_at_byte(chunk_byte_idx);
+                chunk = a;
+                chunk_char_idx = c;
             }
             Err(GraphemeIncomplete::PreContext(n)) => {
-                let (ctx_chunk, _) = slice.chunk_at_byte(n - 1);
+                let ctx_chunk = slice.chunk_at_byte(n - 1).0;
                 gc.provide_context(ctx_chunk, n - ctx_chunk.len());
             }
             _ => unreachable!(),
@@ -82,21 +88,19 @@ fn is_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> bool {
     // We work with bytes for this, so convert.
     let byte_idx = slice.char_to_byte(char_idx);
 
-    // Get the chunk with our byte index in it, and calculate its starting
-    // byte within the total rope slice.
-    let (chunk, byte_offset) = slice.chunk_at_byte(byte_idx);
-    let chunk_start_idx = byte_idx - byte_offset;
+    // Get the chunk with our byte index in it.
+    let (chunk, chunk_byte_idx, _) = slice.chunk_at_byte(byte_idx);
 
     // Set up the grapheme cursor.
     let mut gc = GraphemeCursor::new(byte_idx, slice.len_bytes(), true);
 
     // Determine if the given position is a grapheme cluster boundary.
     loop {
-        match gc.is_boundary(chunk, chunk_start_idx) {
+        match gc.is_boundary(chunk, chunk_byte_idx) {
             Ok(n) => return n,
             Err(GraphemeIncomplete::PreContext(n)) => {
-                let (ctx_chunk, _) = slice.chunk_at_byte(n - 1);
-                gc.provide_context(ctx_chunk, n - ctx_chunk.len());
+                let (ctx_chunk, ctx_byte_start, _) = slice.chunk_at_byte(n - 1);
+                gc.provide_context(ctx_chunk, ctx_byte_start);
             }
             _ => unreachable!(),
         }

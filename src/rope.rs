@@ -755,8 +755,8 @@ impl Rope {
             self.len_chars()
         );
 
-        let (chunk, offset) = self.root.get_chunk_at_char(char_idx);
-        let byte_idx = char_idx_to_byte_idx(chunk, offset);
+        let (chunk, _, chunk_char_idx) = self.root.get_chunk_at_char(char_idx);
+        let byte_idx = char_idx_to_byte_idx(chunk, char_idx - chunk_char_idx);
         chunk[byte_idx..].chars().nth(0).unwrap()
     }
 
@@ -783,12 +783,14 @@ impl Rope {
     }
 
     /// Returns the chunk containing the given byte index, along with
-    /// the byte offset of that byte within the chunk.
+    /// the byte and char indices of the beginning of the chunk.
+    ///
+    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
     ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
-    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize) {
+    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize) {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
@@ -801,9 +803,9 @@ impl Rope {
     }
 
     /// Returns the chunk containing the given char index, along with
-    /// the char and byte offset of that char within the chunk.
+    /// the byte and char indices of the beginning of the chunk.
     ///
-    /// The return is organized as (chunk, char_offset, byte_offset).
+    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
     ///
     /// # Panics
     ///
@@ -817,12 +819,7 @@ impl Rope {
             self.len_chars()
         );
 
-        // TODO: get the byte offset at the same time, as part of the
-        // chunk traversal, to be more efficient.
-        let (chunk, char_offset) = self.root.get_chunk_at_char(char_idx);
-        let byte_offset = char_idx_to_byte_idx(chunk, char_offset);
-
-        (chunk, char_offset, byte_offset)
+        self.root.get_chunk_at_char(char_idx)
     }
 
     //-----------------------------------------------------------------------
