@@ -5,8 +5,8 @@ use std::sync::Arc;
 use iter::{Bytes, Chars, Chunks, Lines};
 use rope::Rope;
 use str_utils::{
-    byte_idx_to_char_idx, char_idx_to_byte_idx, char_idx_to_line_idx, count_chars,
-    count_line_breaks, line_idx_to_char_idx,
+    byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx, char_idx_to_line_idx,
+    count_chars, count_line_breaks, line_idx_to_byte_idx, line_idx_to_char_idx,
 };
 use tree::{Count, Node};
 
@@ -194,6 +194,45 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    /// Returns the line index of the given byte.
+    ///
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - If `byte_idx` is one-past-the-end, then one-past-the-end line index
+    ///   is returned.  This is mainly unintuitive for empty ropes, which will
+    ///   return a line index of 1 for a `byte_idx` of zero.  Otherwise it
+    ///   behaves as expected.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    pub fn byte_to_line(&self, byte_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        if byte_idx == self.len_bytes() {
+            self.len_lines()
+        } else {
+            match *self {
+                RopeSlice(RSEnum::Full {
+                    node,
+                    start_byte,
+                    start_line_break,
+                    ..
+                }) => {
+                    node.byte_to_line(start_byte as usize + byte_idx) - (start_line_break as usize)
+                }
+                RopeSlice(RSEnum::Light { text, .. }) => byte_idx_to_line_idx(text, byte_idx),
+            }
+        }
+    }
+
     /// Returns the byte index of the given char.
     ///
     /// # Panics
@@ -247,6 +286,49 @@ impl<'a> RopeSlice<'a> {
                     node.char_to_line(start_char as usize + char_idx) - (start_line_break as usize)
                 }
                 RopeSlice(RSEnum::Light { text, .. }) => char_idx_to_line_idx(text, char_idx),
+            }
+        }
+    }
+
+    /// Returns the byte index of the start of the given line.
+    ///
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
+    ///   byte index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
+    pub fn line_to_byte(&self, line_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of slice: line index {}, slice line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
+        if line_idx == self.len_lines() {
+            self.len_bytes()
+        } else {
+            match *self {
+                RopeSlice(RSEnum::Full {
+                    node,
+                    start_byte,
+                    start_line_break,
+                    ..
+                }) => {
+                    let raw_byte_idx = node.line_to_byte(start_line_break as usize + line_idx);
+
+                    if raw_byte_idx < (start_byte as usize) {
+                        0
+                    } else {
+                        raw_byte_idx - start_byte as usize
+                    }
+                }
+                RopeSlice(RSEnum::Light { text, .. }) => line_idx_to_byte_idx(text, line_idx),
             }
         }
     }
