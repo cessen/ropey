@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate ropey;
 extern crate unicode_segmentation;
 
