@@ -4,7 +4,7 @@ mod node_text;
 mod text_info;
 
 #[cfg(not(test))]
-use std::mem::size_of;
+use std::{mem::size_of, sync::Arc};
 
 pub(crate) use self::node::Node;
 pub(crate) use self::node_children::NodeChildren;
@@ -13,6 +13,8 @@ pub(crate) use self::text_info::TextInfo;
 
 #[cfg(not(test))]
 const PTR_SIZE: usize = size_of::<&u8>();
+#[cfg(not(test))]
+const CHILD_INFO_SIZE: usize = size_of::<Arc<Node>>() + size_of::<TextInfo>();
 
 // Aim for nodes to be 768 bytes - Arc counters.  Keeping the nodes
 // multiples of large powers of two makes it easier for the memory allocator
@@ -26,7 +28,7 @@ const TARGET_NODE_SIZE: usize = 768 - (PTR_SIZE * 2);
 #[cfg(test)]
 pub(crate) const MAX_CHILDREN: usize = 5;
 #[cfg(not(test))]
-pub(crate) const MAX_CHILDREN: usize = (TARGET_NODE_SIZE - 1) / 32;
+pub(crate) const MAX_CHILDREN: usize = (TARGET_NODE_SIZE - 1) / CHILD_INFO_SIZE;
 pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 #[cfg(test)]
