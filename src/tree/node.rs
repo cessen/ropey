@@ -431,86 +431,120 @@ impl Node {
 
     /// Returns the char index of the given byte.
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        match *self {
-            Node::Leaf(ref text) => byte_idx_to_char_idx(text, byte_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
+        let mut node = self;
+        let mut byte_idx = byte_idx;
+        let mut char_idx = 0;
 
-                acc_info.chars as usize
-                    + children.nodes()[child_i].byte_to_char(byte_idx - acc_info.bytes as usize)
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return char_idx + byte_idx_to_char_idx(text, byte_idx),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
+                    byte_idx -= acc_info.bytes as usize;
+                    char_idx += acc_info.chars as usize;
+                    node = &*children.nodes()[child_i];
+                }
             }
         }
     }
 
     /// Returns the line index of the given byte.
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
-        match *self {
-            Node::Leaf(ref text) => byte_idx_to_line_idx(text, byte_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
+        let mut node = self;
+        let mut byte_idx = byte_idx;
+        let mut line_idx = 0;
 
-                acc_info.line_breaks as usize
-                    + children.nodes()[child_i].byte_to_line(byte_idx - acc_info.bytes as usize)
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return line_idx + byte_idx_to_line_idx(text, byte_idx),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| byte_idx as Count <= inf.bytes);
+                    byte_idx -= acc_info.bytes as usize;
+                    line_idx += acc_info.line_breaks as usize;
+                    node = &*children.nodes()[child_i];
+                }
             }
         }
     }
 
     /// Returns the byte index of the given char.
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        match *self {
-            Node::Leaf(ref text) => char_idx_to_byte_idx(text, char_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+        let mut node = self;
+        let mut char_idx = char_idx;
+        let mut byte_idx = 0;
 
-                acc_info.bytes as usize
-                    + children.nodes()[child_i].char_to_byte(char_idx - acc_info.chars as usize)
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return byte_idx + char_idx_to_byte_idx(text, char_idx),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                    char_idx -= acc_info.chars as usize;
+                    byte_idx += acc_info.bytes as usize;
+                    node = &*children.nodes()[child_i];
+                }
             }
         }
     }
 
     /// Returns the line index of the given char.
     pub fn char_to_line(&self, char_idx: usize) -> usize {
-        match *self {
-            Node::Leaf(ref text) => char_idx_to_line_idx(text, char_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+        let mut node = self;
+        let mut char_idx = char_idx;
+        let mut line_idx = 0;
 
-                acc_info.line_breaks as usize
-                    + children.nodes()[child_i].char_to_line(char_idx - acc_info.chars as usize)
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return line_idx + char_idx_to_line_idx(text, char_idx),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                    char_idx -= acc_info.chars as usize;
+                    line_idx += acc_info.line_breaks as usize;
+                    node = &*children.nodes()[child_i];
+                }
             }
         }
     }
 
     /// Returns the byte index of the start of the given line.
     pub fn line_to_byte(&self, line_idx: usize) -> usize {
-        match *self {
-            Node::Leaf(ref text) => line_idx_to_byte_idx(text, line_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
+        let mut node = self;
+        let mut line_idx = line_idx;
+        let mut byte_idx = 0;
 
-                acc_info.bytes as usize
-                    + children.nodes()[child_i]
-                        .line_to_byte(line_idx - acc_info.line_breaks as usize)
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return byte_idx + line_idx_to_byte_idx(text, line_idx),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
+                    line_idx -= acc_info.line_breaks as usize;
+                    byte_idx += acc_info.bytes as usize;
+                    node = &*children.nodes()[child_i];
+                }
             }
         }
     }
 
     /// Returns the char index of the start of the given line.
     pub fn line_to_char(&self, line_idx: usize) -> usize {
-        match *self {
-            Node::Leaf(ref text) => line_idx_to_char_idx(text, line_idx),
-            Node::Internal(ref children) => {
-                let (child_i, acc_info) =
-                    children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
+        let mut node = self;
+        let mut line_idx = line_idx;
+        let mut char_idx = 0;
 
-                acc_info.chars as usize
-                    + children.nodes()[child_i]
-                        .line_to_char(line_idx - acc_info.line_breaks as usize)
+        loop {
+            match *node {
+                Node::Leaf(ref text) => return char_idx + line_idx_to_char_idx(text, line_idx),
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| line_idx as Count <= inf.line_breaks);
+                    line_idx -= acc_info.line_breaks as usize;
+                    char_idx += acc_info.chars as usize;
+                    node = &*children.nodes()[child_i];
+                }
             }
         }
     }
@@ -574,9 +608,17 @@ impl Node {
     /// This counts root and leafs.  For example, a single leaf node
     /// has depth 1.
     pub fn depth(&self) -> usize {
-        1 + match *self {
-            Node::Leaf(_) => 0,
-            Node::Internal(ref children) => children.nodes()[0].depth(),
+        let mut node = self;
+        let mut depth = 0;
+
+        loop {
+            match *node {
+                Node::Leaf(_) => return depth,
+                Node::Internal(ref children) => {
+                    depth += 1;
+                    node = &*children.nodes()[0];
+                }
+            }
         }
     }
 

@@ -12,6 +12,22 @@ const SMALL_TEXT: &str = include_str!("small.txt");
 
 //----
 
+fn byte_to_char(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_bytes();
+    bench.iter(|| {
+        rope.byte_to_char(random::<usize>() % (len + 1));
+    })
+}
+
+fn char_to_byte(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_chars();
+    bench.iter(|| {
+        rope.char_to_byte(random::<usize>() % (len + 1));
+    })
+}
+
 fn char_to_line(bench: &mut Bencher) {
     let rope = Rope::from_str(TEXT);
     let len = rope.len_chars();
@@ -107,6 +123,8 @@ fn slice_whole_slice(bench: &mut Bencher) {
 
 benchmark_group!(
     benches,
+    byte_to_char,
+    char_to_byte,
     char_to_line,
     line_to_char,
     get_char,
