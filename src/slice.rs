@@ -39,15 +39,24 @@ impl<'a> RopeSlice<'a> {
 
         // Early-out shortcut for taking a slice of the full thing.
         if start == 0 && end == node.char_count() {
-            return RopeSlice(RSEnum::Full {
-                node: node,
-                start_byte: 0,
-                end_byte: node.byte_count() as Count,
-                start_char: 0,
-                end_char: node.char_count() as Count,
-                start_line_break: 0,
-                end_line_break: node.line_break_count() as Count,
-            });
+            if node.is_leaf() {
+                let text = node.leaf_text();
+                return RopeSlice(RSEnum::Light {
+                    text: text,
+                    char_count: (end - start) as Count,
+                    line_break_count: count_line_breaks(text) as Count,
+                });
+            } else {
+                return RopeSlice(RSEnum::Full {
+                    node: node,
+                    start_byte: 0,
+                    end_byte: node.byte_count() as Count,
+                    start_char: 0,
+                    end_char: node.char_count() as Count,
+                    start_line_break: 0,
+                    end_line_break: node.line_break_count() as Count,
+                });
+            }
         }
 
         // Find the deepest node that still contains the full range given.
