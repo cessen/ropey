@@ -117,6 +117,8 @@ impl<'a> Iterator for Chars<'a> {
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
+pub struct Lines<'a>(LinesEnum<'a>);
+
 enum LinesEnum<'a> {
     Full {
         node: &'a Arc<Node>,
@@ -129,8 +131,6 @@ enum LinesEnum<'a> {
         done: bool,
     },
 }
-
-pub struct Lines<'a>(LinesEnum<'a>);
 
 impl<'a> Lines<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Lines {

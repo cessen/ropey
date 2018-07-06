@@ -104,18 +104,19 @@ impl<'a> RopeSlice<'a> {
         })
     }
 
-    /// Creates a `RopeSlice` directly from a string slice.
+    /// Creates a `RopeSlice` from a string slice.
     ///
     /// The resulting `RopeSlice` is very lightweight, and simply refers
     /// directly to the string slice.
     ///
-    /// This is primarily intended for avoiding overhead when working with
-    /// small slices (e.g. characters or words).  Using this for large slices
-    /// may actually decrease performance, depending on usage.  
+    /// This is primarily intended for avoiding the performance overhead of a
+    /// full `slice()` operation when relevant.  The `slice()` method is
+    /// comparatively cheap, but it may nevertheless be too expensive for
+    /// some tight inner loops because of the tree traversal it typically has
+    /// to do.
     ///
-    /// A good example of its usage is in `graphemes_iter.rs` in the `examples`
-    /// directory of this crate, where its use significantly speeds up the
-    /// graphemes iterator.
+    /// A good example of this method's usage is in `examples/graphemes_iter.rs`,
+    /// where it is used to significantly speed up the graphemes iterator.
     pub fn from_str(text: &str) -> RopeSlice {
         RopeSlice(RSEnum::Light {
             text: text,
@@ -261,6 +262,14 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns the line index of the given char.
     ///
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - If `char_idx` is one-past-the-end, then one-past-the-end line index
+    ///   is returned.  This is mainly unintuitive for empty ropes, which will
+    ///   return a line index of 1 for a `char_idx` of zero.  Otherwise it
+    ///   behaves as expected.
+    ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
@@ -335,7 +344,11 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns the char index of the start of the given line.
     ///
-    /// Note: lines are zero-indexed.
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.
+    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
+    ///   char index.
     ///
     /// # Panics
     ///
@@ -430,7 +443,7 @@ impl<'a> RopeSlice<'a> {
     /// Returns the chunk containing the given byte index, along with
     /// the byte and char indices of the beginning of the chunk.
     ///
-    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx)`.
     ///
     /// # Panics
     ///
@@ -482,7 +495,7 @@ impl<'a> RopeSlice<'a> {
     /// Returns the chunk containing the given char index, along with
     /// the byte and char indices of the beginning of the chunk.
     ///
-    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx)`.
     ///
     /// # Panics
     ///
@@ -538,10 +551,9 @@ impl<'a> RopeSlice<'a> {
     /// rope is generally not contiguous in memory.
     ///
     /// This is intended for optimizing cases where the slice is a small
-    /// part of the text (on the order of a few characters or less) and
+    /// part of the text (around the size of a few characters or words) and
     /// therefore has a high chance of being contiguous in memory.
     pub fn as_str(&self) -> Option<&str> {
-        // TODO: can we make this work well for the `Full` variant as well?
         match *self {
             RopeSlice(RSEnum::Full { .. }) => None,
             RopeSlice(RSEnum::Light { text, .. }) => Some(text),

@@ -785,7 +785,7 @@ impl Rope {
     /// Returns the chunk containing the given byte index, along with
     /// the byte and char indices of the beginning of the chunk.
     ///
-    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx)`.
     ///
     /// # Panics
     ///
@@ -805,7 +805,7 @@ impl Rope {
     /// Returns the chunk containing the given char index, along with
     /// the byte and char indices of the beginning of the chunk.
     ///
-    /// The return is organized as (chunk, chunk_byte_idx, chunk_char_idx).
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx)`.
     ///
     /// # Panics
     ///

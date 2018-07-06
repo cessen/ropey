@@ -1,3 +1,24 @@
+# 0.7.0 (2018-07-05)
+
+Peformance improvements:
+
+* `RopeSlice`s have been given a major speed boost for small slices: for contiguous slices of text in memory, they will simply point at the text without any tree structure.  This makes it feasible to use `RopeSlice`s to yield e.g. graphemes or words, even in tight inner loops, while maintaining performance.
+
+New features:
+
+* You can now fetch contiguous chunks of text directly from `Rope`s and `RopeSlice`s, via byte or char index.  The chunk containing the given byte or char will be returned along with offset information.
+
+* Added more index conversion methods.  For both `Rope`s and `RopeSlice`s, you can now convert between any of: byte, char, and line indices.
+
+* Added a method to directly create `RopeSlice`s from string slices.  This isn't terribly useful when using Ropey's standard API's, but it allows for much more efficient implementations of things like custom iterators.
+
+* Added a method to directly access a `RopeSlice`s text as a contiguous string slice when possible.  This is useful for client code to be able to make a fast-path branch for small slices that happen to be contiguous.  Like the above item, this can result in significant performance gains for certain use-cases.
+
+API breaking-changes:
+
+* All grapheme related APIs have been removed.  However, new APIs have been added that allow the efficient implementation of those same APIs on top of Ropey.  See the grapheme examples in the `examples` directory of the repo for working implementations.
+
+
 # 0.6.3 (2018-01-28)
 
 Features:
