@@ -614,10 +614,6 @@ impl Rope {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - If `byte_idx` is one-past-the-end, then one-past-the-end line index
-    ///   is returned.  This is mainly unintuitive for empty ropes, which will
-    ///   return a line index of 1 for a `byte_idx` of zero.  Otherwise it
-    ///   behaves as expected.
     ///
     /// # Panics
     ///
@@ -631,11 +627,7 @@ impl Rope {
             self.len_bytes()
         );
 
-        if byte_idx == self.len_bytes() {
-            self.len_lines()
-        } else {
-            self.root.byte_to_line(byte_idx)
-        }
+        self.root.byte_to_line(byte_idx)
     }
 
     /// Returns the byte index of the given char.
@@ -660,10 +652,6 @@ impl Rope {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - If `char_idx` is one-past-the-end, then one-past-the-end line index
-    ///   is returned.  This is mainly unintuitive for empty ropes, which will
-    ///   return a line index of 1 for a `char_idx` of zero.  Otherwise it
-    ///   behaves as expected.
     ///
     /// # Panics
     ///
@@ -677,11 +665,7 @@ impl Rope {
             self.len_chars()
         );
 
-        if char_idx == self.len_chars() {
-            self.len_lines()
-        } else {
-            self.root.char_to_line(char_idx)
-        }
+        self.root.char_to_line(char_idx)
     }
 
     /// Returns the byte index of the start of the given line.
@@ -1588,6 +1572,48 @@ mod tests {
     }
 
     #[test]
+    fn byte_to_line_01() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        assert_eq!(0, r.byte_to_line(0));
+        assert_eq!(0, r.byte_to_line(1));
+
+        assert_eq!(0, r.byte_to_line(31));
+        assert_eq!(1, r.byte_to_line(32));
+        assert_eq!(1, r.byte_to_line(33));
+
+        assert_eq!(1, r.byte_to_line(58));
+        assert_eq!(2, r.byte_to_line(59));
+        assert_eq!(2, r.byte_to_line(60));
+
+        assert_eq!(2, r.byte_to_line(87));
+        assert_eq!(3, r.byte_to_line(88));
+        assert_eq!(3, r.byte_to_line(89));
+        assert_eq!(3, r.byte_to_line(124));
+    }
+
+    #[test]
+    fn byte_to_line_02() {
+        let r = Rope::from_str("");
+        assert_eq!(0, r.byte_to_line(0));
+    }
+
+    #[test]
+    fn byte_to_line_03() {
+        let r = Rope::from_str("Hi there\n");
+        assert_eq!(0, r.byte_to_line(0));
+        assert_eq!(0, r.byte_to_line(8));
+        assert_eq!(1, r.byte_to_line(9));
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_to_line_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.byte_to_line(125);
+    }
+
+    #[test]
     fn char_to_byte_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1622,21 +1648,53 @@ mod tests {
         assert_eq!(2, r.char_to_line(87));
         assert_eq!(3, r.char_to_line(88));
         assert_eq!(3, r.char_to_line(89));
-
-        assert_eq!(4, r.char_to_line(100));
+        assert_eq!(3, r.char_to_line(100));
     }
 
     #[test]
     fn char_to_line_02() {
         let r = Rope::from_str("");
-        assert_eq!(1, r.char_to_line(0));
+        assert_eq!(0, r.char_to_line(0));
+    }
+
+    #[test]
+    fn char_to_line_03() {
+        let r = Rope::from_str("Hi there\n");
+        assert_eq!(0, r.char_to_line(0));
+        assert_eq!(0, r.char_to_line(8));
+        assert_eq!(1, r.char_to_line(9));
     }
 
     #[test]
     #[should_panic]
-    fn char_to_line_03() {
+    fn char_to_line_04() {
         let r = Rope::from_str(TEXT_LINES);
         r.char_to_line(101);
+    }
+
+    #[test]
+    fn line_to_byte_01() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        assert_eq!(0, r.line_to_byte(0));
+        assert_eq!(32, r.line_to_byte(1));
+        assert_eq!(59, r.line_to_byte(2));
+        assert_eq!(88, r.line_to_byte(3));
+        assert_eq!(124, r.line_to_byte(4));
+    }
+
+    #[test]
+    fn line_to_byte_02() {
+        let r = Rope::from_str("");
+        assert_eq!(0, r.line_to_byte(0));
+        assert_eq!(0, r.line_to_byte(1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_to_byte_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_to_byte(5);
     }
 
     #[test]

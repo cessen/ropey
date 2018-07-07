@@ -200,10 +200,6 @@ impl<'a> RopeSlice<'a> {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - If `byte_idx` is one-past-the-end, then one-past-the-end line index
-    ///   is returned.  This is mainly unintuitive for empty ropes, which will
-    ///   return a line index of 1 for a `byte_idx` of zero.  Otherwise it
-    ///   behaves as expected.
     ///
     /// # Panics
     ///
@@ -217,20 +213,14 @@ impl<'a> RopeSlice<'a> {
             self.len_bytes()
         );
 
-        if byte_idx == self.len_bytes() {
-            self.len_lines()
-        } else {
-            match *self {
-                RopeSlice(RSEnum::Full {
-                    node,
-                    start_byte,
-                    start_line_break,
-                    ..
-                }) => {
-                    node.byte_to_line(start_byte as usize + byte_idx) - (start_line_break as usize)
-                }
-                RopeSlice(RSEnum::Light { text, .. }) => byte_idx_to_line_idx(text, byte_idx),
-            }
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_byte,
+                start_line_break,
+                ..
+            }) => node.byte_to_line(start_byte as usize + byte_idx) - (start_line_break as usize),
+            RopeSlice(RSEnum::Light { text, .. }) => byte_idx_to_line_idx(text, byte_idx),
         }
     }
 
@@ -265,10 +255,6 @@ impl<'a> RopeSlice<'a> {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - If `char_idx` is one-past-the-end, then one-past-the-end line index
-    ///   is returned.  This is mainly unintuitive for empty ropes, which will
-    ///   return a line index of 1 for a `char_idx` of zero.  Otherwise it
-    ///   behaves as expected.
     ///
     /// # Panics
     ///
@@ -282,20 +268,14 @@ impl<'a> RopeSlice<'a> {
             self.len_chars()
         );
 
-        if char_idx == self.len_chars() {
-            self.len_lines()
-        } else {
-            match *self {
-                RopeSlice(RSEnum::Full {
-                    node,
-                    start_char,
-                    start_line_break,
-                    ..
-                }) => {
-                    node.char_to_line(start_char as usize + char_idx) - (start_line_break as usize)
-                }
-                RopeSlice(RSEnum::Light { text, .. }) => char_idx_to_line_idx(text, char_idx),
-            }
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_char,
+                start_line_break,
+                ..
+            }) => node.char_to_line(start_char as usize + char_idx) - (start_line_break as usize),
+            RopeSlice(RSEnum::Light { text, .. }) => char_idx_to_line_idx(text, char_idx),
         }
     }
 
@@ -992,6 +972,52 @@ mod tests {
     }
 
     #[test]
+    fn byte_to_line_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+
+        // 's a fine day, isn't it?\nAren't you glad \
+        // we're alive?\nこんにちは、みん
+
+        assert_eq!(0, s.byte_to_line(0));
+        assert_eq!(0, s.byte_to_line(1));
+
+        assert_eq!(0, s.byte_to_line(24));
+        assert_eq!(1, s.byte_to_line(25));
+        assert_eq!(1, s.byte_to_line(26));
+
+        assert_eq!(1, s.byte_to_line(53));
+        assert_eq!(2, s.byte_to_line(54));
+        assert_eq!(2, s.byte_to_line(57));
+
+        assert_eq!(2, s.byte_to_line(78));
+    }
+
+    #[test]
+    fn byte_to_line_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(50..50);
+        assert_eq!(0, s.byte_to_line(0));
+    }
+
+    #[test]
+    fn byte_to_line_03() {
+        let r = Rope::from_str("Hi there\nstranger!");
+        let s = r.slice(0..9);
+        assert_eq!(0, s.byte_to_line(0));
+        assert_eq!(0, s.byte_to_line(8));
+        assert_eq!(1, s.byte_to_line(9));
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_to_line_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+        s.byte_to_line(79);
+    }
+
+    #[test]
     fn char_to_byte_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(88..102);
@@ -1027,7 +1053,7 @@ mod tests {
         assert_eq!(2, s.char_to_line(54));
         assert_eq!(2, s.char_to_line(55));
 
-        assert_eq!(3, s.char_to_line(62));
+        assert_eq!(2, s.char_to_line(62));
     }
 
     #[test]
@@ -1035,16 +1061,57 @@ mod tests {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
 
-        assert_eq!(1, s.char_to_line(0));
+        assert_eq!(0, s.char_to_line(0));
+    }
+
+    #[test]
+    fn char_to_line_03() {
+        let r = Rope::from_str("Hi there\nstranger!");
+        let s = r.slice(0..9);
+        assert_eq!(0, s.char_to_line(0));
+        assert_eq!(0, s.char_to_line(8));
+        assert_eq!(1, s.char_to_line(9));
     }
 
     #[test]
     #[should_panic]
-    fn char_to_line_03() {
+    fn char_to_line_04() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
 
         s.char_to_line(63);
+    }
+
+    #[test]
+    fn line_to_byte_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+
+        // 's a fine day, isn't it?\nAren't you glad \
+        // we're alive?\nこんにちは、みん
+
+        assert_eq!(0, s.line_to_byte(0));
+        assert_eq!(25, s.line_to_byte(1));
+        assert_eq!(54, s.line_to_byte(2));
+        assert_eq!(78, s.line_to_byte(3));
+    }
+
+    #[test]
+    fn line_to_byte_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(43..43);
+
+        assert_eq!(0, s.line_to_byte(0));
+        assert_eq!(0, s.line_to_byte(1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_to_byte_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+
+        s.line_to_byte(4);
     }
 
     #[test]
