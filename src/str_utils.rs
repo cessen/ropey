@@ -57,7 +57,7 @@ pub fn count_chars(text: &str) -> usize {
 /// - u{0085}        (Next Line)
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
-#[inline]
+#[inline(never)] // Actually slightly faster when inlining is not allowed
 pub fn count_line_breaks(text: &str) -> usize {
     // TODO: right now this checks the high byte for the large line break codepoints
     // when determining whether to skip the full check.  This penalizes texts that use
@@ -112,16 +112,29 @@ pub fn count_line_breaks(text: &str) -> usize {
             ptr = unsafe { ptr.offset(1) };
         }
 
-        // Use usize to to check if it's even possible that there are any
-        // line endings, using bit-fiddling magic.
+        // Use usize to count line breaks where it can.
+        const LF_MASK: usize = std::usize::MAX / 0xFF * 0x0A;
+        const VT_MASK: usize = std::usize::MAX / 0xFF * 0x0B;
+        const FF_MASK: usize = std::usize::MAX / 0xFF * 0x0C;
         if ptr == end_aligned_ptr {
             while unsafe { ptr.offset(tsize as isize) } < end_ptr {
                 let n = unsafe { *(ptr as *const usize) };
 
-                // If there's a possibility that there might be a line-ending, stop
-                // and do the full check.
-                if has_bytes_less_than(n, 0x0E) || has_byte(n, 0xC2) || has_byte(n, 0xE2) {
+                // If there's a possibility that there might be a multi-byte line
+                // ending, stop and do the full check.
+                if has_byte(n, 0xC2) || has_byte(n, 0xE2) {
                     break;
+                } else if has_bytes_less_than(n, 0x0E) {
+                    if has_byte(n, 0x0D) {
+                        // If there's a CR, we unfortunatley need to revert to
+                        // byte-by-byte scanning for CRLF.
+                        break;
+                    } else {
+                        // Count the single-byte line endings.
+                        count += count_zero_bytes(n ^ LF_MASK)
+                            + count_zero_bytes(n ^ VT_MASK)
+                            + count_zero_bytes(n ^ FF_MASK);
+                    }
                 }
 
                 ptr = unsafe { ptr.offset(tsize as isize) };
@@ -240,6 +253,13 @@ pub fn has_byte(word: usize, n: u8) -> bool {
     const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
     let word = word ^ (n as usize * ONEMASK_LOW);
     (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH) != 0
+}
+
+#[inline(always)]
+fn count_zero_bytes(x: usize) -> usize {
+    const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
+    const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
+    ((x.wrapping_sub(ONEMASK_LOW)) & !x & ONEMASK_HIGH) / 128 % 255
 }
 
 #[inline]

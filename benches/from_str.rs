@@ -8,6 +8,7 @@ use ropey::Rope;
 const TEXT_SMALL: &str = include_str!("small.txt");
 const TEXT_MEDIUM: &str = include_str!("medium.txt");
 const TEXT_LARGE: &str = include_str!("large.txt");
+const TEXT_LF: &str = include_str!("lf.txt");
 
 //----
 
@@ -35,7 +36,21 @@ fn from_str_large(bench: &mut Bencher) {
     bench.bytes = TEXT_LARGE.len() as u64;
 }
 
+fn from_str_linefeeds(bench: &mut Bencher) {
+    bench.iter(|| {
+        Rope::from_str(TEXT_LF);
+    });
+
+    bench.bytes = TEXT_LF.len() as u64;
+}
+
 //----
 
-benchmark_group!(benches, from_str_small, from_str_medium, from_str_large);
+benchmark_group!(
+    benches,
+    from_str_small,
+    from_str_medium,
+    from_str_large,
+    from_str_linefeeds
+);
 benchmark_main!(benches);
