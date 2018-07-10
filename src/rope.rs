@@ -1034,6 +1034,7 @@ impl<'a> std::cmp::PartialEq<Rope> for std::borrow::Cow<'a, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use str_utils::byte_idx_to_char_idx;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -1779,6 +1780,43 @@ mod tests {
     fn line_04() {
         let r = Rope::from_str(TEXT_LINES);
         r.line(4);
+    }
+
+    #[test]
+    fn chunk_at_byte() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        for i in 0..r.len_bytes() {
+            let c1 = r.char(r.byte_to_char(i));
+            let c2 = {
+                let (chunk, b, c, l) = r.chunk_at_byte(i);
+                assert_eq!(c, r.byte_to_char(b));
+                assert_eq!(l, r.byte_to_line(b));
+                let i2 = i - b;
+                let i3 = byte_idx_to_char_idx(chunk, i2);
+                chunk.chars().nth(i3).unwrap()
+            };
+
+            assert_eq!(c1, c2);
+        }
+    }
+
+    #[test]
+    fn chunk_at_char() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        for i in 0..r.len_chars() {
+            let c1 = r.char(i);
+            let c2 = {
+                let (chunk, b, c, l) = r.chunk_at_char(i);
+                assert_eq!(b, r.char_to_byte(c));
+                assert_eq!(l, r.char_to_line(c));
+                let i2 = i - c;
+                chunk.chars().nth(i2).unwrap()
+            };
+
+            assert_eq!(c1, c2);
+        }
     }
 
     #[test]

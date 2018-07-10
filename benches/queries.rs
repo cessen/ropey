@@ -86,11 +86,29 @@ fn chunk_at_byte(bench: &mut Bencher) {
     })
 }
 
+fn chunk_at_byte_slice(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let slice = rope.slice(324..(rope.len_chars() - 213));
+    let len = slice.len_bytes();
+    bench.iter(|| {
+        slice.chunk_at_byte(random::<usize>() % (len + 1));
+    })
+}
+
 fn chunk_at_char(bench: &mut Bencher) {
     let rope = Rope::from_str(TEXT);
     let len = rope.len_chars();
     bench.iter(|| {
-        rope.chunk_at_char(random::<usize>() % len);
+        rope.chunk_at_char(random::<usize>() % (len + 1));
+    })
+}
+
+fn chunk_at_char_slice(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let slice = rope.slice(324..(rope.len_chars() - 213));
+    let len = slice.len_chars();
+    bench.iter(|| {
+        slice.chunk_at_char(random::<usize>() % (len + 1));
     })
 }
 
@@ -164,7 +182,9 @@ benchmark_group!(
     get_char,
     get_line,
     chunk_at_byte,
+    chunk_at_byte_slice,
     chunk_at_char,
+    chunk_at_char_slice,
     slice,
     slice_small,
     slice_from_small_rope,
