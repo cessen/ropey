@@ -509,6 +509,32 @@ impl Node {
         }
     }
 
+    /// Returns the byte index of the given char.
+    pub fn char_to_byte_and_line(&self, char_idx: usize) -> (usize, usize) {
+        let mut node = self;
+        let mut char_idx = char_idx;
+        let mut byte_idx = 0;
+        let mut line_idx = 0;
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => {
+                    let bi = char_idx_to_byte_idx(text, char_idx);
+                    let li = byte_idx_to_line_idx(text, bi);
+                    return (byte_idx + bi, line_idx + li);
+                }
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) =
+                        children.search_combine_info(|inf| char_idx as Count <= inf.chars);
+                    char_idx -= acc_info.chars as usize;
+                    byte_idx += acc_info.bytes as usize;
+                    line_idx += acc_info.line_breaks as usize;
+                    node = &*children.nodes()[child_i];
+                }
+            }
+        }
+    }
+
     /// Returns the byte index of the start of the given line.
     pub fn line_to_byte(&self, line_idx: usize) -> usize {
         let mut node = self;

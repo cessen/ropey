@@ -65,6 +65,8 @@ impl<'a> RopeSlice<'a> {
         let mut node = node;
         'outer: loop {
             match *(node as &Node) {
+                // Early out if we reach a leaf, because we can do the
+                // simpler lightweight slice then.
                 Node::Leaf(ref text) => {
                     let start_byte = char_idx_to_byte_idx(&text, n_start);
                     let end_byte =
@@ -93,14 +95,16 @@ impl<'a> RopeSlice<'a> {
         }
 
         // Create the slice
+        let (start_byte, start_line) = node.char_to_byte_and_line(n_start);
+        let (end_byte, end_line) = node.char_to_byte_and_line(n_end);
         RopeSlice(RSEnum::Full {
             node: node,
-            start_byte: node.char_to_byte(n_start) as Count,
-            end_byte: node.char_to_byte(n_end) as Count,
+            start_byte: start_byte as Count,
+            end_byte: end_byte as Count,
             start_char: n_start as Count,
             end_char: n_end as Count,
-            start_line_break: node.char_to_line(n_start) as Count,
-            end_line_break: node.char_to_line(n_end) as Count,
+            start_line_break: start_line as Count,
+            end_line_break: end_line as Count,
         })
     }
 
