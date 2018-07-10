@@ -1,3 +1,9 @@
+# 0.7.1 (2018-07-09)
+
+Bug fixes:
+
+* The chunk fetching methods on slices returned bogus starting char indices.
+
 # 0.7.0 (2018-07-05)
 
 Peformance improvements:

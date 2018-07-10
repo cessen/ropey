@@ -470,22 +470,15 @@ impl<'a> RopeSlice<'a> {
                     node.get_chunk_at_byte(byte_idx + start_byte as usize);
 
                 // Calculate clipped start/end byte indices within the chunk.
-                let chunk_start_byte_idx = if chunk_byte_idx < start_byte as usize {
-                    start_byte as usize - chunk_byte_idx
-                } else {
-                    0
-                };
-                let chunk_end_byte_idx = if (chunk_byte_idx + chunk.len()) > end_byte as usize {
-                    end_byte as usize - chunk_byte_idx
-                } else {
-                    chunk.len()
-                };
+                let chunk_start_byte_idx =
+                    start_byte as usize - chunk_byte_idx.min(start_byte as usize);
+                let chunk_end_byte_idx = chunk.len().min(end_byte as usize - chunk_byte_idx);
 
-                // Return the clipped chunk and byte offset.
+                // Return the clipped chunk and offsets.
                 (
                     &chunk[chunk_start_byte_idx..chunk_end_byte_idx],
-                    chunk_byte_idx + chunk_start_byte_idx,
-                    chunk_char_idx.max(start_char as usize),
+                    chunk_byte_idx - (start_byte as usize).min(chunk_byte_idx),
+                    chunk_char_idx - (start_char as usize).min(chunk_char_idx),
                 )
             }
             RopeSlice(RSEnum::Light { text, .. }) => (text, 0, 0),
@@ -522,22 +515,15 @@ impl<'a> RopeSlice<'a> {
                     node.get_chunk_at_char(char_idx + start_char as usize);
 
                 // Calculate clipped start/end byte indices within the chunk.
-                let chunk_start_byte_idx = if chunk_byte_idx < start_byte as usize {
-                    start_byte as usize - chunk_byte_idx
-                } else {
-                    0
-                };
-                let chunk_end_byte_idx = if (chunk_byte_idx + chunk.len()) > end_byte as usize {
-                    end_byte as usize - chunk_byte_idx
-                } else {
-                    chunk.len()
-                };
+                let chunk_start_byte_idx =
+                    start_byte as usize - chunk_byte_idx.min(start_byte as usize);
+                let chunk_end_byte_idx = chunk.len().min(end_byte as usize - chunk_byte_idx);
 
                 // Return the clipped chunk and byte offset.
                 (
                     &chunk[chunk_start_byte_idx..chunk_end_byte_idx],
-                    chunk_byte_idx + chunk_start_byte_idx,
-                    chunk_char_idx.max(start_char as usize),
+                    chunk_byte_idx - (start_byte as usize).min(chunk_byte_idx),
+                    chunk_char_idx - (start_char as usize).min(chunk_char_idx),
                 )
             }
             RopeSlice(RSEnum::Light { text, .. }) => (text, 0, 0),
@@ -913,6 +899,7 @@ impl CharIdxRange for RangeFull {
 
 #[cfg(test)]
 mod tests {
+    use str_utils::byte_idx_to_char_idx;
     use Rope;
 
     // 127 bytes, 103 chars, 1 line
@@ -1143,6 +1130,61 @@ mod tests {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
         s.line(3);
+    }
+
+    #[test]
+    fn chunk_at_byte() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+        // "'s a fine day, isn't it?\nAren't you glad \
+        //  we're alive?\nこんにちは、みん"
+
+        let mut last_chunk = "";
+        let mut chunk_len_sum = 0;
+        for i in 0..s.len_bytes() {
+            let c1 = s.char(s.byte_to_char(i));
+            let c2 = {
+                let (chunk, b, c) = s.chunk_at_byte(i);
+                if chunk != last_chunk {
+                    chunk_len_sum += chunk.len();
+                    last_chunk = chunk;
+                }
+                assert_eq!(c, s.byte_to_char(b));
+                let i2 = i - b;
+                let i3 = byte_idx_to_char_idx(chunk, i2);
+                chunk.chars().nth(i3).unwrap()
+            };
+
+            assert_eq!(c1, c2);
+        }
+        assert_eq!(s.len_bytes(), chunk_len_sum);
+    }
+
+    #[test]
+    fn chunk_at_char() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+        // "'s a fine day, isn't it?\nAren't you glad \
+        //  we're alive?\nこんにちは、みん"
+
+        let mut last_chunk = "";
+        let mut chunk_len_sum = 0;
+        for i in 0..s.len_chars() {
+            let c1 = s.char(i);
+            let c2 = {
+                let (chunk, b, c) = s.chunk_at_char(i);
+                if chunk != last_chunk {
+                    chunk_len_sum += chunk.len();
+                    last_chunk = chunk;
+                }
+                assert_eq!(b, s.char_to_byte(c));
+                let i2 = i - c;
+                chunk.chars().nth(i2).unwrap()
+            };
+
+            assert_eq!(c1, c2);
+        }
+        assert_eq!(s.len_bytes(), chunk_len_sum);
     }
 
     #[test]
