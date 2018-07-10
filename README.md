@@ -65,10 +65,10 @@ Ropey is fast and minimizes memory usage:
 
 ### Strong Unicode support
 Ropey treats [Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
-([`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust) as the
-atomic unit of text.  Indexing and edits are all done in terms of Unicode
-scalar values, making the APIs intuitive and making it impossible to
-accidentally create invalid utf8 data.
+([`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
+encoded in utf8 as the atomic unit of text.  Indexing and edits are all done
+in terms of Unicode scalar values, making the APIs intuitive and making it
+impossible to accidentally create invalid utf8 data.
 
 
 ### Line-aware
@@ -88,17 +88,32 @@ any of the read-only operations of a full rope including iterators and making
 sub-slices.
 
 
-### Streaming loading and saving
+### Flexible APIs With Low Level Access
 
-Ropey provides APIs for efficiently streaming text data to and from ropes.  This
-is primarily intended for efficiently saving and loading text data from disk, but
-the APIs are flexible, and can be used for whatever you like.
+Although Ropey is intentionally limited in scope, it also provides APIs for
+efficiently accessing and working with its internal text chunk
+representation, allowing additional functionality to be efficiently
+implemented by client code with minimal overhead.
 
 
 ### Thread safe
 
 Ropey ensures that even though clones share memory, everything is thread-safe.
 Clones can be sent to other threads for both reading and writing.
+
+
+## Note about unsafe code:
+
+Ropey does use unsafe code to help acheive some of its space and performance
+characteristics.  Although a lot of effort has been put into keeping unsafe
+code compartmentalized and making it correct, it is nevertheless _not_
+recommended to use Ropey in software that may face adversarial conditions.
+
+Auditing, fuzzing, etc. of the unsafe code in Ropey is extremely welcome.
+If any unsoundness is found, _please_ file an issue!  Also welcome are
+recommendations for how to remove any of the unsafe code from Ropey without
+introducing significant space or performance regressions, or how to
+compartmentalize the unsafe code even better.
 
 
 ## License

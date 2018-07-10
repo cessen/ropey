@@ -110,13 +110,18 @@ impl<'a> RopeSlice<'a> {
     /// directly to the string slice.
     ///
     /// This is primarily intended for avoiding the performance overhead of a
-    /// full `slice()` operation when relevant.  The `slice()` method is
-    /// comparatively cheap, but it may nevertheless be too expensive for
-    /// some tight inner loops because of the tree traversal it typically has
-    /// to do.
+    /// full `slice()` operation when operating on short text that is
+    /// contiguous in memory. The `slice()` method is comparatively cheap,
+    /// but it may nevertheless be too expensive for some tight inner loops
+    /// because of the tree traversal it typically has to do.
     ///
     /// A good example of this method's usage is in `examples/graphemes_iter.rs`,
     /// where it is used to significantly speed up the graphemes iterator.
+    ///
+    /// Runs in O(N) time, where N is the length of the string slice.  The
+    /// constant factor for that O(N) is small, but this is nevertheless
+    /// only recommended for use with relatively small text slices (under
+    /// 1000 characters or so).
     pub fn from_str(text: &str) -> RopeSlice {
         RopeSlice(RSEnum::Light {
             text: text,
@@ -129,6 +134,8 @@ impl<'a> RopeSlice<'a> {
     // Informational methods
 
     /// Total number of bytes in the `RopeSlice`.
+    ///
+    /// Runs in O(1) time.
     pub fn len_bytes(&self) -> usize {
         match *self {
             RopeSlice(RSEnum::Full {
@@ -141,6 +148,8 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Total number of chars in the `RopeSlice`.
+    ///
+    /// Runs in O(1) time.
     pub fn len_chars(&self) -> usize {
         match *self {
             RopeSlice(RSEnum::Full {
@@ -153,6 +162,8 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Total number of lines in the `RopeSlice`.
+    ///
+    /// Runs in O(1) time.
     pub fn len_lines(&self) -> usize {
         match *self {
             RopeSlice(RSEnum::Full {
@@ -199,7 +210,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Notes:
     ///
-    /// - Lines are zero-indexed.
+    /// - Lines are zero-indexed.  This is functionally equivalent to
+    ///   counting the line endings before the specified byte.
     ///
     /// # Panics
     ///
@@ -254,7 +266,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Notes:
     ///
-    /// - Lines are zero-indexed.
+    /// - Lines are zero-indexed.  This is functionally equivalent to
+    ///   counting the line endings before the specified char.
     ///
     /// # Panics
     ///
@@ -533,6 +546,8 @@ impl<'a> RopeSlice<'a> {
     /// This is intended for optimizing cases where the slice is a small
     /// part of the text (around the size of a few characters or words) and
     /// therefore has a high chance of being contiguous in memory.
+    ///
+    /// Runs in O(1) time.
     pub fn as_str(&self) -> Option<&str> {
         match *self {
             RopeSlice(RSEnum::Full { .. }) => None,
@@ -650,6 +665,8 @@ impl<'a> RopeSlice<'a> {
     // Conversion methods
 
     /// Returns the entire text of the `RopeSlice` as a newly allocated `String`.
+    ///
+    /// Runs in O(N) time.
     pub fn to_string(&self) -> String {
         let mut text = String::with_capacity(self.len_bytes());
         for chunk in self.chunks() {
@@ -659,6 +676,11 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates a new `Rope` from the contents of the `RopeSlice`.
+    ///
+    /// Shares data where possible.
+    ///
+    /// Perhaps unexpectedly, runs in O(log N) time, not O(1) time like
+    /// `Rope` cloning.
     pub fn to_rope(&self) -> Rope {
         match *self {
             RopeSlice(RSEnum::Full {

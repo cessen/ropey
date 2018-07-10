@@ -12,11 +12,6 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
-/// `Rope`'s atomic unit of data is Unicode scalar values (or `char`s in Rust).
-/// Except where otherwise documented, all methods that index into a rope
-/// or return an index into a rope do so by `char` index.  This makes the API's
-/// intuitive and prevents accidentally creating a Rope with invalid utf8 data.
-///
 /// The primary editing operations available for `Rope` are insertion of text,
 /// deletion of text, splitting a `Rope` in two, and appending one `Rope` to
 /// another.  For example:
@@ -33,9 +28,9 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 ///
 /// Cloning `Rope`'s is extremely cheap, taking only a few instructions and
 /// 8 bytes of memory, regardless of text size.  This is accomplished by data
-/// sharing between `Rope` clones, and the memory used by clones only grows
+/// sharing between `Rope` clones.  The memory used by clones only grows
 /// incrementally as the their contents diverge due to edits.  All of this
-/// is thread safe, and clones can be sent freely between threads.
+/// is thread safe, so clones can be sent freely between threads.
 ///
 /// `Rope` tracks line endings and has efficient API's for working with lines.
 /// You can convert between `char` and line index, determining which line a
@@ -277,7 +272,7 @@ impl Rope {
         );
 
         if text.len() > MAX_BYTES * 6 {
-            // For huge insert texts, build a tree out of it and then
+            // For huge insertion texts, build a tree out of it and then
             // split and join.
             let text_rope = Rope::from_str(text);
             let right = self.split_off(char_idx);
@@ -871,6 +866,8 @@ impl Rope {
     // Conversion methods
 
     /// Returns the entire text of the `Rope` as a newly allocated String.
+    ///
+    /// Runs in O(N) time.
     pub fn to_string(&self) -> String {
         use iter::Chunks;
         let mut text = String::with_capacity(self.len_bytes());
@@ -883,6 +880,8 @@ impl Rope {
     //-----------------------------------------------------------------------
     // Debugging
 
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    ///
     /// Debugging tool to make sure that all of the meta-data of the
     /// tree is consistent with the actual data.
     #[doc(hidden)]
@@ -890,6 +889,8 @@ impl Rope {
         self.root.assert_integrity();
     }
 
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    ///
     /// Debugging tool to make sure that all of the following invariants
     /// hold true throughout the tree:
     ///

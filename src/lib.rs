@@ -3,13 +3,20 @@
 //! Unicode-safe, has low memory overhead, and can handle huge texts
 //! and memory-incoherent edits without trouble.
 //!
+//! Ropey's atomic unit of text is Unicode scalar values (or `char`s in
+//! Rust) encoded as utf8.  Except where otherwise documented, all functions
+//! use `char` indices.  This not only makes the APIs more intuitive, but
+//! also makes it impossible to create invalid utf8 data through Ropey's
+//! APIs.
+//!
 //! The library is made up of four main components:
 //!
 //! - [`Rope`](struct.Rope.html): the main editable text buffer type.
 //! - [`RopeSlice`](struct.RopeSlice.html): an immutable view into part
 //!   of a `Rope`.
-//! - [`RopeBuilder`](struct.RopeBuilder.html): an efficient incremental `Rope` builder.
-//! - [`iter`](iter/index.html): iterators over a `Rope`'s/`RopeSlice`'s
+//! - [`RopeBuilder`](struct.RopeBuilder.html): an efficient incremental
+//!   `Rope` builder.
+//! - [`iter`](iter/index.html): iterators over a `Rope`/`RopeSlice`'s
 //!   data.
 //!
 //! # A Contrived Example
