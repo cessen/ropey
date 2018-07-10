@@ -20,6 +20,14 @@ fn byte_to_char(bench: &mut Bencher) {
     })
 }
 
+fn byte_to_line(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_bytes();
+    bench.iter(|| {
+        rope.byte_to_line(random::<usize>() % (len + 1));
+    })
+}
+
 fn char_to_byte(bench: &mut Bencher) {
     let rope = Rope::from_str(TEXT);
     let len = rope.len_chars();
@@ -33,6 +41,14 @@ fn char_to_line(bench: &mut Bencher) {
     let len = rope.len_chars();
     bench.iter(|| {
         rope.char_to_line(random::<usize>() % (len + 1));
+    })
+}
+
+fn line_to_byte(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_lines();
+    bench.iter(|| {
+        rope.line_to_byte(random::<usize>() % (len + 1));
     })
 }
 
@@ -59,6 +75,22 @@ fn get_line(bench: &mut Bencher) {
     let len = rope.len_lines();
     bench.iter(|| {
         rope.line(random::<usize>() % len);
+    })
+}
+
+fn chunk_at_byte(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_bytes();
+    bench.iter(|| {
+        rope.chunk_at_byte(random::<usize>() % (len + 1));
+    })
+}
+
+fn chunk_at_char(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_chars();
+    bench.iter(|| {
+        rope.chunk_at_char(random::<usize>() % len);
     })
 }
 
@@ -124,11 +156,15 @@ fn slice_whole_slice(bench: &mut Bencher) {
 benchmark_group!(
     benches,
     byte_to_char,
+    byte_to_line,
     char_to_byte,
     char_to_line,
+    line_to_byte,
     line_to_char,
     get_char,
     get_line,
+    chunk_at_byte,
+    chunk_at_char,
     slice,
     slice_small,
     slice_from_small_rope,

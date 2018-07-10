@@ -623,17 +623,24 @@ impl Node {
     }
 
     /// Returns the chunk that contains the given byte, and the chunk's starting
-    /// byte and char indices.
+    /// byte and char indices and the index of the line that the chunk starts on.
     ///
-    /// Return takes the form of (chunk, chunk_char_idx, chunk_byte_idx).
-    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize) {
+    /// Return takes the form of `(chunk, chunk_char_idx, chunk_byte_idx, chunk_line_idx)`.
+    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize, usize) {
         let mut node = self;
         let mut byte_idx = byte_idx;
         let mut info = TextInfo::new();
 
         loop {
             match *node {
-                Node::Leaf(ref text) => return (text, info.bytes as usize, info.chars as usize),
+                Node::Leaf(ref text) => {
+                    return (
+                        text,
+                        info.bytes as usize,
+                        info.chars as usize,
+                        info.line_breaks as usize,
+                    )
+                }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_byte_idx(byte_idx);
                     info += acc_info;
@@ -645,17 +652,24 @@ impl Node {
     }
 
     /// Returns the chunk that contains the given char, and the chunk's starting
-    /// byte and char indices.
+    /// byte and char indices and the index of the line that the chunk starts on.
     ///
-    /// Return takes the form of (chunk, chunk_char_idx, chunk_byte_idx).
-    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize) {
+    /// Return takes the form of `(chunk, chunk_char_idx, chunk_byte_idx, chunk_line_idx)`.
+    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize, usize) {
         let mut node = self;
         let mut char_idx = char_idx;
         let mut info = TextInfo::new();
 
         loop {
             match *node {
-                Node::Leaf(ref text) => return (text, info.bytes as usize, info.chars as usize),
+                Node::Leaf(ref text) => {
+                    return (
+                        text,
+                        info.bytes as usize,
+                        info.chars as usize,
+                        info.line_breaks as usize,
+                    )
+                }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_char_idx(char_idx);
                     info += acc_info;

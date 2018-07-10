@@ -734,7 +734,7 @@ impl Rope {
             self.len_chars()
         );
 
-        let (chunk, _, chunk_char_idx) = self.root.get_chunk_at_char(char_idx);
+        let (chunk, _, chunk_char_idx, _) = self.root.get_chunk_at_char(char_idx);
         let byte_idx = char_idx_to_byte_idx(chunk, char_idx - chunk_char_idx);
         chunk[byte_idx..].chars().nth(0).unwrap()
     }
@@ -762,14 +762,15 @@ impl Rope {
     }
 
     /// Returns the chunk containing the given byte index, along with
-    /// the byte and char indices of the beginning of the chunk.
+    /// the byte and char indices of the beginning of the chunk and the
+    /// index of the line that the chunk starts on.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx)`.
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
-    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize) {
+    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize, usize) {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
@@ -782,14 +783,15 @@ impl Rope {
     }
 
     /// Returns the chunk containing the given char index, along with
-    /// the byte and char indices of the beginning of the chunk.
+    /// the byte and char indices of the beginning of the chunk and the
+    /// index of the line that the chunk starts on.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx)`.
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize) {
+    pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize, usize) {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
