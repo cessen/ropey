@@ -81,10 +81,10 @@ mod crlf;
 mod rope;
 mod rope_builder;
 mod slice;
-mod str_utils;
 mod tree;
 
 pub mod iter;
+pub mod str_utils;
 
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;

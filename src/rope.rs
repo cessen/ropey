@@ -8,8 +8,8 @@ use iter::{Bytes, Chars, Chunks, Lines};
 use rope_builder::RopeBuilder;
 use slice::{CharIdxRange, RopeSlice};
 use str_utils::{
-    byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx, char_idx_to_line_idx,
-    line_idx_to_byte_idx, line_idx_to_char_idx,
+    byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx, line_to_byte_idx,
+    line_to_char_idx,
 };
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -307,7 +307,7 @@ impl Rope {
                     |acc_info, cur_info, leaf_text| {
                         debug_assert!(acc_info.chars as usize <= char_idx);
                         let byte_idx =
-                            char_idx_to_byte_idx(leaf_text, char_idx - acc_info.chars as usize);
+                            char_to_byte_idx(leaf_text, char_idx - acc_info.chars as usize);
                         if byte_idx == 0 {
                             seam = Some(acc_info.bytes);
                         } else if byte_idx == leaf_text.len() {
@@ -446,8 +446,8 @@ impl Rope {
                 root.edit_char_range(start, end, |acc_info, cur_info, leaf_text| {
                     let local_start = start - (acc_info.chars as usize).min(start);
                     let local_end = (end - acc_info.chars as usize).min(cur_info.chars as usize);
-                    let byte_start = char_idx_to_byte_idx(leaf_text, local_start);
-                    let byte_end = char_idx_to_byte_idx(leaf_text, local_end);
+                    let byte_start = char_to_byte_idx(leaf_text, local_start);
+                    let byte_end = char_to_byte_idx(leaf_text, local_end);
 
                     if local_start == 0 || local_end == cur_info.chars as usize {
                         seam = Some(acc_info.bytes as usize + byte_start);
@@ -611,7 +611,7 @@ impl Rope {
         );
 
         let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
-        c + byte_idx_to_char_idx(chunk, byte_idx - b)
+        c + byte_to_char_idx(chunk, byte_idx - b)
     }
 
     /// Returns the line index of the given byte.
@@ -634,7 +634,7 @@ impl Rope {
         );
 
         let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
-        l + byte_idx_to_line_idx(chunk, byte_idx - b)
+        l + byte_to_line_idx(chunk, byte_idx - b)
     }
 
     /// Returns the byte index of the given char.
@@ -653,7 +653,7 @@ impl Rope {
         );
 
         let (chunk, b, c, _) = self.chunk_at_char(char_idx);
-        b + char_idx_to_byte_idx(chunk, char_idx - c)
+        b + char_to_byte_idx(chunk, char_idx - c)
     }
 
     /// Returns the line index of the given char.
@@ -676,7 +676,7 @@ impl Rope {
         );
 
         let (chunk, _, c, l) = self.chunk_at_char(char_idx);
-        l + char_idx_to_line_idx(chunk, char_idx - c)
+        l + char_to_line_idx(chunk, char_idx - c)
     }
 
     /// Returns the byte index of the start of the given line.
@@ -704,7 +704,7 @@ impl Rope {
             self.len_bytes()
         } else {
             let (chunk, b, _, l) = self.chunk_at_line_break(line_idx);
-            b + line_idx_to_byte_idx(chunk, line_idx - l)
+            b + line_to_byte_idx(chunk, line_idx - l)
         }
     }
 
@@ -733,7 +733,7 @@ impl Rope {
             self.len_chars()
         } else {
             let (chunk, _, c, l) = self.chunk_at_line_break(line_idx);
-            c + line_idx_to_char_idx(chunk, line_idx - l)
+            c + line_to_char_idx(chunk, line_idx - l)
         }
     }
 
@@ -756,7 +756,7 @@ impl Rope {
         );
 
         let (chunk, _, chunk_char_idx, _) = self.chunk_at_char(char_idx);
-        let byte_idx = char_idx_to_byte_idx(chunk, char_idx - chunk_char_idx);
+        let byte_idx = char_to_byte_idx(chunk, char_idx - chunk_char_idx);
         chunk[byte_idx..].chars().nth(0).unwrap()
     }
 
@@ -1092,7 +1092,7 @@ impl<'a> std::cmp::PartialEq<Rope> for std::borrow::Cow<'a, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use str_utils::byte_idx_to_char_idx;
+    use str_utils::byte_to_char_idx;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -1848,8 +1848,8 @@ mod tests {
         let mut last_chunk = "";
         for i in 0..r.len_bytes() {
             let (chunk, b, c, l) = r.chunk_at_byte(i);
-            assert_eq!(c, byte_idx_to_char_idx(TEXT_LINES, b));
-            assert_eq!(l, byte_idx_to_line_idx(TEXT_LINES, b));
+            assert_eq!(c, byte_to_char_idx(TEXT_LINES, b));
+            assert_eq!(l, byte_to_line_idx(TEXT_LINES, b));
             if chunk != last_chunk {
                 assert_eq!(chunk, &t[..chunk.len()]);
                 t = &t[chunk.len()..];
@@ -1857,12 +1857,12 @@ mod tests {
             }
 
             let c1 = {
-                let i2 = byte_idx_to_char_idx(TEXT_LINES, i);
+                let i2 = byte_to_char_idx(TEXT_LINES, i);
                 TEXT_LINES.chars().nth(i2).unwrap()
             };
             let c2 = {
                 let i2 = i - b;
-                let i3 = byte_idx_to_char_idx(chunk, i2);
+                let i3 = byte_to_char_idx(chunk, i2);
                 chunk.chars().nth(i3).unwrap()
             };
             assert_eq!(c1, c2);
@@ -1878,8 +1878,8 @@ mod tests {
         let mut last_chunk = "";
         for i in 0..r.len_chars() {
             let (chunk, b, c, l) = r.chunk_at_char(i);
-            assert_eq!(b, char_idx_to_byte_idx(TEXT_LINES, c));
-            assert_eq!(l, char_idx_to_line_idx(TEXT_LINES, c));
+            assert_eq!(b, char_to_byte_idx(TEXT_LINES, c));
+            assert_eq!(l, char_to_line_idx(TEXT_LINES, c));
             if chunk != last_chunk {
                 assert_eq!(chunk, &t[..chunk.len()]);
                 t = &t[chunk.len()..];
@@ -1913,10 +1913,10 @@ mod tests {
         for i in 1..r.len_lines() {
             let (chunk, b, c, l) = r.chunk_at_line_break(i);
             assert_eq!(chunk, &TEXT_LINES[b..(b + chunk.len())]);
-            assert_eq!(c, byte_idx_to_char_idx(TEXT_LINES, b));
-            assert_eq!(l, byte_idx_to_line_idx(TEXT_LINES, b));
+            assert_eq!(c, byte_to_char_idx(TEXT_LINES, b));
+            assert_eq!(l, byte_to_line_idx(TEXT_LINES, b));
             assert!(l < i);
-            assert!(i <= byte_idx_to_line_idx(TEXT_LINES, b + chunk.len()));
+            assert!(i <= byte_to_line_idx(TEXT_LINES, b + chunk.len()));
         }
 
         // Last chunk
@@ -1924,8 +1924,8 @@ mod tests {
             let (chunk, b, c, l) = r.chunk_at_line_break(r.len_lines());
             assert_eq!(chunk, &TEXT_LINES[(TEXT_LINES.len() - chunk.len())..]);
             assert_eq!(chunk, &TEXT_LINES[b..]);
-            assert_eq!(c, byte_idx_to_char_idx(TEXT_LINES, b));
-            assert_eq!(l, byte_idx_to_line_idx(TEXT_LINES, b));
+            assert_eq!(c, byte_to_char_idx(TEXT_LINES, b));
+            assert_eq!(l, byte_to_line_idx(TEXT_LINES, b));
         }
     }
 

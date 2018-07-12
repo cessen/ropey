@@ -7,7 +7,7 @@ use std::str;
 
 use crlf;
 use smallvec::{Array, SmallVec};
-use str_utils::{char_idx_to_byte_idx, count_chars};
+use str_utils::{char_to_byte_idx, count_chars};
 use tree::MAX_BYTES;
 
 // TODO: handle corner-case when fixing CRLF seams, and then uncomment
@@ -66,7 +66,7 @@ impl NodeText {
     /// Inserts the given text into the given string at the given char index.
     pub fn insert_str_at_char(&mut self, text: &str, char_idx: usize) {
         // debug_assert!((self.len() + text.len()) <= MAX_BYTES);
-        let byte_idx = char_idx_to_byte_idx(self, char_idx);
+        let byte_idx = char_to_byte_idx(self, char_idx);
         self.insert_str(byte_idx, text);
     }
 
@@ -194,8 +194,8 @@ impl NodeText {
         debug_assert!(start <= end);
         debug_assert!(end <= count_chars(self));
 
-        let byte_start = char_idx_to_byte_idx(self, start);
-        let byte_end = char_idx_to_byte_idx(&self[start..], end - start);
+        let byte_start = char_to_byte_idx(self, start);
+        let byte_end = char_to_byte_idx(&self[start..], end - start);
 
         unsafe { self.remove_bytes(byte_start, byte_end) }
         self.inline_if_possible();
@@ -231,7 +231,7 @@ impl NodeText {
     /// while the second section of the split is returned as a new string.
     pub fn split_off_at_char(&mut self, char_idx: usize) -> Self {
         debug_assert!(char_idx <= count_chars(self));
-        let byte_idx = char_idx_to_byte_idx(self, char_idx);
+        let byte_idx = char_to_byte_idx(self, char_idx);
         self.split_off(byte_idx)
     }
 

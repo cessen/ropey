@@ -1,7 +1,7 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{byte_idx_to_line_idx, char_idx_to_byte_idx};
+use str_utils::{byte_to_line_idx, char_to_byte_idx};
 use tree::node_text::fix_segment_seam;
 use tree::{
     Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
@@ -401,7 +401,7 @@ impl Node {
         debug_assert!(char_idx != (self.text_info().chars as usize));
         match *self {
             Node::Leaf(ref mut text) => {
-                let byte_idx = char_idx_to_byte_idx(text, char_idx);
+                let byte_idx = char_to_byte_idx(text, char_idx);
                 Node::Leaf(text.split_off(byte_idx))
             }
             Node::Internal(ref mut children) => {
@@ -525,8 +525,8 @@ impl Node {
     #[inline(always)]
     pub fn char_to_byte_and_line(&self, char_idx: usize) -> (usize, usize) {
         let (chunk, b, c, l) = self.get_chunk_at_char(char_idx);
-        let bi = char_idx_to_byte_idx(chunk, char_idx - c);
-        (b + bi, l + byte_idx_to_line_idx(chunk, bi))
+        let bi = char_to_byte_idx(chunk, char_idx - c);
+        (b + bi, l + byte_to_line_idx(chunk, bi))
     }
 
     pub fn text_info(&self) -> TextInfo {

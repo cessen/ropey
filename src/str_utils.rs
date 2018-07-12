@@ -1,3 +1,12 @@
+//! Utility functions for string slices.
+//!
+//! This module provides various utility functions that operate on string
+//! slices in ways compatible with Ropey.  They may be useful when building
+//! additional functionality on top of Ropey.
+//!
+//! These functions are guaranteed to stay in-sync with how Ropey functions,
+//! and in fact are used internally for much of Ropey's functionality.
+
 use std;
 
 /// Uses bit-fiddling magic to count utf8 chars really quickly.
@@ -6,7 +15,7 @@ use std;
 /// subtract from the byte length of the text to get the final
 /// count.
 #[inline]
-pub fn count_chars(text: &str) -> usize {
+pub(crate) fn count_chars(text: &str) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
 
     let tsize: usize = std::mem::size_of::<usize>();
@@ -58,7 +67,7 @@ pub fn count_chars(text: &str) -> usize {
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
 #[inline(never)] // Actually slightly faster when inlining is not allowed
-pub fn count_line_breaks(text: &str) -> usize {
+pub(crate) fn count_line_breaks(text: &str) -> usize {
     // TODO: right now this checks the high byte for the large line break codepoints
     // when determining whether to skip the full check.  This penalizes texts that use
     // a lot of code points in those ranges.  We should check the low bytes instead, to
@@ -146,7 +155,7 @@ pub fn count_line_breaks(text: &str) -> usize {
 }
 
 #[inline]
-pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
+pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
     if byte_idx == 0 {
         return 0;
     } else if byte_idx >= text.len() {
@@ -159,7 +168,7 @@ pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
 }
 
 #[inline]
-pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
+pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
     use crlf;
     let mut byte_idx = byte_idx;
     while !text.is_char_boundary(byte_idx) {
@@ -174,7 +183,7 @@ pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
 }
 
 #[inline]
-pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
+pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
     let tsize: usize = std::mem::size_of::<usize>();
 
@@ -223,14 +232,14 @@ pub fn char_idx_to_byte_idx(text: &str, char_idx: usize) -> usize {
 }
 
 #[inline]
-pub fn char_idx_to_line_idx(text: &str, char_idx: usize) -> usize {
-    byte_idx_to_line_idx(text, char_idx_to_byte_idx(text, char_idx))
+pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
+    byte_to_line_idx(text, char_to_byte_idx(text, char_idx))
 }
 
 // TODO: use bit fiddling magic to make this faster, as in
 // `count_line_breaks()`.
 #[inline]
-pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
+pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
     if line_idx == 0 {
         0
     } else {
@@ -240,19 +249,19 @@ pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     }
 }
 
-#[inline(always)]
-pub fn line_idx_to_char_idx(text: &str, line_idx: usize) -> usize {
-    byte_idx_to_char_idx(text, line_idx_to_byte_idx(text, line_idx))
+#[inline]
+pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
+    byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
 }
 
 #[inline(always)]
-pub fn has_bytes_less_than(word: usize, n: u8) -> bool {
+pub(crate) fn has_bytes_less_than(word: usize, n: u8) -> bool {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
     ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
 }
 
 #[inline(always)]
-pub fn has_byte(word: usize, n: u8) -> bool {
+pub(crate) fn has_byte(word: usize, n: u8) -> bool {
     const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
     const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
     let word = word ^ (n as usize * ONEMASK_LOW);
@@ -260,14 +269,14 @@ pub fn has_byte(word: usize, n: u8) -> bool {
 }
 
 #[inline(always)]
-fn count_zero_bytes(x: usize) -> usize {
+pub(crate) fn count_zero_bytes(x: usize) -> usize {
     const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
     const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
     ((x.wrapping_sub(ONEMASK_LOW)) & !x & ONEMASK_HIGH) / 128 % 255
 }
 
 #[inline(always)]
-pub fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
+pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
 }
 
@@ -387,190 +396,184 @@ mod tests {
     }
 
     #[test]
-    fn byte_idx_to_char_idx_01() {
+    fn byte_to_char_idx_01() {
         let text = "Hello せかい!";
-        assert_eq!(0, byte_idx_to_char_idx(text, 0));
-        assert_eq!(1, byte_idx_to_char_idx(text, 1));
-        assert_eq!(8, byte_idx_to_char_idx(text, 12));
-        assert_eq!(10, byte_idx_to_char_idx(text, 16));
+        assert_eq!(0, byte_to_char_idx(text, 0));
+        assert_eq!(1, byte_to_char_idx(text, 1));
+        assert_eq!(8, byte_to_char_idx(text, 12));
+        assert_eq!(10, byte_to_char_idx(text, 16));
     }
 
     #[test]
-    fn byte_idx_to_char_idx_02() {
+    fn byte_to_char_idx_02() {
         let text = "せかい";
-        assert_eq!(0, byte_idx_to_char_idx(text, 0));
-        assert_eq!(0, byte_idx_to_char_idx(text, 1));
-        assert_eq!(0, byte_idx_to_char_idx(text, 2));
-        assert_eq!(1, byte_idx_to_char_idx(text, 3));
-        assert_eq!(1, byte_idx_to_char_idx(text, 4));
-        assert_eq!(1, byte_idx_to_char_idx(text, 5));
-        assert_eq!(2, byte_idx_to_char_idx(text, 6));
-        assert_eq!(2, byte_idx_to_char_idx(text, 7));
-        assert_eq!(2, byte_idx_to_char_idx(text, 8));
-        assert_eq!(3, byte_idx_to_char_idx(text, 9));
+        assert_eq!(0, byte_to_char_idx(text, 0));
+        assert_eq!(0, byte_to_char_idx(text, 1));
+        assert_eq!(0, byte_to_char_idx(text, 2));
+        assert_eq!(1, byte_to_char_idx(text, 3));
+        assert_eq!(1, byte_to_char_idx(text, 4));
+        assert_eq!(1, byte_to_char_idx(text, 5));
+        assert_eq!(2, byte_to_char_idx(text, 6));
+        assert_eq!(2, byte_to_char_idx(text, 7));
+        assert_eq!(2, byte_to_char_idx(text, 8));
+        assert_eq!(3, byte_to_char_idx(text, 9));
     }
 
     #[test]
-    fn byte_idx_to_line_idx_01() {
+    fn byte_to_line_idx_01() {
         let text = "Here\nare\nsome\nwords";
-        assert_eq!(0, byte_idx_to_line_idx(text, 0));
-        assert_eq!(0, byte_idx_to_line_idx(text, 4));
-        assert_eq!(1, byte_idx_to_line_idx(text, 5));
-        assert_eq!(1, byte_idx_to_line_idx(text, 8));
-        assert_eq!(2, byte_idx_to_line_idx(text, 9));
-        assert_eq!(2, byte_idx_to_line_idx(text, 13));
-        assert_eq!(3, byte_idx_to_line_idx(text, 14));
-        assert_eq!(3, byte_idx_to_line_idx(text, 19));
+        assert_eq!(0, byte_to_line_idx(text, 0));
+        assert_eq!(0, byte_to_line_idx(text, 4));
+        assert_eq!(1, byte_to_line_idx(text, 5));
+        assert_eq!(1, byte_to_line_idx(text, 8));
+        assert_eq!(2, byte_to_line_idx(text, 9));
+        assert_eq!(2, byte_to_line_idx(text, 13));
+        assert_eq!(3, byte_to_line_idx(text, 14));
+        assert_eq!(3, byte_to_line_idx(text, 19));
     }
 
     #[test]
-    fn byte_idx_to_line_idx_02() {
+    fn byte_to_line_idx_02() {
         let text = "\nHere\nare\nsome\nwords\n";
-        assert_eq!(0, byte_idx_to_line_idx(text, 0));
-        assert_eq!(1, byte_idx_to_line_idx(text, 1));
-        assert_eq!(1, byte_idx_to_line_idx(text, 5));
-        assert_eq!(2, byte_idx_to_line_idx(text, 6));
-        assert_eq!(2, byte_idx_to_line_idx(text, 9));
-        assert_eq!(3, byte_idx_to_line_idx(text, 10));
-        assert_eq!(3, byte_idx_to_line_idx(text, 14));
-        assert_eq!(4, byte_idx_to_line_idx(text, 15));
-        assert_eq!(4, byte_idx_to_line_idx(text, 20));
-        assert_eq!(5, byte_idx_to_line_idx(text, 21));
+        assert_eq!(0, byte_to_line_idx(text, 0));
+        assert_eq!(1, byte_to_line_idx(text, 1));
+        assert_eq!(1, byte_to_line_idx(text, 5));
+        assert_eq!(2, byte_to_line_idx(text, 6));
+        assert_eq!(2, byte_to_line_idx(text, 9));
+        assert_eq!(3, byte_to_line_idx(text, 10));
+        assert_eq!(3, byte_to_line_idx(text, 14));
+        assert_eq!(4, byte_to_line_idx(text, 15));
+        assert_eq!(4, byte_to_line_idx(text, 20));
+        assert_eq!(5, byte_to_line_idx(text, 21));
     }
 
     #[test]
-    fn byte_idx_to_line_idx_03() {
+    fn byte_to_line_idx_03() {
         let text = "Here\r\nare\r\nsome\r\nwords";
-        assert_eq!(0, byte_idx_to_line_idx(text, 0));
-        assert_eq!(0, byte_idx_to_line_idx(text, 4));
-        assert_eq!(0, byte_idx_to_line_idx(text, 5));
-        assert_eq!(1, byte_idx_to_line_idx(text, 6));
-        assert_eq!(1, byte_idx_to_line_idx(text, 9));
-        assert_eq!(1, byte_idx_to_line_idx(text, 10));
-        assert_eq!(2, byte_idx_to_line_idx(text, 11));
-        assert_eq!(2, byte_idx_to_line_idx(text, 15));
-        assert_eq!(2, byte_idx_to_line_idx(text, 16));
-        assert_eq!(3, byte_idx_to_line_idx(text, 17));
+        assert_eq!(0, byte_to_line_idx(text, 0));
+        assert_eq!(0, byte_to_line_idx(text, 4));
+        assert_eq!(0, byte_to_line_idx(text, 5));
+        assert_eq!(1, byte_to_line_idx(text, 6));
+        assert_eq!(1, byte_to_line_idx(text, 9));
+        assert_eq!(1, byte_to_line_idx(text, 10));
+        assert_eq!(2, byte_to_line_idx(text, 11));
+        assert_eq!(2, byte_to_line_idx(text, 15));
+        assert_eq!(2, byte_to_line_idx(text, 16));
+        assert_eq!(3, byte_to_line_idx(text, 17));
     }
 
     #[test]
-    fn char_idx_to_byte_idx_01() {
+    fn char_to_byte_idx_01() {
         let text = "Hello せかい!";
-        assert_eq!(0, char_idx_to_byte_idx(text, 0));
-        assert_eq!(1, char_idx_to_byte_idx(text, 1));
-        assert_eq!(2, char_idx_to_byte_idx(text, 2));
-        assert_eq!(5, char_idx_to_byte_idx(text, 5));
-        assert_eq!(6, char_idx_to_byte_idx(text, 6));
-        assert_eq!(12, char_idx_to_byte_idx(text, 8));
-        assert_eq!(15, char_idx_to_byte_idx(text, 9));
-        assert_eq!(16, char_idx_to_byte_idx(text, 10));
+        assert_eq!(0, char_to_byte_idx(text, 0));
+        assert_eq!(1, char_to_byte_idx(text, 1));
+        assert_eq!(2, char_to_byte_idx(text, 2));
+        assert_eq!(5, char_to_byte_idx(text, 5));
+        assert_eq!(6, char_to_byte_idx(text, 6));
+        assert_eq!(12, char_to_byte_idx(text, 8));
+        assert_eq!(15, char_to_byte_idx(text, 9));
+        assert_eq!(16, char_to_byte_idx(text, 10));
     }
 
     #[test]
-    fn char_idx_to_byte_idx_02() {
+    fn char_to_byte_idx_02() {
         let text = "せかい";
-        assert_eq!(0, char_idx_to_byte_idx(text, 0));
-        assert_eq!(3, char_idx_to_byte_idx(text, 1));
-        assert_eq!(6, char_idx_to_byte_idx(text, 2));
-        assert_eq!(9, char_idx_to_byte_idx(text, 3));
+        assert_eq!(0, char_to_byte_idx(text, 0));
+        assert_eq!(3, char_to_byte_idx(text, 1));
+        assert_eq!(6, char_to_byte_idx(text, 2));
+        assert_eq!(9, char_to_byte_idx(text, 3));
     }
 
     #[test]
-    fn char_idx_to_byte_idx_03() {
+    fn char_to_byte_idx_03() {
         let text = "Hello world!";
-        assert_eq!(0, char_idx_to_byte_idx(text, 0));
-        assert_eq!(1, char_idx_to_byte_idx(text, 1));
-        assert_eq!(8, char_idx_to_byte_idx(text, 8));
-        assert_eq!(11, char_idx_to_byte_idx(text, 11));
-        assert_eq!(12, char_idx_to_byte_idx(text, 12));
+        assert_eq!(0, char_to_byte_idx(text, 0));
+        assert_eq!(1, char_to_byte_idx(text, 1));
+        assert_eq!(8, char_to_byte_idx(text, 8));
+        assert_eq!(11, char_to_byte_idx(text, 11));
+        assert_eq!(12, char_to_byte_idx(text, 12));
     }
 
     #[test]
-    fn char_idx_to_byte_idx_04() {
+    fn char_to_byte_idx_04() {
         let text = "Hello world! Hello せかい! Hello world! Hello せかい! \
                     Hello world! Hello せかい! Hello world! Hello せかい! \
                     Hello world! Hello せかい! Hello world! Hello せかい! \
                     Hello world! Hello せかい! Hello world! Hello せかい!";
-        assert_eq!(0, char_idx_to_byte_idx(text, 0));
-        assert_eq!(30, char_idx_to_byte_idx(text, 24));
-        assert_eq!(60, char_idx_to_byte_idx(text, 48));
-        assert_eq!(90, char_idx_to_byte_idx(text, 72));
-        assert_eq!(115, char_idx_to_byte_idx(text, 93));
-        assert_eq!(120, char_idx_to_byte_idx(text, 96));
-        assert_eq!(150, char_idx_to_byte_idx(text, 120));
-        assert_eq!(180, char_idx_to_byte_idx(text, 144));
-        assert_eq!(210, char_idx_to_byte_idx(text, 168));
-        assert_eq!(239, char_idx_to_byte_idx(text, 191));
+        assert_eq!(0, char_to_byte_idx(text, 0));
+        assert_eq!(30, char_to_byte_idx(text, 24));
+        assert_eq!(60, char_to_byte_idx(text, 48));
+        assert_eq!(90, char_to_byte_idx(text, 72));
+        assert_eq!(115, char_to_byte_idx(text, 93));
+        assert_eq!(120, char_to_byte_idx(text, 96));
+        assert_eq!(150, char_to_byte_idx(text, 120));
+        assert_eq!(180, char_to_byte_idx(text, 144));
+        assert_eq!(210, char_to_byte_idx(text, 168));
+        assert_eq!(239, char_to_byte_idx(text, 191));
     }
 
     #[test]
-    fn char_idx_to_line_idx_01() {
+    fn char_to_line_idx_01() {
         let text = "Hello せ\nか\nい!";
-        assert_eq!(0, char_idx_to_line_idx(text, 0));
-        assert_eq!(0, char_idx_to_line_idx(text, 7));
-        assert_eq!(1, char_idx_to_line_idx(text, 8));
-        assert_eq!(1, char_idx_to_line_idx(text, 9));
-        assert_eq!(2, char_idx_to_line_idx(text, 10));
+        assert_eq!(0, char_to_line_idx(text, 0));
+        assert_eq!(0, char_to_line_idx(text, 7));
+        assert_eq!(1, char_to_line_idx(text, 8));
+        assert_eq!(1, char_to_line_idx(text, 9));
+        assert_eq!(2, char_to_line_idx(text, 10));
     }
 
     #[test]
-    fn line_idx_to_byte_idx_01() {
+    fn line_to_byte_idx_01() {
         let text = "Here\r\nare\r\nsome\r\nwords";
-        assert_eq!(0, line_idx_to_byte_idx(text, 0));
-        assert_eq!(6, line_idx_to_byte_idx(text, 1));
-        assert_eq!(11, line_idx_to_byte_idx(text, 2));
-        assert_eq!(17, line_idx_to_byte_idx(text, 3));
+        assert_eq!(0, line_to_byte_idx(text, 0));
+        assert_eq!(6, line_to_byte_idx(text, 1));
+        assert_eq!(11, line_to_byte_idx(text, 2));
+        assert_eq!(17, line_to_byte_idx(text, 3));
     }
 
     #[test]
-    fn line_idx_to_byte_idx_02() {
+    fn line_to_byte_idx_02() {
         let text = "\nHere\nare\nsome\nwords\n";
-        assert_eq!(0, line_idx_to_byte_idx(text, 0));
-        assert_eq!(1, line_idx_to_byte_idx(text, 1));
-        assert_eq!(6, line_idx_to_byte_idx(text, 2));
-        assert_eq!(10, line_idx_to_byte_idx(text, 3));
-        assert_eq!(15, line_idx_to_byte_idx(text, 4));
-        assert_eq!(21, line_idx_to_byte_idx(text, 5));
+        assert_eq!(0, line_to_byte_idx(text, 0));
+        assert_eq!(1, line_to_byte_idx(text, 1));
+        assert_eq!(6, line_to_byte_idx(text, 2));
+        assert_eq!(10, line_to_byte_idx(text, 3));
+        assert_eq!(15, line_to_byte_idx(text, 4));
+        assert_eq!(21, line_to_byte_idx(text, 5));
     }
 
     #[test]
-    fn line_idx_to_char_idx_01() {
+    fn line_to_char_idx_01() {
         let text = "Hello せ\nか\nい!";
-        assert_eq!(0, line_idx_to_char_idx(text, 0));
-        assert_eq!(8, line_idx_to_char_idx(text, 1));
-        assert_eq!(10, line_idx_to_char_idx(text, 2));
+        assert_eq!(0, line_to_char_idx(text, 0));
+        assert_eq!(8, line_to_char_idx(text, 1));
+        assert_eq!(10, line_to_char_idx(text, 2));
     }
 
     #[test]
     fn line_byte_round_trip() {
         let text = "\nHere\nare\nsome\nwords\n";
-        assert_eq!(6, line_idx_to_byte_idx(text, byte_idx_to_line_idx(text, 6)));
-        assert_eq!(2, byte_idx_to_line_idx(text, line_idx_to_byte_idx(text, 2)));
+        assert_eq!(6, line_to_byte_idx(text, byte_to_line_idx(text, 6)));
+        assert_eq!(2, byte_to_line_idx(text, line_to_byte_idx(text, 2)));
 
-        assert_eq!(0, line_idx_to_byte_idx(text, byte_idx_to_line_idx(text, 0)));
-        assert_eq!(0, byte_idx_to_line_idx(text, line_idx_to_byte_idx(text, 0)));
+        assert_eq!(0, line_to_byte_idx(text, byte_to_line_idx(text, 0)));
+        assert_eq!(0, byte_to_line_idx(text, line_to_byte_idx(text, 0)));
 
-        assert_eq!(
-            21,
-            line_idx_to_byte_idx(text, byte_idx_to_line_idx(text, 21))
-        );
-        assert_eq!(5, byte_idx_to_line_idx(text, line_idx_to_byte_idx(text, 5)));
+        assert_eq!(21, line_to_byte_idx(text, byte_to_line_idx(text, 21)));
+        assert_eq!(5, byte_to_line_idx(text, line_to_byte_idx(text, 5)));
     }
 
     #[test]
     fn line_char_round_trip() {
         let text = "\nHere\nare\nsome\nwords\n";
-        assert_eq!(6, line_idx_to_char_idx(text, char_idx_to_line_idx(text, 6)));
-        assert_eq!(2, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 2)));
+        assert_eq!(6, line_to_char_idx(text, char_to_line_idx(text, 6)));
+        assert_eq!(2, char_to_line_idx(text, line_to_char_idx(text, 2)));
 
-        assert_eq!(0, line_idx_to_char_idx(text, char_idx_to_line_idx(text, 0)));
-        assert_eq!(0, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 0)));
+        assert_eq!(0, line_to_char_idx(text, char_to_line_idx(text, 0)));
+        assert_eq!(0, char_to_line_idx(text, line_to_char_idx(text, 0)));
 
-        assert_eq!(
-            21,
-            line_idx_to_char_idx(text, char_idx_to_line_idx(text, 21))
-        );
-        assert_eq!(5, char_idx_to_line_idx(text, line_idx_to_char_idx(text, 5)));
+        assert_eq!(21, line_to_char_idx(text, char_to_line_idx(text, 21)));
+        assert_eq!(5, char_to_line_idx(text, line_to_char_idx(text, 5)));
     }
 
     #[test]
