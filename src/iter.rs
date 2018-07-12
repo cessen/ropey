@@ -10,7 +10,9 @@ use std::str;
 use std::sync::Arc;
 
 use slice::RopeSlice;
-use str_utils::line_idx_to_byte_idx;
+use str_utils::{
+    char_idx_to_byte_idx, char_idx_to_line_idx, line_idx_to_byte_idx, line_idx_to_char_idx,
+};
 use tree::Node;
 
 //==========================================================
@@ -147,7 +149,10 @@ impl<'a> Lines<'a> {
             node: node,
             start_char: start_char,
             end_char: end_char,
-            line_idx: node.char_to_line(start_char),
+            line_idx: {
+                let (chunk, _, c, l) = node.get_chunk_at_char(start_char);
+                l + char_idx_to_line_idx(chunk, start_char - c)
+            },
         })
     }
 
@@ -173,16 +178,24 @@ impl<'a> Iterator for Lines<'a> {
                 if *line_idx > node.line_break_count() {
                     return None;
                 } else {
-                    let a = node.line_to_char(*line_idx).max(start_char);
+                    let a = {
+                        // Find the char that corresponds to the start of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx);
+                        let a = (c + line_idx_to_char_idx(chunk, *line_idx - l)).max(start_char);
 
-                    // Early out if we're past the specified end char
-                    if a > end_char {
-                        *line_idx = node.line_break_count() + 1;
-                        return None;
-                    }
+                        // Early out if we're past the specified end char
+                        if a > end_char {
+                            *line_idx = node.line_break_count() + 1;
+                            return None;
+                        }
+
+                        a
+                    };
 
                     let b = if *line_idx < node.line_break_count() {
-                        node.line_to_char(*line_idx + 1)
+                        // Find the char that corresponds to the start of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx + 1);
+                        c + line_idx_to_char_idx(chunk, *line_idx + 1 - l)
                     } else {
                         node.char_count()
                     }.min(end_char);
@@ -261,10 +274,18 @@ impl<'a> Chunks<'a> {
     }
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+        let start_byte = {
+            let (chunk, b, c, _) = node.get_chunk_at_char(start_char);
+            b + char_idx_to_byte_idx(chunk, start_char - c)
+        };
+        let end_byte = {
+            let (chunk, b, c, _) = node.get_chunk_at_char(end_char);
+            b + char_idx_to_byte_idx(chunk, end_char - c)
+        };
         Chunks(ChunksEnum::Full {
             node_stack: vec![node],
-            start: node.char_to_byte(start_char),
-            end: node.char_to_byte(end_char),
+            start: start_byte,
+            end: end_byte,
             idx: 0,
         })
     }

@@ -7,7 +7,10 @@ use crlf;
 use iter::{Bytes, Chars, Chunks, Lines};
 use rope_builder::RopeBuilder;
 use slice::{CharIdxRange, RopeSlice};
-use str_utils::char_idx_to_byte_idx;
+use str_utils::{
+    byte_idx_to_char_idx, byte_idx_to_line_idx, char_idx_to_byte_idx, char_idx_to_line_idx,
+    line_idx_to_byte_idx, line_idx_to_char_idx,
+};
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
@@ -65,6 +68,7 @@ impl Rope {
     // Constructors
 
     /// Creates an empty `Rope`.
+    #[inline]
     pub fn new() -> Self {
         Rope {
             root: Arc::new(Node::new()),
@@ -74,6 +78,7 @@ impl Rope {
     /// Creates a `Rope` from a string slice.
     ///
     /// Runs in O(N) time.
+    #[inline]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
     }
@@ -165,6 +170,7 @@ impl Rope {
     /// Total number of bytes in the `Rope`.
     ///
     /// Runs in O(1) time.
+    #[inline]
     pub fn len_bytes(&self) -> usize {
         self.root.byte_count()
     }
@@ -172,6 +178,7 @@ impl Rope {
     /// Total number of chars in the `Rope`.
     ///
     /// Runs in O(1) time.
+    #[inline]
     pub fn len_chars(&self) -> usize {
         self.root.char_count()
     }
@@ -179,6 +186,7 @@ impl Rope {
     /// Total number of lines in the `Rope`.
     ///
     /// Runs in O(1) time.
+    #[inline]
     pub fn len_lines(&self) -> usize {
         self.root.line_break_count() + 1
     }
@@ -592,6 +600,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    #[inline]
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -601,7 +610,8 @@ impl Rope {
             self.len_bytes()
         );
 
-        self.root.byte_to_char(byte_idx)
+        let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
+        c + byte_idx_to_char_idx(chunk, byte_idx - b)
     }
 
     /// Returns the line index of the given byte.
@@ -613,6 +623,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    #[inline]
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -622,7 +633,8 @@ impl Rope {
             self.len_bytes()
         );
 
-        self.root.byte_to_line(byte_idx)
+        let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
+        l + byte_idx_to_line_idx(chunk, byte_idx - b)
     }
 
     /// Returns the byte index of the given char.
@@ -630,6 +642,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -639,7 +652,8 @@ impl Rope {
             self.len_chars()
         );
 
-        self.root.char_to_byte(char_idx)
+        let (chunk, b, c, _) = self.chunk_at_char(char_idx);
+        b + char_idx_to_byte_idx(chunk, char_idx - c)
     }
 
     /// Returns the line index of the given char.
@@ -651,6 +665,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
     pub fn char_to_line(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -660,7 +675,8 @@ impl Rope {
             self.len_chars()
         );
 
-        self.root.char_to_line(char_idx)
+        let (chunk, _, c, l) = self.chunk_at_char(char_idx);
+        l + char_idx_to_line_idx(chunk, char_idx - c)
     }
 
     /// Returns the byte index of the start of the given line.
@@ -674,6 +690,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
+    #[inline]
     pub fn line_to_byte(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -686,7 +703,8 @@ impl Rope {
         if line_idx == self.len_lines() {
             self.len_bytes()
         } else {
-            self.root.line_to_byte(line_idx)
+            let (chunk, b, _, l) = self.chunk_at_line_break(line_idx);
+            b + line_idx_to_byte_idx(chunk, line_idx - l)
         }
     }
 
@@ -701,6 +719,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
+    #[inline]
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         // Bounds check
         assert!(
@@ -713,7 +732,8 @@ impl Rope {
         if line_idx == self.len_lines() {
             self.len_chars()
         } else {
-            self.root.line_to_char(line_idx)
+            let (chunk, _, c, l) = self.chunk_at_line_break(line_idx);
+            c + line_idx_to_char_idx(chunk, line_idx - l)
         }
     }
 
@@ -725,6 +745,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
+    #[inline]
     pub fn char(&self, char_idx: usize) -> char {
         // Bounds check
         assert!(
@@ -734,7 +755,7 @@ impl Rope {
             self.len_chars()
         );
 
-        let (chunk, _, chunk_char_idx, _) = self.root.get_chunk_at_char(char_idx);
+        let (chunk, _, chunk_char_idx, _) = self.chunk_at_char(char_idx);
         let byte_idx = char_idx_to_byte_idx(chunk, char_idx - chunk_char_idx);
         chunk[byte_idx..].chars().nth(0).unwrap()
     }
@@ -746,6 +767,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
+    #[inline]
     pub fn line(&self, line_idx: usize) -> RopeSlice {
         // Bounds check
         assert!(
@@ -770,6 +792,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    #[inline]
     pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize, usize) {
         // Bounds check
         assert!(
@@ -791,6 +814,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
     pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize, usize) {
         // Bounds check
         assert!(
@@ -801,6 +825,34 @@ impl Rope {
         );
 
         self.root.get_chunk_at_char(char_idx)
+    }
+
+    /// Returns the chunk containing the given line break, along with the
+    /// byte and char indices of the beginning of the chunk and the index of
+    /// the line that the chunk starts on.
+    ///
+    /// Note: for convenience, both the beginning and end of the rope are
+    /// considered line breaks for indexing.  For example, in the string
+    /// `"Hello \n world!"` 0 would give the first chunk, 1 would give the
+    /// chunk containing the newline character, and 2 would give the last
+    /// chunk.
+    ///
+    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_break_idx` is out of bounds (i.e. `line_break_idx > len_lines()`).
+    #[inline]
+    pub fn chunk_at_line_break(&self, line_break_idx: usize) -> (&str, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            line_break_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line break index {}, max index {}",
+            line_break_idx,
+            self.len_lines()
+        );
+
+        self.root.get_chunk_at_line_break(line_break_idx)
     }
 
     //-----------------------------------------------------------------------
@@ -825,6 +877,7 @@ impl Rope {
     ///
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
+    #[inline]
     pub fn slice<R: CharIdxRange>(&self, range: R) -> RopeSlice {
         let start = range.start().unwrap_or(0);
         let end = range.end().unwrap_or_else(|| self.len_chars());
@@ -845,21 +898,25 @@ impl Rope {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `Rope`.
+    #[inline]
     pub fn bytes(&self) -> Bytes {
         Bytes::new(&self.root)
     }
 
     /// Creates an iterator over the chars of the `Rope`.
+    #[inline]
     pub fn chars(&self) -> Chars {
         Chars::new(&self.root)
     }
 
     /// Creates an iterator over the lines of the `Rope`.
+    #[inline]
     pub fn lines(&self) -> Lines {
         Lines::new(&self.root)
     }
 
     /// Creates an iterator over the chunks of the `Rope`.
+    #[inline]
     pub fn chunks(&self) -> Chunks {
         Chunks::new(&self.root)
     }
@@ -870,6 +927,7 @@ impl Rope {
     /// Returns the entire text of the `Rope` as a newly allocated String.
     ///
     /// Runs in O(N) time.
+    #[inline]
     pub fn to_string(&self) -> String {
         use iter::Chunks;
         let mut text = String::with_capacity(self.len_bytes());
@@ -1785,37 +1843,89 @@ mod tests {
     #[test]
     fn chunk_at_byte() {
         let r = Rope::from_str(TEXT_LINES);
+        let mut t = TEXT_LINES;
 
+        let mut last_chunk = "";
         for i in 0..r.len_bytes() {
-            let c1 = r.char(r.byte_to_char(i));
+            let (chunk, b, c, l) = r.chunk_at_byte(i);
+            assert_eq!(c, byte_idx_to_char_idx(TEXT_LINES, b));
+            assert_eq!(l, byte_idx_to_line_idx(TEXT_LINES, b));
+            if chunk != last_chunk {
+                assert_eq!(chunk, &t[..chunk.len()]);
+                t = &t[chunk.len()..];
+                last_chunk = chunk;
+            }
+
+            let c1 = {
+                let i2 = byte_idx_to_char_idx(TEXT_LINES, i);
+                TEXT_LINES.chars().nth(i2).unwrap()
+            };
             let c2 = {
-                let (chunk, b, c, l) = r.chunk_at_byte(i);
-                assert_eq!(c, r.byte_to_char(b));
-                assert_eq!(l, r.byte_to_line(b));
                 let i2 = i - b;
                 let i3 = byte_idx_to_char_idx(chunk, i2);
                 chunk.chars().nth(i3).unwrap()
             };
-
             assert_eq!(c1, c2);
         }
+        assert_eq!(t.len(), 0);
     }
 
     #[test]
     fn chunk_at_char() {
         let r = Rope::from_str(TEXT_LINES);
+        let mut t = TEXT_LINES;
 
+        let mut last_chunk = "";
         for i in 0..r.len_chars() {
-            let c1 = r.char(i);
+            let (chunk, b, c, l) = r.chunk_at_char(i);
+            assert_eq!(b, char_idx_to_byte_idx(TEXT_LINES, c));
+            assert_eq!(l, char_idx_to_line_idx(TEXT_LINES, c));
+            if chunk != last_chunk {
+                assert_eq!(chunk, &t[..chunk.len()]);
+                t = &t[chunk.len()..];
+                last_chunk = chunk;
+            }
+
+            let c1 = TEXT_LINES.chars().nth(i).unwrap();
             let c2 = {
-                let (chunk, b, c, l) = r.chunk_at_char(i);
-                assert_eq!(b, r.char_to_byte(c));
-                assert_eq!(l, r.char_to_line(c));
                 let i2 = i - c;
                 chunk.chars().nth(i2).unwrap()
             };
-
             assert_eq!(c1, c2);
+        }
+        assert_eq!(t.len(), 0);
+    }
+
+    #[test]
+    fn chunk_at_line_break() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        // First chunk
+        {
+            let (chunk, b, c, l) = r.chunk_at_line_break(0);
+            assert_eq!(chunk, &TEXT_LINES[..chunk.len()]);
+            assert_eq!(b, 0);
+            assert_eq!(c, 0);
+            assert_eq!(l, 0);
+        }
+
+        // Middle chunks
+        for i in 1..r.len_lines() {
+            let (chunk, b, c, l) = r.chunk_at_line_break(i);
+            assert_eq!(chunk, &TEXT_LINES[b..(b + chunk.len())]);
+            assert_eq!(c, byte_idx_to_char_idx(TEXT_LINES, b));
+            assert_eq!(l, byte_idx_to_line_idx(TEXT_LINES, b));
+            assert!(l < i);
+            assert!(i <= byte_idx_to_line_idx(TEXT_LINES, b + chunk.len()));
+        }
+
+        // Last chunk
+        {
+            let (chunk, b, c, l) = r.chunk_at_line_break(r.len_lines());
+            assert_eq!(chunk, &TEXT_LINES[(TEXT_LINES.len() - chunk.len())..]);
+            assert_eq!(chunk, &TEXT_LINES[b..]);
+            assert_eq!(c, byte_idx_to_char_idx(TEXT_LINES, b));
+            assert_eq!(l, byte_idx_to_line_idx(TEXT_LINES, b));
         }
     }
 

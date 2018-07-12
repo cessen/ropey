@@ -353,6 +353,37 @@ impl NodeChildren {
         (idx, accum)
     }
 
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given line break.
+    ///
+    /// Beginning of the rope is considered index 0, although is not
+    /// considered a line break for the returned left-side-accumulated
+    /// text info.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_line_break_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
+        debug_assert!(self.len() > 0);
+
+        let mut accum = TextInfo::new();
+        let mut idx = 0;
+        for info in self.info()[0..(self.len() - 1)].iter() {
+            let next_accum = accum + *info;
+            if line_break_idx <= next_accum.line_breaks as usize {
+                break;
+            }
+            accum = next_accum;
+            idx += 1;
+        }
+
+        #[cfg(any(test, debug_assertions))]
+        assert!(
+            line_break_idx <= (accum.line_breaks + self.info()[idx].line_breaks + 1) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
     /// Returns the child indices at the start and end of the given char
     /// range, and returns their left-side-accumulated text info as well.
     ///
@@ -803,5 +834,112 @@ mod tests {
         children.update_child_info(2);
 
         children.search_char_idx_range(18, 19);
+    }
+
+    #[test]
+    fn search_line_break_idx_01() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("Hello\n"))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("\nthere\n"))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("world!\n"))),
+        ));
+
+        children.update_child_info(0);
+        children.update_child_info(1);
+        children.update_child_info(2);
+
+        assert_eq!(0, children.search_line_break_idx(0).0);
+        assert_eq!(0, children.search_line_break_idx(0).1.line_breaks);
+
+        assert_eq!(0, children.search_line_break_idx(1).0);
+        assert_eq!(0, children.search_line_break_idx(1).1.line_breaks);
+
+        assert_eq!(1, children.search_line_break_idx(2).0);
+        assert_eq!(1, children.search_line_break_idx(2).1.line_breaks);
+
+        assert_eq!(1, children.search_line_break_idx(3).0);
+        assert_eq!(1, children.search_line_break_idx(3).1.line_breaks);
+
+        assert_eq!(2, children.search_line_break_idx(4).0);
+        assert_eq!(3, children.search_line_break_idx(4).1.line_breaks);
+
+        assert_eq!(2, children.search_line_break_idx(5).0);
+        assert_eq!(3, children.search_line_break_idx(5).1.line_breaks);
+    }
+
+    #[test]
+    fn search_line_break_idx_02() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("Hello\n"))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("there"))),
+        ));
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+        ));
+
+        children.update_child_info(0);
+        children.update_child_info(1);
+        children.update_child_info(2);
+
+        assert_eq!(0, children.search_line_break_idx(0).0);
+        assert_eq!(0, children.search_line_break_idx(0).1.line_breaks);
+
+        assert_eq!(0, children.search_line_break_idx(1).0);
+        assert_eq!(0, children.search_line_break_idx(1).1.line_breaks);
+
+        assert_eq!(2, children.search_line_break_idx(2).0);
+        assert_eq!(1, children.search_line_break_idx(2).1.line_breaks);
+    }
+
+    #[test]
+    fn search_line_break_idx_03() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str(""))),
+        ));
+
+        children.update_child_info(0);
+
+        assert_eq!(0, children.search_line_break_idx(0).0);
+        assert_eq!(0, children.search_line_break_idx(0).1.line_breaks);
+
+        assert_eq!(0, children.search_line_break_idx(1).0);
+        assert_eq!(0, children.search_line_break_idx(1).1.line_breaks);
+    }
+
+    #[test]
+    #[should_panic]
+    fn search_line_break_idx_04() {
+        let mut children = NodeChildren::new();
+        children.push((
+            TextInfo::new(),
+            Arc::new(Node::Leaf(NodeText::from_str(""))),
+        ));
+
+        children.update_child_info(0);
+
+        assert_eq!(0, children.search_line_break_idx(0).0);
+        assert_eq!(0, children.search_line_break_idx(0).1.line_breaks);
+
+        assert_eq!(0, children.search_line_break_idx(1).0);
+        assert_eq!(0, children.search_line_break_idx(1).1.line_breaks);
+
+        assert_eq!(0, children.search_line_break_idx(2).0);
+        assert_eq!(0, children.search_line_break_idx(2).1.line_breaks);
     }
 }
