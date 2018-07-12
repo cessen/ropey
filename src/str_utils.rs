@@ -160,15 +160,17 @@ pub fn byte_idx_to_char_idx(text: &str, byte_idx: usize) -> usize {
 
 #[inline]
 pub fn byte_idx_to_line_idx(text: &str, byte_idx: usize) -> usize {
-    let mut line_i = 1;
-    for offset in LineBreakIter::new(text) {
-        if byte_idx < offset {
-            break;
-        } else {
-            line_i += 1;
-        }
+    use crlf;
+    let mut byte_idx = byte_idx;
+    while !text.is_char_boundary(byte_idx) {
+        byte_idx += 1;
     }
-    line_i - 1
+    let nl_count = count_line_breaks(&text[..byte_idx]);
+    if crlf::is_break(byte_idx, text.as_bytes()) {
+        nl_count
+    } else {
+        nl_count - 1
+    }
 }
 
 #[inline]
@@ -225,6 +227,8 @@ pub fn char_idx_to_line_idx(text: &str, char_idx: usize) -> usize {
     byte_idx_to_line_idx(text, char_idx_to_byte_idx(text, char_idx))
 }
 
+// TODO: use bit fiddling magic to make this faster, as in
+// `count_line_breaks()`.
 #[inline]
 pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     if line_idx == 0 {
@@ -236,7 +240,7 @@ pub fn line_idx_to_byte_idx(text: &str, line_idx: usize) -> usize {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn line_idx_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_idx_to_char_idx(text, line_idx_to_byte_idx(text, line_idx))
 }
@@ -262,7 +266,7 @@ fn count_zero_bytes(x: usize) -> usize {
     ((x.wrapping_sub(ONEMASK_LOW)) & !x & ONEMASK_HIGH) / 128 % 255
 }
 
-#[inline]
+#[inline(always)]
 pub fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
 }
