@@ -3,7 +3,7 @@
 extern crate ropey;
 extern crate unicode_segmentation;
 
-use ropey::RopeSlice;
+use ropey::{str_utils::byte_to_char_idx, RopeSlice};
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 
 fn main() {}
@@ -27,7 +27,7 @@ fn prev_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
         match gc.prev_boundary(chunk, chunk_byte_idx) {
             Ok(None) => return 0,
             Ok(Some(n)) => {
-                let tmp = chunk[..(n - chunk_byte_idx)].chars().count();
+                let tmp = byte_to_char_idx(chunk, n - chunk_byte_idx);
                 return chunk_char_idx + tmp;
             }
             Err(GraphemeIncomplete::PrevChunk) => {
@@ -64,7 +64,7 @@ fn next_grapheme_boundary(slice: &RopeSlice, char_idx: usize) -> usize {
         match gc.next_boundary(chunk, chunk_byte_idx) {
             Ok(None) => return slice.len_chars(),
             Ok(Some(n)) => {
-                let tmp = chunk[..(n - chunk_byte_idx)].chars().count();
+                let tmp = byte_to_char_idx(chunk, n - chunk_byte_idx);
                 return chunk_char_idx + tmp;
             }
             Err(GraphemeIncomplete::NextChunk) => {
