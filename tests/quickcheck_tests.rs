@@ -4,29 +4,26 @@ extern crate ropey;
 
 use proptest::collection::vec;
 use proptest::test_runner::Config;
-use ropey::Rope;
-
-// Helper function used in the tests below
-fn char_to_byte_idx(idx: usize, text: &str) -> usize {
-    text.char_indices().nth(idx).unwrap_or((text.len(), '\0')).0
-}
+use ropey::{
+    str_utils::{byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx}, Rope,
+};
 
 fn string_insert(text: &mut String, char_idx: usize, text_ins: &str) {
-    let byte_idx = char_to_byte_idx(char_idx, text);
+    let byte_idx = char_to_byte_idx(text, char_idx);
     text.insert_str(byte_idx, text_ins);
 }
 
 fn string_remove(text: &mut String, char_start: usize, char_end: usize) {
-    let byte_start = char_to_byte_idx(char_start, text);
-    let byte_end = char_to_byte_idx(char_end, text);
+    let byte_start = char_to_byte_idx(text, char_start);
+    let byte_end = char_to_byte_idx(text, char_end);
     let text_r = text.split_off(byte_end);
     text.truncate(byte_start);
     text.push_str(&text_r);
 }
 
 fn string_slice(text: &str, char_start: usize, char_end: usize) -> &str {
-    let byte_start = char_to_byte_idx(char_start, text);
-    let byte_end = char_to_byte_idx(char_end, text);
+    let byte_start = char_to_byte_idx(text, char_start);
+    let byte_end = char_to_byte_idx(text, char_end);
     &text[byte_start..byte_end]
 }
 
@@ -146,6 +143,95 @@ proptest! {
 
         assert!((rope.capacity() - rope.len_bytes()) < max_diff);
         assert_eq!(rope, rope_clone);
+    }
+
+    #[test]
+    fn pt_chunk_at_byte(ref text in "\\PC*") {
+        let r = Rope::from_str(text);
+        let mut t = &text[..];
+
+        let mut last_chunk = "";
+        for i in 0..r.len_bytes() {
+            let (chunk, b, c, l) = r.chunk_at_byte(i);
+            assert_eq!(c, byte_to_char_idx(text, b));
+            assert_eq!(l, byte_to_line_idx(text, b));
+            if chunk != last_chunk {
+                assert_eq!(chunk, &t[..chunk.len()]);
+                t = &t[chunk.len()..];
+                last_chunk = chunk;
+            }
+
+            let c1 = {
+                let i2 = byte_to_char_idx(text, i);
+                text.chars().nth(i2).unwrap()
+            };
+            let c2 = {
+                let i2 = i - b;
+                let i3 = byte_to_char_idx(chunk, i2);
+                chunk.chars().nth(i3).unwrap()
+            };
+            assert_eq!(c1, c2);
+        }
+        assert_eq!(t.len(), 0);
+    }
+
+    #[test]
+    fn pt_chunk_at_char(ref text in "\\PC*") {
+        let r = Rope::from_str(text);
+        let mut t = &text[..];
+
+        let mut last_chunk = "";
+        for i in 0..r.len_chars() {
+            let (chunk, b, c, l) = r.chunk_at_char(i);
+            assert_eq!(b, char_to_byte_idx(text, c));
+            assert_eq!(l, char_to_line_idx(text, c));
+            if chunk != last_chunk {
+                assert_eq!(chunk, &t[..chunk.len()]);
+                t = &t[chunk.len()..];
+                last_chunk = chunk;
+            }
+
+            let c1 = text.chars().nth(i).unwrap();
+            let c2 = {
+                let i2 = i - c;
+                chunk.chars().nth(i2).unwrap()
+            };
+            assert_eq!(c1, c2);
+        }
+        assert_eq!(t.len(), 0);
+    }
+
+    #[test]
+    fn pt_chunk_at_line_break(ref text in "\\PC*") {
+        let r = Rope::from_str(&text);
+
+        // First chunk
+        {
+            let (chunk, b, c, l) = r.chunk_at_line_break(0);
+            assert_eq!(chunk, &text[..chunk.len()]);
+            assert_eq!(b, 0);
+            assert_eq!(c, 0);
+            assert_eq!(l, 0);
+        }
+
+        // Middle chunks
+        for i in 1..r.len_lines() {
+            let (chunk, b, c, l) = r.chunk_at_line_break(i);
+            assert_eq!(chunk, &text[b..(b + chunk.len())]);
+            assert_eq!(c, byte_to_char_idx(&text, b));
+            assert_eq!(l, byte_to_line_idx(&text, b));
+            assert!(l < i);
+            assert!(i <= byte_to_line_idx(&text, b + chunk.len()));
+        }
+
+        // Last chunk
+        {
+            let (chunk, b, c, l) = r.chunk_at_line_break(r.len_lines());
+            assert_eq!(chunk, &text[(text.len() - chunk.len())..]);
+            assert_eq!(chunk, &text[b..]);
+            assert_eq!(c, byte_to_char_idx(&text, b));
+            assert_eq!(l, byte_to_line_idx(&text, b));
+        }
     }
 
     #[test]
