@@ -1,4 +1,4 @@
-//! Utility functions for string slices.
+//! Utility functions for utf8 string slices.
 //!
 //! This module provides various utility functions that operate on string
 //! slices in ways compatible with Ropey.  They may be useful when building
