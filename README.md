@@ -104,16 +104,16 @@ Clones can be sent to other threads for both reading and writing.
 
 ## Unsafe Code
 
-Ropey does use unsafe code to help acheive some of its space and performance
-characteristics.  Although a lot of effort has been put into keeping unsafe
-code compartmentalized and making it correct, it is nevertheless _not_
-recommended to use Ropey in software that may face adversarial conditions.
+Ropey does use unsafe code to help achieve some of its space and performance
+characteristics.  Although effort has been put into keeping the unsafe code
+compartmentalized, it is nevertheless _not_ recommended at this time to use
+Ropey in software that may face adversarial conditions.
 
 Auditing, fuzzing, etc. of the unsafe code in Ropey is extremely welcome.
-If any unsoundness is found, _please_ file an issue!  Also welcome are
-recommendations for how to remove any of the unsafe code from Ropey without
-introducing significant space or performance regressions, or how to
-compartmentalize the unsafe code even better.
+If you find any unsoundness, _please_ file an issue!  Also welcome are
+recommendations for how to remove any of the unsafe code without introducing
+significant space or performance regressions, or how to compartmentalize the
+unsafe code even better.
 
 
 ## License
