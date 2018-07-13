@@ -669,11 +669,18 @@ impl Node {
     /// But this should nevertheless get addressed at some point.
     /// Probably the most straight-forward way to address this is via the
     /// `fix_info_*` methods below, but I'm not totally sure.
-    pub fn fix_grapheme_seam(
-        &mut self,
+    ///
+    /// WARNING: this function internally uses unsafe code in one place to
+    /// work around the borrow checker.  Be very careful when modifying any
+    /// of this function's code!  Even changing the signature must be done
+    /// with care, accounting for the unsafe code.
+    /// See the comments around the unsafe block for details.  Would love to
+    /// get rid of it!
+    pub fn fix_grapheme_seam<'a>(
+        &'a mut self,
         byte_pos: Count,
         must_be_boundary: bool,
-    ) -> Option<&mut NodeText> {
+    ) -> Option<&'a mut NodeText> {
         match *self {
             Node::Leaf(ref mut text) => {
                 if (!must_be_boundary) || byte_pos == 0 || byte_pos == text.len() as Count {
@@ -741,21 +748,35 @@ impl Node {
                         return None;
                     } else {
                         // Internal to child
-                        // WARNING: we use raw pointers to work around the borrow
-                        // checker here, so be careful when modifying this code!
                         {
+                            // WARNING: we use raw pointers to work around the borrow
+                            // checker here, so be careful when modifying this code!
                             let raw_text = Arc::make_mut(&mut children.nodes_mut()[child_i])
                                 .fix_grapheme_seam(pos_in_child, must_be_boundary)
                                 .map(|text| text as *mut NodeText);
 
-                            // This is the bit we have to work arround.  If raw_text
+                            // This is the bit we have to work around.  If raw_text
                             // weren't cast to a raw_point, it's &mut would keep us
-                            // from calling this.  However, this is actually safe,
-                            // since it doesn't modify the `Node`.
+                            // from calling this.  However, this is actually safe
+                            // because:
+                            // 1. We're only keeping a &mut to the node's text,
+                            //    not the whole node.
+                            // 2. We're only updating the node's _metadata_ here,
+                            //    not its text.
+                            // 3. The node's metadata isn't even stored in itself,
+                            //    it's stored in its parent.
+                            //
+                            // I've tried working around this without unsafe code
+                            // quite a few times, and always failed.  Definitely
+                            // would like to get rid of this hack!
                             children.update_child_info(child_i);
 
                             // If the node isn't empty, return the text.
                             if children.info()[child_i].bytes > 0 {
+                                // This is where we're reconstructing the &mut
+                                // from the raw pointer.  It is coerced to the
+                                // appropriate lifetime due to the function
+                                // signature.
                                 return raw_text.map(|text| unsafe { &mut *text });
                             }
                         }
