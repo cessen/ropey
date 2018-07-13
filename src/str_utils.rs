@@ -409,11 +409,13 @@ pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 /// - u{0085}        (Next Line)
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
+#[allow(unused)] // Used in tests, as reference solution.
 pub(crate) struct LineBreakIter<'a> {
     byte_itr: std::str::Bytes<'a>,
     byte_idx: usize,
 }
 
+#[allow(unused)]
 impl<'a> LineBreakIter<'a> {
     #[inline]
     pub fn new(text: &str) -> LineBreakIter {
