@@ -10,80 +10,55 @@ use smallvec::{Array, SmallVec};
 use str_utils::{char_to_byte_idx, count_chars};
 use tree::MAX_BYTES;
 
-// TODO: handle corner-case when fixing CRLF seams, and then uncomment
-// all of the `MAX_BYTES` asserts to make sure that no allocations are
-// happening.  Finally, remove SmallVec in favor of a simple byte array
-// + len.
-
 /// A custom small string, with an internal buffer of `tree::MAX_BYTES`
 /// length.  Has a bunch of methods on it that are useful for the rope
 /// tree.
 #[derive(Clone, Default)]
-pub(crate) struct NodeText {
-    buffer: SmallVec<BackingArray>,
-}
+pub(crate) struct NodeText(NodeSmallString);
 
 impl NodeText {
     /// Creates a new empty `NodeText`
     #[inline(always)]
     pub fn new() -> Self {
-        NodeText {
-            buffer: SmallVec::new(),
-        }
+        NodeText(NodeSmallString::new())
     }
 
     /// Creates a new empty `NodeText` with at least `capacity` bytes
     /// of capacity.
     #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
-        NodeText {
-            buffer: SmallVec::with_capacity(capacity),
-        }
+        NodeText(NodeSmallString::with_capacity(capacity))
     }
 
     /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        debug_assert!(string.len() <= MAX_BYTES);
-        let mut nodetext = NodeText::with_capacity(string.len());
-        unsafe { nodetext.insert_bytes(0, string.as_bytes()) };
-        nodetext
+        NodeText(NodeSmallString::from_str(string))
     }
 
-    /// Inserts a `&str` at byte offset `idx`.
-    ///
-    /// Panics if `idx` is not a char boundary, as that would result in an
-    /// invalid utf8 string.
+    /// Inserts a `&str` at byte offset `byte_idx`.
     pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
-        debug_assert!(self.is_char_boundary(byte_idx));
-        debug_assert!(byte_idx <= self.len());
-        // debug_assert!((self.len() + string.len()) <= MAX_BYTES);
-
-        unsafe {
-            self.insert_bytes(byte_idx, string.as_bytes());
-        }
+        self.0.insert_str(byte_idx, string);
     }
 
     /// Inserts the given text into the given string at the given char index.
     pub fn insert_str_at_char(&mut self, text: &str, char_idx: usize) {
-        // debug_assert!((self.len() + text.len()) <= MAX_BYTES);
         let byte_idx = char_to_byte_idx(self, char_idx);
         self.insert_str(byte_idx, text);
     }
 
-    /// Inserts a `&str` and splits the resulting string in half, returning
-    /// the right half.
+    /// Inserts `string` at `byte_idx` and splits the resulting string in half,
+    /// returning the right half.
     ///
     /// Only splits on code point boundaries and will never split CRLF pairs,
     /// so if the whole string is a single code point or CRLF pair, the split
     /// will fail and the returned string will be empty.
-    pub fn insert_str_split(&mut self, idx: usize, string: &str) -> Self {
-        debug_assert!(self.is_char_boundary(idx));
-        // debug_assert!((self.len() + string.len()) <= (MAX_BYTES * 2 - 4));
+    pub fn insert_str_split(&mut self, byte_idx: usize, string: &str) -> Self {
+        debug_assert!(self.is_char_boundary(byte_idx));
 
         let tot_len = self.len() + string.len();
         let mid_idx = tot_len / 2;
-        let a = idx;
-        let b = idx + string.len();
+        let a = byte_idx;
+        let b = byte_idx + string.len();
 
         // Figure out the split index, accounting for code point
         // boundaries and CRLF pairs.
@@ -107,8 +82,6 @@ impl NodeText {
             crlf::nearest_internal_break(mid_idx - start, &buf[..(end - start)]) + start
         };
 
-        // debug_assert!(split_idx <= MAX_BYTES);
-
         let mut right = NodeText::new();
         if split_idx <= a {
             right.push_str(&self[split_idx..a]);
@@ -126,16 +99,14 @@ impl NodeText {
             self.insert_str(a, string);
         }
 
+        self.0.inline_if_possible();
         right
     }
 
     /// Appends a `&str` to end the of the `NodeText`.
     pub fn push_str(&mut self, string: &str) {
-        // debug_assert!((self.len() + string.len()) <= MAX_BYTES);
         let len = self.len();
-        unsafe {
-            self.insert_bytes(len, string.as_bytes());
-        }
+        self.0.insert_str(len, string);
     }
 
     /// Appends a `&str` and splits the resulting string in half, returning
@@ -144,85 +115,48 @@ impl NodeText {
     /// Only splits on code point boundaries and will never split CRLF pairs,
     /// grapheme boundaries, so if the whole string is a single code point or
     /// CRLF pair, the split will fail and the returned string will be empty.
-    ///
-    /// TODO: make this work without allocations when possible.
     pub fn push_str_split(&mut self, string: &str) -> Self {
         let len = self.len();
         self.insert_str_split(len, string)
     }
 
-    /// Drops the text after byte index `idx`.
-    ///
-    /// Panics if `idx` is not a char boundary, as that would result in an
-    /// invalid utf8 string.
-    pub fn truncate(&mut self, idx: usize) {
-        assert!(self.is_char_boundary(idx));
-        debug_assert!(idx <= self.len());
-        self.buffer.truncate(idx);
-        self.inline_if_possible();
+    /// Drops the text after byte index `byte_idx`.
+    pub fn truncate(&mut self, byte_idx: usize) {
+        self.0.truncate(byte_idx);
+        self.0.inline_if_possible();
     }
 
-    /// Drops the text before byte index `idx`, shifting the
+    /// Drops the text before byte index `byte_idx`, shifting the
     /// rest of the text to fill in the space.
-    ///
-    /// Panics if `idx` is not a char boundary, as that would result in an
-    /// invalid utf8 string.
-    pub fn truncate_front(&mut self, idx: usize) {
-        assert!(self.is_char_boundary(idx));
-        debug_assert!(idx <= self.len());
-        unsafe {
-            self.remove_bytes(0, idx);
-        }
+    pub fn truncate_front(&mut self, byte_idx: usize) {
+        self.0.remove_range(0, byte_idx);
+        self.0.inline_if_possible();
     }
 
-    /// Removes the text in the byte index interval `[start, end)`.
-    ///
-    /// Panics if either `start` or `end` are not char boundaries, as that
-    /// would result in an invalid utf8 string.
-    pub fn remove_range(&mut self, start: usize, end: usize) {
-        assert!(self.is_char_boundary(start));
-        assert!(self.is_char_boundary(end));
-        debug_assert!(end <= self.len());
-        debug_assert!(start <= end);
-        unsafe {
-            self.remove_bytes(start, end);
-        }
-        self.inline_if_possible();
+    /// Removes the text in the byte index interval `[byte_start, byte_end)`.
+    pub fn remove_range(&mut self, byte_start: usize, byte_end: usize) {
+        self.0.remove_range(byte_start, byte_end);
+        self.0.inline_if_possible();
     }
 
-    pub fn remove_char_range(&mut self, start: usize, end: usize) {
-        debug_assert!(start <= end);
-        debug_assert!(end <= count_chars(self));
+    pub fn remove_char_range(&mut self, char_start: usize, char_end: usize) {
+        debug_assert!(char_start <= char_end);
+        debug_assert!(char_end <= count_chars(self));
 
-        let byte_start = char_to_byte_idx(self, start);
-        let byte_end = char_to_byte_idx(&self[start..], end - start);
+        let byte_start = char_to_byte_idx(self, char_start);
+        let byte_end = char_to_byte_idx(&self[char_start..], char_end - char_start);
 
-        unsafe { self.remove_bytes(byte_start, byte_end) }
-        self.inline_if_possible();
+        self.0.remove_range(byte_start, byte_end);
+        self.0.inline_if_possible();
     }
 
-    /// Splits the `NodeText` at `idx`.
+    /// Splits the `NodeText` at `byte_idx`.
     ///
     /// The left part remains in the original, and the right part is
     /// returned in a new `NodeText`.
-    ///
-    /// Panics if `idx` is not a char boundary, as that would result in an
-    /// invalid utf8 string.
-    pub fn split_off(&mut self, idx: usize) -> Self {
-        assert!(self.is_char_boundary(idx));
-        assert!(idx <= self.len());
-        let len = self.len();
-        let mut other = NodeText::with_capacity(len - idx);
-        unsafe {
-            ptr::copy_nonoverlapping(
-                self.buffer.as_ptr().offset(idx as isize),
-                other.buffer.as_mut_ptr().offset(0),
-                len - idx,
-            );
-            self.buffer.set_len(idx);
-            other.buffer.set_len(len - idx);
-        }
-        self.inline_if_possible();
+    pub fn split_off(&mut self, byte_idx: usize) -> Self {
+        let other = NodeText(self.0.split_off(byte_idx));
+        self.0.inline_if_possible();
         other
     }
 
@@ -233,69 +167,6 @@ impl NodeText {
         debug_assert!(char_idx <= count_chars(self));
         let byte_idx = char_to_byte_idx(self, char_idx);
         self.split_off(byte_idx)
-    }
-
-    #[inline(always)]
-    pub fn shrink_to_fit(&mut self) {
-        self.buffer.shrink_to_fit();
-    }
-
-    /// Returns whether the string has spilled out into a heap-allocated
-    /// memory area.
-    pub fn spilled(&self) -> bool {
-        self.buffer.spilled()
-    }
-
-    #[inline(always)]
-    pub unsafe fn as_mut_smallvec(&mut self) -> &mut SmallVec<BackingArray> {
-        &mut self.buffer
-    }
-
-    #[inline(always)]
-    unsafe fn insert_bytes(&mut self, idx: usize, bytes: &[u8]) {
-        assert!(idx <= self.len());
-        // debug_assert!((self.len() + bytes.len()) <= MAX_BYTES);
-
-        let len = self.len();
-        let amt = bytes.len();
-        self.buffer.reserve(amt);
-
-        ptr::copy(
-            self.buffer.as_ptr().offset(idx as isize),
-            self.buffer.as_mut_ptr().offset((idx + amt) as isize),
-            len - idx,
-        );
-        ptr::copy(
-            bytes.as_ptr(),
-            self.buffer.as_mut_ptr().offset(idx as isize),
-            amt,
-        );
-        self.buffer.set_len(len + amt);
-    }
-
-    #[inline(always)]
-    unsafe fn remove_bytes(&mut self, start: usize, end: usize) {
-        assert!(start <= end);
-        assert!(end <= self.len());
-        let len = self.len();
-        let amt = end - start;
-        ptr::copy(
-            self.buffer.as_ptr().offset(end as isize),
-            self.buffer.as_mut_ptr().offset(start as isize),
-            len - end,
-        );
-        self.buffer.set_len(len - amt);
-
-        self.inline_if_possible();
-    }
-
-    /// Re-inlines the data if it's been heap allocated but can
-    /// fit inline.
-    #[inline(always)]
-    fn inline_if_possible(&mut self) {
-        if self.buffer.spilled() && (self.buffer.len() <= self.buffer.inline_size()) {
-            self.buffer.shrink_to_fit();
-        }
     }
 }
 
@@ -340,25 +211,19 @@ impl Deref for NodeText {
     type Target = str;
 
     fn deref(&self) -> &str {
-        // NodeText's methods don't allow `buffer` to become invalid utf8,
-        // so this is safe.
-        unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
+        self.0.as_str()
     }
 }
 
 impl AsRef<str> for NodeText {
     fn as_ref(&self) -> &str {
-        // NodeText's methods don't allow `buffer` to become invalid utf8,
-        // so this is safe.
-        unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
+        self.0.as_str()
     }
 }
 
 impl Borrow<str> for NodeText {
     fn borrow(&self) -> &str {
-        // NodeText's methods don't allow `buffer` to become invalid utf8,
-        // so this is safe.
-        unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
+        self.0.as_str()
     }
 }
 
@@ -387,9 +252,6 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
         }
     };
 
-    // debug_assert!(new_split_pos <= MAX_BYTES);
-    // debug_assert!((tot_len - new_split_pos) <= MAX_BYTES);
-
     // Move the bytes to create the new split
     if new_split_pos < l.len() {
         r.insert_str(0, &l[new_split_pos..]);
@@ -403,7 +265,7 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
 
 //=======================================================================
 
-/// The backing internal buffer for `NodeText`.
+/// The backing internal buffer type for `NodeText`.
 #[derive(Copy, Clone)]
 pub(crate) struct BackingArray([u8; MAX_BYTES]);
 unsafe impl Array for BackingArray {
@@ -419,6 +281,138 @@ unsafe impl Array for BackingArray {
     }
 }
 
+/// Internal small string for `NodeText`, to compartmentalize the unsafe
+/// code.  This exposes a minimal safe interface that guarantees memory
+/// safety and makes it impossible to accidentally create invalid utf8
+/// data. `NodeText` implements the more sophisticated API on top of this.
+#[derive(Clone, Default)]
+struct NodeSmallString {
+    buffer: SmallVec<BackingArray>,
+}
+
+impl NodeSmallString {
+    #[inline(always)]
+    fn new() -> Self {
+        NodeSmallString {
+            buffer: SmallVec::new(),
+        }
+    }
+
+    #[inline(always)]
+    fn with_capacity(capacity: usize) -> Self {
+        NodeSmallString {
+            buffer: SmallVec::with_capacity(capacity),
+        }
+    }
+
+    #[inline(always)]
+    fn from_str(string: &str) -> Self {
+        let mut nodetext = NodeSmallString::with_capacity(string.len());
+        nodetext.insert_str(0, string);
+        nodetext
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    #[inline(always)]
+    fn as_str(&self) -> &str {
+        // NodeSmallString's methods don't allow `buffer` to become invalid utf8,
+        // so this is safe.
+        unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
+    }
+
+    /// Inserts `string` at `byte_idx`.
+    ///
+    /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
+    #[inline(always)]
+    fn insert_str(&mut self, byte_idx: usize, string: &str) {
+        assert!(byte_idx <= self.len());
+        assert!(self.as_str().is_char_boundary(byte_idx));
+
+        let len = self.len();
+        let amt = string.len();
+        self.buffer.reserve(amt);
+
+        unsafe {
+            ptr::copy(
+                self.buffer.as_ptr().offset(byte_idx as isize),
+                self.buffer.as_mut_ptr().offset((byte_idx + amt) as isize),
+                len - byte_idx,
+            );
+            ptr::copy(
+                string.as_ptr(),
+                self.buffer.as_mut_ptr().offset(byte_idx as isize),
+                amt,
+            );
+            self.buffer.set_len(len + amt);
+        }
+    }
+
+    /// Removes text in range `[start_byte_idx, end_byte_idx)`
+    ///
+    /// Panics on out-of-bounds or non-char-boundary indices.
+    #[inline(always)]
+    fn remove_range(&mut self, start_byte_idx: usize, end_byte_idx: usize) {
+        assert!(start_byte_idx <= end_byte_idx);
+        assert!(end_byte_idx <= self.len());
+        assert!(self.as_str().is_char_boundary(start_byte_idx));
+        assert!(self.as_str().is_char_boundary(end_byte_idx));
+        let len = self.len();
+        let amt = end_byte_idx - start_byte_idx;
+
+        unsafe {
+            ptr::copy(
+                self.buffer.as_ptr().offset(end_byte_idx as isize),
+                self.buffer.as_mut_ptr().offset(start_byte_idx as isize),
+                len - end_byte_idx,
+            );
+            self.buffer.set_len(len - amt);
+        }
+    }
+
+    /// Removes text after `byte_idx`.
+    #[inline(always)]
+    pub fn truncate(&mut self, byte_idx: usize) {
+        assert!(byte_idx <= self.len());
+        assert!(self.as_str().is_char_boundary(byte_idx));
+        self.buffer.truncate(byte_idx);
+    }
+
+    /// Splits at `byte_idx`, returning the right part and leaving the
+    /// left part in the original.
+    ///
+    /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
+    #[inline(always)]
+    fn split_off(&mut self, byte_idx: usize) -> Self {
+        assert!(byte_idx <= self.len());
+        assert!(self.as_str().is_char_boundary(byte_idx));
+        let len = self.len();
+        let mut other = NodeSmallString::with_capacity(len - byte_idx);
+        unsafe {
+            ptr::copy_nonoverlapping(
+                self.buffer.as_ptr().offset(byte_idx as isize),
+                other.buffer.as_mut_ptr().offset(0),
+                len - byte_idx,
+            );
+            self.buffer.set_len(byte_idx);
+            other.buffer.set_len(len - byte_idx);
+        }
+        other
+    }
+
+    /// Re-inlines the data if it's been heap allocated but can
+    /// fit inline.
+    #[inline(always)]
+    fn inline_if_possible(&mut self) {
+        if self.buffer.spilled() && (self.buffer.len() <= self.buffer.inline_size()) {
+            self.buffer.shrink_to_fit();
+        }
+    }
+}
+
 //=======================================================================
 
 #[cfg(test)]
@@ -427,11 +421,8 @@ mod tests {
 
     #[test]
     fn remove_bytes_01() {
-        let mut s = NodeText::new();
-        s.push_str("Hello!");
-        unsafe {
-            s.remove_bytes(2, 4);
-        }
-        assert_eq!("Heo!", s);
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.remove_range(2, 4);
+        assert_eq!("Heo!", s.as_str());
     }
 }
