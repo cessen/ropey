@@ -9,6 +9,140 @@
 
 use std;
 
+/// Converts from byte-index to char-index in a string slice.
+///
+/// Any past-the-end index will return the one-past-the-end char index.
+#[inline]
+pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
+    if byte_idx == 0 {
+        return 0;
+    } else if byte_idx >= text.len() {
+        return count_chars(text);
+    } else {
+        return count_chars(unsafe {
+            std::str::from_utf8_unchecked(&text.as_bytes()[0..(byte_idx + 1)])
+        }) - 1;
+    }
+}
+
+/// Converts from byte-index to line-index in a string slice.
+///
+/// Specifically: returns the index of the line that contains the given
+/// byte.  This is equivalent to counting the line endings before the
+/// given byte.
+///
+/// Any past-the-end index will return the last line index.
+#[inline]
+pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
+    use crlf;
+    let mut byte_idx = byte_idx.min(text.len());
+    while !text.is_char_boundary(byte_idx) {
+        byte_idx += 1;
+    }
+    let nl_count = count_line_breaks(&text[..byte_idx]);
+    if crlf::is_break(byte_idx, text.as_bytes()) {
+        nl_count
+    } else {
+        nl_count - 1
+    }
+}
+
+/// Converts from char-index to byte-index in a string slice.
+///
+/// Any past-the-end index will return the one-past-the-end byte index.
+#[inline]
+pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
+    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    let tsize: usize = std::mem::size_of::<usize>();
+
+    let mut char_count = 0;
+    let mut ptr = text.as_ptr();
+    let start_ptr = text.as_ptr();
+    let end_ptr = unsafe { ptr.offset(text.len() as isize) };
+
+    // Take care of any unaligned bytes at the beginning
+    let end_pre_ptr = {
+        let aligned = ptr as usize + (tsize - (ptr as usize & (tsize - 1)));
+        (end_ptr as usize).min(aligned) as *const u8
+    };
+    while ptr < end_pre_ptr && char_count <= char_idx {
+        let byte = unsafe { *ptr };
+        char_count += ((byte & 0xC0) != 0x80) as usize;
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Use usize to count multiple bytes at once, using bit-fiddling magic.
+    let mut ptr = ptr as *const usize;
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (tsize - 1))) as *const usize;
+    while ptr < end_mid_ptr && (char_count + tsize) <= char_idx {
+        // Do the clever counting
+        let n = unsafe { *ptr };
+        let byte_bools = (!((n >> 7) & (!n >> 6))) & ONEMASK;
+        char_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Take care of any unaligned bytes at the end
+    let mut ptr = ptr as *const u8;
+    while ptr < end_ptr && char_count <= char_idx {
+        let byte = unsafe { *ptr };
+        char_count += ((byte & 0xC0) != 0x80) as usize;
+        ptr = unsafe { ptr.offset(1) };
+    }
+
+    // Finish up
+    let byte_count = ptr as usize - start_ptr as usize;
+    if ptr == end_ptr && char_count <= char_idx {
+        byte_count
+    } else {
+        byte_count - 1
+    }
+}
+
+/// Converts from char-index to line-index in a string slice.
+///
+/// Specifically: returns the index of the line that contains the given
+/// char.  This is equivalent to counting the line endings before the
+/// given char.
+///
+/// Any past-the-end index will return the last line index.
+#[inline]
+pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
+    byte_to_line_idx(text, char_to_byte_idx(text, char_idx))
+}
+
+/// Converts from line-index to byte-index in a string slice.
+///
+/// Specifically: returns the index of the first byte of the given line.
+///
+/// Any past-the-end index will return the one-past-the-end byte index.
+#[inline]
+pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
+    // TODO: use bit fiddling magic to make this faster, as in
+    // `count_line_breaks()`.
+    if line_idx == 0 {
+        0
+    } else {
+        LineBreakIter::new(text)
+            .nth(line_idx - 1)
+            .unwrap_or_else(|| text.len())
+    }
+}
+
+/// Converts from line-index to char-index in a string slice.
+///
+/// Specifically: returns the index of the first char of the given line.
+///
+/// Any past-the-end index will return the one-past-the-end char index.
+#[inline]
+pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
+    byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
+}
+
+//===========================================================================
+// Internal
+//===========================================================================
+
 /// Uses bit-fiddling magic to count utf8 chars really quickly.
 /// We actually count the number of non-starting utf8 bytes, since
 /// they have a consistent starting two-bit pattern.  We then
@@ -154,106 +288,6 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
     count
 }
 
-#[inline]
-pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
-    if byte_idx == 0 {
-        return 0;
-    } else if byte_idx >= text.len() {
-        return count_chars(text);
-    } else {
-        return count_chars(unsafe {
-            std::str::from_utf8_unchecked(&text.as_bytes()[0..(byte_idx + 1)])
-        }) - 1;
-    }
-}
-
-#[inline]
-pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
-    use crlf;
-    let mut byte_idx = byte_idx;
-    while !text.is_char_boundary(byte_idx) {
-        byte_idx += 1;
-    }
-    let nl_count = count_line_breaks(&text[..byte_idx]);
-    if crlf::is_break(byte_idx, text.as_bytes()) {
-        nl_count
-    } else {
-        nl_count - 1
-    }
-}
-
-#[inline]
-pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
-    const ONEMASK: usize = std::usize::MAX / 0xFF;
-    let tsize: usize = std::mem::size_of::<usize>();
-
-    let mut char_count = 0;
-    let mut ptr = text.as_ptr();
-    let start_ptr = text.as_ptr();
-    let end_ptr = unsafe { ptr.offset(text.len() as isize) };
-
-    // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = {
-        let aligned = ptr as usize + (tsize - (ptr as usize & (tsize - 1)));
-        (end_ptr as usize).min(aligned) as *const u8
-    };
-    while ptr < end_pre_ptr && char_count <= char_idx {
-        let byte = unsafe { *ptr };
-        char_count += ((byte & 0xC0) != 0x80) as usize;
-        ptr = unsafe { ptr.offset(1) };
-    }
-
-    // Use usize to count multiple bytes at once, using bit-fiddling magic.
-    let mut ptr = ptr as *const usize;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (tsize - 1))) as *const usize;
-    while ptr < end_mid_ptr && (char_count + tsize) <= char_idx {
-        // Do the clever counting
-        let n = unsafe { *ptr };
-        let byte_bools = (!((n >> 7) & (!n >> 6))) & ONEMASK;
-        char_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
-        ptr = unsafe { ptr.offset(1) };
-    }
-
-    // Take care of any unaligned bytes at the end
-    let mut ptr = ptr as *const u8;
-    while ptr < end_ptr && char_count <= char_idx {
-        let byte = unsafe { *ptr };
-        char_count += ((byte & 0xC0) != 0x80) as usize;
-        ptr = unsafe { ptr.offset(1) };
-    }
-
-    // Finish up
-    let byte_count = ptr as usize - start_ptr as usize;
-    if ptr == end_ptr && char_count == char_idx {
-        byte_count
-    } else {
-        byte_count - 1
-    }
-}
-
-#[inline]
-pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
-    byte_to_line_idx(text, char_to_byte_idx(text, char_idx))
-}
-
-// TODO: use bit fiddling magic to make this faster, as in
-// `count_line_breaks()`.
-#[inline]
-pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
-    if line_idx == 0 {
-        0
-    } else {
-        LineBreakIter::new(text)
-            .nth(line_idx - 1)
-            .unwrap_or_else(|| text.len())
-    }
-}
-
-#[inline]
-pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
-    byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
-}
-
 #[inline(always)]
 pub(crate) fn has_bytes_less_than(word: usize, n: u8) -> bool {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
@@ -356,12 +390,22 @@ impl<'a> Iterator for LineBreakIter<'a> {
 mod tests {
     use super::*;
 
+    // 124 bytes, 100 chars, 4 lines
+    const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
+                              a fine day, isn't it?\nAren't you glad \
+                              we're alive?\nこんにちは、みんなさん！";
+
     #[test]
     fn count_chars_01() {
         let text =
             "Hello せかい! Hello せかい! Hello せかい! Hello せかい! Hello せかい!";
 
         assert_eq!(54, count_chars(text));
+    }
+
+    #[test]
+    fn count_chars_02() {
+        assert_eq!(100, count_chars(TEXT_LINES));
     }
 
     #[test]
@@ -400,8 +444,20 @@ mod tests {
         let text = "Hello せかい!";
         assert_eq!(0, byte_to_char_idx(text, 0));
         assert_eq!(1, byte_to_char_idx(text, 1));
+        assert_eq!(6, byte_to_char_idx(text, 6));
+        assert_eq!(6, byte_to_char_idx(text, 7));
+        assert_eq!(6, byte_to_char_idx(text, 8));
+        assert_eq!(7, byte_to_char_idx(text, 9));
+        assert_eq!(7, byte_to_char_idx(text, 10));
+        assert_eq!(7, byte_to_char_idx(text, 11));
         assert_eq!(8, byte_to_char_idx(text, 12));
+        assert_eq!(8, byte_to_char_idx(text, 13));
+        assert_eq!(8, byte_to_char_idx(text, 14));
+        assert_eq!(9, byte_to_char_idx(text, 15));
         assert_eq!(10, byte_to_char_idx(text, 16));
+        assert_eq!(10, byte_to_char_idx(text, 17));
+        assert_eq!(10, byte_to_char_idx(text, 18));
+        assert_eq!(10, byte_to_char_idx(text, 19));
     }
 
     #[test]
@@ -417,6 +473,27 @@ mod tests {
         assert_eq!(2, byte_to_char_idx(text, 7));
         assert_eq!(2, byte_to_char_idx(text, 8));
         assert_eq!(3, byte_to_char_idx(text, 9));
+        assert_eq!(3, byte_to_char_idx(text, 10));
+        assert_eq!(3, byte_to_char_idx(text, 11));
+        assert_eq!(3, byte_to_char_idx(text, 12));
+    }
+
+    #[test]
+    fn byte_to_char_idx_03() {
+        // Ascii range
+        for i in 0..88 {
+            assert_eq!(i, byte_to_char_idx(TEXT_LINES, i));
+        }
+
+        // Hiragana characters
+        for i in 88..125 {
+            assert_eq!(88 + ((i - 88) / 3), byte_to_char_idx(TEXT_LINES, i));
+        }
+
+        // Past the end
+        for i in 125..130 {
+            assert_eq!(100, byte_to_char_idx(TEXT_LINES, i));
+        }
     }
 
     #[test]
@@ -460,6 +537,34 @@ mod tests {
         assert_eq!(2, byte_to_line_idx(text, 15));
         assert_eq!(2, byte_to_line_idx(text, 16));
         assert_eq!(3, byte_to_line_idx(text, 17));
+    }
+
+    #[test]
+    fn byte_to_line_idx_04() {
+        // Line 0
+        for i in 0..32 {
+            assert_eq!(0, byte_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Line 1
+        for i in 32..59 {
+            assert_eq!(1, byte_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Line 2
+        for i in 59..88 {
+            assert_eq!(2, byte_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Line 3
+        for i in 88..125 {
+            assert_eq!(3, byte_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Past the end
+        for i in 125..130 {
+            assert_eq!(3, byte_to_line_idx(TEXT_LINES, i));
+        }
     }
 
     #[test]
@@ -513,6 +618,25 @@ mod tests {
     }
 
     #[test]
+    fn char_to_byte_idx_05() {
+        // Ascii range
+        for i in 0..88 {
+            assert_eq!(i, char_to_byte_idx(TEXT_LINES, i));
+        }
+
+        // Hiragana characters
+        for i in 88..100 {
+            assert_eq!(88 + ((i - 88) * 3), char_to_byte_idx(TEXT_LINES, i));
+        }
+
+        // Past the end
+        for i in 100..110 {
+            println!("AAAAAA {}", i);
+            assert_eq!(124, char_to_byte_idx(TEXT_LINES, i));
+        }
+    }
+
+    #[test]
     fn char_to_line_idx_01() {
         let text = "Hello せ\nか\nい!";
         assert_eq!(0, char_to_line_idx(text, 0));
@@ -520,6 +644,34 @@ mod tests {
         assert_eq!(1, char_to_line_idx(text, 8));
         assert_eq!(1, char_to_line_idx(text, 9));
         assert_eq!(2, char_to_line_idx(text, 10));
+    }
+
+    #[test]
+    fn char_to_line_idx_02() {
+        // Line 0
+        for i in 0..32 {
+            assert_eq!(0, char_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Line 1
+        for i in 32..59 {
+            assert_eq!(1, char_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Line 2
+        for i in 59..88 {
+            assert_eq!(2, char_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Line 3
+        for i in 88..100 {
+            assert_eq!(3, char_to_line_idx(TEXT_LINES, i));
+        }
+
+        // Past the end
+        for i in 100..110 {
+            assert_eq!(3, char_to_line_idx(TEXT_LINES, i));
+        }
     }
 
     #[test]
@@ -543,11 +695,37 @@ mod tests {
     }
 
     #[test]
+    fn line_to_byte_idx_03() {
+        assert_eq!(0, line_to_byte_idx(TEXT_LINES, 0));
+        assert_eq!(32, line_to_byte_idx(TEXT_LINES, 1));
+        assert_eq!(59, line_to_byte_idx(TEXT_LINES, 2));
+        assert_eq!(88, line_to_byte_idx(TEXT_LINES, 3));
+
+        // Past end
+        assert_eq!(124, line_to_byte_idx(TEXT_LINES, 4));
+        assert_eq!(124, line_to_byte_idx(TEXT_LINES, 5));
+        assert_eq!(124, line_to_byte_idx(TEXT_LINES, 6));
+    }
+
+    #[test]
     fn line_to_char_idx_01() {
         let text = "Hello せ\nか\nい!";
         assert_eq!(0, line_to_char_idx(text, 0));
         assert_eq!(8, line_to_char_idx(text, 1));
         assert_eq!(10, line_to_char_idx(text, 2));
+    }
+
+    #[test]
+    fn line_to_char_idx_02() {
+        assert_eq!(0, line_to_char_idx(TEXT_LINES, 0));
+        assert_eq!(32, line_to_char_idx(TEXT_LINES, 1));
+        assert_eq!(59, line_to_char_idx(TEXT_LINES, 2));
+        assert_eq!(88, line_to_char_idx(TEXT_LINES, 3));
+
+        // Past end
+        assert_eq!(100, line_to_char_idx(TEXT_LINES, 4));
+        assert_eq!(100, line_to_char_idx(TEXT_LINES, 5));
+        assert_eq!(100, line_to_char_idx(TEXT_LINES, 6));
     }
 
     #[test]
