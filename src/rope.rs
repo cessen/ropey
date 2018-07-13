@@ -417,9 +417,9 @@ impl Rope {
     ///
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
-    pub fn remove<R: CharIdxRange>(&mut self, range: R) {
-        let start = range.start().unwrap_or(0);
-        let end = range.end().unwrap_or_else(|| self.len_chars());
+    pub fn remove<R: CharIdxRange>(&mut self, char_range: R) {
+        let start = char_range.start().unwrap_or(0);
+        let end = char_range.end().unwrap_or_else(|| self.len_chars());
 
         // Bounds check
         assert!(start <= end);
@@ -878,9 +878,9 @@ impl Rope {
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
     #[inline]
-    pub fn slice<R: CharIdxRange>(&self, range: R) -> RopeSlice {
-        let start = range.start().unwrap_or(0);
-        let end = range.end().unwrap_or_else(|| self.len_chars());
+    pub fn slice<R: CharIdxRange>(&self, char_range: R) -> RopeSlice {
+        let start = char_range.start().unwrap_or(0);
+        let end = char_range.end().unwrap_or_else(|| self.len_chars());
 
         // Bounds check
         assert!(start <= end);

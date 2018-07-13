@@ -565,14 +565,14 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Panics if the start of the range is greater than the end, or the end
     /// is out of bounds (i.e. `end > len_chars()`).
-    pub fn slice<R: CharIdxRange>(&self, range: R) -> Self {
+    pub fn slice<R: CharIdxRange>(&self, char_range: R) -> Self {
         // Early-out shortcut for taking a slice of the full thing.
-        if range.start() == None && range.end() == None {
+        if char_range.start() == None && char_range.end() == None {
             return *self;
         }
 
-        let start = range.start().unwrap_or(0);
-        let end = range.end().unwrap_or_else(|| self.len_chars());
+        let start = char_range.start().unwrap_or(0);
+        let end = char_range.end().unwrap_or_else(|| self.len_chars());
 
         // Bounds check
         assert!(start <= end);
