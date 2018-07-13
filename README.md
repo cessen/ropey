@@ -102,7 +102,7 @@ Ropey ensures that even though clones share memory, everything is thread-safe.
 Clones can be sent to other threads for both reading and writing.
 
 
-## Note about unsafe code:
+## Unsafe Code
 
 Ropey does use unsafe code to help acheive some of its space and performance
 characteristics.  Although a lot of effort has been put into keeping unsafe
