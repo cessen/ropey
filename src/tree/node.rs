@@ -669,123 +669,100 @@ impl Node {
     /// But this should nevertheless get addressed at some point.
     /// Probably the most straight-forward way to address this is via the
     /// `fix_info_*` methods below, but I'm not totally sure.
-    ///
-    /// WARNING: this function internally uses unsafe code in one place to
-    /// work around the borrow checker.  Be very careful when modifying any
-    /// of this function's code!  Even changing the signature must be done
-    /// with care, accounting for the unsafe code.
-    /// See the comments around the unsafe block for details.  Would love to
-    /// get rid of it!
-    pub fn fix_grapheme_seam<'a>(
-        &'a mut self,
-        byte_pos: Count,
-        must_be_boundary: bool,
-    ) -> Option<&'a mut NodeText> {
-        match *self {
-            Node::Leaf(ref mut text) => {
-                if (!must_be_boundary) || byte_pos == 0 || byte_pos == text.len() as Count {
-                    Some(text)
-                } else {
-                    panic!("Byte position given is not on a leaf boundary.")
-                }
-            }
+    pub fn fix_grapheme_seam(&mut self, byte_pos: Count, must_be_boundary: bool) {
+        if let Node::Internal(ref mut children) = *self {
+            if byte_pos == 0 {
+                // Special-case 1
+                Arc::make_mut(&mut children.nodes_mut()[0])
+                    .fix_grapheme_seam(byte_pos, must_be_boundary);
+            } else if byte_pos == children.combined_info().bytes {
+                // Special-case 2
+                let (info, nodes) = children.data_mut();
+                Arc::make_mut(nodes.last_mut().unwrap())
+                    .fix_grapheme_seam(info.last().unwrap().bytes, must_be_boundary);
+            } else {
+                // Find the child to navigate into
+                let (child_i, start_info) = children.search_byte_idx(byte_pos as usize);
+                let start_byte = start_info.bytes;
 
-            Node::Internal(ref mut children) => {
-                if byte_pos == 0 {
-                    // Special-case 1
-                    return Arc::make_mut(&mut children.nodes_mut()[0])
-                        .fix_grapheme_seam(byte_pos, must_be_boundary);
-                } else if byte_pos == children.combined_info().bytes {
-                    // Special-case 2
-                    let (info, nodes) = children.data_mut();
-                    return Arc::make_mut(nodes.last_mut().unwrap())
-                        .fix_grapheme_seam(info.last().unwrap().bytes, must_be_boundary);
-                } else {
-                    // Find the child to navigate into
-                    let (child_i, start_info) = children.search_byte_idx(byte_pos as usize);
-                    let start_byte = start_info.bytes;
+                let pos_in_child = byte_pos - start_byte;
+                let child_len = children.info()[child_i].bytes;
 
-                    let pos_in_child = byte_pos - start_byte;
-                    let child_len = children.info()[child_i].bytes;
-
-                    if pos_in_child == 0 || pos_in_child == child_len {
-                        // Left or right edge, get neighbor and fix seam
-                        let l_child_i;
-                        // Scope for borrow
-                        {
-                            if pos_in_child == 0 {
-                                debug_assert!(child_i != 0);
-                                l_child_i = child_i - 1;
-                            } else {
-                                debug_assert!(child_i < children.len());
-                                l_child_i = child_i;
-                            }
-
-                            let (mut l_child, mut r_child) =
-                                children.get_two_mut(l_child_i, l_child_i + 1);
-                            let l_child_bytes = l_child.0.bytes;
-                            let l_child = Arc::make_mut(&mut l_child.1);
-                            let r_child = Arc::make_mut(&mut r_child.1);
-                            fix_segment_seam(
-                                l_child
-                                    .fix_grapheme_seam(l_child_bytes, must_be_boundary)
-                                    .unwrap(),
-                                r_child.fix_grapheme_seam(0, must_be_boundary).unwrap(),
-                            );
-
-                            l_child.fix_info_right();
-                            r_child.fix_info_left();
-                        }
-
-                        children.update_child_info(l_child_i);
-                        children.update_child_info(l_child_i + 1);
-                        if children.info()[l_child_i + 1].bytes == 0 {
-                            children.remove(l_child_i + 1);
-                        } else if children.info()[l_child_i].bytes == 0 {
-                            children.remove(l_child_i);
-                        }
-
-                        return None;
+                if pos_in_child == 0 || pos_in_child == child_len {
+                    // Left or right edge, get neighbor and fix seam
+                    let l_child_i;
+                    if pos_in_child == 0 {
+                        debug_assert!(child_i != 0);
+                        l_child_i = child_i - 1;
                     } else {
-                        // Internal to child
+                        debug_assert!(child_i < children.len());
+                        l_child_i = child_i;
+                    }
+
+                    // Scope for borrow
+                    {
+                        // Fetch the two children
+                        let (mut l_child, mut r_child) =
+                            children.get_two_mut(l_child_i, l_child_i + 1);
+                        let l_child_bytes = l_child.0.bytes;
+                        let l_child = Arc::make_mut(&mut l_child.1);
+                        let r_child = Arc::make_mut(&mut r_child.1);
+
+                        // Get the text of the two children and fix
+                        // the seam between them.
+                        // Scope for borrow.
                         {
-                            // WARNING: we use raw pointers to work around the borrow
-                            // checker here, so be careful when modifying this code!
-                            let raw_text = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                                .fix_grapheme_seam(pos_in_child, must_be_boundary)
-                                .map(|text| text as *mut NodeText);
-
-                            // This is the bit we have to work around.  If raw_text
-                            // weren't cast to a raw_point, it's &mut would keep us
-                            // from calling this.  However, this is actually safe
-                            // because:
-                            // 1. We're only keeping a &mut to the node's text,
-                            //    not the whole node.
-                            // 2. We're only updating the node's _metadata_ here,
-                            //    not its text.
-                            // 3. The node's metadata isn't even stored in itself,
-                            //    it's stored in its parent.
-                            //
-                            // I've tried working around this without unsafe code
-                            // quite a few times, and always failed.  Definitely
-                            // would like to get rid of this hack!
-                            children.update_child_info(child_i);
-
-                            // If the node isn't empty, return the text.
-                            if children.info()[child_i].bytes > 0 {
-                                // This is where we're reconstructing the &mut
-                                // from the raw pointer.  It is coerced to the
-                                // appropriate lifetime due to the function
-                                // signature.
-                                return raw_text.map(|text| unsafe { &mut *text });
+                            let (l_text, l_offset) =
+                                l_child.get_chunk_at_byte_mut(l_child_bytes as usize);
+                            let (r_text, r_offset) = r_child.get_chunk_at_byte_mut(0);
+                            if must_be_boundary {
+                                assert!(l_offset == 0 || l_offset == l_text.len());
+                                assert!(r_offset == 0 || r_offset == r_text.len());
                             }
+                            fix_segment_seam(l_text, r_text);
                         }
 
-                        // If the node _is_ empty, remove it.
+                        // Fix up the children's metadata after the change
+                        // to their text.
+                        l_child.fix_info_right();
+                        r_child.fix_info_left();
+                    }
+
+                    // Fix up this node's metadata for those
+                    // two children.
+                    children.update_child_info(l_child_i);
+                    children.update_child_info(l_child_i + 1);
+
+                    // Remove the children if empty.
+                    if children.info()[l_child_i + 1].bytes == 0 {
+                        children.remove(l_child_i + 1);
+                    } else if children.info()[l_child_i].bytes == 0 {
+                        children.remove(l_child_i);
+                    }
+                } else {
+                    // Internal to child
+                    Arc::make_mut(&mut children.nodes_mut()[child_i])
+                        .fix_grapheme_seam(pos_in_child, must_be_boundary);
+
+                    children.update_child_info(child_i);
+
+                    if children.info()[child_i].bytes == 0 {
                         children.remove(child_i);
-                        return None;
                     }
                 }
+            }
+        }
+    }
+
+    /// Returns the chunk that contains the given byte, and the offset
+    /// of that byte within the chunk.
+    pub fn get_chunk_at_byte_mut(&mut self, byte_idx: usize) -> (&mut NodeText, usize) {
+        match self {
+            &mut Node::Leaf(ref mut text) => return (text, byte_idx),
+            &mut Node::Internal(ref mut children) => {
+                let (child_i, acc_info) = children.search_byte_idx(byte_idx);
+                Arc::make_mut(&mut children.nodes_mut()[child_i])
+                    .get_chunk_at_byte_mut(byte_idx - acc_info.bytes as usize)
             }
         }
     }
