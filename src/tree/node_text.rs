@@ -10,9 +10,8 @@ use smallvec::{Array, SmallVec};
 use str_utils::{char_to_byte_idx, count_chars};
 use tree::MAX_BYTES;
 
-/// A custom small string, with an internal buffer of `tree::MAX_BYTES`
-/// length.  Has a bunch of methods on it that are useful for the rope
-/// tree.
+/// A custom small string.  The unsafe guts of this are in `NodeSmallString`
+/// further down in this file.
 #[derive(Clone, Default)]
 pub(crate) struct NodeText(NodeSmallString);
 
@@ -420,9 +419,101 @@ mod tests {
     use super::*;
 
     #[test]
-    fn remove_bytes_01() {
+    fn small_string_basics() {
+        let s = NodeSmallString::from_str("Hello!");
+        assert_eq!("Hello!", s.as_str());
+        assert_eq!(6, s.len());
+    }
+
+    #[test]
+    fn insert_str_01() {
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.insert_str(3, "oz");
+        assert_eq!("Helozlo!", s.as_str());
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_str_02() {
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.insert_str(7, "oz");
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_str_03() {
+        let mut s = NodeSmallString::from_str("こんにちは");
+        s.insert_str(4, "oz");
+    }
+
+    #[test]
+    fn remove_range_01() {
         let mut s = NodeSmallString::from_str("Hello!");
         s.remove_range(2, 4);
         assert_eq!("Heo!", s.as_str());
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_range_02() {
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.remove_range(4, 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_range_03() {
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.remove_range(2, 7);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_range_04() {
+        let mut s = NodeSmallString::from_str("こんにちは");
+        s.remove_range(2, 4);
+    }
+
+    #[test]
+    fn truncate_01() {
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.truncate(4);
+        assert_eq!("Hell", s.as_str());
+    }
+
+    #[test]
+    #[should_panic]
+    fn truncate_02() {
+        let mut s = NodeSmallString::from_str("Hello!");
+        s.truncate(7);
+    }
+
+    #[test]
+    #[should_panic]
+    fn truncate_03() {
+        let mut s = NodeSmallString::from_str("こんにちは");
+        s.truncate(4);
+    }
+
+    #[test]
+    fn split_off_01() {
+        let mut s1 = NodeSmallString::from_str("Hello!");
+        let s2 = s1.split_off(4);
+        assert_eq!("Hell", s1.as_str());
+        assert_eq!("o!", s2.as_str());
+    }
+
+    #[test]
+    #[should_panic]
+    fn split_off_02() {
+        let mut s1 = NodeSmallString::from_str("Hello!");
+        s1.split_off(7);
+    }
+
+    #[test]
+    #[should_panic]
+    fn split_off_03() {
+        let mut s1 = NodeSmallString::from_str("こんにちは");
+        s1.split_off(4);
     }
 }
