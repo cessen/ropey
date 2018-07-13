@@ -33,7 +33,7 @@ proptest! {
     #![proptest_config(Config::with_cases(512))]
 
     #[test]
-    fn pt_from_str(ref text in "\\PC*") {
+    fn pt_from_str(ref text in "\\PC*\\PC*\\PC*") {
         let rope = Rope::from_str(&text);
 
         rope.assert_integrity();
@@ -146,7 +146,7 @@ proptest! {
     }
 
     #[test]
-    fn pt_chunk_at_byte(ref text in "\\PC*") {
+    fn pt_chunk_at_byte(ref text in "\\PC*\\n?\\PC*\\n?\\PC*") {
         let r = Rope::from_str(text);
         let mut t = &text[..];
 
@@ -176,7 +176,7 @@ proptest! {
     }
 
     #[test]
-    fn pt_chunk_at_char(ref text in "\\PC*") {
+    fn pt_chunk_at_char(ref text in "\\PC*\\n?\\PC*\\n?\\PC*") {
         let r = Rope::from_str(text);
         let mut t = &text[..];
 
@@ -202,7 +202,7 @@ proptest! {
     }
 
     #[test]
-    fn pt_chunk_at_line_break(ref text in "\\PC*") {
+    fn pt_chunk_at_line_break(ref text in "\\PC*\\n?\\PC*\\n?\\PC*") {
         let r = Rope::from_str(&text);
 
         // First chunk
@@ -231,6 +231,117 @@ proptest! {
             assert_eq!(chunk, &text[b..]);
             assert_eq!(c, byte_to_char_idx(&text, b));
             assert_eq!(l, byte_to_line_idx(&text, b));
+        }
+    }
+
+    #[test]
+    fn pt_chunk_at_byte_slice(ref gen_text in "\\PC*\\n?\\PC*\\n?\\PC*", range in (0usize..1000000, 0usize..1000000)) {
+        let r = Rope::from_str(&gen_text);
+        let mut idx1 = range.0 % (r.len_chars() + 1);
+        let mut idx2 = range.1 % (r.len_chars() + 1);
+        if idx1 > idx2 {
+            std::mem::swap(&mut idx1, &mut idx2)
+        };
+        let s = r.slice(idx1..idx2);
+        let text = string_slice(&gen_text, idx1, idx2);
+
+        let mut t = text;
+        let mut prev_chunk = "";
+        for i in 0..s.len_bytes() {
+            let (chunk, b, c, l) = s.chunk_at_byte(i);
+            assert_eq!(c, byte_to_char_idx(text, b));
+            assert_eq!(l, byte_to_line_idx(text, b));
+            if chunk != prev_chunk {
+                assert_eq!(chunk, &t[..chunk.len()]);
+                t = &t[chunk.len()..];
+                prev_chunk = chunk;
+            }
+
+            let c1 = {
+                let i2 = byte_to_char_idx(text, i);
+                text.chars().nth(i2).unwrap()
+            };
+            let c2 = {
+                let i2 = i - b;
+                let i3 = byte_to_char_idx(chunk, i2);
+                chunk.chars().nth(i3).unwrap()
+            };
+            assert_eq!(c1, c2);
+        }
+
+        assert_eq!(t.len(), 0);
+    }
+
+    #[test]
+    fn pt_chunk_at_char_slice(ref gen_text in "\\PC*\\n?\\PC*\\n?\\PC*", range in (0usize..1000000, 0usize..1000000)) {
+        let r = Rope::from_str(&gen_text);
+        let mut idx1 = range.0 % (r.len_chars() + 1);
+        let mut idx2 = range.1 % (r.len_chars() + 1);
+        if idx1 > idx2 {
+            std::mem::swap(&mut idx1, &mut idx2)
+        };
+        let s = r.slice(idx1..idx2);
+        let text = string_slice(&gen_text, idx1, idx2);
+
+        let mut t = text;
+        let mut prev_chunk = "";
+        for i in 0..s.len_chars() {
+            let (chunk, b, c, l) = s.chunk_at_char(i);
+            assert_eq!(b, char_to_byte_idx(text, c));
+            assert_eq!(l, char_to_line_idx(text, c));
+            if chunk != prev_chunk {
+                assert_eq!(chunk, &t[..chunk.len()]);
+                t = &t[chunk.len()..];
+                prev_chunk = chunk;
+            }
+
+            let c1 = text.chars().nth(i).unwrap();
+            let c2 = {
+                let i2 = i - c;
+                chunk.chars().nth(i2).unwrap()
+            };
+            assert_eq!(c1, c2);
+        }
+        assert_eq!(t.len(), 0);
+    }
+
+    #[test]
+    fn pt_chunk_at_line_break_slice(ref gen_text in "\\PC*\\n?\\PC*\\n?\\PC*", range in (0usize..1000000, 0usize..1000000)) {
+        let r = Rope::from_str(&gen_text);
+        let mut idx1 = range.0 % (r.len_chars() + 1);
+        let mut idx2 = range.1 % (r.len_chars() + 1);
+        if idx1 > idx2 {
+            std::mem::swap(&mut idx1, &mut idx2)
+        };
+        let s = r.slice(idx1..idx2);
+        let text = string_slice(&gen_text, idx1, idx2);
+
+        // First chunk
+        {
+            let (chunk, b, c, l) = s.chunk_at_line_break(0);
+            assert_eq!(chunk, &text[..chunk.len()]);
+            assert_eq!(b, 0);
+            assert_eq!(c, 0);
+            assert_eq!(l, 0);
+        }
+
+        // Middle chunks
+        for i in 1..s.len_lines() {
+            let (chunk, b, c, l) = s.chunk_at_line_break(i);
+            assert_eq!(chunk, &text[b..(b + chunk.len())]);
+            assert_eq!(c, byte_to_char_idx(text, b));
+            assert_eq!(l, byte_to_line_idx(text, b));
+            assert!(l < i);
+            assert!(i <= byte_to_line_idx(text, b + chunk.len()));
+        }
+
+        // Last chunk
+        {
+            let (chunk, b, c, l) = s.chunk_at_line_break(s.len_lines());
+            assert_eq!(chunk, &text[(text.len() - chunk.len())..]);
+            assert_eq!(chunk, &text[b..]);
+            assert_eq!(c, byte_to_char_idx(text, b));
+            assert_eq!(l, byte_to_line_idx(text, b));
         }
     }
 
