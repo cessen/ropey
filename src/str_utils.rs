@@ -116,17 +116,101 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// Specifically: returns the index of the first byte of the given line.
 ///
 /// Any past-the-end index will return the one-past-the-end byte index.
-#[inline]
+#[inline(never)]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
-    // TODO: use bit fiddling magic to make this faster, as in
-    // `count_line_breaks()`.
-    if line_idx == 0 {
-        0
-    } else {
-        LineBreakIter::new(text)
-            .nth(line_idx - 1)
-            .unwrap_or_else(|| text.len())
+    let tsize: usize = std::mem::size_of::<usize>();
+
+    let len = text.len();
+    let mut ptr = text.as_ptr();
+    let start_ptr = text.as_ptr();
+    let end_ptr = unsafe { ptr.offset(len as isize) };
+    let mut line_break_count = 0;
+
+    while ptr < end_ptr {
+        // Calculate the next aligned ptr after this one
+        let end_aligned_ptr = next_aligned_ptr(ptr, tsize).min(end_ptr);
+
+        // Do the full check, line_break_counting as we go.
+        while ptr < end_aligned_ptr && line_break_count < line_idx {
+            let byte = unsafe { *ptr };
+
+            // Handle u{000A}, u{000B}, u{000C}, and u{000D}
+            if (byte <= 0x0D) && (byte >= 0x0A) {
+                // Check for CRLF and go forward one more if it is
+                let next = unsafe { ptr.offset(1) };
+                if byte == 0x0D && next < end_ptr && unsafe { *next } == 0x0A {
+                    ptr = next;
+                }
+
+                line_break_count += 1;
+            }
+            // Handle u{0085}
+            else if byte == 0xC2 {
+                ptr = unsafe { ptr.offset(1) };
+                if ptr < end_ptr && unsafe { *ptr } == 0x85 {
+                    line_break_count += 1;
+                }
+            }
+            // Handle u{2028} and u{2029}
+            else if byte == 0xE2 {
+                let next1 = unsafe { ptr.offset(1) };
+                let next2 = unsafe { ptr.offset(2) };
+                if next1 < end_ptr
+                    && next2 < end_ptr
+                    && unsafe { *next1 } == 0x80
+                    && (unsafe { *next2 } >> 1) == 0x54
+                {
+                    line_break_count += 1;
+                }
+                ptr = unsafe { ptr.offset(2) };
+            }
+
+            ptr = unsafe { ptr.offset(1) };
+        }
+
+        // Have we counted all the lines for the conversion?
+        if line_break_count >= line_idx {
+            break;
+        }
+
+        // Use usize to count line breaks where it can.
+        const LF_MASK: usize = std::usize::MAX / 0xFF * 0x0A;
+        const VT_MASK: usize = std::usize::MAX / 0xFF * 0x0B;
+        const FF_MASK: usize = std::usize::MAX / 0xFF * 0x0C;
+        if ptr == end_aligned_ptr {
+            while unsafe { ptr.offset(tsize as isize) } < end_ptr {
+                let n = unsafe { *(ptr as *const usize) };
+
+                // If there's a possibility that there might be a multi-byte line
+                // ending, stop and do the full check.
+                if has_byte(n, 0xC2) || has_byte(n, 0xE2) {
+                    break;
+                } else if has_bytes_less_than(n, 0x0E) {
+                    if has_byte(n, 0x0D) {
+                        // If there's a CR, we unfortunatley need to revert to
+                        // byte-by-byte scanning for CRLF.
+                        break;
+                    } else {
+                        // Count the single-byte line endings.
+                        let lb = line_break_count
+                            + count_zero_bytes(n ^ LF_MASK)
+                            + count_zero_bytes(n ^ VT_MASK)
+                            + count_zero_bytes(n ^ FF_MASK);
+                        if lb >= line_idx {
+                            break;
+                        } else {
+                            line_break_count = lb;
+                        }
+                    }
+                }
+
+                ptr = unsafe { ptr.offset(tsize as isize) };
+            }
+        }
     }
+
+    // Finish up
+    ptr as usize - start_ptr as usize
 }
 
 /// Converts from line-index to char-index in a string slice.
@@ -202,10 +286,6 @@ pub(crate) fn count_chars(text: &str) -> usize {
 /// - u{2029}        (Paragraph Separator)
 #[inline(never)] // Actually slightly faster when inlining is not allowed
 pub(crate) fn count_line_breaks(text: &str) -> usize {
-    // TODO: right now this checks the high byte for the large line break codepoints
-    // when determining whether to skip the full check.  This penalizes texts that use
-    // a lot of code points in those ranges.  We should check the low bytes instead, to
-    // better distribute the penalty.
     let tsize: usize = std::mem::size_of::<usize>();
 
     let len = text.len();
@@ -631,7 +711,6 @@ mod tests {
 
         // Past the end
         for i in 100..110 {
-            println!("AAAAAA {}", i);
             assert_eq!(124, char_to_byte_idx(TEXT_LINES, i));
         }
     }
