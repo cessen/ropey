@@ -616,7 +616,7 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the bytes of the `RopeSlice`.
     #[inline]
-    pub fn bytes(&self) -> Bytes {
+    pub fn bytes(&self) -> Bytes<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
@@ -630,7 +630,7 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the chars of the `RopeSlice`.
     #[inline]
-    pub fn chars(&self) -> Chars {
+    pub fn chars(&self) -> Chars<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
@@ -644,7 +644,7 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the lines of the `RopeSlice`.
     #[inline]
-    pub fn lines(&self) -> Lines {
+    pub fn lines(&self) -> Lines<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
@@ -658,7 +658,7 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the chunks of the `RopeSlice`.
     #[inline]
-    pub fn chunks(&self) -> Chunks {
+    pub fn chunks(&self) -> Chunks<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
