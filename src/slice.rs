@@ -363,7 +363,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     #[inline]
-    pub fn line(&self, line_idx: usize) -> RopeSlice {
+    pub fn line(&self, line_idx: usize) -> RopeSlice<'a> {
         // Bounds check
         assert!(
             line_idx < self.len_lines(),
@@ -394,7 +394,7 @@ impl<'a> RopeSlice<'a> {
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
-    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize, usize) {
+    pub fn chunk_at_byte(&self, byte_idx: usize) -> (&'a str, usize, usize, usize) {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
@@ -442,7 +442,7 @@ impl<'a> RopeSlice<'a> {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
-    pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize, usize) {
+    pub fn chunk_at_char(&self, char_idx: usize) -> (&'a str, usize, usize, usize) {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
@@ -496,7 +496,7 @@ impl<'a> RopeSlice<'a> {
     /// # Panics
     ///
     /// Panics if `line_break_idx` is out of bounds (i.e. `line_break_idx > len_lines()`).
-    pub fn chunk_at_line_break(&self, line_break_idx: usize) -> (&str, usize, usize, usize) {
+    pub fn chunk_at_line_break(&self, line_break_idx: usize) -> (&'a str, usize, usize, usize) {
         // Bounds check
         assert!(
             line_break_idx <= self.len_lines(),
@@ -553,7 +553,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Runs in O(1) time.
     #[inline]
-    pub fn as_str(&self) -> Option<&str> {
+    pub fn as_str(&self) -> Option<&'a str> {
         match *self {
             RopeSlice(RSEnum::Full { .. }) => None,
             RopeSlice(RSEnum::Light { text, .. }) => Some(text),
