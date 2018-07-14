@@ -112,6 +112,23 @@ fn chunk_at_char_slice(bench: &mut Bencher) {
     })
 }
 
+fn chunk_at_line_break(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_lines();
+    bench.iter(|| {
+        rope.chunk_at_line_break(random::<usize>() % (len + 1));
+    })
+}
+
+fn chunk_at_line_break_slice(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let slice = rope.slice(324..(rope.len_chars() - 213));
+    let len = slice.len_lines();
+    bench.iter(|| {
+        slice.chunk_at_line_break(random::<usize>() % (len + 1));
+    })
+}
+
 //----
 
 fn slice(bench: &mut Bencher) {
@@ -185,6 +202,8 @@ benchmark_group!(
     chunk_at_byte_slice,
     chunk_at_char,
     chunk_at_char_slice,
+    chunk_at_line_break,
+    chunk_at_line_break_slice,
     slice,
     slice_small,
     slice_from_small_rope,
