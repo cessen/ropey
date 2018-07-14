@@ -327,10 +327,7 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
 ///
 /// ptr MUST be aligned to usize alignment.
 #[inline(always)]
-pub(crate) unsafe fn count_line_breaks_in_usize_from_ptr(
-    ptr: *const u8,
-    end_ptr: *const u8,
-) -> usize {
+unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8) -> usize {
     let mut count = 0;
     let n = *(ptr as *const usize);
     let next_ptr = ptr.offset(TSIZE as isize);
@@ -407,7 +404,7 @@ pub(crate) unsafe fn count_line_breaks_in_usize_from_ptr(
 }
 
 #[inline(always)]
-pub(crate) fn flag_bytes(word: usize, n: u8) -> usize {
+fn flag_bytes(word: usize, n: u8) -> usize {
     const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
     const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
     let word = word ^ (n as usize * ONEMASK_LOW);
@@ -415,7 +412,7 @@ pub(crate) fn flag_bytes(word: usize, n: u8) -> usize {
 }
 
 #[inline(always)]
-pub(crate) fn count_flag_bytes(word: usize) -> usize {
+fn count_flag_bytes(word: usize) -> usize {
     if word == 0 {
         0
     } else {
@@ -424,7 +421,7 @@ pub(crate) fn count_flag_bytes(word: usize) -> usize {
 }
 
 #[inline(always)]
-pub(crate) fn shift_bytes_back(word: usize, n: usize) -> usize {
+fn shift_bytes_back(word: usize, n: usize) -> usize {
     if cfg!(target_endian = "little") {
         word >> (n * 8)
     } else {
@@ -434,18 +431,18 @@ pub(crate) fn shift_bytes_back(word: usize, n: usize) -> usize {
 
 #[inline(always)]
 #[allow(unused)] // Used in tests
-pub(crate) fn has_byte(word: usize, n: u8) -> bool {
+fn has_byte(word: usize, n: u8) -> bool {
     flag_bytes(word, n) != 0
 }
 
 #[inline(always)]
-pub(crate) fn has_bytes_less_than(word: usize, n: u8) -> bool {
+fn has_bytes_less_than(word: usize, n: u8) -> bool {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
     ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
 }
 
 #[inline(always)]
-pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
+fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
 }
 
@@ -465,7 +462,7 @@ pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
 #[allow(unused)] // Used in tests, as reference solution.
-pub(crate) struct LineBreakIter<'a> {
+struct LineBreakIter<'a> {
     byte_itr: std::str::Bytes<'a>,
     byte_idx: usize,
 }
@@ -473,7 +470,7 @@ pub(crate) struct LineBreakIter<'a> {
 #[allow(unused)]
 impl<'a> LineBreakIter<'a> {
     #[inline]
-    pub fn new(text: &str) -> LineBreakIter {
+    fn new(text: &str) -> LineBreakIter {
         LineBreakIter {
             byte_itr: text.bytes(),
             byte_idx: 0,
