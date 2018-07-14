@@ -777,10 +777,17 @@ impl Rope {
             self.len_lines()
         );
 
-        let start = self.line_to_char(line_idx);
-        let end = self.line_to_char(line_idx + 1);
-
-        self.slice(start..end)
+        let (chunk_1, _, c1, l1) = self.chunk_at_line_break(line_idx);
+        let (chunk_2, _, c2, l2) = self.chunk_at_line_break(line_idx + 1);
+        if c1 == c2 {
+            let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
+            let text2 = &text1[..line_to_byte_idx(text1, 1)];
+            RopeSlice::from_str(text2)
+        } else {
+            let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
+            let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
+            self.slice(start..end)
+        }
     }
 
     /// Returns the chunk containing the given byte index, along with
@@ -1828,6 +1835,19 @@ mod tests {
 
     #[test]
     fn line_03() {
+        let r = Rope::from_str("Hi\nHi\nHi\nHi\nHi\nHi\n");
+
+        assert_eq!(r.line(0), "Hi\n");
+        assert_eq!(r.line(1), "Hi\n");
+        assert_eq!(r.line(2), "Hi\n");
+        assert_eq!(r.line(3), "Hi\n");
+        assert_eq!(r.line(4), "Hi\n");
+        assert_eq!(r.line(5), "Hi\n");
+        assert_eq!(r.line(6), "");
+    }
+
+    #[test]
+    fn line_04() {
         let r = Rope::from_str("");
 
         assert_eq!(r.line(0), "");
@@ -1835,7 +1855,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn line_04() {
+    fn line_05() {
         let r = Rope::from_str(TEXT_LINES);
         r.line(4);
     }
