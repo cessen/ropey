@@ -9,6 +9,8 @@
 
 use std;
 
+const TSIZE: usize = std::mem::size_of::<usize>(); // Shorthand for usize size.
+
 /// Converts from byte-index to char-index in a string slice.
 ///
 /// Any past-the-end index will return the one-past-the-end char index.
@@ -53,7 +55,6 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 #[inline]
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
-    let tsize: usize = std::mem::size_of::<usize>();
 
     let mut char_count = 0;
     let mut ptr = text.as_ptr();
@@ -62,7 +63,7 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
 
     // Take care of any unaligned bytes at the beginning
     let end_pre_ptr = {
-        let aligned = ptr as usize + (tsize - (ptr as usize & (tsize - 1)));
+        let aligned = ptr as usize + (TSIZE - (ptr as usize & (TSIZE - 1)));
         (end_ptr as usize).min(aligned) as *const u8
     };
     while ptr < end_pre_ptr && char_count <= char_idx {
@@ -73,12 +74,12 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
 
     // Use usize to count multiple bytes at once, using bit-fiddling magic.
     let mut ptr = ptr as *const usize;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (tsize - 1))) as *const usize;
-    while ptr < end_mid_ptr && (char_count + tsize) <= char_idx {
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (TSIZE - 1))) as *const usize;
+    while ptr < end_mid_ptr && (char_count + TSIZE) <= char_idx {
         // Do the clever counting
         let n = unsafe { *ptr };
         let byte_bools = (!((n >> 7) & (!n >> 6))) & ONEMASK;
-        char_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
+        char_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((TSIZE - 1) * 8);
         ptr = unsafe { ptr.offset(1) };
     }
 
@@ -118,8 +119,6 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline(never)]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
-    let tsize: usize = std::mem::size_of::<usize>();
-
     let len = text.len();
     let mut ptr = text.as_ptr();
     let start_ptr = text.as_ptr();
@@ -128,9 +127,9 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
 
     while ptr < end_ptr {
         // Calculate the next aligned ptr after this one
-        let end_aligned_ptr = next_aligned_ptr(ptr, tsize).min(end_ptr);
+        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
 
-        // Do the full check, line_break_counting as we go.
+        // Count line breaks a byte at a time.
         while ptr < end_aligned_ptr && line_break_count < line_idx {
             let byte = unsafe { *ptr };
 
@@ -173,38 +172,19 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
             break;
         }
 
-        // Use usize to count line breaks where it can.
-        const LF_MASK: usize = std::usize::MAX / 0xFF * 0x0A;
-        const VT_MASK: usize = std::usize::MAX / 0xFF * 0x0B;
-        const FF_MASK: usize = std::usize::MAX / 0xFF * 0x0C;
+        // Use usize to count line breaks in big chunks.
         if ptr == end_aligned_ptr {
-            while unsafe { ptr.offset(tsize as isize) } < end_ptr {
-                let n = unsafe { *(ptr as *const usize) };
+            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
+                let lb =
+                    line_break_count + unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
 
-                // If there's a possibility that there might be a multi-byte line
-                // ending, stop and do the full check.
-                if has_byte(n, 0xC2) || has_byte(n, 0xE2) {
+                if lb >= line_idx {
                     break;
-                } else if has_bytes_less_than(n, 0x0E) {
-                    if has_byte(n, 0x0D) {
-                        // If there's a CR, we unfortunatley need to revert to
-                        // byte-by-byte scanning for CRLF.
-                        break;
-                    } else {
-                        // Count the single-byte line endings.
-                        let lb = line_break_count
-                            + count_zero_bytes(n ^ LF_MASK)
-                            + count_zero_bytes(n ^ VT_MASK)
-                            + count_zero_bytes(n ^ FF_MASK);
-                        if lb >= line_idx {
-                            break;
-                        } else {
-                            line_break_count = lb;
-                        }
-                    }
+                } else {
+                    line_break_count = lb;
                 }
 
-                ptr = unsafe { ptr.offset(tsize as isize) };
+                ptr = unsafe { ptr.offset(TSIZE as isize) };
             }
         }
     }
@@ -236,15 +216,13 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
 pub(crate) fn count_chars(text: &str) -> usize {
     const ONEMASK: usize = std::usize::MAX / 0xFF;
 
-    let tsize: usize = std::mem::size_of::<usize>();
-
     let len = text.len();
     let mut ptr = text.as_ptr();
     let end_ptr = unsafe { ptr.offset(len as isize) };
     let mut inv_count = 0;
 
     // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = next_aligned_ptr(unsafe { ptr.offset(-1) }, tsize).min(end_ptr);
+    let end_pre_ptr = next_aligned_ptr(unsafe { ptr.offset(-1) }, TSIZE).min(end_ptr);
     while ptr < end_pre_ptr {
         let byte = unsafe { *ptr };
         inv_count += ((byte & 0xC0) == 0x80) as usize;
@@ -253,12 +231,12 @@ pub(crate) fn count_chars(text: &str) -> usize {
 
     // Use usize to count multiple bytes at once, using bit-fiddling magic.
     let mut ptr = ptr as *const usize;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (tsize - 1))) as *const usize;
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (TSIZE - 1))) as *const usize;
     while ptr < end_mid_ptr {
         // Do the clever counting
         let n = unsafe { *ptr };
         let byte_bools = ((n >> 7) & (!n >> 6)) & ONEMASK;
-        inv_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((tsize - 1) * 8);
+        inv_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((TSIZE - 1) * 8);
         ptr = unsafe { ptr.offset(1) };
     }
 
@@ -286,8 +264,6 @@ pub(crate) fn count_chars(text: &str) -> usize {
 /// - u{2029}        (Paragraph Separator)
 #[inline(never)] // Actually slightly faster when inlining is not allowed
 pub(crate) fn count_line_breaks(text: &str) -> usize {
-    let tsize: usize = std::mem::size_of::<usize>();
-
     let len = text.len();
     let mut ptr = text.as_ptr();
     let end_ptr = unsafe { ptr.offset(len as isize) };
@@ -295,9 +271,9 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
 
     while ptr < end_ptr {
         // Calculate the next aligned ptr after this one
-        let end_aligned_ptr = next_aligned_ptr(ptr, tsize).min(end_ptr);
+        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
 
-        // Do the full check, counting as we go.
+        // Count line breaks a byte at a time.
         while ptr < end_aligned_ptr {
             let byte = unsafe { *ptr };
 
@@ -335,32 +311,94 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
             ptr = unsafe { ptr.offset(1) };
         }
 
-        // Use usize to count line breaks where it can.
-        const LF_MASK: usize = std::usize::MAX / 0xFF * 0x0A;
-        const VT_MASK: usize = std::usize::MAX / 0xFF * 0x0B;
-        const FF_MASK: usize = std::usize::MAX / 0xFF * 0x0C;
+        // Use usize to count line breaks in big chunks.
         if ptr == end_aligned_ptr {
-            while unsafe { ptr.offset(tsize as isize) } < end_ptr {
-                let n = unsafe { *(ptr as *const usize) };
+            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
+                count += unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
+                ptr = unsafe { ptr.offset(TSIZE as isize) };
+            }
+        }
+    }
 
-                // If there's a possibility that there might be a multi-byte line
-                // ending, stop and do the full check.
-                if has_byte(n, 0xC2) || has_byte(n, 0xE2) {
-                    break;
-                } else if has_bytes_less_than(n, 0x0E) {
-                    if has_byte(n, 0x0D) {
-                        // If there's a CR, we unfortunatley need to revert to
-                        // byte-by-byte scanning for CRLF.
-                        break;
-                    } else {
-                        // Count the single-byte line endings.
-                        count += count_zero_bytes(n ^ LF_MASK)
-                            + count_zero_bytes(n ^ VT_MASK)
-                            + count_zero_bytes(n ^ FF_MASK);
-                    }
-                }
+    count
+}
 
-                ptr = unsafe { ptr.offset(tsize as isize) };
+/// Used internally in the line-break counting functions.
+///
+/// ptr MUST be aligned to usize alignment.
+#[inline(always)]
+pub(crate) unsafe fn count_line_breaks_in_usize_from_ptr(
+    ptr: *const u8,
+    end_ptr: *const u8,
+) -> usize {
+    let mut count = 0;
+    let n = *(ptr as *const usize);
+    let next_ptr = ptr.offset(TSIZE as isize);
+
+    let nl_1_flags = flag_bytes(n, 0xC2);
+    let sp_1_flags = flag_bytes(n, 0xE2);
+    let has_single_byte_lb = has_bytes_less_than(n, 0x0E);
+
+    if has_single_byte_lb || nl_1_flags != 0 || sp_1_flags != 0 {
+        // Line Feed:                   u{000A}
+        // Vertical Tab:                u{000B}
+        // Form Feed:                   u{000C}
+        // Carriage Return:             u{000D}
+        // Carriage Return + Line Feed: u{000D}u{000A}
+        if has_single_byte_lb {
+            count += count_bytes(n, 0x0B);
+            count += count_bytes(n, 0x0C);
+
+            let lf_flags = flag_bytes(n, 0x0A);
+            let cr_flags = flag_bytes(n, 0x0D);
+            let crlf_flags = cr_flags & shift_bytes_back(lf_flags, 1);
+
+            count += count_flag_bytes(lf_flags);
+            count += count_flag_bytes(cr_flags);
+            count -= count_flag_bytes(crlf_flags);
+
+            // Handle final CR in word, because there might be
+            // an LF in the next byte.
+            if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
+                count -= 1;
+            }
+        }
+
+        // Next Line: u{0085}
+        if nl_1_flags != 0 {
+            let nl_2_flags = shift_bytes_back(flag_bytes(n, 0x85), 1);
+            count += count_flag_bytes(nl_1_flags & nl_2_flags);
+
+            // Handle ending boundary
+            if next_ptr < end_ptr && *next_ptr.offset(-1) == 0xC2 && *next_ptr == 0x85 {
+                count += 1;
+            }
+        }
+
+        // Line Separator:      u{2028}
+        // Paragraph Separator: u{2029}
+        if sp_1_flags != 0 {
+            let sp_2_flags = sp_1_flags & shift_bytes_back(flag_bytes(n, 0x80), 1);
+            if sp_2_flags != 0 {
+                let sp_3_flags = flag_bytes(n, 0xA8);
+                let sp_4_flags = flag_bytes(n, 0xA9);
+                let sp_flags = sp_2_flags & shift_bytes_back(sp_3_flags | sp_4_flags, 2);
+                count += count_flag_bytes(sp_flags);
+            }
+
+            // Handle ending boundary
+            if next_ptr < end_ptr
+                && *next_ptr.offset(-2) == 0xE2
+                && *next_ptr.offset(-1) == 0x80
+                && (*next_ptr >> 1) == 0x54
+            {
+                count += 1;
+            } else if next_ptr.offset(1) < end_ptr
+                && *next_ptr.offset(-1) == 0xE2
+                && *next_ptr == 0x80
+                && (*next_ptr.offset(1) >> 1) == 0x54
+            {
+                count += 1;
             }
         }
     }
@@ -375,23 +413,45 @@ pub(crate) fn has_bytes_less_than(word: usize, n: u8) -> bool {
 }
 
 #[inline(always)]
+#[allow(unused)] // Used in tests
 pub(crate) fn has_byte(word: usize, n: u8) -> bool {
-    const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
-    const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
-    let word = word ^ (n as usize * ONEMASK_LOW);
-    (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH) != 0
+    flag_bytes(word, n) != 0
 }
 
 #[inline(always)]
-pub(crate) fn count_zero_bytes(x: usize) -> usize {
+pub(crate) fn flag_bytes(word: usize, n: u8) -> usize {
     const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
     const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
-    ((x.wrapping_sub(ONEMASK_LOW)) & !x & ONEMASK_HIGH) / 128 % 255
+    let word = word ^ (n as usize * ONEMASK_LOW);
+    (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH)
+}
+
+#[inline(always)]
+pub(crate) fn count_flag_bytes(word: usize) -> usize {
+    if word == 0 {
+        0
+    } else {
+        word / 128 % 255
+    }
+}
+
+#[inline(always)]
+pub(crate) fn count_bytes(word: usize, n: u8) -> usize {
+    count_flag_bytes(flag_bytes(word, n))
 }
 
 #[inline(always)]
 pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
+}
+
+#[inline(always)]
+pub(crate) fn shift_bytes_back(word: usize, n: usize) -> usize {
+    if cfg!(target_endian = "little") {
+        word >> (n * 8)
+    } else {
+        word << (n * 8)
+    }
 }
 
 //======================================================================
