@@ -337,33 +337,8 @@ pub(crate) unsafe fn count_line_breaks_in_usize_from_ptr(
 
     let nl_1_flags = flag_bytes(n, 0xC2);
     let sp_1_flags = flag_bytes(n, 0xE2);
-    let has_single_byte_lb = has_bytes_less_than(n, 0x0E);
 
-    if has_single_byte_lb || nl_1_flags != 0 || sp_1_flags != 0 {
-        // Line Feed:                   u{000A}
-        // Vertical Tab:                u{000B}
-        // Form Feed:                   u{000C}
-        // Carriage Return:             u{000D}
-        // Carriage Return + Line Feed: u{000D}u{000A}
-        if has_single_byte_lb {
-            count += count_bytes(n, 0x0B);
-            count += count_bytes(n, 0x0C);
-
-            let lf_flags = flag_bytes(n, 0x0A);
-            let cr_flags = flag_bytes(n, 0x0D);
-            let crlf_flags = cr_flags & shift_bytes_back(lf_flags, 1);
-
-            count += count_flag_bytes(lf_flags);
-            count += count_flag_bytes(cr_flags);
-            count -= count_flag_bytes(crlf_flags);
-
-            // Handle final CR in word, because there might be
-            // an LF in the next byte.
-            if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
-                count -= 1;
-            }
-        }
-
+    if !(nl_1_flags == 0 && sp_1_flags == 0) {
         // Next Line: u{0085}
         if nl_1_flags != 0 {
             let nl_2_flags = shift_bytes_back(flag_bytes(n, 0x85), 1);
@@ -403,19 +378,32 @@ pub(crate) unsafe fn count_line_breaks_in_usize_from_ptr(
         }
     }
 
+    // Line Feed:                   u{000A}
+    // Vertical Tab:                u{000B}
+    // Form Feed:                   u{000C}
+    // Carriage Return:             u{000D}
+    // Carriage Return + Line Feed: u{000D}u{000A}
+    if has_bytes_less_than(n, 0x0E) {
+        let lf_flags = flag_bytes(n, 0x0A);
+        count += count_flag_bytes(lf_flags);
+        let vt_flags = flag_bytes(n, 0x0B);
+        count += count_flag_bytes(vt_flags);
+        let ff_flags = flag_bytes(n, 0x0C);
+        count += count_flag_bytes(ff_flags);
+        let cr_flags = flag_bytes(n, 0x0D);
+        count += count_flag_bytes(cr_flags);
+
+        // Handle CRLF
+        if cr_flags != 0 {
+            let crlf_flags = cr_flags & shift_bytes_back(lf_flags, 1);
+            count -= count_flag_bytes(crlf_flags);
+            if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
+                count -= 1;
+            }
+        }
+    }
+
     count
-}
-
-#[inline(always)]
-pub(crate) fn has_bytes_less_than(word: usize, n: u8) -> bool {
-    const ONEMASK: usize = std::usize::MAX / 0xFF;
-    ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
-}
-
-#[inline(always)]
-#[allow(unused)] // Used in tests
-pub(crate) fn has_byte(word: usize, n: u8) -> bool {
-    flag_bytes(word, n) != 0
 }
 
 #[inline(always)]
@@ -436,22 +424,29 @@ pub(crate) fn count_flag_bytes(word: usize) -> usize {
 }
 
 #[inline(always)]
-pub(crate) fn count_bytes(word: usize, n: u8) -> usize {
-    count_flag_bytes(flag_bytes(word, n))
-}
-
-#[inline(always)]
-pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
-    (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
-}
-
-#[inline(always)]
 pub(crate) fn shift_bytes_back(word: usize, n: usize) -> usize {
     if cfg!(target_endian = "little") {
         word >> (n * 8)
     } else {
         word << (n * 8)
     }
+}
+
+#[inline(always)]
+#[allow(unused)] // Used in tests
+pub(crate) fn has_byte(word: usize, n: u8) -> bool {
+    flag_bytes(word, n) != 0
+}
+
+#[inline(always)]
+pub(crate) fn has_bytes_less_than(word: usize, n: u8) -> bool {
+    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
+}
+
+#[inline(always)]
+pub(crate) fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
+    (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
 }
 
 //======================================================================
