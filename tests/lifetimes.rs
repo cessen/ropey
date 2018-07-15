@@ -12,11 +12,12 @@ fn main() {
     let rope = Rope::from_str(TEXT);
 
     let (a, b, c, d, e, f, count, line, string) = {
-        // The lifetimes of the intermediate slices shouldn't matter,
-        // and all of this should compile.  The lifetimes of the things
-        // produced by these calls should be tied to the lifetime of the
-        // original rope, not the lifetime of the slice they were created
-        // from.
+        // The lifetimes of intermediate slices shouldn't matter.  The
+        // lifetimes of the things produced by the calls below should be
+        // tied to the lifetime of the original rope, not the lifetimes of
+        // the slices they were created from.  Therefore, this should all
+        // compile.
+
         let a = rope.slice(4..500).slice(4..400).slice(4..300);
         let b = rope.slice(4..500).slice(4..400).as_str();
         let c = rope.slice(4..500).slice(4..400).line(1);
@@ -26,7 +27,7 @@ fn main() {
 
         // Same for iterators.  In addition, the items _yielded_ by the
         // iterators should also be tied to the lifetime of the original
-        // rope, not to the iterator or slice they came from.
+        // rope, not to the iterators or slices they came from.
 
         let mut count = 0;
         for _ in rope.slice(4..500).slice(4..400).bytes() {
