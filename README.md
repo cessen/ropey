@@ -62,11 +62,12 @@ Ropey is fast and minimizes memory usage:
 
 
 ### Strong Unicode support
-Ropey treats [Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
-([`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
-encoded in utf8 as the atomic unit of text.  Indexing and edits are all done
-in terms of Unicode scalar values, making the APIs intuitive and making it
-impossible to accidentally create invalid utf8 data.
+Ropey's atomic unit of text is
+[Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
+(or [`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
+encoded as utf8.  All of Ropey's editing and slicing operations are done
+in terms of char indices, which prevents accidental creation of invalid
+utf8 data.
 
 
 ### Line-aware
