@@ -89,6 +89,9 @@ impl Rope {
 
     /// Creates a `Rope` from the output of a reader.
     ///
+    /// This is a convenience function.  To do more sophisticated text loading,
+    /// see [`RopeBuilder`](struct.RopeBuilder.html).
+    ///
     /// Runs in O(N) time.
     ///
     /// # Errors
@@ -172,6 +175,9 @@ impl Rope {
     // Convenience output methods
 
     /// Writes the contents of the `Rope` to a writer.
+    ///
+    /// This is a convenience function.  To do more sophisticated text output,
+    /// see the [`Chunks`](iter/struct.Chunks.html) iterator.
     ///
     /// Runs in O(N) time.
     ///
@@ -623,6 +629,13 @@ impl Rope {
 
     /// Returns the char index of the given byte.
     ///
+    /// Notes:
+    ///
+    /// - If the byte is in the middle of a multi-byte char, returns the
+    ///   index of the char that the byte belongs to.
+    /// - `byte_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end char index.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -644,7 +657,10 @@ impl Rope {
     ///
     /// Notes:
     ///
-    /// - Lines are zero-indexed.
+    /// - Lines are zero-indexed.  This is functionally equivalent to
+    ///   counting the line endings before the specified byte.
+    /// - `byte_idx` can be one-past-the-end, which will return the
+    ///   last line index.
     ///
     /// # Panics
     ///
@@ -664,6 +680,11 @@ impl Rope {
     }
 
     /// Returns the byte index of the given char.
+    ///
+    /// Notes:
+    ///
+    /// - `char_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end byte index.
     ///
     /// # Panics
     ///
@@ -686,7 +707,10 @@ impl Rope {
     ///
     /// Notes:
     ///
-    /// - Lines are zero-indexed.
+    /// - Lines are zero-indexed.  This is functionally equivalent to
+    ///   counting the line endings before the specified char.
+    /// - `char_idx` can be one-past-the-end, which will return the
+    ///   last line index.
     ///
     /// # Panics
     ///
@@ -710,8 +734,8 @@ impl Rope {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
-    ///   byte index.
+    /// - `line_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end byte index.
     ///
     /// # Panics
     ///
@@ -739,8 +763,8 @@ impl Rope {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
-    ///   char index.
+    /// - `line_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end char index.
     ///
     /// # Panics
     ///

@@ -163,6 +163,13 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns the char index of the given byte.
     ///
+    /// Notes:
+    ///
+    /// - If the byte is in the middle of a multi-byte char, returns the
+    ///   index of the char that the byte belongs to.
+    /// - `byte_idx` can be one-past-the-end, which will return one-past-the-end
+    ///   char index.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -186,6 +193,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// - Lines are zero-indexed.  This is functionally equivalent to
     ///   counting the line endings before the specified byte.
+    /// - `byte_idx` can be one-past-the-end, which will return the
+    ///   last line index.
     ///
     /// # Panics
     ///
@@ -205,6 +214,11 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Returns the byte index of the given char.
+    ///
+    /// Notes:
+    ///
+    /// - `char_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end byte index.
     ///
     /// # Panics
     ///
@@ -229,6 +243,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// - Lines are zero-indexed.  This is functionally equivalent to
     ///   counting the line endings before the specified char.
+    /// - `char_idx` can be one-past-the-end, which will return the
+    ///   last line index.
     ///
     /// # Panics
     ///
@@ -252,8 +268,8 @@ impl<'a> RopeSlice<'a> {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
-    ///   byte index.
+    /// - `line_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end byte index.
     ///
     /// # Panics
     ///
@@ -281,8 +297,8 @@ impl<'a> RopeSlice<'a> {
     /// Notes:
     ///
     /// - Lines are zero-indexed.
-    /// - `line_idx` can be one-past-the-end, which will return one-past-the-end
-    ///   char index.
+    /// - `line_idx` can be one-past-the-end, which will return
+    ///   one-past-the-end char index.
     ///
     /// # Panics
     ///
@@ -363,6 +379,9 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
+    /// Note: the chunks at the beginning and end of the slice _are_
+    /// appropriately truncated to the slice's range.
+    ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
@@ -411,6 +430,9 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
+    ///
+    /// Note: the chunks at the beginning and end of the slice _are_
+    /// appropriately truncated to the slice's range.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -461,11 +483,15 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// Note: for convenience, both the beginning and end of the rope are
-    /// considered line breaks for indexing.  For example, in the string
-    /// `"Hello \n world!"` 0 would give the first chunk, 1 would give the
-    /// chunk containing the newline character, and 2 would give the last
-    /// chunk.
+    /// Notes:
+    ///
+    /// - The chunks at the beginning and end of the slice _are_
+    ///   appropriately truncated to the slice's range.
+    /// - For convenience, both the beginning and end of the rope are
+    ///   considered line breaks for indexing.  For example, in the string
+    ///   `"Hello \n world!"` 0 would give the first chunk, 1 would give the
+    ///   chunk containing the newline character, and 2 would give the last
+    ///   chunk.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///

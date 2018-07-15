@@ -231,16 +231,23 @@ impl<'a> Iterator for Lines<'a> {
 /// strings. This iterator iterates over those segments, returning a
 /// `&str` slice for each one.  It is useful for situations such as:
 ///
-/// - Writing a rope's text data to disk (but see `Rope::write_to()` which
-///   uses this internally for precisely that use-case).
+/// - Writing a rope's utf8 text data to disk (but see
+///   [`Rope::write_to()`](../struct.Rope.html#method.write_to) for a
+///   convenience function that does this).
 /// - Streaming a rope's text data somewhere.
 /// - Saving a rope to a non-utf8 encoding, doing the encoding conversion
 ///   incrementally as you go.
 /// - Writing custom iterators over a rope's text data.
 ///
-/// There are no guarantees about the size of yielded chunks, or where they
-/// are split.  For example, they may be zero-sized, they don't necessarily
-/// align with line breaks, etc.
+/// There are precisely two guarantees about the yielded chunks:
+///
+/// - All chunks are yielded, and they are yielded in order.
+/// - CRLF pairs are never split across chunks.
+///
+/// There are no guarantees about the size of yielded chunks, and except for
+/// CRLF pairs there are no guarantees about where the chunks are split.  For
+/// example, they may be zero-sized, they don't necessarily align with line
+/// breaks, etc.
 pub struct Chunks<'a>(ChunksEnum<'a>);
 
 enum ChunksEnum<'a> {

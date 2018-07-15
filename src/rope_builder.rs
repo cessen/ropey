@@ -13,8 +13,9 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// chunks.  It is useful for creating ropes from:
 ///
 /// - ...large text files, without pre-loading their entire contents into
-///   memory (but see `Rope::from_reader()` which uses this internally
-///   for precisely that use-case).
+///   memory (but see
+///   [`Rope::from_reader()`](struct.Rope.html#method.from_reader) for a
+///   convenience function that does this for utf8 text).
 /// - ...streaming data sources.
 /// - ...non-utf8 text data, doing the encoding conversion incrementally
 ///   as you go.

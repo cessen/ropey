@@ -10,6 +10,9 @@ const TSIZE: usize = std::mem::size_of::<usize>(); // Shorthand for usize size.
 
 /// Converts from byte-index to char-index in a string slice.
 ///
+/// If the byte is in the middle of a multi-byte char, returns the index of
+/// the char that the byte belongs to.
+///
 /// Any past-the-end index will return the one-past-the-end char index.
 #[inline]
 pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
