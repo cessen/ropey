@@ -36,12 +36,10 @@ let start_idx = text.line_to_char(511);
 let end_idx = text.line_to_char(516);
 println!("{}", text.slice(start_idx..end_idx));
 
-// Write the file back out to disk using the `Chunks` iterator
-// for efficiency.
-let mut file = File::create("my_great_book.txt")?;
-for chunk in text.chunks() {
-    file.write(chunk.as_bytes())?;
-}
+// Write the file back out to disk.
+text.write_to(
+    BufWriter::new(File::create("my_great_book.txt")?)
+)?;
 ```
 
 ## Features

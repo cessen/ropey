@@ -26,7 +26,7 @@
 //! ```no_run
 //! # use std::io::Result;
 //! use std::fs::File;
-//! use std::io::{Write, BufReader, BufWriter};
+//! use std::io::{BufReader, BufWriter};
 //! use ropey::Rope;
 //!
 //! # fn do_stuff() -> Result<()> {
@@ -37,9 +37,8 @@
 //!
 //! // Make sure there are at least 516 lines.
 //! if text.len_lines() >= 516 {
-//!     // Let's print the line first, to embarrass ourselves with our
-//!     // terrible writing!  Note that lines are zero-indexed, so the
-//!     // 516th line is at index 515.
+//!     // Print the 516th line (zero-indexed) to see the terrible
+//!     // writing.
 //!     println!("{}", text.line(515));
 //!
 //!     // Get the char indices of the start/end of the line.
@@ -59,12 +58,10 @@
 //!     println!("{}", text.slice(start_idx..end_idx));
 //! }
 //!
-//! // Write the file back out to disk.  We use the `Chunks` iterator
-//! // here to be maximally efficient.
-//! let mut file = BufWriter::new(File::create("my_great_book.txt")?);
-//! for chunk in text.chunks() {
-//!     file.write(chunk.as_bytes())?;
-//! }
+//! // Write the file back out to disk.
+//! text.write_to(
+//!     BufWriter::new(File::create("my_great_book.txt")?)
+//! )?;
 //! # Ok(())
 //! # }
 //! # do_stuff().unwrap();

@@ -231,7 +231,8 @@ impl<'a> Iterator for Lines<'a> {
 /// strings. This iterator iterates over those segments, returning a
 /// `&str` slice for each one.  It is useful for situations such as:
 ///
-/// - Writing a rope's text data to disk.
+/// - Writing a rope's text data to disk (but see `Rope::write_to()` which
+///   uses this internally for precisely that use-case).
 /// - Streaming a rope's text data somewhere.
 /// - Saving a rope to a non-utf8 encoding, doing the encoding conversion
 ///   incrementally as you go.

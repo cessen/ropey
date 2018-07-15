@@ -165,6 +165,28 @@ impl Rope {
     }
 
     //-----------------------------------------------------------------------
+    // Convenience output methods
+
+    /// Writes the contents of the `Rope` to a writer.
+    ///
+    /// Runs in O(N) time.
+    ///
+    /// # Errors
+    ///
+    /// - If the writer returns an error, `write_to` stops and returns that
+    ///   error.
+    ///
+    /// Note: some data may have been written even if an error is returned.
+    #[allow(unused_mut)]
+    pub fn write_to<T: io::Write>(&self, mut writer: T) -> io::Result<()> {
+        for chunk in self.chunks() {
+            writer.write(chunk.as_bytes())?;
+        }
+
+        Ok(())
+    }
+
+    //-----------------------------------------------------------------------
     // Informational methods
 
     /// Total number of bytes in the `Rope`.
