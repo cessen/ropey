@@ -1,3 +1,39 @@
+# 0.8.0 (2018-07-14)
+
+Peformance improvements:
+
+* Building new ropes via RopeBuilder or Rope::from_str() is now about 15% faster.
+
+* Slicing is now almost twice as fast.
+
+* Fetching lines is now almost twice as fast.
+
+* Significant speedups for byte/char -> line index conversion methods.
+
+* Significant speedups for line -> byte/char index conversion methods.
+
+New features:
+
+* Chunk fetching can now be done by line break index as well as byte/char index.
+
+* Some previously-internal utility functions for working with string slices are now part of Ropey's public API.
+
+* Added Rope::write_to() convenience function for writing a Rope's data to a writer.
+
+Breaking changes:
+
+* Conversion from byte/char indices to line indices has been changed to be more intuitive.  It is now equivalent to counting the line endings before the given byte/char index.
+
+* Chunk fetching now returns the starting byte/char/line of the chunk, which is generally easier to work with.
+
+
+# 0.7.1 (2018-07-09)
+
+Bug fixes:
+
+* The chunk fetching methods on slices returned bogus starting char indices.
+
+
 # 0.7.0 (2018-07-05)
 
 Peformance improvements:
