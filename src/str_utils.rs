@@ -3,9 +3,6 @@
 //! This module provides various utility functions that operate on string
 //! slices in ways compatible with Ropey.  They may be useful when building
 //! additional functionality on top of Ropey.
-//!
-//! These functions are guaranteed to stay in-sync with how Ropey functions,
-//! and in fact are used internally for much of Ropey's functionality.
 
 use std;
 
@@ -29,9 +26,7 @@ pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
 
 /// Converts from byte-index to line-index in a string slice.
 ///
-/// Specifically: returns the index of the line that contains the given
-/// byte.  This is equivalent to counting the line endings before the
-/// given byte.
+/// This is equivalent to counting the line endings before the given byte.
 ///
 /// Any past-the-end index will return the last line index.
 #[inline]
@@ -102,9 +97,7 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
 
 /// Converts from char-index to line-index in a string slice.
 ///
-/// Specifically: returns the index of the line that contains the given
-/// char.  This is equivalent to counting the line endings before the
-/// given char.
+/// This is equivalent to counting the line endings before the given char.
 ///
 /// Any past-the-end index will return the last line index.
 #[inline]
@@ -114,7 +107,8 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 
 /// Converts from line-index to byte-index in a string slice.
 ///
-/// Specifically: returns the index of the first byte of the given line.
+/// More specifically, this returns the index of the first byte of the given
+/// line.
 ///
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline(never)]
@@ -195,7 +189,8 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
 
 /// Converts from line-index to char-index in a string slice.
 ///
-/// Specifically: returns the index of the first char of the given line.
+/// More specifically, this returns the index of the first char of the given
+/// line.
 ///
 /// Any past-the-end index will return the one-past-the-end char index.
 #[inline]

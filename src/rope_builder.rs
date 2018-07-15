@@ -23,10 +23,6 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// this API runs in time linear to the amount of data fed to it, and
 /// is overall much faster.
 ///
-/// The converse of this API is the [`Chunks`](iter/struct.Chunks.html)
-/// iterator, which is useful for efficiently streaming a rope's text
-/// data _out_.
-///
 /// # Example
 /// ```
 /// # use ropey::RopeBuilder;

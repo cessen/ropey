@@ -240,9 +240,6 @@ impl<'a> Iterator for Lines<'a> {
 /// There are no guarantees about the size of yielded chunks, or where they
 /// are split.  For example, they may be zero-sized, they don't necessarily
 /// align with line breaks, etc.
-///
-/// The converse of this API is [`RopeBuilder`](../struct.RopeBuilder.html),
-/// which is useful for efficiently streaming text data _into_ a rope.
 pub struct Chunks<'a>(ChunksEnum<'a>);
 
 enum ChunksEnum<'a> {

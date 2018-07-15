@@ -108,33 +108,6 @@ impl<'a> RopeSlice<'a> {
         })
     }
 
-    /// Creates a `RopeSlice` from a string slice.
-    ///
-    /// The resulting `RopeSlice` is very lightweight, and simply refers
-    /// directly to the string slice.
-    ///
-    /// This is primarily intended for avoiding the performance overhead of a
-    /// full `slice()` operation when operating on short text that is
-    /// contiguous in memory. The `slice()` method is comparatively cheap,
-    /// but it may nevertheless be too expensive for some tight inner loops
-    /// because of the tree traversal it typically has to do.
-    ///
-    /// A good example of this method's usage is in `examples/graphemes_iter.rs`,
-    /// where it is used to significantly speed up the graphemes iterator.
-    ///
-    /// Runs in O(N) time, where N is the length of the string slice.  The
-    /// constant factor for that O(N) is small, but this is nevertheless
-    /// only recommended for use with relatively small text slices (under
-    /// 1000 characters or so).
-    #[inline]
-    pub fn from_str(text: &str) -> RopeSlice {
-        RopeSlice(RSEnum::Light {
-            text: text,
-            char_count: count_chars(text) as Count,
-            line_break_count: count_line_breaks(text) as Count,
-        })
-    }
-
     //-----------------------------------------------------------------------
     // Informational methods
 
@@ -385,9 +358,10 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Returns the chunk containing the given byte index, along with
-    /// the byte and char indices of the beginning of the chunk and the
-    /// index of the line that the chunk starts on.
+    /// Returns the chunk containing the given byte index.
+    ///
+    /// Also returns the byte and char indices of the beginning of the chunk
+    /// and the index of the line that the chunk starts on.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -433,9 +407,10 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Returns the chunk containing the given char index, along with
-    /// the byte and char indices of the beginning of the chunk and the
-    /// index of the line that the chunk starts on.
+    /// Returns the chunk containing the given char index.
+    ///
+    /// Also returns the byte and char indices of the beginning of the chunk
+    /// and the index of the line that the chunk starts on.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -481,9 +456,10 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Returns the chunk containing the given line break, along with the
-    /// byte and char indices of the beginning of the chunk and the index of
-    /// the line that the chunk starts on.
+    /// Returns the chunk containing the given line break.
+    ///
+    /// Also returns the byte and char indices of the beginning of the chunk
+    /// and the index of the line that the chunk starts on.
     ///
     /// Note: for convenience, both the beginning and end of the rope are
     /// considered line breaks for indexing.  For example, in the string
@@ -541,15 +517,15 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Returns the entire contents of the `RopeSlice` as a `str` slice if
+    /// Returns the entire contents of the `RopeSlice` as a `&str` if
     /// possible.
     ///
-    /// Note that this method will typically fail, since the contents of a
-    /// rope is generally not contiguous in memory.
+    /// This is useful for optimizing cases where the slice is only a few
+    /// characters or words, and therefore has a high chance of being
+    /// contiguous in memory.
     ///
-    /// This is intended for optimizing cases where the slice is a small
-    /// part of the text (around the size of a few characters or words) and
-    /// therefore has a high chance of being contiguous in memory.
+    /// For large slices this method will typically fail and return `None`
+    /// because large slices usually cross chunk boundaries in the rope.
     ///
     /// Runs in O(1) time.
     #[inline]
@@ -561,12 +537,35 @@ impl<'a> RopeSlice<'a> {
     }
 
     //-----------------------------------------------------------------------
-    // Slicing
+    // Slice creation
+
+    /// Creates a `RopeSlice` directly from a string slice.
+    ///
+    /// Despite its straightforward name, the useful applications of this
+    /// method are somewhat narrow.  It is intended primarily as an aid when
+    /// implementing additional functionality on top of Ropey, where you may
+    /// already have access to a rope chunk and want to directly create a
+    /// `RopeSlice` from it, avoiding the overhead of going through the
+    /// slicing APIs.
+    ///
+    /// Although it is possible to use this to create `RopeSlice`s from
+    /// arbitrary strings, doing so is not especially useful.  For example,
+    /// `Rope`s and `RopeSlice`s can already be directly compared for
+    /// equality with strings and string slices.
+    ///
+    /// Runs in O(N) time, where N is the length of the string slice.
+    #[inline]
+    pub fn from_str(text: &str) -> RopeSlice {
+        RopeSlice(RSEnum::Light {
+            text: text,
+            char_count: count_chars(text) as Count,
+            line_break_count: count_line_breaks(text) as Count,
+        })
+    }
 
     /// Returns a sub-slice of the `RopeSlice` in the given char index range.
     ///
-    /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
-    /// indices.
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.
     ///
     /// # Panics
     ///

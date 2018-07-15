@@ -790,9 +790,10 @@ impl Rope {
         }
     }
 
-    /// Returns the chunk containing the given byte index, along with
-    /// the byte and char indices of the beginning of the chunk and the
-    /// index of the line that the chunk starts on.
+    /// Returns the chunk containing the given byte index.
+    ///
+    /// Also returns the byte and char indices of the beginning of the chunk
+    /// and the index of the line that the chunk starts on.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -812,9 +813,10 @@ impl Rope {
         self.root.get_chunk_at_byte(byte_idx)
     }
 
-    /// Returns the chunk containing the given char index, along with
-    /// the byte and char indices of the beginning of the chunk and the
-    /// index of the line that the chunk starts on.
+    /// Returns the chunk containing the given char index.
+    ///
+    /// Also returns the byte and char indices of the beginning of the chunk
+    /// and the index of the line that the chunk starts on.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -834,9 +836,10 @@ impl Rope {
         self.root.get_chunk_at_char(char_idx)
     }
 
-    /// Returns the chunk containing the given line break, along with the
-    /// byte and char indices of the beginning of the chunk and the index of
-    /// the line that the chunk starts on.
+    /// Returns the chunk containing the given line break.
+    ///
+    /// Also returns the byte and char indices of the beginning of the chunk
+    /// and the index of the line that the chunk starts on.
     ///
     /// Note: for convenience, both the beginning and end of the rope are
     /// considered line breaks for indexing.  For example, in the string
@@ -867,8 +870,7 @@ impl Rope {
 
     /// Gets an immutable slice of the `Rope`.
     ///
-    /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
-    /// indices.
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.
     ///
     /// # Example
     ///
