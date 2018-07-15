@@ -1,6 +1,8 @@
 # Ropey
 
-[![Travis CI Build Status][trav-ci-img]][trav-ci] [![][crates-io-badge]][crates-io-url]
+[![Travis CI Build Status][trav-ci-img]][trav-ci]
+[![Latest Release][crates-io-badge]][crates-io-url]
+[![Documentation][docs-rs-img]][docs-rs-url]
 
 Ropey is a utf8 text buffer for Rust, designed to be the backing text buffer
 for applications such as text editors.  Ropey is fast, Unicode-safe, has low
@@ -135,3 +137,5 @@ terms or conditions.
 [crates-io-url]: https://crates.io/crates/ropey
 [trav-ci-img]: https://travis-ci.org/cessen/ropey.svg?branch=master
 [trav-ci]: https://travis-ci.org/cessen/ropey
+[docs-rs-img]: https://docs.rs/ropey/badge.svg
+[docs-rs-url]: https://docs.rs/ropey
