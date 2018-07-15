@@ -104,8 +104,8 @@ Clones can be sent to other threads for both reading and writing.
 
 Ropey does use unsafe code to help achieve some of its space and performance
 characteristics.  Although effort has been put into keeping the unsafe code
-compartmentalized, it is nevertheless _not_ recommended at this time to use
-Ropey in software that may face adversarial conditions.
+compartmentalized and making it correct, it is nevertheless _not_ recommended
+at this time to use Ropey in software that may face adversarial conditions.
 
 Auditing, fuzzing, etc. of the unsafe code in Ropey is extremely welcome.
 If you find any unsoundness, _please_ file an issue!  Also welcome are
