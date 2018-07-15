@@ -29,27 +29,31 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// assert_eq!(rope, "Hello world!");
 /// ```
 ///
-/// Cloning `Rope`'s is extremely cheap, taking only a few instructions and
-/// 8 bytes of memory, regardless of text size.  This is accomplished by data
-/// sharing between `Rope` clones.  The memory used by clones only grows
-/// incrementally as the their contents diverge due to edits.  All of this
-/// is thread safe, so clones can be sent freely between threads.
+/// Cloning `Rope`s is extremely cheap, running in `O(1)` time and taking a
+/// constant amount of memory for the new clone, regardless of text size.
+/// This is accomplished by data sharing between `Rope` clones.  The memory
+/// used by clones only grows incrementally as the their contents diverge due
+/// to edits.  All of this is thread safe, so clones can be sent freely
+/// between threads.
 ///
-/// `Rope` tracks line endings and has efficient API's for working with lines.
-/// You can convert between `char` and line index, determining which line a
-/// given `char` is on or the `char` index of the beginning of a line:
+/// `Rope` tracks line endings and utf8 `char` boundaries, and has efficient
+/// APIs for working with both.  For example, you can freely convert between
+/// byte, `char`, and line indices:
 ///
 /// ```
 /// # use ropey::Rope;
 /// #
-/// let rope = Rope::from_str("Hello individual!\nHow are you?\nThis text has multiple lines!");
+/// let rope = Rope::from_str("Hello みんなさん!\nHow are you?\nThis text has multiple lines!");
+///
+/// assert_eq!(rope.byte_to_char(15), 9);
+/// assert_eq!(rope.byte_to_char(41), 31);
 ///
 /// assert_eq!(rope.char_to_line(5), 0);
 /// assert_eq!(rope.char_to_line(21), 1);
 ///
 /// assert_eq!(rope.line_to_char(0), 0);
-/// assert_eq!(rope.line_to_char(1), 18);
-/// assert_eq!(rope.line_to_char(2), 31);
+/// assert_eq!(rope.line_to_char(1), 13);
+/// assert_eq!(rope.line_to_char(2), 26);
 /// ```
 ///
 /// `Rope` is written to be fast and memory efficient.  Except where otherwise
