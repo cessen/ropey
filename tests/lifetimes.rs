@@ -11,7 +11,7 @@ const TEXT: &str = include_str!("test_text.txt");
 fn main() {
     let rope = Rope::from_str(TEXT);
 
-    let (a, b, c, d, e, f, count, line, string) = {
+    let (a, b, c, d, e, f, g, count, line, string) = {
         // The lifetimes of intermediate slices shouldn't matter.  The
         // lifetimes of the things produced by the calls below should be
         // tied to the lifetime of the original rope, not the lifetimes of
@@ -21,9 +21,10 @@ fn main() {
         let a = rope.slice(4..500).slice(4..400).slice(4..300);
         let b = rope.slice(4..500).slice(4..400).as_str();
         let c = rope.slice(4..500).slice(4..400).line(1);
-        let d = rope.slice(4..500).slice(4..400).chunk_at_byte(50);
-        let e = rope.slice(4..500).slice(4..400).chunk_at_char(50);
-        let f = rope.slice(4..500).slice(4..400).chunk_at_line_break(3);
+        let d = rope.line(1).slice(4..20).slice(4..10);
+        let e = rope.slice(4..500).slice(4..400).chunk_at_byte(50);
+        let f = rope.slice(4..500).slice(4..400).chunk_at_char(50);
+        let g = rope.slice(4..500).slice(4..400).chunk_at_line_break(3);
 
         // Same for iterators.  In addition, the items _yielded_ by the
         // iterators should also be tied to the lifetime of the original
@@ -48,11 +49,11 @@ fn main() {
             string = c;
         }
 
-        (a, b, c, d, e, f, count, line, string)
+        (a, b, c, d, e, f, g, count, line, string)
     };
 
     println!(
-        "{} {:?} {} {:?} {:?} {:?} {} {} {}",
-        a, b, c, d, e, f, count, line, string
+        "{} {:?} {} {} {:?} {:?} {:?} {} {} {}",
+        a, b, c, d, e, f, g, count, line, string
     );
 }
