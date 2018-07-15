@@ -87,7 +87,7 @@ any of the read-only operations of a full rope including iterators and making
 sub-slices.
 
 
-### Flexible APIs With Low Level Access
+### Flexible APIs with low-level access
 
 Although Ropey is intentionally limited in scope, it also provides APIs for
 efficiently accessing and working with its internal text chunk
@@ -101,7 +101,7 @@ Ropey ensures that even though clones share memory, everything is thread-safe.
 Clones can be sent to other threads for both reading and writing.
 
 
-## Unsafe Code
+## Unsafe code
 
 Ropey does use unsafe code to help achieve some of its space and performance
 characteristics.  Although effort has been put into keeping the unsafe code
