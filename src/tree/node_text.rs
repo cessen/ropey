@@ -2,36 +2,33 @@ use std;
 
 use std::borrow::Borrow;
 use std::ops::Deref;
-use std::ptr;
 use std::str;
 
 use crlf;
-use smallvec::{Array, SmallVec};
 use str_utils::{char_to_byte_idx, count_chars};
-use tree::MAX_BYTES;
 
 /// A custom small string.  The unsafe guts of this are in `NodeSmallString`
 /// further down in this file.
 #[derive(Clone, Default)]
-pub(crate) struct NodeText(NodeSmallString);
+pub(crate) struct NodeText(inner::NodeSmallString);
 
 impl NodeText {
     /// Creates a new empty `NodeText`
     #[inline(always)]
     pub fn new() -> Self {
-        NodeText(NodeSmallString::new())
+        NodeText(inner::NodeSmallString::new())
     }
 
     /// Creates a new empty `NodeText` with at least `capacity` bytes
     /// of capacity.
     #[inline(always)]
     pub fn with_capacity(capacity: usize) -> Self {
-        NodeText(NodeSmallString::with_capacity(capacity))
+        NodeText(inner::NodeSmallString::with_capacity(capacity))
     }
 
     /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        NodeText(NodeSmallString::from_str(string))
+        NodeText(inner::NodeSmallString::from_str(string))
     }
 
     /// Inserts a `&str` at byte offset `byte_idx`.
@@ -264,256 +261,263 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
 
 //=======================================================================
 
-/// The backing internal buffer type for `NodeText`.
-#[derive(Copy, Clone)]
-pub(crate) struct BackingArray([u8; MAX_BYTES]);
-unsafe impl Array for BackingArray {
-    type Item = u8;
-    fn size() -> usize {
-        MAX_BYTES
-    }
-    fn ptr(&self) -> *const u8 {
-        &self.0[0]
-    }
-    fn ptr_mut(&mut self) -> *mut u8 {
-        &mut self.0[0]
-    }
-}
+/// The unsafe guts of NodeText, exposed through a safe API.
+mod inner {
+    use smallvec::{Array, SmallVec};
+    use std::{ptr, str};
+    use tree::MAX_BYTES;
 
-/// Internal small string for `NodeText`, to compartmentalize the unsafe
-/// code.  This exposes a minimal safe interface that guarantees memory
-/// safety and makes it impossible to accidentally create invalid utf8
-/// data. `NodeText` implements the more sophisticated API on top of this.
-#[derive(Clone, Default)]
-struct NodeSmallString {
-    buffer: SmallVec<BackingArray>,
-}
-
-impl NodeSmallString {
-    #[inline(always)]
-    fn new() -> Self {
-        NodeSmallString {
-            buffer: SmallVec::new(),
+    /// The backing internal buffer type for `NodeText`.
+    #[derive(Copy, Clone)]
+    struct BackingArray([u8; MAX_BYTES]);
+    unsafe impl Array for BackingArray {
+        type Item = u8;
+        fn size() -> usize {
+            MAX_BYTES
+        }
+        fn ptr(&self) -> *const u8 {
+            &self.0[0]
+        }
+        fn ptr_mut(&mut self) -> *mut u8 {
+            &mut self.0[0]
         }
     }
 
-    #[inline(always)]
-    fn with_capacity(capacity: usize) -> Self {
-        NodeSmallString {
-            buffer: SmallVec::with_capacity(capacity),
+    /// Internal small string for `NodeText`, to compartmentalize the unsafe
+    /// code.  This exposes a minimal safe interface that guarantees memory
+    /// safety and makes it impossible to accidentally create invalid utf8
+    /// data. `NodeText` implements the more sophisticated API on top of this.
+    #[derive(Clone, Default)]
+    pub struct NodeSmallString {
+        buffer: SmallVec<BackingArray>,
+    }
+
+    impl NodeSmallString {
+        #[inline(always)]
+        pub fn new() -> Self {
+            NodeSmallString {
+                buffer: SmallVec::new(),
+            }
+        }
+
+        #[inline(always)]
+        pub fn with_capacity(capacity: usize) -> Self {
+            NodeSmallString {
+                buffer: SmallVec::with_capacity(capacity),
+            }
+        }
+
+        #[inline(always)]
+        pub fn from_str(string: &str) -> Self {
+            let mut nodetext = NodeSmallString::with_capacity(string.len());
+            nodetext.insert_str(0, string);
+            nodetext
+        }
+
+        #[inline(always)]
+        pub fn len(&self) -> usize {
+            self.buffer.len()
+        }
+
+        #[inline(always)]
+        pub fn as_str(&self) -> &str {
+            // NodeSmallString's methods don't allow `buffer` to become invalid utf8,
+            // so this is safe.
+            unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
+        }
+
+        /// Inserts `string` at `byte_idx`.
+        ///
+        /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
+        #[inline(always)]
+        pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
+            assert!(byte_idx <= self.len());
+            assert!(self.as_str().is_char_boundary(byte_idx));
+
+            let len = self.len();
+            let amt = string.len();
+            self.buffer.reserve(amt);
+
+            unsafe {
+                ptr::copy(
+                    self.buffer.as_ptr().offset(byte_idx as isize),
+                    self.buffer.as_mut_ptr().offset((byte_idx + amt) as isize),
+                    len - byte_idx,
+                );
+                ptr::copy(
+                    string.as_ptr(),
+                    self.buffer.as_mut_ptr().offset(byte_idx as isize),
+                    amt,
+                );
+                self.buffer.set_len(len + amt);
+            }
+        }
+
+        /// Removes text in range `[start_byte_idx, end_byte_idx)`
+        ///
+        /// Panics on out-of-bounds or non-char-boundary indices.
+        #[inline(always)]
+        pub fn remove_range(&mut self, start_byte_idx: usize, end_byte_idx: usize) {
+            assert!(start_byte_idx <= end_byte_idx);
+            assert!(end_byte_idx <= self.len());
+            assert!(self.as_str().is_char_boundary(start_byte_idx));
+            assert!(self.as_str().is_char_boundary(end_byte_idx));
+            let len = self.len();
+            let amt = end_byte_idx - start_byte_idx;
+
+            unsafe {
+                ptr::copy(
+                    self.buffer.as_ptr().offset(end_byte_idx as isize),
+                    self.buffer.as_mut_ptr().offset(start_byte_idx as isize),
+                    len - end_byte_idx,
+                );
+                self.buffer.set_len(len - amt);
+            }
+        }
+
+        /// Removes text after `byte_idx`.
+        #[inline(always)]
+        pub fn truncate(&mut self, byte_idx: usize) {
+            assert!(byte_idx <= self.len());
+            assert!(self.as_str().is_char_boundary(byte_idx));
+            self.buffer.truncate(byte_idx);
+        }
+
+        /// Splits at `byte_idx`, returning the right part and leaving the
+        /// left part in the original.
+        ///
+        /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
+        #[inline(always)]
+        pub fn split_off(&mut self, byte_idx: usize) -> Self {
+            assert!(byte_idx <= self.len());
+            assert!(self.as_str().is_char_boundary(byte_idx));
+            let len = self.len();
+            let mut other = NodeSmallString::with_capacity(len - byte_idx);
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    self.buffer.as_ptr().offset(byte_idx as isize),
+                    other.buffer.as_mut_ptr().offset(0),
+                    len - byte_idx,
+                );
+                self.buffer.set_len(byte_idx);
+                other.buffer.set_len(len - byte_idx);
+            }
+            other
+        }
+
+        /// Re-inlines the data if it's been heap allocated but can
+        /// fit inline.
+        #[inline(always)]
+        pub fn inline_if_possible(&mut self) {
+            if self.buffer.spilled() && (self.buffer.len() <= self.buffer.inline_size()) {
+                self.buffer.shrink_to_fit();
+            }
         }
     }
 
-    #[inline(always)]
-    fn from_str(string: &str) -> Self {
-        let mut nodetext = NodeSmallString::with_capacity(string.len());
-        nodetext.insert_str(0, string);
-        nodetext
-    }
+    //-----------------------------------------------------------------------
 
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.buffer.len()
-    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
 
-    #[inline(always)]
-    fn as_str(&self) -> &str {
-        // NodeSmallString's methods don't allow `buffer` to become invalid utf8,
-        // so this is safe.
-        unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
-    }
-
-    /// Inserts `string` at `byte_idx`.
-    ///
-    /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
-    #[inline(always)]
-    fn insert_str(&mut self, byte_idx: usize, string: &str) {
-        assert!(byte_idx <= self.len());
-        assert!(self.as_str().is_char_boundary(byte_idx));
-
-        let len = self.len();
-        let amt = string.len();
-        self.buffer.reserve(amt);
-
-        unsafe {
-            ptr::copy(
-                self.buffer.as_ptr().offset(byte_idx as isize),
-                self.buffer.as_mut_ptr().offset((byte_idx + amt) as isize),
-                len - byte_idx,
-            );
-            ptr::copy(
-                string.as_ptr(),
-                self.buffer.as_mut_ptr().offset(byte_idx as isize),
-                amt,
-            );
-            self.buffer.set_len(len + amt);
+        #[test]
+        fn small_string_basics() {
+            let s = NodeSmallString::from_str("Hello!");
+            assert_eq!("Hello!", s.as_str());
+            assert_eq!(6, s.len());
         }
-    }
 
-    /// Removes text in range `[start_byte_idx, end_byte_idx)`
-    ///
-    /// Panics on out-of-bounds or non-char-boundary indices.
-    #[inline(always)]
-    fn remove_range(&mut self, start_byte_idx: usize, end_byte_idx: usize) {
-        assert!(start_byte_idx <= end_byte_idx);
-        assert!(end_byte_idx <= self.len());
-        assert!(self.as_str().is_char_boundary(start_byte_idx));
-        assert!(self.as_str().is_char_boundary(end_byte_idx));
-        let len = self.len();
-        let amt = end_byte_idx - start_byte_idx;
-
-        unsafe {
-            ptr::copy(
-                self.buffer.as_ptr().offset(end_byte_idx as isize),
-                self.buffer.as_mut_ptr().offset(start_byte_idx as isize),
-                len - end_byte_idx,
-            );
-            self.buffer.set_len(len - amt);
+        #[test]
+        fn insert_str_01() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.insert_str(3, "oz");
+            assert_eq!("Helozlo!", s.as_str());
         }
-    }
 
-    /// Removes text after `byte_idx`.
-    #[inline(always)]
-    pub fn truncate(&mut self, byte_idx: usize) {
-        assert!(byte_idx <= self.len());
-        assert!(self.as_str().is_char_boundary(byte_idx));
-        self.buffer.truncate(byte_idx);
-    }
-
-    /// Splits at `byte_idx`, returning the right part and leaving the
-    /// left part in the original.
-    ///
-    /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
-    #[inline(always)]
-    fn split_off(&mut self, byte_idx: usize) -> Self {
-        assert!(byte_idx <= self.len());
-        assert!(self.as_str().is_char_boundary(byte_idx));
-        let len = self.len();
-        let mut other = NodeSmallString::with_capacity(len - byte_idx);
-        unsafe {
-            ptr::copy_nonoverlapping(
-                self.buffer.as_ptr().offset(byte_idx as isize),
-                other.buffer.as_mut_ptr().offset(0),
-                len - byte_idx,
-            );
-            self.buffer.set_len(byte_idx);
-            other.buffer.set_len(len - byte_idx);
+        #[test]
+        #[should_panic]
+        fn insert_str_02() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.insert_str(7, "oz");
         }
-        other
-    }
 
-    /// Re-inlines the data if it's been heap allocated but can
-    /// fit inline.
-    #[inline(always)]
-    fn inline_if_possible(&mut self) {
-        if self.buffer.spilled() && (self.buffer.len() <= self.buffer.inline_size()) {
-            self.buffer.shrink_to_fit();
+        #[test]
+        #[should_panic]
+        fn insert_str_03() {
+            let mut s = NodeSmallString::from_str("こんにちは");
+            s.insert_str(4, "oz");
         }
-    }
-}
 
-//=======================================================================
+        #[test]
+        fn remove_range_01() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.remove_range(2, 4);
+            assert_eq!("Heo!", s.as_str());
+        }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+        #[test]
+        #[should_panic]
+        fn remove_range_02() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.remove_range(4, 2);
+        }
 
-    #[test]
-    fn small_string_basics() {
-        let s = NodeSmallString::from_str("Hello!");
-        assert_eq!("Hello!", s.as_str());
-        assert_eq!(6, s.len());
-    }
+        #[test]
+        #[should_panic]
+        fn remove_range_03() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.remove_range(2, 7);
+        }
 
-    #[test]
-    fn insert_str_01() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.insert_str(3, "oz");
-        assert_eq!("Helozlo!", s.as_str());
-    }
+        #[test]
+        #[should_panic]
+        fn remove_range_04() {
+            let mut s = NodeSmallString::from_str("こんにちは");
+            s.remove_range(2, 4);
+        }
 
-    #[test]
-    #[should_panic]
-    fn insert_str_02() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.insert_str(7, "oz");
-    }
+        #[test]
+        fn truncate_01() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.truncate(4);
+            assert_eq!("Hell", s.as_str());
+        }
 
-    #[test]
-    #[should_panic]
-    fn insert_str_03() {
-        let mut s = NodeSmallString::from_str("こんにちは");
-        s.insert_str(4, "oz");
-    }
+        #[test]
+        #[should_panic]
+        fn truncate_02() {
+            let mut s = NodeSmallString::from_str("Hello!");
+            s.truncate(7);
+        }
 
-    #[test]
-    fn remove_range_01() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.remove_range(2, 4);
-        assert_eq!("Heo!", s.as_str());
-    }
+        #[test]
+        #[should_panic]
+        fn truncate_03() {
+            let mut s = NodeSmallString::from_str("こんにちは");
+            s.truncate(4);
+        }
 
-    #[test]
-    #[should_panic]
-    fn remove_range_02() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.remove_range(4, 2);
-    }
+        #[test]
+        fn split_off_01() {
+            let mut s1 = NodeSmallString::from_str("Hello!");
+            let s2 = s1.split_off(4);
+            assert_eq!("Hell", s1.as_str());
+            assert_eq!("o!", s2.as_str());
+        }
 
-    #[test]
-    #[should_panic]
-    fn remove_range_03() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.remove_range(2, 7);
-    }
+        #[test]
+        #[should_panic]
+        fn split_off_02() {
+            let mut s1 = NodeSmallString::from_str("Hello!");
+            s1.split_off(7);
+        }
 
-    #[test]
-    #[should_panic]
-    fn remove_range_04() {
-        let mut s = NodeSmallString::from_str("こんにちは");
-        s.remove_range(2, 4);
-    }
-
-    #[test]
-    fn truncate_01() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.truncate(4);
-        assert_eq!("Hell", s.as_str());
-    }
-
-    #[test]
-    #[should_panic]
-    fn truncate_02() {
-        let mut s = NodeSmallString::from_str("Hello!");
-        s.truncate(7);
-    }
-
-    #[test]
-    #[should_panic]
-    fn truncate_03() {
-        let mut s = NodeSmallString::from_str("こんにちは");
-        s.truncate(4);
-    }
-
-    #[test]
-    fn split_off_01() {
-        let mut s1 = NodeSmallString::from_str("Hello!");
-        let s2 = s1.split_off(4);
-        assert_eq!("Hell", s1.as_str());
-        assert_eq!("o!", s2.as_str());
-    }
-
-    #[test]
-    #[should_panic]
-    fn split_off_02() {
-        let mut s1 = NodeSmallString::from_str("Hello!");
-        s1.split_off(7);
-    }
-
-    #[test]
-    #[should_panic]
-    fn split_off_03() {
-        let mut s1 = NodeSmallString::from_str("こんにちは");
-        s1.split_off(4);
+        #[test]
+        #[should_panic]
+        fn split_off_03() {
+            let mut s1 = NodeSmallString::from_str("こんにちは");
+            s1.split_off(4);
+        }
     }
 }
