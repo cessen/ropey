@@ -863,8 +863,7 @@ impl Node {
             loop {
                 // Do merging
                 if children.len() > 1 {
-                    let (child_i, start_info) =
-                        children.search_combine_info(|inf| char_idx <= inf.chars as usize);
+                    let (child_i, start_info) = children.search_char_idx(char_idx);
                     let end_info = start_info + children.info()[child_i];
 
                     if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {

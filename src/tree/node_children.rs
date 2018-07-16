@@ -287,18 +287,6 @@ impl NodeChildren {
         self.info().iter().fold(TextInfo::new(), |a, b| a + *b)
     }
 
-    pub fn search_combine_info<F: Fn(&TextInfo) -> bool>(&self, pred: F) -> (usize, TextInfo) {
-        let mut accum = TextInfo::new();
-        for (idx, inf) in self.info().iter().enumerate() {
-            if pred(&(accum + *inf)) {
-                return (idx, accum);
-            } else {
-                accum += *inf;
-            }
-        }
-        panic!("Predicate is mal-formed and never evaluated true.")
-    }
-
     /// Returns the child index and left-side-accumulated text info of the
     /// child that contains the given byte.
     ///
