@@ -354,7 +354,7 @@ impl Rope {
                             let new_info = {
                                 // Get summed info of current text and to-be-inserted text
                                 let mut info = cur_info + TextInfo::from_str(ins_text);
-                                // Check for CRLF graphemes on the insertion seams, and
+                                // Check for CRLF pairs on the insertion seams, and
                                 // adjust line break counts accordingly
                                 if !ins_text.is_empty() {
                                     if byte_idx > 0
@@ -411,7 +411,7 @@ impl Rope {
 
                 // Handle seam, if any.
                 if let Some(byte_pos) = seam {
-                    Arc::make_mut(&mut self.root).fix_grapheme_seam(byte_pos, true);
+                    Arc::make_mut(&mut self.root).fix_crlf_seam(byte_pos, true);
                 }
             }
         }
@@ -490,7 +490,7 @@ impl Rope {
                         let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
                         let mut info = cur_info - rem_info;
 
-                        // Check for CRLF graphemes on the insertion seams, and
+                        // Check for CRLF pairs on the insertion seams, and
                         // adjust line break counts accordingly
                         if byte_start != byte_end {
                             if byte_start > 0
@@ -530,7 +530,7 @@ impl Rope {
             };
 
             if let Some(seam_idx) = seam {
-                root.fix_grapheme_seam(seam_idx as Count, false);
+                root.fix_crlf_seam(seam_idx as Count, false);
             }
             root.zip_fix(start);
         }
@@ -620,7 +620,7 @@ impl Rope {
                 *self = other;
             };
 
-            Arc::make_mut(&mut self.root).fix_grapheme_seam(seam_byte_i, true);
+            Arc::make_mut(&mut self.root).fix_crlf_seam(seam_byte_i, true);
         }
     }
 
@@ -1021,11 +1021,11 @@ impl Rope {
     pub fn assert_invariants(&self) {
         self.root.assert_balance();
         self.root.assert_node_size(true);
-        self.assert_grapheme_seams();
+        self.assert_crlf_seams();
     }
 
-    /// Checks that graphemes are never split over chunk boundaries.
-    fn assert_grapheme_seams(&self) {
+    /// Checks that CRLF pairs are never split over chunk boundaries.
+    fn assert_crlf_seams(&self) {
         if self.chunks().count() > 0 {
             let mut itr = self.chunks();
             let mut last_chunk = itr.next().unwrap();

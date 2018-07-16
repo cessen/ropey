@@ -657,7 +657,7 @@ impl Node {
     }
 
     /// Checks to make sure that a boundary between leaf nodes (given as a byte
-    /// position in the rope) doesn't split a grapheme, and fixes it if it does.
+    /// position in the rope) doesn't split a CRLF pair, and fixes it if it does.
     ///
     /// If `must_be_boundary` is true, panics if the given byte position is
     /// not on the boundary between two leaf nodes.
@@ -669,17 +669,17 @@ impl Node {
     /// But this should nevertheless get addressed at some point.
     /// Probably the most straight-forward way to address this is via the
     /// `fix_info_*` methods below, but I'm not totally sure.
-    pub fn fix_grapheme_seam(&mut self, byte_pos: Count, must_be_boundary: bool) {
+    pub fn fix_crlf_seam(&mut self, byte_pos: Count, must_be_boundary: bool) {
         if let Node::Internal(ref mut children) = *self {
             if byte_pos == 0 {
                 // Special-case 1
                 Arc::make_mut(&mut children.nodes_mut()[0])
-                    .fix_grapheme_seam(byte_pos, must_be_boundary);
+                    .fix_crlf_seam(byte_pos, must_be_boundary);
             } else if byte_pos == children.combined_info().bytes {
                 // Special-case 2
                 let (info, nodes) = children.data_mut();
                 Arc::make_mut(nodes.last_mut().unwrap())
-                    .fix_grapheme_seam(info.last().unwrap().bytes, must_be_boundary);
+                    .fix_crlf_seam(info.last().unwrap().bytes, must_be_boundary);
             } else {
                 // Find the child to navigate into
                 let (child_i, start_info) = children.search_byte_idx(byte_pos as usize);
@@ -742,7 +742,7 @@ impl Node {
                 } else {
                     // Internal to child
                     Arc::make_mut(&mut children.nodes_mut()[child_i])
-                        .fix_grapheme_seam(pos_in_child, must_be_boundary);
+                        .fix_crlf_seam(pos_in_child, must_be_boundary);
 
                     children.update_child_info(child_i);
 

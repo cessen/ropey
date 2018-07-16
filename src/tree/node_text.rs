@@ -109,8 +109,8 @@ impl NodeText {
     /// the right half.
     ///
     /// Only splits on code point boundaries and will never split CRLF pairs,
-    /// grapheme boundaries, so if the whole string is a single code point or
-    /// CRLF pair, the split will fail and the returned string will be empty.
+    /// so if the whole string is a single code point or CRLF pair, the split
+    /// will fail and the returned string will be empty.
     pub fn push_str_split(&mut self, string: &str) -> Self {
         let len = self.len();
         self.insert_str_split(len, string)
@@ -225,10 +225,10 @@ impl Borrow<str> for NodeText {
 
 //=======================================================================
 
-/// Takes two `NodeText`s and mends the segment break between them, if any.
+/// Takes two `NodeText`s and mends the CRLF break between them, if any.
 ///
 /// Note: this will leave one of the strings empty if the entire composite string
-/// is one big grapheme.
+/// is a single CRLF pair.
 pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
     // Early out, if there's nothing to do.
     if crlf::seam_is_break(l.as_bytes(), r.as_bytes()) {
