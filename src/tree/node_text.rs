@@ -262,6 +262,9 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
 //=======================================================================
 
 /// The unsafe guts of NodeText, exposed through a safe API.
+///
+/// Try to keep this as small as possible, and implement functionality on
+/// NodeText via the safe APIs whenever possible.
 mod inner {
     use smallvec::{Array, SmallVec};
     use std::{ptr, str};
@@ -283,10 +286,7 @@ mod inner {
         }
     }
 
-    /// Internal small string for `NodeText`, to compartmentalize the unsafe
-    /// code.  This exposes a minimal safe interface that guarantees memory
-    /// safety and makes it impossible to accidentally create invalid utf8
-    /// data. `NodeText` implements the more sophisticated API on top of this.
+    /// Internal small string for `NodeText`.
     #[derive(Clone, Default)]
     pub struct NodeSmallString {
         buffer: SmallVec<BackingArray>,
