@@ -38,6 +38,86 @@ impl Node {
         self.text_info().line_breaks as usize
     }
 
+    /// Fetches a chunk mutably, and allows it to be edited via a closure.
+    ///
+    /// There are three parameters:
+    /// - char_idx: the chunk that contains this char is fetched,
+    /// - node_info: this is the text info of the current node.  This
+    ///              makes it a little awkward to call, because you
+    ///              need to calculate the TextInfo of the node you're
+    ///              calling it on, but it's part of the recursion, to
+    ///              make things efficient.
+    /// - edit: the closure that receives the chunk and does the edits.
+    ///
+    /// The closure is effectively the termination case for the recursion,
+    /// and takes essentially same parameters and returns the same things as
+    /// the method itself.  In particular, the closure receives the char offset
+    /// within the given chunk that char_idx is, the TextInfo of the chunk.
+    /// The main difference is that it receives a NodeText instead of a node.
+    ///
+    /// The closure is expected to return the updated text info of the node,
+    /// and if the node had to be split, then it also returns the right-hand
+    /// node along with its TextInfo as well.
+    ///
+    /// The main method call will then return the total updated TextInfo for
+    /// the whole tree, and a new node only if the whole tree had to be split.
+    /// It is up to the caller to check for that new node, and handle it by
+    /// creating a new root with both the original node and the new node as
+    /// children.
+    pub fn edit_chunk_at_char<F>(
+        &mut self,
+        char_idx: usize,
+        node_info: TextInfo,
+        mut edit: F,
+    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    where
+        F: FnMut(usize, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, Arc<Node>)>),
+    {
+        match *self {
+            Node::Leaf(ref mut leaf_text) => edit(char_idx, node_info, leaf_text),
+            Node::Internal(ref mut children) => {
+                // Compact leaf children if we're very close to maximum leaf
+                // fragmentation.  This basically guards against excessive memory
+                // ballooning when repeatedly appending to the end of a rope.
+                // The constant here was arrived at experimentally, and is otherwise
+                // fairly arbitrary.
+                const FRAG_MIN_BYTES: usize = (MAX_BYTES * MIN_CHILDREN) + (MAX_BYTES / 32);
+                if children.is_full()
+                    && children.nodes()[0].is_leaf()
+                    && (children.combined_info().bytes as usize) < FRAG_MIN_BYTES
+                {
+                    children.compact_leaves();
+                }
+
+                // Find the child we care about.
+                let (child_i, acc_info) = children.search_char_idx(char_idx);
+                let info = children.info()[child_i];
+
+                // Handle residual node, if any, and return.
+                let (l_info, mut residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                    .edit_chunk_at_char(char_idx - acc_info.chars as usize, info, edit);
+                children.info_mut()[child_i] = l_info;
+
+                // Handle the CRLF and main insertion residuals
+                if let Some((r_info, r_node)) = residual {
+                    if children.len() < MAX_CHILDREN {
+                        children.insert(child_i + 1, (r_info, r_node));
+                        (children.combined_info(), None)
+                    } else {
+                        let r = children.insert_split(child_i + 1, (r_info, r_node));
+                        let r_info = r.combined_info();
+                        (
+                            children.combined_info(),
+                            Some((r_info, Arc::new(Node::Internal(r)))),
+                        )
+                    }
+                } else {
+                    (children.combined_info(), None)
+                }
+            }
+        }
+    }
+
     /// Edits nodes in range `start_idx..end_idx`.
     ///
     /// Nodes completely subsumed by the range will be removed except the
