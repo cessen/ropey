@@ -528,60 +528,9 @@ impl Rope {
         // Scope to contain borrow of root
         {
             let root = Arc::make_mut(&mut self.root);
-            let mut seam = None;
 
-            root.edit_char_range(start, end, |acc_info, cur_info, leaf_text| {
-                let local_start = start - (acc_info.chars as usize).min(start);
-                let local_end = (end - acc_info.chars as usize).min(cur_info.chars as usize);
-                let byte_start = char_to_byte_idx(leaf_text, local_start);
-                let byte_end = char_to_byte_idx(leaf_text, local_end);
-
-                if local_start == 0 || local_end == cur_info.chars as usize {
-                    seam = Some(acc_info.bytes as usize + byte_start);
-                }
-
-                // Remove text and calculate new info
-                let new_info = if (byte_end - byte_start) < leaf_text.len() {
-                    let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
-                    let mut info = cur_info - rem_info;
-
-                    // Check for CRLF pairs on the insertion seams, and
-                    // adjust line break counts accordingly
-                    if byte_start != byte_end {
-                        if byte_start > 0
-                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D
-                            && leaf_text.as_bytes()[byte_start] == 0x0A
-                        {
-                            info.line_breaks += 1;
-                        }
-                        if byte_end < leaf_text.len()
-                            && leaf_text.as_bytes()[byte_end - 1] == 0x0D
-                            && leaf_text.as_bytes()[byte_end] == 0x0A
-                        {
-                            info.line_breaks += 1;
-                        }
-                        if byte_start > 0
-                            && byte_end < leaf_text.len()
-                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D
-                            && leaf_text.as_bytes()[byte_end] == 0x0A
-                        {
-                            info.line_breaks -= 1;
-                        }
-                    }
-
-                    // Remove the text
-                    leaf_text.remove_range(byte_start, byte_end);
-
-                    info
-                } else {
-                    // Remove the text
-                    leaf_text.remove_range(byte_start, byte_end);
-
-                    TextInfo::from_str(leaf_text)
-                };
-
-                new_info
-            });
+            let root_info = root.text_info();
+            let (_, seam) = root.remove_char_range(start, end, root_info);
 
             if let Some(seam_idx) = seam {
                 root.fix_crlf_seam(seam_idx as Count, false);

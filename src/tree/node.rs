@@ -118,100 +118,103 @@ impl Node {
         }
     }
 
-    /// Edits nodes in range `start_idx..end_idx`.
+    /// Removes chars in the range `start_idx..end_idx`.
     ///
-    /// Nodes completely subsumed by the range will be removed except the
-    /// leftmost node even if it is subsumed, and the remaining 1 or 2 leaf
-    /// nodes overlapping the range are passed to the given closure.
-    ///
-    /// The closure function parameters are:
-    ///
-    /// 1. The accumulated text info of the rope up to the left edge
-    ///    of the selected leaf node.
-    /// 2. The current text info of the selected leaf node.
-    /// 3. The selected leaf node's text, for editing.
-    ///
-    /// The closure return values are:
-    ///
-    /// 1. The text info of the selected leaf node after the edits.
-    /// 2. An optional new leaf node to the right of the selected leaf node,
-    ///    along with its text info.
+    /// Returns the updated TextInfo for the node, as well as the byte
+    /// offset of a possible CRLF seam, if any.
     ///
     /// WARNING: does not correctly handle all text being removed.  That
     /// should be special-cased in calling code.
-    pub fn edit_char_range<F>(&mut self, start_idx: usize, end_idx: usize, mut edit: F) -> TextInfo
-    where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> TextInfo,
-    {
-        debug_assert!(start_idx <= end_idx);
-        debug_assert!(end_idx <= self.text_info().chars as usize);
-
-        // Early-out
-        if start_idx == end_idx {
-            return self.text_info();
-        }
-        
-        match *self {
-            Node::Leaf(_) => {
-                let cur_info = self.text_info();
-                self.edit_char_range_internal(
-                    start_idx,
-                    end_idx,
-                    TextInfo::new(),
-                    cur_info,
-                    &mut edit,
-                )
-            }
-            Node::Internal(_) => self.edit_char_range_internal(
-                start_idx,
-                end_idx,
-                TextInfo::new(),
-                TextInfo::new(),
-                &mut edit,
-            ),
-        }
-    }
-
-    // Internal implementation of edit_char_range(), above.
-    fn edit_char_range_internal<F>(
+    pub fn remove_char_range(
         &mut self,
         start_idx: usize,
         end_idx: usize,
-        acc_info: TextInfo,
-        cur_info: TextInfo,
-        edit: &mut F,
-    ) -> TextInfo
-    where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> TextInfo,
-    {
+        node_info: TextInfo,
+    ) -> (TextInfo, Option<usize>) {
         match *self {
             // If it's a leaf
-            Node::Leaf(ref mut cur_text) => edit(acc_info, cur_info, cur_text),
+            Node::Leaf(ref mut leaf_text) => {
+                let byte_start = char_to_byte_idx(leaf_text, start_idx);
+                let byte_end =
+                    byte_start + char_to_byte_idx(&leaf_text[byte_start..], end_idx - start_idx);
+
+                let seam_idx = if byte_start == 0 {
+                    Some(byte_start)
+                } else if byte_end == leaf_text.len() as usize {
+                    Some(byte_start)
+                } else {
+                    None
+                };
+
+                // Remove text and calculate new info
+                let new_info = if byte_start > 0 || byte_end < leaf_text.len() {
+                    let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
+                    let mut info = node_info - rem_info;
+
+                    // Check for CRLF pairs on the insertion seams, and
+                    // adjust line break counts accordingly
+                    if byte_start != byte_end {
+                        if byte_start > 0
+                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                            && leaf_text.as_bytes()[byte_start] == 0x0A
+                        {
+                            info.line_breaks += 1;
+                        }
+                        if byte_end < leaf_text.len()
+                            && leaf_text.as_bytes()[byte_end - 1] == 0x0D
+                            && leaf_text.as_bytes()[byte_end] == 0x0A
+                        {
+                            info.line_breaks += 1;
+                        }
+                        if byte_start > 0
+                            && byte_end < leaf_text.len()
+                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                            && leaf_text.as_bytes()[byte_end] == 0x0A
+                        {
+                            info.line_breaks -= 1;
+                        }
+                    }
+
+                    // Remove the text
+                    leaf_text.remove_range(byte_start, byte_end);
+
+                    info
+                } else {
+                    // Remove the text
+                    leaf_text.remove_range(byte_start, byte_end);
+
+                    TextInfo::new()
+                };
+
+                return (new_info, seam_idx);
+            }
 
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
                 // Shared code for handling children.
-                let mut handle_child =
-                    |children: &mut NodeChildren, child_i: usize, c_acc_info: TextInfo| {
-                        // Recurse into child
-                        let tmp_info = children.info()[child_i];
-                        let tmp_chars = children.info()[child_i].chars as usize;
-                        let new_info = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                            .edit_char_range_internal(
-                                start_idx - (c_acc_info.chars as usize).min(start_idx),
-                                (end_idx - c_acc_info.chars as usize).min(tmp_chars),
-                                acc_info + c_acc_info,
-                                tmp_info,
-                                edit,
-                            );
+                let mut handle_child = |children: &mut NodeChildren,
+                                        child_i: usize,
+                                        c_acc_info: TextInfo|
+                 -> Option<usize> {
+                    // Recurse into child
+                    let tmp_info = children.info()[child_i];
+                    let tmp_chars = children.info()[child_i].chars as usize;
+                    let (new_info, seam) = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                        .remove_char_range(
+                            start_idx - (c_acc_info.chars as usize).min(start_idx),
+                            (end_idx - c_acc_info.chars as usize).min(tmp_chars),
+                            tmp_info,
+                        );
 
-                        // Handle result
-                        if new_info.bytes == 0 {
-                            children.remove(child_i);
-                        } else {
-                            children.info_mut()[child_i] = new_info;
-                        }
-                    };
+                    // Handle result
+                    if new_info.bytes == 0 {
+                        children.remove(child_i);
+                    } else {
+                        children.info_mut()[child_i] = new_info;
+                    }
+
+                    seam.map(|i| c_acc_info.bytes as usize + i)
+                };
 
                 // Shared code for merging children
                 let merge_child = |children: &mut NodeChildren, child_i: usize| {
@@ -242,10 +245,10 @@ impl Node {
 
                 // Both indices point into the same child
                 if l_child_i == r_child_i {
-                    handle_child(children, l_child_i, l_acc_info);
+                    let seam = handle_child(children, l_child_i, l_acc_info);
                     merge_child(children, l_child_i);
 
-                    return children.combined_info();
+                    return (children.combined_info(), seam);
                 }
                 // We're dealing with more than one child.
                 else {
@@ -273,7 +276,7 @@ impl Node {
                     }
 
                     // Handle left child
-                    handle_child(children, l_child_i, l_acc_info);
+                    let seam = handle_child(children, l_child_i, l_acc_info);
 
                     // Handle merging
                     let merge_extent = 1 + if r_child_exists { 1 } else { 0 };
@@ -282,7 +285,7 @@ impl Node {
                     }
 
                     // Return
-                    return children.combined_info();
+                    return (children.combined_info(), seam);
                 }
             }
         }
