@@ -139,18 +139,18 @@ impl Node {
     ///
     /// WARNING: does not correctly handle all text being removed.  That
     /// should be special-cased in calling code.
-    pub fn edit_char_range<F>(
-        &mut self,
-        start_idx: usize,
-        end_idx: usize,
-        mut edit: F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    pub fn edit_char_range<F>(&mut self, start_idx: usize, end_idx: usize, mut edit: F) -> TextInfo
     where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> TextInfo,
     {
         debug_assert!(start_idx <= end_idx);
         debug_assert!(end_idx <= self.text_info().chars as usize);
 
+        // Early-out
+        if start_idx == end_idx {
+            return self.text_info();
+        }
+        
         match *self {
             Node::Leaf(_) => {
                 let cur_info = self.text_info();
@@ -180,97 +180,50 @@ impl Node {
         acc_info: TextInfo,
         cur_info: TextInfo,
         edit: &mut F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    ) -> TextInfo
     where
-        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, NodeText)>),
+        F: FnMut(TextInfo, TextInfo, &mut NodeText) -> TextInfo,
     {
         match *self {
             // If it's a leaf
-            Node::Leaf(ref mut cur_text) => {
-                let (info, residual) = edit(acc_info, cur_info, cur_text);
-
-                if let Some((r_info, r_text)) = residual {
-                    (info, Some((r_info, Arc::new(Node::Leaf(r_text)))))
-                } else {
-                    (info, None)
-                }
-            }
+            Node::Leaf(ref mut cur_text) => edit(acc_info, cur_info, cur_text),
 
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
                 // Shared code for handling children.
-                let mut handle_child = |children: &mut NodeChildren,
-                                        child_i: usize,
-                                        c_acc_info: TextInfo|
-                 -> Option<Arc<Node>> {
-                    // Recurse into child
-                    let tmp_info = children.info()[child_i];
-                    let tmp_chars = children.info()[child_i].chars as usize;
-                    let (new_info, residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                        .edit_char_range_internal(
-                            start_idx - (c_acc_info.chars as usize).min(start_idx),
-                            (end_idx - c_acc_info.chars as usize).min(tmp_chars),
-                            acc_info + c_acc_info,
-                            tmp_info,
-                            edit,
-                        );
+                let mut handle_child =
+                    |children: &mut NodeChildren, child_i: usize, c_acc_info: TextInfo| {
+                        // Recurse into child
+                        let tmp_info = children.info()[child_i];
+                        let tmp_chars = children.info()[child_i].chars as usize;
+                        let new_info = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                            .edit_char_range_internal(
+                                start_idx - (c_acc_info.chars as usize).min(start_idx),
+                                (end_idx - c_acc_info.chars as usize).min(tmp_chars),
+                                acc_info + c_acc_info,
+                                tmp_info,
+                                edit,
+                            );
 
-                    // Handle result
-                    if new_info.bytes == 0 {
-                        children.remove(child_i);
-                        debug_assert!(residual.is_none());
-                        return None;
-                    } else {
-                        children.info_mut()[child_i] = new_info;
-
-                        // Handle node residual
-                        if let Some((info, node)) = residual {
-                            // The new node will fit as a child of this node
-                            if children.len() < MAX_CHILDREN {
-                                children.insert(child_i + 1, (info, node));
-                                return None;
-                            }
-                            // The new node won't fit!  Must split.
-                            else {
-                                return Some(Arc::new(Node::Internal(
-                                    children.insert_split(child_i + 1, (info, node)),
-                                )));
-                            }
+                        // Handle result
+                        if new_info.bytes == 0 {
+                            children.remove(child_i);
                         } else {
-                            return None;
+                            children.info_mut()[child_i] = new_info;
                         }
-                    }
-                };
+                    };
 
                 // Shared code for merging children
-                let merge_child = |children: &mut NodeChildren,
-                                   split_node: &mut Option<Arc<Node>>,
-                                   child_i: usize|
-                 -> bool {
-                    if child_i < children.len() {
-                        if children.len() > 1 && children.nodes()[child_i].is_undersized() {
-                            if child_i == 0 {
-                                children.merge_distribute(child_i, child_i + 1)
-                            } else {
-                                children.merge_distribute(child_i - 1, child_i)
-                            }
+                let merge_child = |children: &mut NodeChildren, child_i: usize| {
+                    if child_i < children.len()
+                        && children.len() > 1
+                        && children.nodes()[child_i].is_undersized()
+                    {
+                        if child_i == 0 {
+                            children.merge_distribute(child_i, child_i + 1);
                         } else {
-                            false
+                            children.merge_distribute(child_i - 1, child_i);
                         }
-                    } else if let Some(ref mut node) = *split_node {
-                        let r_children = Arc::make_mut(node).children();
-                        let child_i = child_i - children.len();
-                        if r_children.len() > 1 && r_children.nodes()[child_i].is_undersized() {
-                            if child_i == 0 {
-                                r_children.merge_distribute(child_i, child_i + 1)
-                            } else {
-                                r_children.merge_distribute(child_i - 1, child_i)
-                            }
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
                     }
                 };
 
@@ -283,29 +236,16 @@ impl Node {
                     children.compact_leaves();
                 }
 
-                // Early-out optimization, to make simple insertion faster
-                if start_idx == end_idx {
-                    let (child_i, child_acc_info) = children.search_char_idx(start_idx);
-                    let residual = handle_child(children, child_i, child_acc_info);
-                    return (
-                        children.combined_info(),
-                        residual.map(|c| (c.text_info(), c)),
-                    );
-                }
-
                 // Get child info for the two char indices
                 let ((l_child_i, l_acc_info), (r_child_i, r_acc_info)) =
                     children.search_char_idx_range(start_idx, end_idx);
 
                 // Both indices point into the same child
                 if l_child_i == r_child_i {
-                    let mut residual = handle_child(children, l_child_i, l_acc_info);
-                    merge_child(children, &mut residual, l_child_i);
+                    handle_child(children, l_child_i, l_acc_info);
+                    merge_child(children, l_child_i);
 
-                    return (
-                        children.combined_info(),
-                        residual.map(|c| (c.text_info(), c)),
-                    );
+                    return children.combined_info();
                 }
                 // We're dealing with more than one child.
                 else {
@@ -327,49 +267,22 @@ impl Node {
                         children.remove(start_i);
                     }
 
-                    let tot_children = children.len(); // Used later during merging
-
                     // Handle right child
-                    let mut split_children = if r_child_exists {
-                        handle_child(children, l_child_i + 1, r_acc_info)
-                    } else {
-                        None
-                    };
-
-                    // Handle left child
-                    if split_children.is_none() {
-                        // We have to check because merging may have
-                        split_children = handle_child(children, l_child_i, l_acc_info);
-                    } else if l_child_i < children.len() {
-                        let tmp = handle_child(children, l_child_i, l_acc_info);
-                        debug_assert!(tmp.is_none());
-                    } else if let Some(ref mut r_children) = split_children {
-                        let tmp = handle_child(
-                            Arc::make_mut(r_children).children(),
-                            l_child_i - children.len(),
-                            l_acc_info,
-                        );
-                        debug_assert!(tmp.is_none());
+                    if r_child_exists {
+                        handle_child(children, l_child_i + 1, r_acc_info);
                     }
 
+                    // Handle left child
+                    handle_child(children, l_child_i, l_acc_info);
+
                     // Handle merging
-                    let merge_extent = {
-                        let new_tot_children = children.len()
-                            + split_children
-                                .as_ref()
-                                .map(|c| c.child_count())
-                                .unwrap_or(0);
-                        1 + new_tot_children - tot_children + if r_child_exists { 1 } else { 0 }
-                    };
+                    let merge_extent = 1 + if r_child_exists { 1 } else { 0 };
                     for i in (l_child_i..(l_child_i + merge_extent)).rev() {
-                        merge_child(children, &mut split_children, i);
+                        merge_child(children, i);
                     }
 
                     // Return
-                    return (
-                        children.combined_info(),
-                        split_children.map(|c| (c.text_info(), c)),
-                    );
+                    return children.combined_info();
                 }
             }
         }

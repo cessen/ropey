@@ -32,7 +32,7 @@ pub(crate) const MAX_CHILDREN: usize = (TARGET_NODE_SIZE - 1) / CHILD_INFO_SIZE;
 pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN - (MAX_CHILDREN / 2);
 
 #[cfg(test)]
-pub(crate) const MAX_BYTES: usize = 8;
+pub(crate) const MAX_BYTES: usize = 9; // Note: can't be 8, because 3-byte characters.
 #[cfg(not(test))]
 pub(crate) const MAX_BYTES: usize = TARGET_NODE_SIZE - 1 - (PTR_SIZE * 2);
 pub(crate) const MIN_BYTES: usize = MAX_BYTES - (MAX_BYTES / 2);
