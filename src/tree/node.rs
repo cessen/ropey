@@ -121,7 +121,8 @@ impl Node {
     /// Removes chars in the range `start_idx..end_idx`.
     ///
     /// Returns the updated TextInfo for the node, as well as the byte
-    /// offset of a possible CRLF seam, if any.
+    /// offset of a possible CRLF seam, if any, and whether fix_after_remove()
+    /// needs to be run after this.
     ///
     /// WARNING: does not correctly handle all text being removed.  That
     /// should be special-cased in calling code.
@@ -130,7 +131,7 @@ impl Node {
         start_idx: usize,
         end_idx: usize,
         node_info: TextInfo,
-    ) -> (TextInfo, Option<usize>) {
+    ) -> (TextInfo, Option<usize>, bool) {
         match *self {
             // If it's a leaf
             Node::Leaf(ref mut leaf_text) => {
@@ -138,16 +139,17 @@ impl Node {
                 let byte_end =
                     byte_start + char_to_byte_idx(&leaf_text[byte_start..], end_idx - start_idx);
 
-                let seam_idx = if byte_start == 0 {
-                    Some(byte_start)
-                } else if byte_end == leaf_text.len() as usize {
-                    Some(byte_start)
-                } else {
-                    None
-                };
+                // Remove text and calculate new info & seam info
+                if byte_start > 0 || byte_end < leaf_text.len() {
+                    let seam = if (byte_start == 0 && leaf_text.as_bytes()[byte_end] == 0x0A)
+                        || (byte_end == leaf_text.len()
+                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D)
+                    {
+                        Some(byte_start)
+                    } else {
+                        None
+                    };
 
-                // Remove text and calculate new info
-                let new_info = if byte_start > 0 || byte_end < leaf_text.len() {
                     let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
                     let mut info = node_info - rem_info;
 
@@ -178,15 +180,13 @@ impl Node {
                     // Remove the text
                     leaf_text.remove_range(byte_start, byte_end);
 
-                    info
+                    (info, seam, false)
                 } else {
                     // Remove the text
                     leaf_text.remove_range(byte_start, byte_end);
 
-                    TextInfo::new()
-                };
-
-                return (new_info, seam_idx);
+                    (TextInfo::new(), Some(byte_start), false)
+                }
             }
 
             // If it's internal, it's much more complicated
@@ -195,12 +195,12 @@ impl Node {
                 let mut handle_child = |children: &mut NodeChildren,
                                         child_i: usize,
                                         c_acc_info: TextInfo|
-                 -> Option<usize> {
+                 -> (Option<usize>, bool) {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
-                    let (new_info, seam) = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                        .remove_char_range(
+                    let (new_info, seam, needs_fix) =
+                        Arc::make_mut(&mut children.nodes_mut()[child_i]).remove_char_range(
                             start_idx - (c_acc_info.chars as usize).min(start_idx),
                             (end_idx - c_acc_info.chars as usize).min(tmp_chars),
                             tmp_info,
@@ -213,7 +213,7 @@ impl Node {
                         children.info_mut()[child_i] = new_info;
                     }
 
-                    seam.map(|i| c_acc_info.bytes as usize + i)
+                    (seam.map(|i| c_acc_info.bytes as usize + i), needs_fix)
                 };
 
                 // Shared code for merging children
@@ -230,28 +230,25 @@ impl Node {
                     }
                 };
 
-                // Compact leaf children if we're close to maximum leaf
-                // fragmentation.
-                if children.is_full()
-                    && children.nodes()[0].is_leaf()
-                    && (children.combined_info().bytes as usize) < (MAX_BYTES * (MIN_CHILDREN + 1))
-                {
-                    children.compact_leaves();
-                }
-
                 // Get child info for the two char indices
                 let ((l_child_i, l_acc_info), (r_child_i, r_acc_info)) =
                     children.search_char_idx_range(start_idx, end_idx);
 
                 // Both indices point into the same child
                 if l_child_i == r_child_i {
-                    let seam = handle_child(children, l_child_i, l_acc_info);
+                    let (seam, needs_fix) = handle_child(children, l_child_i, l_acc_info);
                     merge_child(children, l_child_i);
 
-                    return (children.combined_info(), seam);
+                    return (
+                        children.combined_info(),
+                        seam,
+                        needs_fix | (children.len() < MIN_CHILDREN),
+                    );
                 }
                 // We're dealing with more than one child.
                 else {
+                    let mut needs_fix = false;
+
                     // Calculate the start..end range of nodes to be removed.
                     let r_child_exists: bool;
                     let start_i = l_child_i + 1;
@@ -272,11 +269,13 @@ impl Node {
 
                     // Handle right child
                     if r_child_exists {
-                        handle_child(children, l_child_i + 1, r_acc_info);
+                        let (_, fix) = handle_child(children, l_child_i + 1, r_acc_info);
+                        needs_fix |= fix;
                     }
 
                     // Handle left child
-                    let seam = handle_child(children, l_child_i, l_acc_info);
+                    let (seam, fix) = handle_child(children, l_child_i, l_acc_info);
+                    needs_fix |= fix;
 
                     // Handle merging
                     let merge_extent = 1 + if r_child_exists { 1 } else { 0 };
@@ -285,7 +284,11 @@ impl Node {
                     }
 
                     // Return
-                    return (children.combined_info(), seam);
+                    return (
+                        children.combined_info(),
+                        seam,
+                        needs_fix | (children.len() < MIN_CHILDREN),
+                    );
                 }
             }
         }
@@ -849,11 +852,13 @@ impl Node {
         }
     }
 
-    /// Fixes dangling nodes down the middle of the tree.
+    /// Fixes up the tree after remove_char_range().
+    ///
+    /// Takes the char index of the start of the removal range.
     ///
     /// Returns whether it did anything or not that would affect the
     /// parent. True: did stuff, false: didn't do stuff
-    pub fn zip_fix(&mut self, char_idx: usize) -> bool {
+    pub fn fix_after_remove(&mut self, char_idx: usize) -> bool {
         if let Node::Internal(ref mut children) = *self {
             let mut did_stuff = false;
             loop {
@@ -897,13 +902,15 @@ impl Node {
 
                 if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
                     let tmp = children.info()[child_i].chars as usize;
-                    let effect_1 = Arc::make_mut(&mut children.nodes_mut()[child_i]).zip_fix(tmp);
-                    let effect_2 = Arc::make_mut(&mut children.nodes_mut()[child_i + 1]).zip_fix(0);
+                    let effect_1 =
+                        Arc::make_mut(&mut children.nodes_mut()[child_i]).fix_after_remove(tmp);
+                    let effect_2 =
+                        Arc::make_mut(&mut children.nodes_mut()[child_i + 1]).fix_after_remove(0);
                     if (!effect_1) && (!effect_2) {
                         break;
                     }
                 } else if !Arc::make_mut(&mut children.nodes_mut()[child_i])
-                    .zip_fix(char_idx - start_info.chars as usize)
+                    .fix_after_remove(char_idx - start_info.chars as usize)
                 {
                     break;
                 }

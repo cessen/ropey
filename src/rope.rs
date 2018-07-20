@@ -530,12 +530,14 @@ impl Rope {
             let root = Arc::make_mut(&mut self.root);
 
             let root_info = root.text_info();
-            let (_, seam) = root.remove_char_range(start, end, root_info);
+            let (_, seam, needs_fix) = root.remove_char_range(start, end, root_info);
 
             if let Some(seam_idx) = seam {
                 root.fix_crlf_seam(seam_idx as Count, false);
             }
-            root.zip_fix(start);
+            if needs_fix {
+                root.fix_after_remove(start);
+            }
         }
 
         self.pull_up_singular_nodes();
