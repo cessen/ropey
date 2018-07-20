@@ -120,8 +120,8 @@ impl Node {
 
     /// Removes chars in the range `start_idx..end_idx`.
     ///
-    /// Returns the updated TextInfo for the node, as well as the byte
-    /// offset of a possible CRLF seam, if any, and whether fix_after_remove()
+    /// Returns the updated TextInfo for the node, the byte offset of a
+    /// possible CRLF seam (if any), and whether fix_after_remove()
     /// needs to be run after this.
     ///
     /// WARNING: does not correctly handle all text being removed.  That

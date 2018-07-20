@@ -491,6 +491,9 @@ impl Rope {
     /// Uses range syntax, e.g. `2..7`, `2..`, etc.  The range is in `char`
     /// indices.
     ///
+    /// Runs in O(M + log N) time, where N is the length of the `Rope` and M
+    /// is the length of the range being removed.
+    ///
     /// # Example
     ///
     /// ```
