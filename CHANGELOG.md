@@ -1,3 +1,16 @@
+# 0.8.1 (2018-07-20)
+
+Peformance improvements:
+
+* Increased Rope::insert() speed by roughly 1.4x for small insertion strings.
+
+* Increased Rope::remove() speed by roughly 1.75x.
+
+Other:
+
+* General documentation improvements, based on feedback.
+
+
 # 0.8.0 (2018-07-14)
 
 Peformance improvements:

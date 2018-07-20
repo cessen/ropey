@@ -5,7 +5,7 @@
 //!
 //! Ropey's atomic unit of text is Unicode scalar values (or `char`s in Rust)
 //! encoded as utf8.  All of Ropey's editing and slicing operations are done
-//! in terms of char indices, which prevents accidental creation of invalid
+//! in terms of char indices which prevents accidental creation of invalid
 //! utf8 data.
 //!
 //! The library is made up of four main components:
@@ -70,7 +70,7 @@
 //! # Low-level APIs
 //!
 //! Ropey also provides access to some of its low-level APIs, enabling client
-//! code to efficiently work with a rope's data and implement new
+//! code to efficiently work with a `Rope`'s data and implement new
 //! functionality.  The most important of those API's are:
 //!
 //! - The [`chunk_at_*()`](struct.Rope.html#method.chunk_at_byte)
@@ -81,8 +81,8 @@
 //!
 //! Internally, each `Rope` stores text as a segemented collection of utf8
 //! strings.  The chunk-fetching methods and `Chunks` iterator provide direct
-//! access to those chunks as `&str` slices, allowing client code to directly
-//! work with the underlying utf8 data.
+//! access to those chunks as `&str` slices, allowing client code to work
+//! directly with the underlying utf8 data.
 //!
 //! The chunk-fetching methods and `str_utils` functions are the basic
 //! building blocks that Ropey itself uses to build much of its functionality.
@@ -127,8 +127,7 @@
 //! break.
 //!
 //! CRLF pairs are always treated as a single line break, and are never split
-//! across chunks.  However, slicing can split them, in which case the slice
-//! can only see the CR or LF within its range.
+//! across chunks.  Note, however, that slicing can still split them.
 
 #![cfg_attr(feature = "cargo-clippy", allow(inline_always))]
 #![cfg_attr(feature = "cargo-clippy", allow(needless_return))]

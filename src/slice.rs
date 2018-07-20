@@ -11,6 +11,14 @@ use str_utils::{
 use tree::{Count, Node};
 
 /// An immutable view into part of a `Rope`.
+///
+/// Just like standard `&str` slices, `RopeSlice`s behave as if the text in
+/// their range is the only text that exists.  All indexing is relative to
+/// the start of their range, and all iterators and methods that return text
+/// content truncate that content to the range of the slice.
+///
+/// In other words, the behavior of a `RopeSlice` is always identical to that
+/// of a full `Rope` with the same content.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a>(RSEnum<'a>);
 
@@ -379,9 +387,6 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// Note: the chunks at the beginning and end of the slice _are_
-    /// appropriately truncated to the slice's range.
-    ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
@@ -430,9 +435,6 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
-    ///
-    /// Note: the chunks at the beginning and end of the slice _are_
-    /// appropriately truncated to the slice's range.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -483,15 +485,11 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// Notes:
-    ///
-    /// - The chunks at the beginning and end of the slice _are_
-    ///   appropriately truncated to the slice's range.
-    /// - For convenience, both the beginning and end of the rope are
-    ///   considered line breaks for indexing.  For example, in the string
-    ///   `"Hello \n world!"` 0 would give the first chunk, 1 would give the
-    ///   chunk containing the newline character, and 2 would give the last
-    ///   chunk.
+    /// Note: for convenience, both the beginning and end of the slice are
+    /// considered line breaks for the purposes of indexing.  For example, in
+    /// the string `"Hello \n world!"` 0 would give the first chunk, 1 would
+    /// give the chunk containing the newline character, and 2 would give the
+    /// last chunk.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///

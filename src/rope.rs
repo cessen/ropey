@@ -900,10 +900,10 @@ impl Rope {
     /// and the index of the line that the chunk starts on.
     ///
     /// Note: for convenience, both the beginning and end of the rope are
-    /// considered line breaks for indexing.  For example, in the string
-    /// `"Hello \n world!"` 0 would give the first chunk, 1 would give the
-    /// chunk containing the newline character, and 2 would give the last
-    /// chunk.
+    /// considered line breaks for the purposes of indexing.  For example, in
+    /// the string `"Hello \n world!"` 0 would give the first chunk, 1 would
+    /// give the chunk containing the newline character, and 2 would give the
+    /// last chunk.
     ///
     /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
