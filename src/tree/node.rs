@@ -150,37 +150,44 @@ impl Node {
                         None
                     };
 
-                    let rem_info = TextInfo::from_str(&leaf_text[byte_start..byte_end]);
-                    let mut info = node_info - rem_info;
+                    if (byte_end - byte_start) < leaf_text.len() {
+                        let mut info =
+                            node_info - TextInfo::from_str(&leaf_text[byte_start..byte_end]);
 
-                    // Check for CRLF pairs on the insertion seams, and
-                    // adjust line break counts accordingly
-                    if byte_start != byte_end {
-                        if byte_start > 0
-                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D
-                            && leaf_text.as_bytes()[byte_start] == 0x0A
-                        {
-                            info.line_breaks += 1;
+                        // Check for CRLF pairs on the removal seams, and
+                        // adjust line break counts accordingly.
+                        if byte_start != byte_end {
+                            if byte_start > 0
+                                && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_start] == 0x0A
+                            {
+                                info.line_breaks += 1;
+                            }
+                            if byte_end < leaf_text.len()
+                                && leaf_text.as_bytes()[byte_end - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_end] == 0x0A
+                            {
+                                info.line_breaks += 1;
+                            }
+                            if byte_start > 0
+                                && byte_end < leaf_text.len()
+                                && leaf_text.as_bytes()[byte_start - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_end] == 0x0A
+                            {
+                                info.line_breaks -= 1;
+                            }
                         }
-                        if byte_end < leaf_text.len()
-                            && leaf_text.as_bytes()[byte_end - 1] == 0x0D
-                            && leaf_text.as_bytes()[byte_end] == 0x0A
-                        {
-                            info.line_breaks += 1;
-                        }
-                        if byte_start > 0
-                            && byte_end < leaf_text.len()
-                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D
-                            && leaf_text.as_bytes()[byte_end] == 0x0A
-                        {
-                            info.line_breaks -= 1;
-                        }
+
+                        // Remove the text
+                        leaf_text.remove_range(byte_start, byte_end);
+
+                        (info, seam, false)
+                    } else {
+                        // Remove the text
+                        leaf_text.remove_range(byte_start, byte_end);
+
+                        (TextInfo::from_str(&leaf_text), seam, false)
                     }
-
-                    // Remove the text
-                    leaf_text.remove_range(byte_start, byte_end);
-
-                    (info, seam, false)
                 } else {
                     // Remove the text
                     leaf_text.remove_range(byte_start, byte_end);
