@@ -1,3 +1,14 @@
+# 0.8.2 (2018-07-22)
+
+Peformance improvements:
+
+* File loading is slightly faster.
+
+Bug fixes:
+
+* The low-level line break counting functions could return an incorrect count under certain circumstances.  This also affected the higher-level methods in Ropey, although it was somewhat difficult to trigger in practice.
+
+
 # 0.8.1 (2018-07-20)
 
 Peformance improvements:
