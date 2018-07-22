@@ -127,8 +127,8 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
         // Use usize to count line breaks in big chunks.
         if ptr == align_ptr(ptr, TSIZE) {
             while unsafe { ptr.offset(TSIZE as isize) } < end_ptr && line_break_count < line_idx {
-                let lb =
-                    line_break_count + unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
+                let lb = line_break_count
+                    + unsafe { count_line_breaks_in_chunks_from_ptr::<usize>(ptr, end_ptr) };
 
                 if lb >= line_idx {
                     break;
@@ -268,7 +268,7 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
         // Use usize to count line breaks in big chunks.
         if ptr == align_ptr(ptr, TSIZE) {
             while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
-                count += unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
+                count += unsafe { count_line_breaks_in_chunks_from_ptr::<usize>(ptr, end_ptr) };
                 ptr = unsafe { ptr.offset(TSIZE as isize) };
             }
         }
@@ -321,21 +321,25 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
 
 /// Used internally in the line-break counting functions.
 ///
-/// ptr MUST be aligned to usize alignment.
+/// ptr MUST be aligned to T alignment.
 #[inline(always)]
-unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8) -> usize {
+unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
+    ptr: *const u8,
+    end_ptr: *const u8,
+) -> usize {
     let mut count = 0;
-    let n = *(ptr as *const usize);
-    let next_ptr = ptr.offset(TSIZE as isize);
+    let c = *(ptr as *const T);
+    let next_ptr = ptr.offset(T::size() as isize);
 
-    let nl_1_flags = flag_bytes(n, 0xC2);
-    let sp_1_flags = flag_bytes(n, 0xE2);
+    let nl_1_flags = c.cmp_eq_byte(0xC2);
+    let sp_1_flags = c.cmp_eq_byte(0xE2);
 
-    if !(nl_1_flags == 0 && sp_1_flags == 0) {
+    if !(nl_1_flags.is_zero() && sp_1_flags.is_zero()) {
         // Next Line: u{0085}
-        if nl_1_flags != 0 {
-            let nl_2_flags = shift_bytes_back(flag_bytes(n, 0x85), 1);
-            count += count_flag_bytes(nl_1_flags & nl_2_flags);
+        if !nl_1_flags.is_zero() {
+            let nl_2_flags = c.cmp_eq_byte(0x85).shift_back_lex(1);
+            let flags = nl_1_flags.bitand(nl_2_flags);
+            count += flags.sum_bytes();
 
             // Handle ending boundary
             if next_ptr < end_ptr && *next_ptr.offset(-1) == 0xC2 && *next_ptr == 0x85 {
@@ -345,12 +349,15 @@ unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8
 
         // Line Separator:      u{2028}
         // Paragraph Separator: u{2029}
-        if sp_1_flags != 0 {
-            let sp_2_flags = sp_1_flags & shift_bytes_back(flag_bytes(n, 0x80), 1);
-            if sp_2_flags != 0 {
-                let sp_3_flags = flag_bytes((n >> 1) & !ONEMASK_HIGH, 0x54);
-                let sp_flags = sp_2_flags & shift_bytes_back(sp_3_flags, 2);
-                count += count_flag_bytes(sp_flags);
+        if !sp_1_flags.is_zero() {
+            let sp_2_flags = c.cmp_eq_byte(0x80).shift_back_lex(1).bitand(sp_1_flags);
+            if !sp_2_flags.is_zero() {
+                let sp_3_flags = c.shr(1)
+                    .bitand(T::splat(!0x80))
+                    .cmp_eq_byte(0x54)
+                    .shift_back_lex(2);
+                let sp_flags = sp_2_flags.bitand(sp_3_flags);
+                count += sp_flags.sum_bytes();
             }
 
             // Handle ending boundary
@@ -375,17 +382,17 @@ unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8
     // Form Feed:                   u{000C}
     // Carriage Return:             u{000D}
     // Carriage Return + Line Feed: u{000D}u{000A}
-    if has_bytes_less_than(n, 0x0E) {
-        let all_flags = flag_bytes_between(n, 0x09, 0x0E);
-        if all_flags != 0 {
-            count += count_flag_bytes(all_flags);
+    if c.has_bytes_less_than(0x0E) {
+        let all_flags = c.bytes_between(0x09, 0x0E);
+        if !all_flags.is_zero() {
+            count += all_flags.sum_bytes();
 
             // Handle CRLF
-            let cr_flags = flag_bytes(n, 0x0D);
-            if cr_flags != 0 {
-                let lf_flags = flag_bytes(n, 0x0A);
-                let crlf_flags = cr_flags & shift_bytes_back(lf_flags, 1);
-                count -= count_flag_bytes(crlf_flags);
+            let cr_flags = c.cmp_eq_byte(0x0D);
+            if !cr_flags.is_zero() {
+                let lf_flags = c.cmp_eq_byte(0x0A);
+                let crlf_flags = cr_flags.bitand(lf_flags.shift_back_lex(1));
+                count -= crlf_flags.sum_bytes();
                 if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
                     count -= 1;
                 }
@@ -466,6 +473,111 @@ fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 #[inline(always)]
 fn align_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
     next_aligned_ptr(unsafe { ptr.offset(-1) }, alignment)
+}
+
+//======================================================================
+
+trait ByteChunk: Copy + Clone {
+    /// Returns the size of the chunk in bytes.
+    fn size() -> usize;
+
+    /// Creates a new chunk with all bytes set to n.
+    fn splat(n: u8) -> Self;
+
+    /// Returns whether all bytes are zero or not.
+    fn is_zero(&self) -> bool;
+
+    /// Shifts bytes back lexographically by n bytes.
+    fn shift_back_lex(&self, n: usize) -> Self;
+
+    /// Shifts bits to the right by n bits.
+    fn shr(&self, n: usize) -> Self;
+
+    /// Compares bytes for equality with the given byte.
+    ///
+    /// Bytes that are equal are set to 1, bytes that are not
+    /// are set to 0.
+    fn cmp_eq_byte(&self, byte: u8) -> Self;
+
+    /// Returns true if any of the bytes in the chunk are < n.
+    fn has_bytes_less_than(&self, n: u8) -> bool;
+
+    /// Compares bytes to see if they're in the non-inclusive range (a, b).
+    ///
+    /// Bytes in the range are set to 1, bytes not in the range are set to 0.
+    fn bytes_between(&self, a: u8, b: u8) -> Self;
+
+    /// Performs a bitwise and on two chunks.
+    fn bitand(&self, other: Self) -> Self;
+
+    /// Returns the sum of all bytes in the chunk.
+    fn sum_bytes(&self) -> usize;
+}
+
+impl ByteChunk for usize {
+    #[inline(always)]
+    fn size() -> usize {
+        std::mem::size_of::<usize>()
+    }
+
+    #[inline(always)]
+    fn splat(n: u8) -> Self {
+        const ONES: usize = std::usize::MAX / 0xFF;
+        ONES * n as usize
+    }
+
+    #[inline(always)]
+    fn is_zero(&self) -> bool {
+        *self == 0
+    }
+
+    #[inline(always)]
+    fn shift_back_lex(&self, n: usize) -> Self {
+        if cfg!(target_endian = "little") {
+            *self >> (n * 8)
+        } else {
+            *self << (n * 8)
+        }
+    }
+
+    #[inline(always)]
+    fn shr(&self, n: usize) -> Self {
+        *self >> n
+    }
+
+    #[inline(always)]
+    fn cmp_eq_byte(&self, byte: u8) -> Self {
+        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES_HIGH: usize = ONES << 7;
+        let word = *self ^ (byte as usize * ONES);
+        (!(((word & !ONES_HIGH) + !ONES_HIGH) | word) & ONES_HIGH) >> 7
+    }
+
+    #[inline(always)]
+    fn has_bytes_less_than(&self, n: u8) -> bool {
+        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES_HIGH: usize = ONES << 7;
+        ((self.wrapping_sub(ONES * n as usize)) & !*self & ONES_HIGH) != 0
+    }
+
+    #[inline(always)]
+    fn bytes_between(&self, a: u8, b: u8) -> Self {
+        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES_HIGH: usize = ONES << 7;
+        let tmp = *self & (ONES * 127);
+        ((ONES * (127 + b as usize) - tmp & !*self & tmp + (ONES * (127 - a as usize))) & ONES_HIGH)
+            >> 7
+    }
+
+    #[inline(always)]
+    fn bitand(&self, other: Self) -> Self {
+        *self & other
+    }
+
+    #[inline(always)]
+    fn sum_bytes(&self) -> usize {
+        *self % 255
+    }
 }
 
 //======================================================================
