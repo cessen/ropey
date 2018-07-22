@@ -5,9 +5,8 @@
 //! additional functionality on top of Ropey.
 
 use std;
+use std::arch::x86_64;
 
-const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
-const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
 const TSIZE: usize = std::mem::size_of::<usize>(); // Shorthand for usize size.
 
 /// Converts from byte-index to char-index in a string slice.
@@ -127,8 +126,9 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
         // Use usize to count line breaks in big chunks.
         if ptr == align_ptr(ptr, TSIZE) {
             while unsafe { ptr.offset(TSIZE as isize) } < end_ptr && line_break_count < line_idx {
-                let lb = line_break_count
-                    + unsafe { count_line_breaks_in_chunks_from_ptr::<usize>(ptr, end_ptr) };
+                let lb = line_break_count + unsafe {
+                    count_line_breaks_in_chunks_from_ptr::<usize>(ptr, end_ptr)
+                }.sum_bytes();
 
                 if lb >= line_idx {
                     break;
@@ -259,22 +259,40 @@ pub(crate) fn count_chars(text: &str) -> usize {
 /// - u{2029}        (Paragraph Separator)
 #[inline(never)] // Actually slightly faster when inlining is not allowed
 pub(crate) fn count_line_breaks(text: &str) -> usize {
+    if is_x86_feature_detected!("sse2") {
+        count_line_breaks_internal::<x86_64::__m128i>(text)
+    } else {
+        count_line_breaks_internal::<usize>(text)
+    }
+}
+
+#[inline(always)]
+fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
     let len = text.len();
     let mut ptr = text.as_ptr();
     let end_ptr = unsafe { ptr.offset(len as isize) };
     let mut count = 0;
 
     while ptr < end_ptr {
-        // Use usize to count line breaks in big chunks.
-        if ptr == align_ptr(ptr, TSIZE) {
-            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
-                count += unsafe { count_line_breaks_in_chunks_from_ptr::<usize>(ptr, end_ptr) };
-                ptr = unsafe { ptr.offset(TSIZE as isize) };
+        // Count line breaks in big chunks.
+        if ptr == align_ptr(ptr, T::size()) {
+            let mut i = 0;
+            let mut acc = T::splat(0);
+            while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
+                acc = acc.add(unsafe { count_line_breaks_in_chunks_from_ptr::<T>(ptr, end_ptr) });
+                ptr = unsafe { ptr.offset(T::size() as isize) };
+                i += 1;
+                if i == T::max_acc() {
+                    i = 0;
+                    count += acc.sum_bytes();
+                    acc = T::splat(0);
+                }
             }
+            count += acc.sum_bytes();
         }
 
         // Count line breaks a byte at a time.
-        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
+        let end_aligned_ptr = next_aligned_ptr(ptr, T::size()).min(end_ptr);
         while ptr < end_aligned_ptr {
             let byte = unsafe { *ptr };
 
@@ -326,8 +344,8 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
 unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
     ptr: *const u8,
     end_ptr: *const u8,
-) -> usize {
-    let mut count = 0;
+) -> T {
+    let mut acc = T::splat(0);
     let c = *(ptr as *const T);
     let next_ptr = ptr.offset(T::size() as isize);
 
@@ -339,11 +357,11 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
         if !nl_1_flags.is_zero() {
             let nl_2_flags = c.cmp_eq_byte(0x85).shift_back_lex(1);
             let flags = nl_1_flags.bitand(nl_2_flags);
-            count += flags.sum_bytes();
+            acc = acc.add(flags);
 
             // Handle ending boundary
             if next_ptr < end_ptr && *next_ptr.offset(-1) == 0xC2 && *next_ptr == 0x85 {
-                count += 1;
+                acc = acc.inc_nth_from_end_lex_byte(0);
             }
         }
 
@@ -357,7 +375,7 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
                     .cmp_eq_byte(0x54)
                     .shift_back_lex(2);
                 let sp_flags = sp_2_flags.bitand(sp_3_flags);
-                count += sp_flags.sum_bytes();
+                acc = acc.add(sp_flags);
             }
 
             // Handle ending boundary
@@ -366,13 +384,13 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
                 && *next_ptr.offset(-1) == 0x80
                 && (*next_ptr >> 1) == 0x54
             {
-                count += 1;
+                acc = acc.inc_nth_from_end_lex_byte(1);
             } else if next_ptr.offset(1) < end_ptr
                 && *next_ptr.offset(-1) == 0xE2
                 && *next_ptr == 0x80
                 && (*next_ptr.offset(1) >> 1) == 0x54
             {
-                count += 1;
+                acc = acc.inc_nth_from_end_lex_byte(0);
             }
         }
     }
@@ -385,77 +403,22 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
     if c.has_bytes_less_than(0x0E) {
         let all_flags = c.bytes_between(0x09, 0x0E);
         if !all_flags.is_zero() {
-            count += all_flags.sum_bytes();
+            acc = acc.add(all_flags);
 
             // Handle CRLF
             let cr_flags = c.cmp_eq_byte(0x0D);
             if !cr_flags.is_zero() {
                 let lf_flags = c.cmp_eq_byte(0x0A);
                 let crlf_flags = cr_flags.bitand(lf_flags.shift_back_lex(1));
-                count -= crlf_flags.sum_bytes();
+                acc = acc.sub(crlf_flags);
                 if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
-                    count -= 1;
+                    acc = acc.dec_last_lex_byte();
                 }
             }
         }
     }
 
-    count
-}
-
-/// Sets the high bit of bytes that are zero, and sets all other bits to
-/// zero.
-#[inline(always)]
-fn flag_zero_bytes(word: usize) -> usize {
-    !(((word & !ONEMASK_HIGH) + !ONEMASK_HIGH) | word) & ONEMASK_HIGH
-}
-
-/// Sets the high bit of bytes that match n, and sets all other bits to zero.
-#[inline(always)]
-fn flag_bytes(word: usize, n: u8) -> usize {
-    flag_zero_bytes(word ^ (n as usize * ONEMASK_LOW))
-}
-
-/// Counts the bytes flagged by the various flag_* functions.
-#[inline(always)]
-fn count_flag_bytes(word: usize) -> usize {
-    if word == 0 {
-        0
-    } else {
-        (word >> 7) % 255
-    }
-}
-
-#[inline(always)]
-fn shift_bytes_back(word: usize, n: usize) -> usize {
-    if cfg!(target_endian = "little") {
-        word >> (n * 8)
-    } else {
-        word << (n * 8)
-    }
-}
-
-#[inline(always)]
-#[allow(unused)] // Used in tests
-fn has_byte(word: usize, n: u8) -> bool {
-    let word = word ^ (n as usize * ONEMASK_LOW);
-    ((word.wrapping_sub(ONEMASK_LOW)) & !word & ONEMASK_HIGH) != 0
-}
-
-#[inline(always)]
-fn has_bytes_less_than(word: usize, n: u8) -> bool {
-    ((word.wrapping_sub(ONEMASK_LOW * n as usize)) & !word & ONEMASK_HIGH) != 0
-}
-
-/// Sets the high bit for bytes that are in the range (a, b), and sets all
-/// other bits to zero.
-///
-/// To clarify: the range does _not include_ a and b.
-#[inline(always)]
-fn flag_bytes_between(word: usize, a: u8, b: u8) -> usize {
-    let tmp = word & (ONEMASK_LOW * 127);
-    ((ONEMASK_LOW * (127 + b as usize) - tmp & !word & tmp + (ONEMASK_LOW * (127 - a as usize)))
-        & ONEMASK_HIGH)
+    acc
 }
 
 /// Returns the next pointer after `ptr` that is aligned with `alignment`.
@@ -480,6 +443,10 @@ fn align_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 trait ByteChunk: Copy + Clone {
     /// Returns the size of the chunk in bytes.
     fn size() -> usize;
+
+    /// Returns the maximum number of iterations the chunk can accumulate
+    /// before sum_bytes() becomes inaccurate.
+    fn max_acc() -> usize;
 
     /// Creates a new chunk with all bytes set to n.
     fn splat(n: u8) -> Self;
@@ -510,6 +477,18 @@ trait ByteChunk: Copy + Clone {
     /// Performs a bitwise and on two chunks.
     fn bitand(&self, other: Self) -> Self;
 
+    /// Adds the bytes of two chunks together.
+    fn add(&self, other: Self) -> Self;
+
+    /// Subtracts other's bytes from this chunk.
+    fn sub(&self, other: Self) -> Self;
+
+    /// Increments the nth-from-last lexographic byte by 1.
+    fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self;
+
+    /// Decrements the last lexographic byte by 1.
+    fn dec_last_lex_byte(&self) -> Self;
+
     /// Returns the sum of all bytes in the chunk.
     fn sum_bytes(&self) -> usize;
 }
@@ -518,6 +497,11 @@ impl ByteChunk for usize {
     #[inline(always)]
     fn size() -> usize {
         std::mem::size_of::<usize>()
+    }
+
+    #[inline(always)]
+    fn max_acc() -> usize {
+        (256 / std::mem::size_of::<usize>()) - 1
     }
 
     #[inline(always)]
@@ -575,8 +559,142 @@ impl ByteChunk for usize {
     }
 
     #[inline(always)]
+    fn add(&self, other: Self) -> Self {
+        *self + other
+    }
+
+    #[inline(always)]
+    fn sub(&self, other: Self) -> Self {
+        *self - other
+    }
+
+    #[inline(always)]
+    fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self {
+        if cfg!(target_endian = "little") {
+            *self + (1 << ((Self::size() - 1 - n) * 8))
+        } else {
+            *self + (1 << (n * 8))
+        }
+    }
+
+    #[inline(always)]
+    fn dec_last_lex_byte(&self) -> Self {
+        if cfg!(target_endian = "little") {
+            *self - (1 << ((Self::size() - 1) * 8))
+        } else {
+            *self - 1
+        }
+    }
+
+    #[inline(always)]
     fn sum_bytes(&self) -> usize {
-        *self % 255
+        const ONES: usize = std::usize::MAX / 0xFF;
+        self.wrapping_mul(ONES) >> ((Self::size() - 1) * 8)
+    }
+}
+
+impl ByteChunk for x86_64::__m128i {
+    #[inline(always)]
+    fn size() -> usize {
+        std::mem::size_of::<x86_64::__m128i>()
+    }
+
+    #[inline(always)]
+    fn max_acc() -> usize {
+        (256 / 8) - 1
+    }
+
+    #[inline(always)]
+    fn splat(n: u8) -> Self {
+        unsafe { x86_64::_mm_set1_epi8(n as i8) }
+    }
+
+    #[inline(always)]
+    fn is_zero(&self) -> bool {
+        let tmp = unsafe { std::mem::transmute::<Self, (u64, u64)>(*self) };
+        tmp.0 == 0 && tmp.1 == 0
+    }
+
+    #[inline(always)]
+    fn shift_back_lex(&self, n: usize) -> Self {
+        match n {
+            0 => *self,
+            1 => unsafe { x86_64::_mm_srli_si128(*self, 1) },
+            2 => unsafe { x86_64::_mm_srli_si128(*self, 2) },
+            3 => unsafe { x86_64::_mm_srli_si128(*self, 3) },
+            4 => unsafe { x86_64::_mm_srli_si128(*self, 4) },
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline(always)]
+    fn shr(&self, n: usize) -> Self {
+        match n {
+            0 => *self,
+            1 => unsafe { x86_64::_mm_srli_epi64(*self, 1) },
+            2 => unsafe { x86_64::_mm_srli_epi64(*self, 2) },
+            3 => unsafe { x86_64::_mm_srli_epi64(*self, 3) },
+            4 => unsafe { x86_64::_mm_srli_epi64(*self, 4) },
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline(always)]
+    fn cmp_eq_byte(&self, byte: u8) -> Self {
+        let tmp = unsafe { x86_64::_mm_cmpeq_epi8(*self, Self::splat(byte)) };
+        unsafe { x86_64::_mm_and_si128(tmp, Self::splat(1)) }
+    }
+
+    #[inline(always)]
+    fn has_bytes_less_than(&self, n: u8) -> bool {
+        let tmp = unsafe { x86_64::_mm_cmplt_epi8(*self, Self::splat(n)) };
+        !tmp.is_zero()
+    }
+
+    #[inline(always)]
+    fn bytes_between(&self, a: u8, b: u8) -> Self {
+        let tmp1 = unsafe { x86_64::_mm_cmpgt_epi8(*self, Self::splat(a)) };
+        let tmp2 = unsafe { x86_64::_mm_cmplt_epi8(*self, Self::splat(b)) };
+        let tmp3 = unsafe { x86_64::_mm_and_si128(tmp1, tmp2) };
+        unsafe { x86_64::_mm_and_si128(tmp3, Self::splat(1)) }
+    }
+
+    #[inline(always)]
+    fn bitand(&self, other: Self) -> Self {
+        unsafe { x86_64::_mm_and_si128(*self, other) }
+    }
+
+    #[inline(always)]
+    fn add(&self, other: Self) -> Self {
+        unsafe { x86_64::_mm_add_epi8(*self, other) }
+    }
+
+    #[inline(always)]
+    fn sub(&self, other: Self) -> Self {
+        unsafe { x86_64::_mm_sub_epi8(*self, other) }
+    }
+
+    #[inline(always)]
+    fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self {
+        let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 16]>(*self) };
+        tmp[15 - n] += 1;
+        unsafe { std::mem::transmute::<[u8; 16], Self>(tmp) }
+    }
+
+    #[inline(always)]
+    fn dec_last_lex_byte(&self) -> Self {
+        let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 16]>(*self) };
+        tmp[15] -= 1;
+        unsafe { std::mem::transmute::<[u8; 16], Self>(tmp) }
+    }
+
+    #[inline(always)]
+    fn sum_bytes(&self) -> usize {
+        const ONES: u64 = std::u64::MAX / 0xFF;
+        let tmp = unsafe { std::mem::transmute::<Self, (u64, u64)>(*self) };
+        let a = tmp.0.wrapping_mul(ONES) >> (7 * 8);
+        let b = tmp.1.wrapping_mul(ONES) >> (7 * 8);
+        (a + b) as usize
     }
 }
 
@@ -1023,35 +1141,19 @@ mod tests {
 
     #[test]
     fn has_bytes_less_than_01() {
-        let v = 0x0709080905090609;
-        assert!(has_bytes_less_than(v, 0x0A));
-        assert!(has_bytes_less_than(v, 0x06));
-        assert!(!has_bytes_less_than(v, 0x05));
-    }
-
-    #[test]
-    fn has_byte_01() {
-        let v = 0x07_09_08_A6_05_09_E2_09;
-        assert!(has_byte(v, 0x07));
-        assert!(has_byte(v, 0x09));
-        assert!(has_byte(v, 0x08));
-        assert!(has_byte(v, 0xA6));
-        assert!(has_byte(v, 0x05));
-        assert!(has_byte(v, 0xE2));
-
-        assert!(!has_byte(v, 0xA0));
-        assert!(!has_byte(v, 0xA7));
-        assert!(!has_byte(v, 0x06));
-        assert!(!has_byte(v, 0xE3));
+        let v: usize = 0x0709080905090609;
+        assert!(v.has_bytes_less_than(0x0A));
+        assert!(v.has_bytes_less_than(0x06));
+        assert!(!v.has_bytes_less_than(0x05));
     }
 
     #[test]
     fn flag_bytes_01() {
-        let v = 0xE2_09_08_A6_E2_A6_E2_09;
-        assert_eq!(0x00_00_00_00_00_00_00_00, flag_bytes(v, 0x07));
-        assert_eq!(0x00_00_80_00_00_00_00_00, flag_bytes(v, 0x08));
-        assert_eq!(0x00_80_00_00_00_00_00_80, flag_bytes(v, 0x09));
-        assert_eq!(0x00_00_00_80_00_80_00_00, flag_bytes(v, 0xA6));
-        assert_eq!(0x80_00_00_00_80_00_80_00, flag_bytes(v, 0xE2));
+        let v: usize = 0xE2_09_08_A6_E2_A6_E2_09;
+        assert_eq!(0x00_00_00_00_00_00_00_00, v.cmp_eq_byte(0x07));
+        assert_eq!(0x00_00_01_00_00_00_00_00, v.cmp_eq_byte(0x08));
+        assert_eq!(0x00_01_00_00_00_00_00_01, v.cmp_eq_byte(0x09));
+        assert_eq!(0x00_00_00_01_00_01_00_00, v.cmp_eq_byte(0xA6));
+        assert_eq!(0x01_00_00_00_01_00_01_00, v.cmp_eq_byte(0xE2));
     }
 }
