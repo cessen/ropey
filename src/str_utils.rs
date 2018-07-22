@@ -6,6 +6,8 @@
 
 use std;
 
+const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
+const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
 const TSIZE: usize = std::mem::size_of::<usize>(); // Shorthand for usize size.
 
 /// Converts from byte-index to char-index in a string slice.
@@ -116,34 +118,51 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline(never)]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
-    let len = text.len();
-    let mut ptr = text.as_ptr();
     let start_ptr = text.as_ptr();
-    let end_ptr = unsafe { ptr.offset(len as isize) };
-    let mut line_break_count = 0;
+    let end_ptr = unsafe { start_ptr.offset(text.len() as isize) };
 
-    while ptr < end_ptr {
-        // Calculate the next aligned ptr after this one
-        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
+    let mut line_break_count = 0;
+    let mut ptr = start_ptr;
+    while ptr < end_ptr && line_break_count < line_idx {
+        // Use usize to count line breaks in big chunks.
+        if ptr == align_ptr(ptr, TSIZE) {
+            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr && line_break_count < line_idx {
+                let lb =
+                    line_break_count + unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
+
+                if lb >= line_idx {
+                    break;
+                } else {
+                    line_break_count = lb;
+                }
+
+                ptr = unsafe { ptr.offset(TSIZE as isize) };
+            }
+        }
 
         // Count line breaks a byte at a time.
+        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
         while ptr < end_aligned_ptr && line_break_count < line_idx {
             let byte = unsafe { *ptr };
 
             // Handle u{000A}, u{000B}, u{000C}, and u{000D}
             if (byte <= 0x0D) && (byte >= 0x0A) {
-                // Check for CRLF and go forward one more if it is
-                let next = unsafe { ptr.offset(1) };
-                if byte == 0x0D && next < end_ptr && unsafe { *next } == 0x0A {
-                    ptr = next;
-                }
-
                 line_break_count += 1;
+
+                // Check for CRLF and and subtract 1 if it is,
+                // since it will be caught in the next iteration
+                // with the LF.
+                if byte == 0x0D {
+                    let next = unsafe { ptr.offset(1) };
+                    if next < end_ptr && unsafe { *next } == 0x0A {
+                        line_break_count -= 1;
+                    }
+                }
             }
             // Handle u{0085}
             else if byte == 0xC2 {
-                ptr = unsafe { ptr.offset(1) };
-                if ptr < end_ptr && unsafe { *ptr } == 0x85 {
+                let next = unsafe { ptr.offset(1) };
+                if next < end_ptr && unsafe { *next } == 0x85 {
                     line_break_count += 1;
                 }
             }
@@ -158,31 +177,9 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
                 {
                     line_break_count += 1;
                 }
-                ptr = unsafe { ptr.offset(2) };
             }
 
             ptr = unsafe { ptr.offset(1) };
-        }
-
-        // Have we counted all the lines for the conversion?
-        if line_break_count >= line_idx {
-            break;
-        }
-
-        // Use usize to count line breaks in big chunks.
-        if ptr == end_aligned_ptr {
-            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
-                let lb =
-                    line_break_count + unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
-
-                if lb >= line_idx {
-                    break;
-                } else {
-                    line_break_count = lb;
-                }
-
-                ptr = unsafe { ptr.offset(TSIZE as isize) };
-            }
         }
     }
 
@@ -268,27 +265,37 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
     let mut count = 0;
 
     while ptr < end_ptr {
-        // Calculate the next aligned ptr after this one
-        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
+        // Use usize to count line breaks in big chunks.
+        if ptr == align_ptr(ptr, TSIZE) {
+            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
+                count += unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
+                ptr = unsafe { ptr.offset(TSIZE as isize) };
+            }
+        }
 
         // Count line breaks a byte at a time.
+        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
         while ptr < end_aligned_ptr {
             let byte = unsafe { *ptr };
 
             // Handle u{000A}, u{000B}, u{000C}, and u{000D}
             if (byte <= 0x0D) && (byte >= 0x0A) {
-                // Check for CRLF and go forward one more if it is
-                let next = unsafe { ptr.offset(1) };
-                if byte == 0x0D && next < end_ptr && unsafe { *next } == 0x0A {
-                    ptr = next;
-                }
-
                 count += 1;
+
+                // Check for CRLF and and subtract 1 if it is,
+                // since it will be caught in the next iteration
+                // with the LF.
+                if byte == 0x0D {
+                    let next = unsafe { ptr.offset(1) };
+                    if next < end_ptr && unsafe { *next } == 0x0A {
+                        count -= 1;
+                    }
+                }
             }
             // Handle u{0085}
             else if byte == 0xC2 {
-                ptr = unsafe { ptr.offset(1) };
-                if ptr < end_ptr && unsafe { *ptr } == 0x85 {
+                let next = unsafe { ptr.offset(1) };
+                if next < end_ptr && unsafe { *next } == 0x85 {
                     count += 1;
                 }
             }
@@ -303,18 +310,9 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
                 {
                     count += 1;
                 }
-                ptr = unsafe { ptr.offset(2) };
             }
 
             ptr = unsafe { ptr.offset(1) };
-        }
-
-        // Use usize to count line breaks in big chunks.
-        if ptr == end_aligned_ptr {
-            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr {
-                count += unsafe { count_line_breaks_in_usize_from_ptr(ptr, end_ptr) };
-                ptr = unsafe { ptr.offset(TSIZE as isize) };
-            }
         }
     }
 
@@ -350,9 +348,8 @@ unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8
         if sp_1_flags != 0 {
             let sp_2_flags = sp_1_flags & shift_bytes_back(flag_bytes(n, 0x80), 1);
             if sp_2_flags != 0 {
-                let sp_3_flags = flag_bytes(n, 0xA8);
-                let sp_4_flags = flag_bytes(n, 0xA9);
-                let sp_flags = sp_2_flags & shift_bytes_back(sp_3_flags | sp_4_flags, 2);
+                let sp_3_flags = flag_bytes((n >> 1) & !ONEMASK_HIGH, 0x54);
+                let sp_flags = sp_2_flags & shift_bytes_back(sp_3_flags, 2);
                 count += count_flag_bytes(sp_flags);
             }
 
@@ -379,21 +376,19 @@ unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8
     // Carriage Return:             u{000D}
     // Carriage Return + Line Feed: u{000D}u{000A}
     if has_bytes_less_than(n, 0x0E) {
-        let lf_flags = flag_bytes(n, 0x0A);
-        count += count_flag_bytes(lf_flags);
-        let vt_flags = flag_bytes(n, 0x0B);
-        count += count_flag_bytes(vt_flags);
-        let ff_flags = flag_bytes(n, 0x0C);
-        count += count_flag_bytes(ff_flags);
-        let cr_flags = flag_bytes(n, 0x0D);
-        count += count_flag_bytes(cr_flags);
+        let all_flags = flag_bytes_between(n, 0x09, 0x0E);
+        if all_flags != 0 {
+            count += count_flag_bytes(all_flags);
 
-        // Handle CRLF
-        if cr_flags != 0 {
-            let crlf_flags = cr_flags & shift_bytes_back(lf_flags, 1);
-            count -= count_flag_bytes(crlf_flags);
-            if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
-                count -= 1;
+            // Handle CRLF
+            let cr_flags = flag_bytes(n, 0x0D);
+            if cr_flags != 0 {
+                let lf_flags = flag_bytes(n, 0x0A);
+                let crlf_flags = cr_flags & shift_bytes_back(lf_flags, 1);
+                count -= count_flag_bytes(crlf_flags);
+                if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
+                    count -= 1;
+                }
             }
         }
     }
@@ -401,28 +396,26 @@ unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8
     count
 }
 
+/// Sets the high bit of bytes that are zero, and sets all other bits to
+/// zero.
 #[inline(always)]
 fn flag_zero_bytes(word: usize) -> usize {
-    const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
-    const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
-    let a = !word;
-    let b = a & (a << 4);
-    let c = b & (b << 2);
-    c & (c << 1) & ONEMASK_HIGH
+    !(((word & !ONEMASK_HIGH) + !ONEMASK_HIGH) | word) & ONEMASK_HIGH
 }
 
+/// Sets the high bit of bytes that match n, and sets all other bits to zero.
 #[inline(always)]
 fn flag_bytes(word: usize, n: u8) -> usize {
-    const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
     flag_zero_bytes(word ^ (n as usize * ONEMASK_LOW))
 }
 
+/// Counts the bytes flagged by the various flag_* functions.
 #[inline(always)]
 fn count_flag_bytes(word: usize) -> usize {
     if word == 0 {
         0
     } else {
-        word / 128 % 255
+        (word >> 7) % 255
     }
 }
 
@@ -438,13 +431,24 @@ fn shift_bytes_back(word: usize, n: usize) -> usize {
 #[inline(always)]
 #[allow(unused)] // Used in tests
 fn has_byte(word: usize, n: u8) -> bool {
-    flag_bytes(word, n) != 0
+    let word = word ^ (n as usize * ONEMASK_LOW);
+    ((word.wrapping_sub(ONEMASK_LOW)) & !word & ONEMASK_HIGH) != 0
 }
 
 #[inline(always)]
 fn has_bytes_less_than(word: usize, n: u8) -> bool {
-    const ONEMASK: usize = std::usize::MAX / 0xFF;
-    ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
+    ((word.wrapping_sub(ONEMASK_LOW * n as usize)) & !word & ONEMASK_HIGH) != 0
+}
+
+/// Sets the high bit for bytes that are in the range (a, b), and sets all
+/// other bits to zero.
+///
+/// To clarify: the range does _not include_ a and b.
+#[inline(always)]
+fn flag_bytes_between(word: usize, a: u8, b: u8) -> usize {
+    let tmp = word & (ONEMASK_LOW * 127);
+    ((ONEMASK_LOW * (127 + b as usize) - tmp & !word & tmp + (ONEMASK_LOW * (127 - a as usize)))
+        & ONEMASK_HIGH)
 }
 
 /// Returns the next pointer after `ptr` that is aligned with `alignment`.
@@ -915,7 +919,7 @@ mod tests {
 
     #[test]
     fn has_byte_01() {
-        let v = 0x070908A60509E209;
+        let v = 0x07_09_08_A6_05_09_E2_09;
         assert!(has_byte(v, 0x07));
         assert!(has_byte(v, 0x09));
         assert!(has_byte(v, 0x08));
@@ -927,5 +931,15 @@ mod tests {
         assert!(!has_byte(v, 0xA7));
         assert!(!has_byte(v, 0x06));
         assert!(!has_byte(v, 0xE3));
+    }
+
+    #[test]
+    fn flag_bytes_01() {
+        let v = 0xE2_09_08_A6_E2_A6_E2_09;
+        assert_eq!(0x00_00_00_00_00_00_00_00, flag_bytes(v, 0x07));
+        assert_eq!(0x00_00_80_00_00_00_00_00, flag_bytes(v, 0x08));
+        assert_eq!(0x00_80_00_00_00_00_00_80, flag_bytes(v, 0x09));
+        assert_eq!(0x00_00_00_80_00_80_00_00, flag_bytes(v, 0xA6));
+        assert_eq!(0x80_00_00_00_80_00_80_00, flag_bytes(v, 0xE2));
     }
 }
