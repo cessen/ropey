@@ -37,7 +37,7 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
     use crlf;
     let mut byte_idx = byte_idx.min(text.len());
     while !text.is_char_boundary(byte_idx) {
-        byte_idx += 1;
+        byte_idx -= 1;
     }
     let nl_count = count_line_breaks(&text[..byte_idx]);
     if crlf::is_break(byte_idx, text.as_bytes()) {
@@ -220,7 +220,7 @@ pub(crate) fn count_chars(text: &str) -> usize {
     let mut inv_count = 0;
 
     // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = next_aligned_ptr(unsafe { ptr.offset(-1) }, TSIZE).min(end_ptr);
+    let end_pre_ptr = align_ptr(ptr, TSIZE).min(end_ptr);
     while ptr < end_pre_ptr {
         let byte = unsafe { *ptr };
         inv_count += ((byte & 0xC0) == 0x80) as usize;
@@ -402,11 +402,19 @@ unsafe fn count_line_breaks_in_usize_from_ptr(ptr: *const u8, end_ptr: *const u8
 }
 
 #[inline(always)]
-fn flag_bytes(word: usize, n: u8) -> usize {
+fn flag_zero_bytes(word: usize) -> usize {
     const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
     const ONEMASK_HIGH: usize = ONEMASK_LOW << 7;
-    let word = word ^ (n as usize * ONEMASK_LOW);
-    (word.wrapping_sub(ONEMASK_LOW) & !word & ONEMASK_HIGH)
+    let a = !word;
+    let b = a & (a << 4);
+    let c = b & (b << 2);
+    c & (c << 1) & ONEMASK_HIGH
+}
+
+#[inline(always)]
+fn flag_bytes(word: usize, n: u8) -> usize {
+    const ONEMASK_LOW: usize = std::usize::MAX / 0xFF;
+    flag_zero_bytes(word ^ (n as usize * ONEMASK_LOW))
 }
 
 #[inline(always)]
@@ -439,9 +447,21 @@ fn has_bytes_less_than(word: usize, n: u8) -> bool {
     ((word.wrapping_sub(ONEMASK * n as usize)) & !word & (ONEMASK * 128)) != 0
 }
 
+/// Returns the next pointer after `ptr` that is aligned with `alignment`.
+///
+/// NOTE: only works for power-of-two alignments.
 #[inline(always)]
 fn next_aligned_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
-    (ptr as usize + (alignment - (ptr as usize & (alignment - 1)))) as *const T
+    (ptr as usize + alignment - (ptr as usize & (alignment - 1))) as *const T
+}
+
+/// Returns `ptr` if aligned to `alignment`, or the next aligned pointer
+/// after if not.
+///
+/// NOTE: only works for power-of-two alignments.
+#[inline(always)]
+fn align_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
+    next_aligned_ptr(unsafe { ptr.offset(-1) }, alignment)
 }
 
 //======================================================================

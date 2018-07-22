@@ -27,6 +27,71 @@ fn string_slice(text: &str, char_start: usize, char_end: usize) -> &str {
     &text[byte_start..byte_end]
 }
 
+/// A slower, but easy-to-verify, byte->line index converter.
+///
+/// We use this to verify the faster-but-more-complex functions in
+/// Ropey.
+///
+/// Note: counts the number of _complete_ line endings before the given byte.
+/// For example, giving the byte index for the LF in a CRLF pair does not
+/// count the CR as a line ending, since we're not past the complete line
+/// ending.
+fn byte_to_line_index_slow(text: &str, byte_idx: usize) -> usize {
+    assert!(byte_idx <= text.len());
+
+    let mut byte_itr = text.bytes();
+    let mut i = 0;
+    let mut line_count = 0;
+
+    while let Some(byte) = byte_itr.next() {
+        if i >= byte_idx {
+            break;
+        }
+
+        match byte {
+            0x0A | 0x0B | 0x0C => {
+                line_count += 1;
+            }
+            0x0D => {
+                // Check for a following LF.  By cloning the itr, we're
+                // peeking without actually stepping the original itr.
+                if let Some(0x0A) = byte_itr.clone().next() {
+                    // Do nothing.  The CRLF will be properly counted
+                    // on the next iteration if the LF is behind
+                    // byte_idx.
+                } else {
+                    // There's no following LF, so the stand-alone CR is a
+                    // line ending itself.
+                    line_count += 1;
+                }
+            }
+            0xC2 => {
+                if (i + 1) < byte_idx {
+                    i += 1;
+                    if let Some(0x85) = byte_itr.next() {
+                        line_count += 1;
+                    }
+                }
+            }
+            0xE2 => {
+                if (i + 2) < byte_idx {
+                    i += 2;
+                    let byte2 = byte_itr.next().unwrap();
+                    let byte3 = byte_itr.next().unwrap() >> 1;
+                    if byte2 == 0x80 && byte3 == 0x54 {
+                        line_count += 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        i += 1;
+    }
+
+    line_count
+}
+
 //===========================================================================
 
 proptest! {
@@ -361,6 +426,15 @@ proptest! {
         assert_eq!(slice, text_slice);
         assert_eq!(slice.len_bytes(), text_slice.len());
         assert_eq!(slice.len_chars(), text_slice.chars().count());
+    }
+
+    #[test]
+    fn pt_byte_to_line_idx(ref text in "[\\u{000A}\\u{000B}\\u{000C}\\u{000D}\\u{0085}\\u{2028}\\u{2029}]*[\\u{000A}\\u{000B}\\u{000C}\\u{000D}\\u{0085}\\u{2028}\\u{2029}]*", idx in 0usize..200) {
+        let idx = idx % (text.len() + 1);
+        assert_eq!(
+            byte_to_line_index_slow(text, idx),
+            byte_to_line_idx(text, idx),
+        );
     }
 }
 
