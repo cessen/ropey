@@ -20,7 +20,7 @@ const CHILD_INFO_SIZE: usize = size_of::<Arc<Node>>() + size_of::<TextInfo>();
 // multiples of large powers of two makes it easier for the memory allocator
 // to avoid fragmentation.
 #[cfg(not(test))]
-const TARGET_NODE_SIZE: usize = 768 - (PTR_SIZE * 2);
+const TARGET_NODE_SIZE: usize = 1024 - (PTR_SIZE * 2);
 
 // Node min/max values.
 // For testing, they're set small to trigger deeper trees.  For
