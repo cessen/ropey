@@ -16,7 +16,7 @@ const PTR_SIZE: usize = size_of::<&u8>();
 #[cfg(not(test))]
 const CHILD_INFO_SIZE: usize = size_of::<Arc<Node>>() + size_of::<TextInfo>();
 
-// Aim for nodes to be 768 bytes - Arc counters.  Keeping the nodes
+// Aim for nodes to be 1024 bytes minus Arc counters.  Keeping the nodes
 // multiples of large powers of two makes it easier for the memory allocator
 // to avoid fragmentation.
 #[cfg(not(test))]
