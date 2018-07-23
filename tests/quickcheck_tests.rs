@@ -180,7 +180,7 @@ proptest! {
         rope.assert_integrity();
         rope.assert_invariants();
 
-        let max_leaf_bytes = 768 - 33;
+        let max_leaf_bytes = 1024 - 33;
         assert!((rope.capacity() - rope.len_bytes()) < max_leaf_bytes);
         assert!(rope.capacity() <= capacity_before);
         assert_eq!(rope, rope_clone);
@@ -203,7 +203,7 @@ proptest! {
         rope.assert_integrity();
         rope.assert_invariants();
 
-        let max_leaf_bytes = 768 - 33;
+        let max_leaf_bytes = 1024 - 33;
         let max_diff = max_leaf_bytes + ((rope.len_bytes() / max_leaf_bytes) * ins_text.len());
 
         assert!((rope.capacity() - rope.len_bytes()) < max_diff);
