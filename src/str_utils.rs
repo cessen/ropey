@@ -209,15 +209,24 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
 /// count.
 #[inline]
 pub(crate) fn count_chars(text: &str) -> usize {
-    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    if is_x86_feature_detected!("avx2") {
+        count_chars_internal::<x86_64::__m256i>(text)
+    } else if is_x86_feature_detected!("sse2") {
+        count_chars_internal::<x86_64::__m128i>(text)
+    } else {
+        count_chars_internal::<usize>(text)
+    }
+}
 
+#[inline(always)]
+fn count_chars_internal<T: ByteChunk>(text: &str) -> usize {
     let len = text.len();
     let mut ptr = text.as_ptr();
     let end_ptr = unsafe { ptr.offset(len as isize) };
     let mut inv_count = 0;
 
     // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = align_ptr(ptr, TSIZE).min(end_ptr);
+    let end_pre_ptr = align_ptr(ptr, T::size()).min(end_ptr);
     while ptr < end_pre_ptr {
         let byte = unsafe { *ptr };
         inv_count += ((byte & 0xC0) == 0x80) as usize;
@@ -225,15 +234,24 @@ pub(crate) fn count_chars(text: &str) -> usize {
     }
 
     // Use usize to count multiple bytes at once, using bit-fiddling magic.
-    let mut ptr = ptr as *const usize;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (TSIZE - 1))) as *const usize;
+    let mut ptr = ptr as *const T;
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (T::size() - 1))) as *const T;
+    let mut acc = T::splat(0);
+    let mut i = 0;
     while ptr < end_mid_ptr {
         // Do the clever counting
         let n = unsafe { *ptr };
-        let byte_bools = ((n >> 7) & (!n >> 6)) & ONEMASK;
-        inv_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((TSIZE - 1) * 8);
+        let tmp = n.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
+        acc = acc.add(tmp);
+        i += 1;
+        if i == T::max_acc() {
+            i = 0;
+            inv_count += acc.sum_bytes();
+            acc = T::splat(0);
+        }
         ptr = unsafe { ptr.offset(1) };
     }
+    inv_count += acc.sum_bytes();
 
     // Take care of any unaligned bytes at the end
     let mut ptr = ptr as *const u8;
@@ -259,7 +277,9 @@ pub(crate) fn count_chars(text: &str) -> usize {
 /// - u{2029}        (Paragraph Separator)
 #[inline(never)] // Actually slightly faster when inlining is not allowed
 pub(crate) fn count_line_breaks(text: &str) -> usize {
-    if is_x86_feature_detected!("sse2") {
+    if is_x86_feature_detected!("avx2") {
+        count_line_breaks_internal::<x86_64::__m256i>(text)
+    } else if is_x86_feature_detected!("sse2") {
         count_line_breaks_internal::<x86_64::__m128i>(text)
     } else {
         count_line_breaks_internal::<usize>(text)
@@ -349,49 +369,50 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
     let c = *(ptr as *const T);
     let next_ptr = ptr.offset(T::size() as isize);
 
+    // Calculate the flags we're going to be working with.
     let nl_1_flags = c.cmp_eq_byte(0xC2);
     let sp_1_flags = c.cmp_eq_byte(0xE2);
+    let all_flags = c.bytes_between(0x09, 0x0E);
+    let cr_flags = c.cmp_eq_byte(0x0D);
 
-    if !(nl_1_flags.is_zero() && sp_1_flags.is_zero()) {
-        // Next Line: u{0085}
-        if !nl_1_flags.is_zero() {
-            let nl_2_flags = c.cmp_eq_byte(0x85).shift_back_lex(1);
-            let flags = nl_1_flags.bitand(nl_2_flags);
-            acc = acc.add(flags);
+    // Next Line: u{0085}
+    if !nl_1_flags.is_zero() {
+        let nl_2_flags = c.cmp_eq_byte(0x85).shift_back_lex(1);
+        let flags = nl_1_flags.bitand(nl_2_flags);
+        acc = acc.add(flags);
 
-            // Handle ending boundary
-            if next_ptr < end_ptr && *next_ptr.offset(-1) == 0xC2 && *next_ptr == 0x85 {
-                acc = acc.inc_nth_from_end_lex_byte(0);
-            }
+        // Handle ending boundary
+        if next_ptr < end_ptr && *next_ptr.offset(-1) == 0xC2 && *next_ptr == 0x85 {
+            acc = acc.inc_nth_from_end_lex_byte(0);
+        }
+    }
+
+    // Line Separator:      u{2028}
+    // Paragraph Separator: u{2029}
+    if !sp_1_flags.is_zero() {
+        let sp_2_flags = c.cmp_eq_byte(0x80).shift_back_lex(1).bitand(sp_1_flags);
+        if !sp_2_flags.is_zero() {
+            let sp_3_flags = c.shr(1)
+                .bitand(T::splat(!0x80))
+                .cmp_eq_byte(0x54)
+                .shift_back_lex(2);
+            let sp_flags = sp_2_flags.bitand(sp_3_flags);
+            acc = acc.add(sp_flags);
         }
 
-        // Line Separator:      u{2028}
-        // Paragraph Separator: u{2029}
-        if !sp_1_flags.is_zero() {
-            let sp_2_flags = c.cmp_eq_byte(0x80).shift_back_lex(1).bitand(sp_1_flags);
-            if !sp_2_flags.is_zero() {
-                let sp_3_flags = c.shr(1)
-                    .bitand(T::splat(!0x80))
-                    .cmp_eq_byte(0x54)
-                    .shift_back_lex(2);
-                let sp_flags = sp_2_flags.bitand(sp_3_flags);
-                acc = acc.add(sp_flags);
-            }
-
-            // Handle ending boundary
-            if next_ptr < end_ptr
-                && *next_ptr.offset(-2) == 0xE2
-                && *next_ptr.offset(-1) == 0x80
-                && (*next_ptr >> 1) == 0x54
-            {
-                acc = acc.inc_nth_from_end_lex_byte(1);
-            } else if next_ptr.offset(1) < end_ptr
-                && *next_ptr.offset(-1) == 0xE2
-                && *next_ptr == 0x80
-                && (*next_ptr.offset(1) >> 1) == 0x54
-            {
-                acc = acc.inc_nth_from_end_lex_byte(0);
-            }
+        // Handle ending boundary
+        if next_ptr < end_ptr
+            && *next_ptr.offset(-2) == 0xE2
+            && *next_ptr.offset(-1) == 0x80
+            && (*next_ptr >> 1) == 0x54
+        {
+            acc = acc.inc_nth_from_end_lex_byte(1);
+        } else if next_ptr.offset(1) < end_ptr
+            && *next_ptr.offset(-1) == 0xE2
+            && *next_ptr == 0x80
+            && (*next_ptr.offset(1) >> 1) == 0x54
+        {
+            acc = acc.inc_nth_from_end_lex_byte(0);
         }
     }
 
@@ -400,21 +421,14 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
     // Form Feed:                   u{000C}
     // Carriage Return:             u{000D}
     // Carriage Return + Line Feed: u{000D}u{000A}
-    if c.has_bytes_less_than(0x0E) {
-        let all_flags = c.bytes_between(0x09, 0x0E);
-        if !all_flags.is_zero() {
-            acc = acc.add(all_flags);
-
-            // Handle CRLF
-            let cr_flags = c.cmp_eq_byte(0x0D);
-            if !cr_flags.is_zero() {
-                let lf_flags = c.cmp_eq_byte(0x0A);
-                let crlf_flags = cr_flags.bitand(lf_flags.shift_back_lex(1));
-                acc = acc.sub(crlf_flags);
-                if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
-                    acc = acc.dec_last_lex_byte();
-                }
-            }
+    acc = acc.add(all_flags);
+    if !cr_flags.is_zero() {
+        // Handle CRLF
+        let lf_flags = c.cmp_eq_byte(0x0A);
+        let crlf_flags = cr_flags.bitand(lf_flags.shift_back_lex(1));
+        acc = acc.sub(crlf_flags);
+        if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
+            acc = acc.dec_last_lex_byte();
         }
     }
 
@@ -695,6 +709,129 @@ impl ByteChunk for x86_64::__m128i {
         let a = tmp.0.wrapping_mul(ONES) >> (7 * 8);
         let b = tmp.1.wrapping_mul(ONES) >> (7 * 8);
         (a + b) as usize
+    }
+}
+
+impl ByteChunk for x86_64::__m256i {
+    #[inline(always)]
+    fn size() -> usize {
+        std::mem::size_of::<x86_64::__m256i>()
+    }
+
+    #[inline(always)]
+    fn max_acc() -> usize {
+        (256 / 8) - 1
+    }
+
+    #[inline(always)]
+    fn splat(n: u8) -> Self {
+        unsafe { x86_64::_mm256_set1_epi8(n as i8) }
+    }
+
+    #[inline(always)]
+    fn is_zero(&self) -> bool {
+        let tmp = unsafe { std::mem::transmute::<Self, (u64, u64, u64, u64)>(*self) };
+        tmp.0 == 0 && tmp.1 == 0 && tmp.2 == 0 && tmp.3 == 0
+    }
+
+    #[inline(always)]
+    fn shift_back_lex(&self, n: usize) -> Self {
+        let mut tmp1;
+        let tmp2 = unsafe { std::mem::transmute::<Self, [u8; 32]>(*self) };
+        match n {
+            0 => return *self,
+            1 => {
+                tmp1 = unsafe {
+                    std::mem::transmute::<Self, [u8; 32]>(x86_64::_mm256_srli_si256(*self, 1))
+                };
+                tmp1[15] = tmp2[16];
+            }
+            2 => {
+                tmp1 = unsafe {
+                    std::mem::transmute::<Self, [u8; 32]>(x86_64::_mm256_srli_si256(*self, 2))
+                };
+                tmp1[15] = tmp2[17];
+                tmp1[14] = tmp2[16];
+            }
+            _ => unreachable!(),
+        }
+        unsafe { std::mem::transmute::<[u8; 32], Self>(tmp1) }
+    }
+
+    #[inline(always)]
+    fn shr(&self, n: usize) -> Self {
+        match n {
+            0 => *self,
+            1 => unsafe { x86_64::_mm256_srli_epi64(*self, 1) },
+            2 => unsafe { x86_64::_mm256_srli_epi64(*self, 2) },
+            3 => unsafe { x86_64::_mm256_srli_epi64(*self, 3) },
+            4 => unsafe { x86_64::_mm256_srli_epi64(*self, 4) },
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline(always)]
+    fn cmp_eq_byte(&self, byte: u8) -> Self {
+        let tmp = unsafe { x86_64::_mm256_cmpeq_epi8(*self, Self::splat(byte)) };
+        unsafe { x86_64::_mm256_and_si256(tmp, Self::splat(1)) }
+    }
+
+    #[inline(always)]
+    fn has_bytes_less_than(&self, n: u8) -> bool {
+        let tmp1 = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(n + 1)) };
+        let tmp2 = unsafe { x86_64::_mm256_andnot_si256(tmp1, Self::splat(0xff)) };
+        !tmp2.is_zero()
+    }
+
+    #[inline(always)]
+    fn bytes_between(&self, a: u8, b: u8) -> Self {
+        let tmp2 = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(a)) };
+        let tmp1 = {
+            let tmp = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(b + 1)) };
+            unsafe { x86_64::_mm256_andnot_si256(tmp, Self::splat(0xff)) }
+        };
+        let tmp3 = unsafe { x86_64::_mm256_and_si256(tmp1, tmp2) };
+        unsafe { x86_64::_mm256_and_si256(tmp3, Self::splat(1)) }
+    }
+
+    #[inline(always)]
+    fn bitand(&self, other: Self) -> Self {
+        unsafe { x86_64::_mm256_and_si256(*self, other) }
+    }
+
+    #[inline(always)]
+    fn add(&self, other: Self) -> Self {
+        unsafe { x86_64::_mm256_add_epi8(*self, other) }
+    }
+
+    #[inline(always)]
+    fn sub(&self, other: Self) -> Self {
+        unsafe { x86_64::_mm256_sub_epi8(*self, other) }
+    }
+
+    #[inline(always)]
+    fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self {
+        let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 32]>(*self) };
+        tmp[31 - n] += 1;
+        unsafe { std::mem::transmute::<[u8; 32], Self>(tmp) }
+    }
+
+    #[inline(always)]
+    fn dec_last_lex_byte(&self) -> Self {
+        let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 32]>(*self) };
+        tmp[31] -= 1;
+        unsafe { std::mem::transmute::<[u8; 32], Self>(tmp) }
+    }
+
+    #[inline(always)]
+    fn sum_bytes(&self) -> usize {
+        const ONES: u64 = std::u64::MAX / 0xFF;
+        let tmp = unsafe { std::mem::transmute::<Self, (u64, u64, u64, u64)>(*self) };
+        let a = tmp.0.wrapping_mul(ONES) >> (7 * 8);
+        let b = tmp.1.wrapping_mul(ONES) >> (7 * 8);
+        let c = tmp.2.wrapping_mul(ONES) >> (7 * 8);
+        let d = tmp.3.wrapping_mul(ONES) >> (7 * 8);
+        (a + b + c + d) as usize
     }
 }
 
