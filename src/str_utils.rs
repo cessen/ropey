@@ -53,8 +53,17 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline]
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
-    const ONEMASK: usize = std::usize::MAX / 0xFF;
+    if is_x86_feature_detected!("avx2") {
+        char_to_byte_idx_inner::<x86_64::__m256i>(text, char_idx)
+    } else if is_x86_feature_detected!("sse2") {
+        char_to_byte_idx_inner::<x86_64::__m128i>(text, char_idx)
+    } else {
+        char_to_byte_idx_inner::<usize>(text, char_idx)
+    }
+}
 
+#[inline(always)]
+fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
     let mut char_count = 0;
     let mut ptr = text.as_ptr();
     let start_ptr = text.as_ptr();
@@ -62,7 +71,7 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
 
     // Take care of any unaligned bytes at the beginning
     let end_pre_ptr = {
-        let aligned = ptr as usize + (TSIZE - (ptr as usize & (TSIZE - 1)));
+        let aligned = ptr as usize + (T::size() - (ptr as usize & (T::size() - 1)));
         (end_ptr as usize).min(aligned) as *const u8
     };
     while ptr < end_pre_ptr && char_count <= char_idx {
@@ -72,15 +81,24 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
     }
 
     // Use usize to count multiple bytes at once, using bit-fiddling magic.
-    let mut ptr = ptr as *const usize;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (TSIZE - 1))) as *const usize;
-    while ptr < end_mid_ptr && (char_count + TSIZE) <= char_idx {
+    let mut ptr = ptr as *const T;
+    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (T::size() - 1))) as *const T;
+    let mut acc = T::splat(0);
+    let mut i = 0;
+    while ptr < end_mid_ptr && (char_count + (T::size() * (i + 1))) <= char_idx {
         // Do the clever counting
         let n = unsafe { *ptr };
-        let byte_bools = (!((n >> 7) & (!n >> 6))) & ONEMASK;
-        char_count += (byte_bools.wrapping_mul(ONEMASK)) >> ((TSIZE - 1) * 8);
+        let tmp = n.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
+        acc = acc.add(tmp);
+        i += 1;
+        if i == T::max_acc() || (char_count + (T::size() * (i + 1))) > char_idx {
+            char_count += (T::size() * i) - acc.sum_bytes();
+            i = 0;
+            acc = T::splat(0);
+        }
         ptr = unsafe { ptr.offset(1) };
     }
+    char_count += (T::size() * i) - acc.sum_bytes();
 
     // Take care of any unaligned bytes at the end
     let mut ptr = ptr as *const u8;
@@ -233,7 +251,7 @@ fn count_chars_internal<T: ByteChunk>(text: &str) -> usize {
         ptr = unsafe { ptr.offset(1) };
     }
 
-    // Use usize to count multiple bytes at once, using bit-fiddling magic.
+    // Use chunks to count multiple bytes at once.
     let mut ptr = ptr as *const T;
     let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (T::size() - 1))) as *const T;
     let mut acc = T::splat(0);
