@@ -1051,7 +1051,7 @@ impl Rope {
     //-----------------------------------------------------------------------
     // Internal utilities
 
-    /// Iteratively replaced the root node with its child if it only has
+    /// Iteratively replaces the root node with its child if it only has
     /// one child.
     pub(crate) fn pull_up_singular_nodes(&mut self) {
         while (!self.root.is_leaf()) && self.root.child_count() == 1 {
