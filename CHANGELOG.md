@@ -1,3 +1,14 @@
+# 0.8.3 (2018-07-26)
+
+Peformance improvements:
+
+* Line -> byte/char conversion functions are now notably faster.  This also increases the speed of line fetching.
+
+Bug fixes:
+
+* The low-level line -> byte conversion function would sometimes return a byte index in the middle of the line break for multi-byte line break characters.
+
+
 # 0.8.2 (2018-07-22)
 
 Peformance improvements:
