@@ -503,6 +503,36 @@ proptest! {
             line_to_byte_idx(text, idx),
         );
     }
+
+    #[test]
+    fn pt_byte_to_char_idx(ref text in "\\PC*\\PC*\\PC*", idx in 0usize..200) {
+        let idx = idx % (text.len() + 1);
+        let mut idx_2 = idx;
+        while !text.is_char_boundary(idx_2) {
+            idx_2 -= 1;
+        }
+        assert_eq!(
+            (&text[..idx_2]).chars().count(),
+            byte_to_char_idx(text, idx),
+        );
+    }
+
+    #[test]
+    fn pt_char_to_byte_idx(ref text in "\\PC*\\PC*\\PC*", idx in 0usize..200) {
+        let len_chars = byte_to_char_idx(text, text.len());
+        let idx = idx % (len_chars + 1);
+        if idx < len_chars {
+            assert_eq!(
+                text.char_indices().nth(idx).unwrap().0,
+                char_to_byte_idx(text, idx),
+            );
+        } else {
+            assert_eq!(
+                text.len(),
+                char_to_byte_idx(text, idx),
+            );
+        }
+    }
 }
 
 //===========================================================================

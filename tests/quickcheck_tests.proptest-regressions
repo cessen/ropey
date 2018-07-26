@@ -6,3 +6,4 @@
 # everyone who runs the test benefits from these saved cases.
 xs 3540557325 1860947506 820813434 2332024384 # shrinks to ref char_idxs = []
 xs 3233894212 2188982698 1827697686 2168070367 # shrinks to ref char_idxs = [0]
+xs 3424326027 3025228200 341421083 1156727702 # shrinks to ref text = "0𑊏טּ𑰀®00𑙐AA 🢐0Aⶠ🇦  A0A ຍ \u{11da0} ", idx = 80
