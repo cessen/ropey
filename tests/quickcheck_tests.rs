@@ -5,7 +5,10 @@ extern crate ropey;
 use proptest::collection::vec;
 use proptest::test_runner::Config;
 use ropey::{
-    str_utils::{byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx}, Rope,
+    str_utils::{
+        byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx, line_to_byte_idx,
+    },
+    Rope,
 };
 
 fn string_insert(text: &mut String, char_idx: usize, text_ins: &str) {
@@ -90,6 +93,60 @@ fn byte_to_line_index_slow(text: &str, byte_idx: usize) -> usize {
     }
 
     line_count
+}
+
+/// A slower, but easy-to-verify, line->byte index converter.
+///
+/// We use this to verify the faster-but-more-complex functions in
+/// Ropey.
+fn line_to_byte_index_slow(text: &str, line_idx: usize) -> usize {
+    assert!(line_idx <= byte_to_line_idx(text, text.len()));
+
+    let mut byte_itr = text.bytes();
+    let mut i = 0;
+    let mut line_count = 0;
+
+    while let Some(byte) = byte_itr.next() {
+        if line_count == line_idx {
+            break;
+        }
+
+        match byte {
+            0x0A | 0x0B | 0x0C => {
+                line_count += 1;
+            }
+            0x0D => {
+                // Check for a following LF.  By cloning the itr, we're
+                // peeking without actually stepping the original itr.
+                if let Some(0x0A) = byte_itr.clone().next() {
+                    // Skip the LF, since it's part of the CRLF
+                    // pair.
+                    i += 1;
+                    byte_itr.next();
+                }
+                line_count += 1;
+            }
+            0xC2 => {
+                i += 1;
+                if let Some(0x85) = byte_itr.next() {
+                    line_count += 1;
+                }
+            }
+            0xE2 => {
+                i += 2;
+                let byte2 = byte_itr.next().unwrap();
+                let byte3 = byte_itr.next().unwrap() >> 1;
+                if byte2 == 0x80 && byte3 == 0x54 {
+                    line_count += 1;
+                }
+            }
+            _ => {}
+        }
+
+        i += 1;
+    }
+
+    i
 }
 
 //===========================================================================
@@ -434,6 +491,16 @@ proptest! {
         assert_eq!(
             byte_to_line_index_slow(text, idx),
             byte_to_line_idx(text, idx),
+        );
+    }
+
+    #[test]
+    fn pt_line_to_byte_idx(ref text in "[\\u{000A}\\u{000B}\\u{000C}\\u{000D}\\u{0085}\\u{2028}\\u{2029}]*[\\u{000A}\\u{000B}\\u{000C}\\u{000D}\\u{0085}\\u{2028}\\u{2029}]*", idx in 0usize..200) {
+        let line_count = byte_to_line_idx(text, text.len());
+        let idx = idx % (line_count + 1);
+        assert_eq!(
+            line_to_byte_index_slow(text, idx),
+            line_to_byte_idx(text, idx),
         );
     }
 }

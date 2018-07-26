@@ -7,8 +7,6 @@
 use std;
 use std::arch::x86_64;
 
-const TSIZE: usize = std::mem::size_of::<usize>(); // Shorthand for usize size.
-
 /// Converts from byte-index to char-index in a string slice.
 ///
 /// If the byte is in the middle of a multi-byte char, returns the index of
@@ -80,7 +78,7 @@ fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
         ptr = unsafe { ptr.offset(1) };
     }
 
-    // Use usize to count multiple bytes at once, using bit-fiddling magic.
+    // Use chunks to count multiple bytes at once, using bit-fiddling magic.
     let mut ptr = ptr as *const T;
     let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (T::size() - 1))) as *const T;
     let mut acc = T::splat(0);
@@ -133,33 +131,41 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// line.
 ///
 /// Any past-the-end index will return the one-past-the-end byte index.
-#[inline(never)]
+#[inline]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
+    if is_x86_feature_detected!("avx2") {
+        line_to_byte_idx_inner::<x86_64::__m256i>(text, line_idx)
+    } else if is_x86_feature_detected!("sse2") {
+        line_to_byte_idx_inner::<x86_64::__m128i>(text, line_idx)
+    } else {
+        line_to_byte_idx_inner::<usize>(text, line_idx)
+    }
+}
+
+#[inline(always)]
+fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
     let start_ptr = text.as_ptr();
     let end_ptr = unsafe { start_ptr.offset(text.len() as isize) };
 
     let mut line_break_count = 0;
     let mut ptr = start_ptr;
     while ptr < end_ptr && line_break_count < line_idx {
-        // Use usize to count line breaks in big chunks.
-        if ptr == align_ptr(ptr, TSIZE) {
-            while unsafe { ptr.offset(TSIZE as isize) } < end_ptr && line_break_count < line_idx {
-                let lb = line_break_count + unsafe {
-                    count_line_breaks_in_chunks_from_ptr::<usize>(ptr, end_ptr)
-                }.sum_bytes();
-
-                if lb >= line_idx {
+        // Count line breaks in big chunks.
+        if ptr == align_ptr(ptr, T::size()) {
+            while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
+                let tmp =
+                    unsafe { count_line_breaks_in_chunks_from_ptr::<T>(ptr, end_ptr) }.sum_bytes();
+                if tmp + line_break_count >= line_idx {
                     break;
-                } else {
-                    line_break_count = lb;
                 }
+                line_break_count += tmp;
 
-                ptr = unsafe { ptr.offset(TSIZE as isize) };
+                ptr = unsafe { ptr.offset(T::size() as isize) };
             }
         }
 
         // Count line breaks a byte at a time.
-        let end_aligned_ptr = next_aligned_ptr(ptr, TSIZE).min(end_ptr);
+        let end_aligned_ptr = next_aligned_ptr(ptr, T::size()).min(end_ptr);
         while ptr < end_aligned_ptr && line_break_count < line_idx {
             let byte = unsafe { *ptr };
 
@@ -202,7 +208,11 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
     }
 
     // Finish up
-    ptr as usize - start_ptr as usize
+    let mut byte_idx = ptr as usize - start_ptr as usize;
+    while !text.is_char_boundary(byte_idx) {
+        byte_idx += 1;
+    }
+    byte_idx
 }
 
 /// Converts from line-index to char-index in a string slice.
@@ -293,7 +303,7 @@ fn count_chars_internal<T: ByteChunk>(text: &str) -> usize {
 /// - u{0085}        (Next Line)
 /// - u{2028}        (Line Separator)
 /// - u{2029}        (Paragraph Separator)
-#[inline(never)] // Actually slightly faster when inlining is not allowed
+#[inline]
 pub(crate) fn count_line_breaks(text: &str) -> usize {
     if is_x86_feature_detected!("avx2") {
         count_line_breaks_internal::<x86_64::__m256i>(text)
