@@ -2,7 +2,13 @@
 
 Peformance improvements:
 
-* Line -> byte/char conversion functions are now notably faster.  This also increases the speed of line fetching.
+* Significant speedups across the board by using SIMD for index conversions.
+
+* Loading texts from files or creating Ropes from strings is now significantly faster.
+
+Memory usage improvements:
+
+* Memory overhead reduced from 17% to 10% for freshly loaded text.
 
 Bug fixes:
 
