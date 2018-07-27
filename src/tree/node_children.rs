@@ -284,7 +284,16 @@ impl NodeChildren {
     }
 
     pub fn combined_info(&self) -> TextInfo {
-        self.info().iter().fold(TextInfo::new(), |a, b| a + *b)
+        let info = self.info();
+        let mut acc = TextInfo::new();
+
+        // Doing this with an explicit loop is notably faster than
+        // using an iterator in this case.
+        for i in 0..info.len() {
+            acc += info[i];
+        }
+
+        acc
     }
 
     /// Returns the child index and left-side-accumulated text info of the

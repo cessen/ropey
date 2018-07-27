@@ -51,9 +51,10 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline]
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
-    if is_x86_feature_detected!("avx2") {
-        char_to_byte_idx_inner::<x86_64::__m256i>(text, char_idx)
-    } else if is_x86_feature_detected!("sse2") {
+    // if is_x86_feature_detected!("avx2") {
+    //     char_to_byte_idx_inner::<x86_64::__m256i>(text, char_idx)
+    // } else
+    if is_x86_feature_detected!("sse2") {
         char_to_byte_idx_inner::<x86_64::__m128i>(text, char_idx)
     } else {
         char_to_byte_idx_inner::<usize>(text, char_idx)
@@ -133,9 +134,10 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
-    if is_x86_feature_detected!("avx2") {
-        line_to_byte_idx_inner::<x86_64::__m256i>(text, line_idx)
-    } else if is_x86_feature_detected!("sse2") {
+    // if is_x86_feature_detected!("avx2") {
+    //     line_to_byte_idx_inner::<x86_64::__m256i>(text, line_idx)
+    // } else
+    if is_x86_feature_detected!("sse2") {
         line_to_byte_idx_inner::<x86_64::__m128i>(text, line_idx)
     } else {
         line_to_byte_idx_inner::<usize>(text, line_idx)
@@ -237,9 +239,10 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
 /// count.
 #[inline]
 pub(crate) fn count_chars(text: &str) -> usize {
-    if is_x86_feature_detected!("avx2") {
-        count_chars_internal::<x86_64::__m256i>(text)
-    } else if is_x86_feature_detected!("sse2") {
+    // if is_x86_feature_detected!("avx2") {
+    //     count_chars_internal::<x86_64::__m256i>(text)
+    // } else
+    if is_x86_feature_detected!("sse2") {
         count_chars_internal::<x86_64::__m128i>(text)
     } else {
         count_chars_internal::<usize>(text)
@@ -305,9 +308,10 @@ fn count_chars_internal<T: ByteChunk>(text: &str) -> usize {
 /// - u{2029}        (Paragraph Separator)
 #[inline]
 pub(crate) fn count_line_breaks(text: &str) -> usize {
-    if is_x86_feature_detected!("avx2") {
-        count_line_breaks_internal::<x86_64::__m256i>(text)
-    } else if is_x86_feature_detected!("sse2") {
+    // if is_x86_feature_detected!("avx2") {
+    //     count_line_breaks_internal::<x86_64::__m256i>(text)
+    // } else
+    if is_x86_feature_detected!("sse2") {
         count_line_breaks_internal::<x86_64::__m128i>(text)
     } else {
         count_line_breaks_internal::<usize>(text)
