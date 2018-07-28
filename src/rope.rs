@@ -533,14 +533,14 @@ impl Rope {
             let root = Arc::make_mut(&mut self.root);
 
             let root_info = root.text_info();
-            let (_, seam, needs_fix) = root.remove_char_range(start, end, root_info);
+            let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
 
-            if let Some(seam_idx) = seam {
+            if crlf_seam {
                 // TODO: make fix_crlf_seam() work in terms of char indices,
-                // to avoid this conversion.  In practice, this is unlikey
-                // to have a performance impact, because it runs very rarely,
-                // but still!
-                let seam_idx = root.char_to_byte_and_line(seam_idx).0;
+                // to avoid this conversion.  In practice this is unlikely
+                // to have any real performance impact, because it runs very
+                // rarely.  But still!
+                let seam_idx = root.char_to_byte_and_line(start).0;
                 root.fix_crlf_seam(seam_idx as Count, false);
             }
 

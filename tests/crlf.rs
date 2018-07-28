@@ -51,7 +51,7 @@ fn crlf_removals() {
         tree.remove(start..end);
 
         let start = rng.gen::<usize>() % tree.len_chars().max(1);
-        let end = (start + 6).min(tree.len_chars());
+        let end = (start + 9).min(tree.len_chars());
         tree.remove(start..end);
 
         // Make sure the tree is sound

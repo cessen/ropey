@@ -120,9 +120,9 @@ impl Node {
 
     /// Removes chars in the range `start_idx..end_idx`.
     ///
-    /// Returns:
+    /// Returns (in this order):
     /// - The updated TextInfo for the node.
-    /// - The char offset of a possible CRLF seam (if any).
+    /// - Whether there's a possible CRLF seam that needs fixing.
     /// - Whether fix_after_remove() needs to be run after this.
     ///
     /// WARNING: does not correctly handle all text being removed.  That
@@ -132,7 +132,7 @@ impl Node {
         start_idx: usize,
         end_idx: usize,
         node_info: TextInfo,
-    ) -> (TextInfo, Option<usize>, bool) {
+    ) -> (TextInfo, bool, bool) {
         match *self {
             // If it's a leaf
             Node::Leaf(ref mut leaf_text) => {
@@ -142,14 +142,9 @@ impl Node {
 
                 // Remove text and calculate new info & seam info
                 if byte_start > 0 || byte_end < leaf_text.len() {
-                    let seam = if (byte_start == 0 && leaf_text.as_bytes()[byte_end] == 0x0A)
+                    let seam = (byte_start == 0 && leaf_text.as_bytes()[byte_end] == 0x0A)
                         || (byte_end == leaf_text.len()
-                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D)
-                    {
-                        Some(start_idx)
-                    } else {
-                        None
-                    };
+                            && leaf_text.as_bytes()[byte_start - 1] == 0x0D);
 
                     if (byte_end - byte_start) < leaf_text.len() {
                         let mut info =
@@ -193,21 +188,21 @@ impl Node {
                     // Remove the text
                     leaf_text.remove_range(byte_start, byte_end);
 
-                    (TextInfo::new(), Some(start_idx), false)
+                    (TextInfo::new(), true, false)
                 }
             }
 
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
                 // Shared code for handling children.
-                // Returns:
-                // - Potential CRLF seam offset.
+                // Returns (in this order):
+                // - Whether there's a possible CRLF seam that needs fixing.
                 // - Whether the tree may need invariant fixing.
                 // - Updated TextInfo of the node.
                 let mut handle_child = |children: &mut NodeChildren,
                                         child_i: usize,
                                         c_char_acc: usize|
-                 -> (Option<usize>, bool, TextInfo) {
+                 -> (bool, bool, TextInfo) {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
@@ -225,7 +220,7 @@ impl Node {
                         children.info_mut()[child_i] = new_info;
                     }
 
-                    (seam.map(|i| c_char_acc as usize + i), needs_fix, new_info)
+                    (seam, needs_fix, new_info)
                 };
 
                 // Shared code for merging children
