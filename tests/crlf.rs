@@ -20,13 +20,13 @@ fn crlf_inserts() {
         tree.insert(rng.gen::<usize>() % len, "\r\n\r\n");
         tree.insert(rng.gen::<usize>() % len, "\n\r\n\r");
         tree.insert(rng.gen::<usize>() % len, "\r\n\r\n");
+        tree.insert(rng.gen::<usize>() % len, "こんいちは、");
         tree.insert(rng.gen::<usize>() % len, "\n\r\n\r");
         tree.insert(rng.gen::<usize>() % len, "\r\n\r\n");
         tree.insert(rng.gen::<usize>() % len, "\n\r\n\r");
         tree.insert(rng.gen::<usize>() % len, "\r\n\r\n");
         tree.insert(rng.gen::<usize>() % len, "\n\r\n\r");
-        tree.insert(rng.gen::<usize>() % len, "\r\n\r\n");
-        tree.insert(rng.gen::<usize>() % len, "\n\r\n\r");
+        tree.insert(rng.gen::<usize>() % len, "みんなさん！");
 
         // Make sure the tree is sound
         tree.assert_invariants();
@@ -41,7 +41,7 @@ fn crlf_removals() {
     // Build tree.
     for _ in 0..(1 << 9) {
         let len = tree.len_chars().max(1);
-        tree.insert(rng.gen::<usize>() % len, "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
+        tree.insert(rng.gen::<usize>() % len, "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\nこんいちは、\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\nこんいちは、r\n\r\n\r\n\r\nみんなさん！\n\r\n\r\n\r\nこんいちは、\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\nみんなさん！\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\r\n\r\n\r\n\r\n\r\n\r\nみんなさん！\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\rみんなさん！\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
     }
 
     // Do a bunch of random incoherent removals

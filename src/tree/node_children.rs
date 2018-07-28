@@ -409,49 +409,56 @@ impl NodeChildren {
     }
 
     /// Returns the child indices at the start and end of the given char
-    /// range, and returns their left-side-accumulated text info as well.
+    /// range, and returns their left-side-accumulated char indices as well.
+    ///
+    /// Return is:
+    /// (
+    ///     (left_node_index, left_acc_left_side_char_index),
+    ///     (right_node_index, right_acc_left_side_char_index),
+    /// )
     ///
     /// One-past-the end is valid, and corresponds to the last child.
+    #[inline(always)]
     pub fn search_char_idx_range(
         &self,
         start_idx: usize,
         end_idx: usize,
-    ) -> ((usize, TextInfo), (usize, TextInfo)) {
+    ) -> ((usize, usize), (usize, usize)) {
         debug_assert!(start_idx <= end_idx);
         debug_assert!(self.len() > 0);
 
-        let mut accum = TextInfo::new();
+        let mut accum_char_idx = 0;
         let mut idx = 0;
 
         // Find left child and info
         for info in self.info()[..(self.len() - 1)].iter() {
-            let next_accum = accum + *info;
-            if start_idx < next_accum.chars as usize {
+            let next_accum = accum_char_idx + info.chars as usize;
+            if start_idx < next_accum {
                 break;
             }
-            accum = next_accum;
+            accum_char_idx = next_accum;
             idx += 1;
         }
         let l_child_i = idx;
-        let l_acc_info = accum;
+        let l_acc_info = accum_char_idx;
 
         // Find right child and info
         for info in self.info()[idx..(self.len() - 1)].iter() {
-            let next_accum = accum + *info;
-            if end_idx <= next_accum.chars as usize {
+            let next_accum = accum_char_idx + info.chars as usize;
+            if end_idx <= next_accum {
                 break;
             }
-            accum = next_accum;
+            accum_char_idx = next_accum;
             idx += 1;
         }
 
         #[cfg(any(test, debug_assertions))]
         assert!(
-            end_idx <= (accum.chars + self.info()[idx].chars) as usize,
+            end_idx <= accum_char_idx + self.info()[idx].chars as usize,
             "Index out of bounds."
         );
 
-        ((l_child_i, l_acc_info), (idx, accum))
+        ((l_child_i, l_acc_info), (idx, accum_char_idx))
     }
 
     // Debug function, to help verify tree integrity
@@ -785,23 +792,23 @@ mod tests {
 
         assert_eq!(0, (at_0_0.0).0);
         assert_eq!(0, (at_0_0.1).0);
-        assert_eq!(0, (at_0_0.0).1.chars);
-        assert_eq!(0, (at_0_0.1).1.chars);
+        assert_eq!(0, (at_0_0.0).1);
+        assert_eq!(0, (at_0_0.1).1);
 
         assert_eq!(1, (at_6_6.0).0);
         assert_eq!(1, (at_6_6.1).0);
-        assert_eq!(6, (at_6_6.0).1.chars);
-        assert_eq!(6, (at_6_6.1).1.chars);
+        assert_eq!(6, (at_6_6.0).1);
+        assert_eq!(6, (at_6_6.1).1);
 
         assert_eq!(2, (at_12_12.0).0);
         assert_eq!(2, (at_12_12.1).0);
-        assert_eq!(12, (at_12_12.0).1.chars);
-        assert_eq!(12, (at_12_12.1).1.chars);
+        assert_eq!(12, (at_12_12.0).1);
+        assert_eq!(12, (at_12_12.1).1);
 
         assert_eq!(2, (at_18_18.0).0);
         assert_eq!(2, (at_18_18.1).0);
-        assert_eq!(12, (at_18_18.0).1.chars);
-        assert_eq!(12, (at_18_18.1).1.chars);
+        assert_eq!(12, (at_18_18.0).1);
+        assert_eq!(12, (at_18_18.1).1);
 
         let at_0_6 = children.search_char_idx_range(0, 6);
         let at_6_12 = children.search_char_idx_range(6, 12);
@@ -809,31 +816,31 @@ mod tests {
 
         assert_eq!(0, (at_0_6.0).0);
         assert_eq!(0, (at_0_6.1).0);
-        assert_eq!(0, (at_0_6.0).1.chars);
-        assert_eq!(0, (at_0_6.1).1.chars);
+        assert_eq!(0, (at_0_6.0).1);
+        assert_eq!(0, (at_0_6.1).1);
 
         assert_eq!(1, (at_6_12.0).0);
         assert_eq!(1, (at_6_12.1).0);
-        assert_eq!(6, (at_6_12.0).1.chars);
-        assert_eq!(6, (at_6_12.1).1.chars);
+        assert_eq!(6, (at_6_12.0).1);
+        assert_eq!(6, (at_6_12.1).1);
 
         assert_eq!(2, (at_12_18.0).0);
         assert_eq!(2, (at_12_18.1).0);
-        assert_eq!(12, (at_12_18.0).1.chars);
-        assert_eq!(12, (at_12_18.1).1.chars);
+        assert_eq!(12, (at_12_18.0).1);
+        assert_eq!(12, (at_12_18.1).1);
 
         let at_5_7 = children.search_char_idx_range(5, 7);
         let at_11_13 = children.search_char_idx_range(11, 13);
 
         assert_eq!(0, (at_5_7.0).0);
         assert_eq!(1, (at_5_7.1).0);
-        assert_eq!(0, (at_5_7.0).1.chars);
-        assert_eq!(6, (at_5_7.1).1.chars);
+        assert_eq!(0, (at_5_7.0).1);
+        assert_eq!(6, (at_5_7.1).1);
 
         assert_eq!(1, (at_11_13.0).0);
         assert_eq!(2, (at_11_13.1).0);
-        assert_eq!(6, (at_11_13.0).1.chars);
-        assert_eq!(12, (at_11_13.1).1.chars);
+        assert_eq!(6, (at_11_13.0).1);
+        assert_eq!(12, (at_11_13.1).1);
     }
 
     #[test]

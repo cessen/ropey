@@ -120,9 +120,10 @@ impl Node {
 
     /// Removes chars in the range `start_idx..end_idx`.
     ///
-    /// Returns the updated TextInfo for the node, the byte offset of a
-    /// possible CRLF seam (if any), and whether fix_after_remove()
-    /// needs to be run after this.
+    /// Returns:
+    /// - The updated TextInfo for the node.
+    /// - The char offset of a possible CRLF seam (if any).
+    /// - Whether fix_after_remove() needs to be run after this.
     ///
     /// WARNING: does not correctly handle all text being removed.  That
     /// should be special-cased in calling code.
@@ -145,7 +146,7 @@ impl Node {
                         || (byte_end == leaf_text.len()
                             && leaf_text.as_bytes()[byte_start - 1] == 0x0D)
                     {
-                        Some(byte_start)
+                        Some(start_idx)
                     } else {
                         None
                     };
@@ -192,7 +193,7 @@ impl Node {
                     // Remove the text
                     leaf_text.remove_range(byte_start, byte_end);
 
-                    (TextInfo::new(), Some(byte_start), false)
+                    (TextInfo::new(), Some(start_idx), false)
                 }
             }
 
@@ -205,15 +206,15 @@ impl Node {
                 // - Updated TextInfo of the node.
                 let mut handle_child = |children: &mut NodeChildren,
                                         child_i: usize,
-                                        c_acc_info: TextInfo|
+                                        c_char_acc: usize|
                  -> (Option<usize>, bool, TextInfo) {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
                     let (new_info, seam, needs_fix) =
                         Arc::make_mut(&mut children.nodes_mut()[child_i]).remove_char_range(
-                            start_idx - (c_acc_info.chars as usize).min(start_idx),
-                            (end_idx - c_acc_info.chars as usize).min(tmp_chars),
+                            start_idx - c_char_acc.min(start_idx),
+                            (end_idx - c_char_acc).min(tmp_chars),
                             tmp_info,
                         );
 
@@ -224,11 +225,7 @@ impl Node {
                         children.info_mut()[child_i] = new_info;
                     }
 
-                    (
-                        seam.map(|i| c_acc_info.bytes as usize + i),
-                        needs_fix,
-                        new_info,
-                    )
+                    (seam.map(|i| c_char_acc as usize + i), needs_fix, new_info)
                 };
 
                 // Shared code for merging children
@@ -246,13 +243,13 @@ impl Node {
                 };
 
                 // Get child info for the two char indices
-                let ((l_child_i, l_acc_info), (r_child_i, r_acc_info)) =
+                let ((l_child_i, l_char_acc), (r_child_i, r_char_acc)) =
                     children.search_char_idx_range(start_idx, end_idx);
 
                 // Both indices point into the same child
                 if l_child_i == r_child_i {
                     let info = children.info()[l_child_i];
-                    let (seam, needs_fix, new_info) = handle_child(children, l_child_i, l_acc_info);
+                    let (seam, needs_fix, new_info) = handle_child(children, l_child_i, l_char_acc);
                     merge_child(children, l_child_i);
 
                     return (
@@ -268,8 +265,7 @@ impl Node {
                     // Calculate the start..end range of nodes to be removed.
                     let r_child_exists: bool;
                     let start_i = l_child_i + 1;
-                    let end_i = if (r_acc_info.chars + children.info()[r_child_i].chars) as usize
-                        == end_idx
+                    let end_i = if r_char_acc + children.info()[r_child_i].chars as usize == end_idx
                     {
                         r_child_exists = false;
                         r_child_i + 1
@@ -285,12 +281,12 @@ impl Node {
 
                     // Handle right child
                     if r_child_exists {
-                        let (_, fix, _) = handle_child(children, l_child_i + 1, r_acc_info);
+                        let (_, fix, _) = handle_child(children, l_child_i + 1, r_char_acc);
                         needs_fix |= fix;
                     }
 
                     // Handle left child
-                    let (seam, fix, _) = handle_child(children, l_child_i, l_acc_info);
+                    let (seam, fix, _) = handle_child(children, l_child_i, l_char_acc);
                     needs_fix |= fix;
 
                     // Handle merging

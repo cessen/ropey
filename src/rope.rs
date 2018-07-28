@@ -536,6 +536,11 @@ impl Rope {
             let (_, seam, needs_fix) = root.remove_char_range(start, end, root_info);
 
             if let Some(seam_idx) = seam {
+                // TODO: make fix_crlf_seam() work in terms of char indices,
+                // to avoid this conversion.  In practice, this is unlikey
+                // to have a performance impact, because it runs very rarely,
+                // but still!
+                let seam_idx = root.char_to_byte_and_line(seam_idx).0;
                 root.fix_crlf_seam(seam_idx as Count, false);
             }
             if needs_fix {
