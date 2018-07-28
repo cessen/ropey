@@ -249,14 +249,20 @@ impl Node {
                 // Both indices point into the same child
                 if l_child_i == r_child_i {
                     let info = children.info()[l_child_i];
-                    let (seam, needs_fix, new_info) = handle_child(children, l_child_i, l_char_acc);
-                    merge_child(children, l_child_i);
+                    let (seam, mut needs_fix, new_info) =
+                        handle_child(children, l_child_i, l_char_acc);
 
-                    return (
-                        node_info - info + new_info,
-                        seam,
-                        needs_fix | (children.len() < MIN_CHILDREN),
-                    );
+                    if children.len() > 0 {
+                        merge_child(children, l_child_i);
+
+                        // If we couldn't get all children >= minimum size, then
+                        // we'll need to fix that later.
+                        if children.nodes()[l_child_i.min(children.len() - 1)].is_undersized() {
+                            needs_fix = true;
+                        }
+                    }
+
+                    return (node_info - info + new_info, seam, needs_fix);
                 }
                 // We're dealing with more than one child.
                 else {
@@ -289,18 +295,22 @@ impl Node {
                     let (seam, fix, _) = handle_child(children, l_child_i, l_char_acc);
                     needs_fix |= fix;
 
-                    // Handle merging
-                    let merge_extent = 1 + if r_child_exists { 1 } else { 0 };
-                    for i in (l_child_i..(l_child_i + merge_extent)).rev() {
-                        merge_child(children, i);
+                    if children.len() > 0 {
+                        // Handle merging
+                        let merge_extent = 1 + if r_child_exists { 1 } else { 0 };
+                        for i in (l_child_i..(l_child_i + merge_extent)).rev() {
+                            merge_child(children, i);
+                        }
+
+                        // If we couldn't get all children >= minimum size, then
+                        // we'll need to fix that later.
+                        if children.nodes()[l_child_i.min(children.len() - 1)].is_undersized() {
+                            needs_fix = true;
+                        }
                     }
 
                     // Return
-                    return (
-                        children.combined_info(),
-                        seam,
-                        needs_fix | (children.len() < MIN_CHILDREN),
-                    );
+                    return (children.combined_info(), seam, needs_fix);
                 }
             }
         }

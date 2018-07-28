@@ -543,6 +543,7 @@ impl Rope {
                 let seam_idx = root.char_to_byte_and_line(seam_idx).0;
                 root.fix_crlf_seam(seam_idx as Count, false);
             }
+
             if needs_fix {
                 root.fix_after_remove(start);
             }
@@ -1409,7 +1410,7 @@ mod tests {
     fn remove_03() {
         let mut r = Rope::from_str(TEXT);
 
-        // Make sure crlf pairs get merged properly
+        // Make sure removing nothing actually does nothing.
         r.remove(45..45);
         assert_eq!(r, TEXT);
 
@@ -1421,7 +1422,7 @@ mod tests {
     fn remove_04() {
         let mut r = Rope::from_str(TEXT);
 
-        // Make sure crlf pairs get merged properly
+        // Make sure removing everything works.
         r.remove(0..103);
         assert_eq!(r, "");
 
@@ -1430,36 +1431,48 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn remove_05() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(56..55); // Wrong ordering of start/end
+
+        // Make sure removing a large range works.
+        r.remove(3..100);
+        assert_eq!(r, "Helさん！");
+
+        r.assert_integrity();
+        r.assert_invariants();
     }
 
     #[test]
     #[should_panic]
     fn remove_06() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(102..104); // Removing past the end
+        r.remove(56..55); // Wrong ordering of start/end
     }
 
     #[test]
     #[should_panic]
     fn remove_07() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(103..104); // Removing past the end
+        r.remove(102..104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_08() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(104..104); // Removing past the end
+        r.remove(103..104); // Removing past the end
     }
 
     #[test]
     #[should_panic]
     fn remove_09() {
+        let mut r = Rope::from_str(TEXT);
+        r.remove(104..104); // Removing past the end
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_10() {
         let mut r = Rope::from_str(TEXT);
         r.remove(104..105); // Removing past the end
     }
