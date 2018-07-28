@@ -102,7 +102,7 @@ impl Node {
                 if let Some((r_info, r_node)) = residual {
                     if children.len() < MAX_CHILDREN {
                         children.insert(child_i + 1, (r_info, r_node));
-                        (children.combined_info(), None)
+                        (node_info - info + l_info + r_info, None)
                     } else {
                         let r = children.insert_split(child_i + 1, (r_info, r_node));
                         let r_info = r.combined_info();
@@ -112,7 +112,7 @@ impl Node {
                         )
                     }
                 } else {
-                    (children.combined_info(), None)
+                    (node_info - info + l_info, None)
                 }
             }
         }
@@ -199,10 +199,14 @@ impl Node {
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
                 // Shared code for handling children.
+                // Returns:
+                // - Potential CRLF seam offset.
+                // - Whether the tree may need invariant fixing.
+                // - Updated TextInfo of the node.
                 let mut handle_child = |children: &mut NodeChildren,
                                         child_i: usize,
                                         c_acc_info: TextInfo|
-                 -> (Option<usize>, bool) {
+                 -> (Option<usize>, bool, TextInfo) {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
@@ -220,7 +224,11 @@ impl Node {
                         children.info_mut()[child_i] = new_info;
                     }
 
-                    (seam.map(|i| c_acc_info.bytes as usize + i), needs_fix)
+                    (
+                        seam.map(|i| c_acc_info.bytes as usize + i),
+                        needs_fix,
+                        new_info,
+                    )
                 };
 
                 // Shared code for merging children
@@ -243,11 +251,12 @@ impl Node {
 
                 // Both indices point into the same child
                 if l_child_i == r_child_i {
-                    let (seam, needs_fix) = handle_child(children, l_child_i, l_acc_info);
+                    let info = children.info()[l_child_i];
+                    let (seam, needs_fix, new_info) = handle_child(children, l_child_i, l_acc_info);
                     merge_child(children, l_child_i);
 
                     return (
-                        children.combined_info(),
+                        node_info - info + new_info,
                         seam,
                         needs_fix | (children.len() < MIN_CHILDREN),
                     );
@@ -276,12 +285,12 @@ impl Node {
 
                     // Handle right child
                     if r_child_exists {
-                        let (_, fix) = handle_child(children, l_child_i + 1, r_acc_info);
+                        let (_, fix, _) = handle_child(children, l_child_i + 1, r_acc_info);
                         needs_fix |= fix;
                     }
 
                     // Handle left child
-                    let (seam, fix) = handle_child(children, l_child_i, l_acc_info);
+                    let (seam, fix, _) = handle_child(children, l_child_i, l_acc_info);
                     needs_fix |= fix;
 
                     // Handle merging
