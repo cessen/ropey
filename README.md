@@ -50,10 +50,10 @@ text.write_to(
 
 Ropey is fast and minimizes memory usage:
 
-- On a recent mobile i7 Intel CPU, Ropey performed over 1.6 million small
+- On a recent mobile i7 Intel CPU, Ropey performed over 1.7 million small
   incoherent insertions per second while building up a text roughly 100 MB
   large.  Coherent insertions (i.e. all near the same place in the text) are
-  even faster, doing the same task at over 2.9 million insertions per
+  even faster, doing the same task at over 3.2 million insertions per
   second.
 - Freshly loading a file from disk only incurs about 10% memory overhead.  For
   example, a 100 MB text file will occupy about 110 MB of memory when loaded
