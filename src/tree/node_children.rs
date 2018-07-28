@@ -4,9 +4,7 @@ use std::slice;
 use std::sync::Arc;
 
 use crlf;
-use tree;
-use tree::TextInfo;
-use tree::{Node, MAX_BYTES};
+use tree::{self, Node, TextInfo, MAX_BYTES};
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
 
@@ -348,6 +346,35 @@ impl NodeChildren {
         );
 
         (idx, accum)
+    }
+
+    /// Same as `search_char_idx()` above, except that it only calulates the
+    /// left-side-accumulated _char_ index rather than the full text info.
+    ///
+    /// Return is (child_index, left_acc_char_index)
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    #[inline(always)]
+    pub fn search_char_idx_only(&self, char_idx: usize) -> (usize, usize) {
+        debug_assert!(self.len() > 0);
+
+        let mut accum_char_idx = 0;
+        let mut idx = 0;
+        for info in self.info()[0..(self.len() - 1)].iter() {
+            let next_accum = accum_char_idx + info.chars as usize;
+            if char_idx < next_accum {
+                break;
+            }
+            accum_char_idx = next_accum;
+            idx += 1;
+        }
+
+        debug_assert!(
+            char_idx <= (accum_char_idx + self.info()[idx].chars as usize) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum_char_idx)
     }
 
     /// Returns the child index and left-side-accumulated text info of the

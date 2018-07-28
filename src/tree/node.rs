@@ -90,12 +90,12 @@ impl Node {
                 }
 
                 // Find the child we care about.
-                let (child_i, acc_info) = children.search_char_idx(char_idx);
+                let (child_i, acc_char_idx) = children.search_char_idx_only(char_idx);
                 let info = children.info()[child_i];
 
                 // Handle residual node, if any, and return.
                 let (l_info, mut residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                    .edit_chunk_at_char(char_idx - acc_info.chars as usize, info, edit);
+                    .edit_chunk_at_char(char_idx - acc_char_idx, info, edit);
                 children.info_mut()[child_i] = l_info;
 
                 // Handle the CRLF and main insertion residuals
