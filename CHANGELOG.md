@@ -1,3 +1,18 @@
+# 0.8.4 (2018-07-28)
+
+Performance improvements:
+
+* Minor across-the-board speedups by using SIMD better.
+
+* Significant speedups for Rope::insert()/remove() by being more clever about node info updates.
+
+* Further significant speedup to Rope::remove() due to a (performance-only) bug fix.
+
+Bug fixes:
+
+* Ropey wouldn't compile on non-x86/64 platforms after the introduction of SSE2 optimizations in v0.8.3.  They are now wrapped properly so that Ropey again compiles on other platforms as well.
+
+
 # 0.8.3 (2018-07-26)
 
 Peformance improvements:
