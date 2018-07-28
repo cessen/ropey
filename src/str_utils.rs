@@ -58,10 +58,18 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 #[inline]
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    type T = sse2::__m128i;
-    #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-    type T = usize;
+    {
+        if is_x86_feature_detected!("sse2") {
+            return char_to_byte_idx_inner::<sse2::__m128i>(text, char_idx);
+        }
+    }
 
+    // Fallback for non-sse2 platforms.
+    char_to_byte_idx_inner::<usize>(text, char_idx)
+}
+
+#[inline(always)]
+fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
     let mut char_count = 0;
     let mut ptr = text.as_ptr();
     let start_ptr = text.as_ptr();
