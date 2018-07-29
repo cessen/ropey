@@ -13,10 +13,10 @@ Public-facing:
 - `src/slice.rs`: implementation of `RopeSlice`.
 - `src/iter.rs`: implementations of all the iterators.
 - `src/rope_builder.rs`: implementation of `RopeBuilder`.
+- `src/str_utils.rs`: utility functions that operate on `&str` slices.  For example, functions to count chars and line endings.
 
 Internal-only:
 - `src/tree/`: the low-level implementation of `Rope`'s internals, where most of the meat of the b-tree rope is.
-- `src/str_utils.rs`: utility functions that operate on `&str` slices.  For example, functions to count chars and line endings.
 
 
 ## B-tree Rope
@@ -125,9 +125,10 @@ Phew!  Hopefully that all made sense.
 
 Most of the logic for traversing and modifying the tree is implemented in `node.rs` as part of `Node`.  As a general rule, code that needs to know which node is root is implemented in `Rope`, code that otherwise traverses or modifies the tree is implemented in `Node`, and code that only deals with a single node is implemented in `NodeText` and `NodeChildren`.
 
-The four main functions to really pay attention to are part of `Node`:
+The five main functions to really pay attention to are part of `Node`:
 
-- `Node::edit_char_range()`
+- `Node::edit_chunk_at_char()`
+- `Node::remove_char_range()`
 - `Node::split()`
 - `Node::prepend_at_depth()`
 - `Node::append_at_depth()`.
@@ -137,7 +138,7 @@ These are by far the most complex code in Ropey, and are the core editing operat
 
 ## Tree Invariants
 
-The invariants of the tree that must hold true for the tree to operate correctly are:
+The following invariants must hold true for the tree to operate correctly:
 
 - The standard b-tree invariants:
     - All leaf nodes must be at the same depth.
