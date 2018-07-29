@@ -165,6 +165,16 @@ proptest! {
     }
 
     #[test]
+    fn pt_from_str_crlf(ref text in "[\\u{000A}\\u{000D}]*\\u{000A}\\u{000D}]*\\u{000A}\\u{000D}]*") {
+        let rope = Rope::from_str(&text);
+
+        rope.assert_integrity();
+        rope.assert_invariants();
+
+        assert_eq!(rope, text.as_str());
+    }
+
+    #[test]
     fn pt_insert(char_idx in 0usize..(CHAR_LEN+1), ref ins_text in "\\PC*") {
         let mut rope = Rope::from_str(TEXT);
         let mut text = String::from(TEXT);

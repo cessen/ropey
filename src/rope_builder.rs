@@ -43,8 +43,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 #[derive(Debug, Clone)]
 pub struct RopeBuilder {
     stack: SmallVec<[Arc<Node>; 4]>,
-    buffer1: String,
-    buffer2: String,
+    buffer: String,
 }
 
 impl RopeBuilder {
@@ -56,8 +55,7 @@ impl RopeBuilder {
                 stack.push(Arc::new(Node::new()));
                 stack
             },
-            buffer1: String::new(),
-            buffer2: String::new(),
+            buffer: String::new(),
         }
     }
 
@@ -96,24 +94,23 @@ impl RopeBuilder {
     //-----------------------------------------------------------------
 
     // Internal workings of `append()`.
-    fn append_internal(&mut self, chunk: &str, last_chunk: bool) {
+    fn append_internal(&mut self, chunk: &str, is_last_chunk: bool) {
         let mut chunk = chunk;
 
         // Repeatedly chop text off the end of the input, creating
         // leaf nodes out of them and appending them to the tree.
-        while !chunk.is_empty() || (!self.buffer1.is_empty() && last_chunk) {
+        while !chunk.is_empty() || (!self.buffer.is_empty() && is_last_chunk) {
             // Get the text for the next leaf
-            let (leaf_text, remainder) = self.get_next_leaf_text(chunk, last_chunk);
+            let (leaf_text, remainder) = self.get_next_leaf_text(chunk, is_last_chunk);
             chunk = remainder;
 
             // Append the leaf to the rope
             match leaf_text {
                 NextText::None => break,
                 NextText::UseBuffer => {
-                    let string = NodeText::from_str(&self.buffer1);
-                    self.append_leaf_node(Arc::new(Node::Leaf(string)));
-                    self.buffer1.clear();
-                    std::mem::swap(&mut self.buffer1, &mut self.buffer2);
+                    let leaf_text = NodeText::from_str(&self.buffer);
+                    self.append_leaf_node(Arc::new(Node::Leaf(leaf_text)));
+                    self.buffer.clear();
                 }
                 NextText::String(s) => {
                     self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(s))));
@@ -148,59 +145,60 @@ impl RopeBuilder {
     }
 
     // Returns (next_leaf_text, remaining_text)
+    #[inline(always)]
     fn get_next_leaf_text<'a>(
         &mut self,
         text: &'a str,
-        last_chunk: bool,
+        is_last_chunk: bool,
     ) -> (NextText<'a>, &'a str) {
-        if self.buffer1.is_empty() {
-            if text.len() > MAX_BYTES {
-                // Simplest case: just chop off the end of `text`
-                let split_idx = crlf::find_good_split(MAX_BYTES, text.as_bytes(), true);
-                if (split_idx == 0 || split_idx == text.len()) && !last_chunk {
-                    self.buffer1.push_str(text);
-                    return (NextText::None, "");
+        assert!(
+            self.buffer.len() < MAX_BYTES,
+            "RopeBuilder: buffer is already full when receiving a chunk! \
+             This should never happen!",
+        );
+
+        // Simplest case: empty buffer and enough in `text` for a full
+        // chunk, so just chop a chunk off from `text` and use that.
+        if self.buffer.is_empty() && text.len() >= MAX_BYTES {
+            let split_idx = crlf::find_good_split(
+                MAX_BYTES.min(text.len() - 1), // - 1 to avoid CRLF split.
+                text.as_bytes(),
+                true,
+            );
+            return (NextText::String(&text[..split_idx]), &text[split_idx..]);
+        }
+        // If the buffer + `text` is enough for a full chunk, push enough
+        // of `text` onto the buffer to fill it and use that.
+        else if (text.len() + self.buffer.len()) >= MAX_BYTES {
+            let mut split_idx =
+                crlf::find_good_split(MAX_BYTES - self.buffer.len(), text.as_bytes(), true);
+            if split_idx == text.len() && text.as_bytes()[text.len() - 1] == 0x0D {
+                // Avoid CRLF split.
+                split_idx -= 1;
+            };
+            self.buffer.push_str(&text[..split_idx]);
+            return (NextText::UseBuffer, &text[split_idx..]);
+        }
+        // If we don't have enough text for a full chunk.
+        else {
+            // If it's our last chunk, wrap it all up!
+            if is_last_chunk {
+                if self.buffer.is_empty() {
+                    return if text.is_empty() {
+                        (NextText::None, "")
+                    } else {
+                        (NextText::String(text), "")
+                    };
                 } else {
-                    return (NextText::String(&text[..split_idx]), &text[split_idx..]);
+                    self.buffer.push_str(text);
+                    return (NextText::UseBuffer, "");
                 }
-            } else if !last_chunk {
-                self.buffer1.push_str(text);
+            }
+            // Otherwise, just push to the buffer.
+            else {
+                self.buffer.push_str(text);
                 return (NextText::None, "");
-            } else {
-                return (NextText::String(text), "");
             }
-        } else if (text.len() + self.buffer1.len()) > MAX_BYTES {
-            if self.buffer1.len() > MAX_BYTES {
-                let split_idx = crlf::find_good_split(MAX_BYTES, self.buffer1.as_bytes(), true);
-                self.buffer2.push_str(&self.buffer1[split_idx..]);
-                self.buffer1.truncate(split_idx);
-                return (NextText::UseBuffer, text);
-            } else {
-                let split_idx =
-                    crlf::find_good_split(MAX_BYTES - self.buffer1.len(), text.as_bytes(), true);
-                if split_idx <= (MAX_BYTES - self.buffer1.len())
-                    && (split_idx > 0
-                        || crlf::seam_is_break(self.buffer1.as_bytes(), text.as_bytes()))
-                {
-                    self.buffer1.push_str(&text[..split_idx]);
-                    return (NextText::UseBuffer, &text[split_idx..]);
-                } else {
-                    let split_idx = crlf::find_good_split(
-                        self.buffer1.len() - 1,
-                        self.buffer1.as_bytes(),
-                        true,
-                    );
-                    self.buffer2.push_str(&self.buffer1[split_idx..]);
-                    self.buffer1.truncate(split_idx);
-                    return (NextText::UseBuffer, text);
-                }
-            }
-        } else if !last_chunk {
-            self.buffer1.push_str(text);
-            return (NextText::None, "");
-        } else {
-            self.buffer1.push_str(text);
-            return (NextText::UseBuffer, "");
         }
     }
 
