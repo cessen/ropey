@@ -332,6 +332,26 @@ impl<'a> RopeSlice<'a> {
     //-----------------------------------------------------------------------
     // Fetch methods
 
+    /// Returns the byte at `byte_idx`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
+    #[inline]
+    pub fn byte(&self, byte_idx: usize) -> u8 {
+        // Bounds check
+        assert!(
+            byte_idx < self.len_bytes(),
+            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        let (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(byte_idx);
+        let chunk_rel_byte_idx = byte_idx - chunk_byte_idx;
+        chunk.as_bytes()[chunk_rel_byte_idx]
+    }
+
     /// Returns the char at `char_idx`.
     ///
     /// # Panics
@@ -1196,6 +1216,36 @@ mod tests {
         let s = r.slice(34..96);
 
         s.line_to_char(4);
+    }
+
+    #[test]
+    fn byte_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..100);
+
+        assert_eq!(s.byte(0), b't');
+        assert_eq!(s.byte(10), b' ');
+
+        // UTF-8 encoding of 'な'.
+        assert_eq!(s.byte(s.len_bytes() - 3), 0xE3);
+        assert_eq!(s.byte(s.len_bytes() - 2), 0x81);
+        assert_eq!(s.byte(s.len_bytes() - 1), 0xAA);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..100);
+        s.byte(s.len_bytes());
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(42..42);
+        s.byte(0);
     }
 
     #[test]

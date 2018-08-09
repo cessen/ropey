@@ -804,6 +804,26 @@ impl Rope {
     //-----------------------------------------------------------------------
     // Fetch methods
 
+    /// Returns the byte at `byte_idx`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
+    #[inline]
+    pub fn byte(&self, byte_idx: usize) -> u8 {
+        // Bounds check
+        assert!(
+            byte_idx < self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        let (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(byte_idx);
+        let chunk_rel_byte_idx = byte_idx - chunk_byte_idx;
+        chunk.as_bytes()[chunk_rel_byte_idx]
+    }
+
     /// Returns the char at `char_idx`.
     ///
     /// # Panics
@@ -1872,6 +1892,32 @@ mod tests {
     fn line_to_char_03() {
         let r = Rope::from_str(TEXT_LINES);
         r.line_to_char(5);
+    }
+
+    #[test]
+    fn byte_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(r.byte(0), b'H');
+
+        // UTF-8 for "wide exclamation mark"
+        assert_eq!(r.byte(124), 0xEF);
+        assert_eq!(r.byte(125), 0xBC);
+        assert_eq!(r.byte(126), 0x81);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_02() {
+        let r = Rope::from_str(TEXT);
+        r.byte(127);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_03() {
+        let r = Rope::from_str("");
+        r.byte(0);
     }
 
     #[test]
