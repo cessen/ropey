@@ -1,5 +1,5 @@
 use std;
-use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
+use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
 use iter::{Bytes, Chars, Chunks, Lines};
@@ -615,14 +615,24 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Panics if the start of the range is greater than the end, or the end
     /// is out of bounds (i.e. `end > len_chars()`).
-    pub fn slice<R: CharIdxRange>(&self, char_range: R) -> Self {
-        // Early-out shortcut for taking a slice of the full thing.
-        if char_range.start() == None && char_range.end() == None {
-            return *self;
-        }
+    pub fn slice<R>(&self, char_range: R) -> Self
+    where
+        R: RangeBounds<usize>,
+    {
+        let (start, end) = {
+            let start_range = start_bound_to_num(char_range.start_bound());
+            let end_range = end_bound_to_num(char_range.end_bound());
 
-        let start = char_range.start().unwrap_or(0);
-        let end = char_range.end().unwrap_or_else(|| self.len_chars());
+            // Early-out shortcut for taking a slice of the full thing.
+            if start_range == None && end_range == None {
+                return *self;
+            }
+
+            (
+                start_range.unwrap_or(0),
+                end_range.unwrap_or_else(|| self.len_chars()),
+            )
+        };
 
         // Bounds check
         assert!(start <= end);
@@ -760,6 +770,26 @@ impl<'a> RopeSlice<'a> {
             }
             RopeSlice(RSEnum::Light { text, .. }) => Rope::from_str(text),
         }
+    }
+}
+
+//==============================================================
+
+#[inline(always)]
+pub(crate) fn start_bound_to_num(b: Bound<&usize>) -> Option<usize> {
+    match b {
+        Bound::Included(n) => Some(*n),
+        Bound::Excluded(n) => Some(*n + 1),
+        Bound::Unbounded => None,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn end_bound_to_num(b: Bound<&usize>) -> Option<usize> {
+    match b {
+        Bound::Included(n) => Some(*n + 1),
+        Bound::Excluded(n) => Some(*n),
+        Bound::Unbounded => None,
     }
 }
 
@@ -915,51 +945,6 @@ impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a>) -> bool {
         self.slice(..) == *other
-    }
-}
-
-//===========================================================
-
-/// Trait to generalize over the various `Range` types for `a..b` syntax when
-/// expressing char ranges.
-pub trait CharIdxRange {
-    fn start(&self) -> Option<usize>;
-    fn end(&self) -> Option<usize>;
-}
-
-impl CharIdxRange for Range<usize> {
-    fn start(&self) -> Option<usize> {
-        Some(self.start)
-    }
-    fn end(&self) -> Option<usize> {
-        Some(self.end)
-    }
-}
-
-impl CharIdxRange for RangeTo<usize> {
-    fn start(&self) -> Option<usize> {
-        None
-    }
-    fn end(&self) -> Option<usize> {
-        Some(self.end)
-    }
-}
-
-impl CharIdxRange for RangeFrom<usize> {
-    fn start(&self) -> Option<usize> {
-        Some(self.start)
-    }
-    fn end(&self) -> Option<usize> {
-        None
-    }
-}
-
-impl CharIdxRange for RangeFull {
-    fn start(&self) -> Option<usize> {
-        None
-    }
-    fn end(&self) -> Option<usize> {
-        None
     }
 }
 

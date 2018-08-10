@@ -1,12 +1,13 @@
 use std;
 use std::io;
+use std::ops::RangeBounds;
 use std::ptr;
 use std::sync::Arc;
 
 use crlf;
 use iter::{Bytes, Chars, Chunks, Lines};
 use rope_builder::RopeBuilder;
-use slice::{CharIdxRange, RopeSlice};
+use slice::{end_bound_to_num, start_bound_to_num, RopeSlice};
 use str_utils::{
     byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx, line_to_byte_idx,
     line_to_char_idx,
@@ -508,9 +509,12 @@ impl Rope {
     ///
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
-    pub fn remove<R: CharIdxRange>(&mut self, char_range: R) {
-        let start = char_range.start().unwrap_or(0);
-        let end = char_range.end().unwrap_or_else(|| self.len_chars());
+    pub fn remove<R>(&mut self, char_range: R)
+    where
+        R: RangeBounds<usize>,
+    {
+        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
+        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
 
         // Bounds check
         assert!(start <= end);
@@ -971,9 +975,12 @@ impl Rope {
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
     #[inline]
-    pub fn slice<R: CharIdxRange>(&self, char_range: R) -> RopeSlice {
-        let start = char_range.start().unwrap_or(0);
-        let end = char_range.end().unwrap_or_else(|| self.len_chars());
+    pub fn slice<R>(&self, char_range: R) -> RopeSlice
+    where
+        R: RangeBounds<usize>,
+    {
+        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
+        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
 
         // Bounds check
         assert!(start <= end);
