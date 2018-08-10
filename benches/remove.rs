@@ -8,6 +8,7 @@ use rand::random;
 use ropey::Rope;
 
 const TEXT: &str = include_str!("large.txt");
+const TEXT_SMALL: &str = include_str!("small.txt");
 
 fn mul_string_length(text: &str, n: usize) -> String {
     let mut mtext = String::new();
@@ -162,7 +163,7 @@ fn removals_random_large(bench: &mut Bencher) {
     bench.iter(|| {
         let len = rope.len_chars();
         let start = random::<usize>() % (len + 1);
-        let end = (start + 1500).min(len);
+        let end = (start + TEXT_SMALL.len()).min(len);
         rope.remove(start..end);
 
         if rope.len_bytes() == 0 {
@@ -178,7 +179,7 @@ fn removals_start_large(bench: &mut Bencher) {
     bench.iter(|| {
         let len = rope.len_chars();
         let start = 0;
-        let end = (start + 1500).min(len);
+        let end = (start + TEXT_SMALL.len()).min(len);
         rope.remove(start..end);
 
         if rope.len_bytes() == 0 {
@@ -194,7 +195,7 @@ fn removals_middle_large(bench: &mut Bencher) {
     bench.iter(|| {
         let len = rope.len_chars();
         let start = len / 2;
-        let end = (start + 1500).min(len);
+        let end = (start + TEXT_SMALL.len()).min(len);
         rope.remove(start..end);
 
         if rope.len_bytes() == 0 {
@@ -210,7 +211,7 @@ fn removals_end_large(bench: &mut Bencher) {
     bench.iter(|| {
         let len = rope.len_chars();
         let end = len;
-        let start = end - (1500).min(len);
+        let start = end - TEXT_SMALL.len().min(len);
         rope.remove(start..end);
 
         if rope.len_bytes() == 0 {
