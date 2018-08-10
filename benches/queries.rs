@@ -62,6 +62,14 @@ fn line_to_char(bench: &mut Bencher) {
 
 //----
 
+fn get_byte(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let len = rope.len_bytes();
+    bench.iter(|| {
+        rope.byte(random::<usize>() % len);
+    })
+}
+
 fn get_char(bench: &mut Bencher) {
     let rope = Rope::from_str(TEXT);
     let len = rope.len_chars();
@@ -196,6 +204,7 @@ benchmark_group!(
     char_to_line,
     line_to_byte,
     line_to_char,
+    get_byte,
     get_char,
     get_line,
     chunk_at_byte,
