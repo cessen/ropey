@@ -133,6 +133,10 @@ impl Node {
         end_idx: usize,
         node_info: TextInfo,
     ) -> (TextInfo, bool, bool) {
+        if start_idx == end_idx {
+            return (node_info, false, false);
+        }
+
         match *self {
             // If it's a leaf
             Node::Leaf(ref mut leaf_text) => {
@@ -146,29 +150,25 @@ impl Node {
                         || (byte_end == leaf_text.len()
                             && leaf_text.as_bytes()[byte_start - 1] == 0x0D);
 
-                    if (byte_end - byte_start) < leaf_text.len() {
+                    let seg_len = byte_end - byte_start; // Length of removal segement
+                    if seg_len < (leaf_text.len() - seg_len) {
                         let mut info =
                             node_info - TextInfo::from_str(&leaf_text[byte_start..byte_end]);
 
                         // Check for CRLF pairs on the removal seams, and
                         // adjust line break counts accordingly.
-                        if byte_start != byte_end {
-                            if byte_start > 0
-                                && leaf_text.as_bytes()[byte_start - 1] == 0x0D
-                                && leaf_text.as_bytes()[byte_start] == 0x0A
-                            {
+                        if byte_end < leaf_text.len()
+                            && leaf_text.as_bytes()[byte_end - 1] == 0x0D
+                            && leaf_text.as_bytes()[byte_end] == 0x0A
+                        {
+                            info.line_breaks += 1;
+                        }
+                        if byte_start > 0 && leaf_text.as_bytes()[byte_start - 1] == 0x0D {
+                            if leaf_text.as_bytes()[byte_start] == 0x0A {
                                 info.line_breaks += 1;
                             }
-                            if byte_end < leaf_text.len()
-                                && leaf_text.as_bytes()[byte_end - 1] == 0x0D
-                                && leaf_text.as_bytes()[byte_end] == 0x0A
-                            {
-                                info.line_breaks += 1;
-                            }
-                            if byte_start > 0
-                                && byte_end < leaf_text.len()
-                                && leaf_text.as_bytes()[byte_start - 1] == 0x0D
-                                && leaf_text.as_bytes()[byte_end] == 0x0A
+
+                            if byte_end < leaf_text.len() && leaf_text.as_bytes()[byte_end] == 0x0A
                             {
                                 info.line_breaks -= 1;
                             }
@@ -185,7 +185,7 @@ impl Node {
                         (TextInfo::from_str(&leaf_text), seam, false)
                     }
                 } else {
-                    // Remove the text
+                    // Remove all of the text
                     leaf_text.remove_range(byte_start, byte_end);
 
                     (TextInfo::new(), true, false)
