@@ -38,7 +38,7 @@ fn main() {
             count += 1;
         }
 
-        let mut line = RopeSlice::from_str("");
+        let mut line: RopeSlice = "".into();
         for l in rope.slice(4..500).slice(4..400).lines() {
             line = l;
         }

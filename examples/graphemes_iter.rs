@@ -66,7 +66,7 @@ impl<'a> Iterator for RopeGraphemes<'a> {
         } else {
             let a2 = a - self.cur_chunk_start;
             let b2 = b - self.cur_chunk_start;
-            Some(RopeSlice::from_str(&self.cur_chunk[a2..b2]))
+            Some((&self.cur_chunk[a2..b2]).into())
         }
     }
 }

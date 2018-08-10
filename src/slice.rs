@@ -20,10 +20,10 @@ use tree::{Count, Node};
 /// In other words, the behavior of a `RopeSlice` is always identical to that
 /// of a full `Rope` with the same content.
 #[derive(Copy, Clone)]
-pub struct RopeSlice<'a>(RSEnum<'a>);
+pub struct RopeSlice<'a>(pub(crate) RSEnum<'a>);
 
 #[derive(Copy, Clone)]
-enum RSEnum<'a> {
+pub(crate) enum RSEnum<'a> {
     Full {
         node: &'a Arc<Node>,
         start_byte: Count,
@@ -394,7 +394,7 @@ impl<'a> RopeSlice<'a> {
         if c1 == c2 {
             let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
             let text2 = &text1[..line_to_byte_idx(text1, 1)];
-            RopeSlice::from_str(text2)
+            text2.into()
         } else {
             let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
             let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
@@ -571,6 +571,8 @@ impl<'a> RopeSlice<'a> {
     /// For large slices this method will typically fail and return `None`
     /// because large slices usually cross chunk boundaries in the rope.
     ///
+    /// (Also see the `From` impl for converting to a `Cow<str>`.)
+    ///
     /// Runs in O(1) time.
     #[inline]
     pub fn as_str(&self) -> Option<&'a str> {
@@ -582,30 +584,6 @@ impl<'a> RopeSlice<'a> {
 
     //-----------------------------------------------------------------------
     // Slice creation
-
-    /// Creates a `RopeSlice` directly from a string slice.
-    ///
-    /// Despite its straightforward name, the useful applications of this
-    /// method are somewhat narrow.  It is intended primarily as an aid when
-    /// implementing additional functionality on top of Ropey, where you may
-    /// already have access to a rope chunk and want to directly create a
-    /// `RopeSlice` from it, avoiding the overhead of going through the
-    /// slicing APIs.
-    ///
-    /// Although it is possible to use this to create `RopeSlice`s from
-    /// arbitrary strings, doing so is not especially useful.  For example,
-    /// `Rope`s and `RopeSlice`s can already be directly compared for
-    /// equality with strings and string slices.
-    ///
-    /// Runs in O(N) time, where N is the length of the string slice.
-    #[inline]
-    pub fn from_str(text: &str) -> RopeSlice {
-        RopeSlice(RSEnum::Light {
-            text: text,
-            char_count: count_chars(text) as Count,
-            line_break_count: count_line_breaks(text) as Count,
-        })
-    }
 
     /// Returns a sub-slice of the `RopeSlice` in the given char index range.
     ///
@@ -722,55 +700,6 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Light { text, .. }) => Chunks::from_str(text),
         }
     }
-
-    //-----------------------------------------------------------------------
-    // Conversion methods
-
-    /// Returns the entire text of the `RopeSlice` as a newly allocated `String`.
-    ///
-    /// Runs in O(N) time.
-    pub fn to_string(&self) -> String {
-        let mut text = String::with_capacity(self.len_bytes());
-        for chunk in self.chunks() {
-            text.push_str(chunk);
-        }
-        text
-    }
-
-    /// Creates a new `Rope` from the contents of the `RopeSlice`.
-    ///
-    /// Shares data where possible.
-    ///
-    /// Perhaps unexpectedly, runs in O(log N) time, not O(1) time like
-    /// `Rope` cloning.
-    pub fn to_rope(&self) -> Rope {
-        match *self {
-            RopeSlice(RSEnum::Full {
-                node,
-                start_char,
-                end_char,
-                ..
-            }) => {
-                let mut rope = Rope {
-                    root: Arc::clone(node),
-                };
-
-                // Chop off right end if needed
-                if end_char < node.text_info().chars {
-                    rope.split_off(end_char as usize);
-                }
-
-                // Chop off left end if needed
-                if start_char > 0 {
-                    rope = rope.split_off(start_char as usize);
-                }
-
-                // Return the rope
-                rope
-            }
-            RopeSlice(RSEnum::Light { text, .. }) => Rope::from_str(text),
-        }
-    }
 }
 
 //==============================================================
@@ -794,6 +723,59 @@ pub(crate) fn end_bound_to_num(b: Bound<&usize>) -> Option<usize> {
 }
 
 //==============================================================
+// Conversion impls
+
+/// Creates a `RopeSlice` directly from a string slice.
+///
+/// The useful applications of this are actually somewhat narrow.  It is
+/// intended primarily as an aid when implementing additional functionality
+/// on top of Ropey, where you may already have access to a rope chunk and
+/// want to directly create a `RopeSlice` from it, avoiding the overhead of
+/// going through the slicing APIs.
+///
+/// Although it is possible to use this to create `RopeSlice`s from
+/// arbitrary strings, doing so is not especially useful.  For example,
+/// `Rope`s and `RopeSlice`s can already be directly compared for
+/// equality with strings and string slices.
+///
+/// Runs in O(N) time, where N is the length of the string slice.
+impl<'a> From<&'a str> for RopeSlice<'a> {
+    #[inline]
+    fn from(text: &'a str) -> Self {
+        RopeSlice(RSEnum::Light {
+            text: text,
+            char_count: count_chars(text) as Count,
+            line_break_count: count_line_breaks(text) as Count,
+        })
+    }
+}
+
+impl<'a> From<RopeSlice<'a>> for String {
+    #[inline]
+    fn from(s: RopeSlice<'a>) -> Self {
+        let mut text = String::with_capacity(s.len_bytes());
+        text.extend(s.chunks());
+        text
+    }
+}
+
+/// Attempts to borrow the contents of the slice, but will convert to an
+/// owned string if the contents is not contiguous in memory.
+///
+/// Runs in best case O(1), worst case O(N).
+impl<'a> From<RopeSlice<'a>> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn from(s: RopeSlice<'a>) -> Self {
+        if let Some(text) = s.as_str() {
+            std::borrow::Cow::Borrowed(text)
+        } else {
+            std::borrow::Cow::Owned(String::from(s))
+        }
+    }
+}
+
+//==============================================================
+// Other impls
 
 impl<'a> std::fmt::Debug for RopeSlice<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -1558,40 +1540,65 @@ mod tests {
     }
 
     #[test]
-    fn to_rope_01() {
-        let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(..);
-        let r2 = s.to_rope();
+    fn to_string_01() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(..);
+        let s: String = slc.into();
 
-        assert_eq!(r1, r2);
-        assert_eq!(s, r2);
+        assert_eq!(r, s);
+        assert_eq!(slc, s);
     }
 
     #[test]
-    fn to_rope_02() {
-        let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(0..24);
-        let r2 = s.to_rope();
+    fn to_string_02() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(0..24);
+        let s: String = slc.into();
 
-        assert_eq!(s, r2);
+        assert_eq!(slc, s);
     }
 
     #[test]
-    fn to_rope_03() {
-        let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(13..89);
-        let r2 = s.to_rope();
+    fn to_string_03() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(13..89);
+        let s: String = slc.into();
 
-        assert_eq!(s, r2);
+        assert_eq!(slc, s);
     }
 
     #[test]
-    fn to_rope_04() {
-        let r1 = Rope::from_str(TEXT);
-        let s = r1.slice(13..41);
-        let r2 = s.to_rope();
+    fn to_string_04() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(13..41);
+        let s: String = slc.into();
 
-        assert_eq!(s, r2);
+        assert_eq!(slc, s);
+    }
+
+    #[test]
+    fn to_cow_01() {
+        use std::borrow::Cow;
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(13..83);
+        let cow: Cow<str> = s.into();
+
+        assert_eq!(s, cow);
+    }
+
+    #[test]
+    fn to_cow_02() {
+        use std::borrow::Cow;
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(13..14);
+        let cow: Cow<str> = s.into();
+
+        // Make sure it's borrowed.
+        if let Cow::Owned(_) = cow {
+            panic!("Small Cow conversions should result in a borrow.");
+        }
+
+        assert_eq!(s, cow);
     }
 
     // Iterator tests are in the iter module

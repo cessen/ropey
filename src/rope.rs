@@ -1,5 +1,6 @@
 use std;
 use std::io;
+use std::iter::FromIterator;
 use std::ops::RangeBounds;
 use std::ptr;
 use std::sync::Arc;
@@ -870,7 +871,7 @@ impl Rope {
         if c1 == c2 {
             let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
             let text2 = &text1[..line_to_byte_idx(text1, 1)];
-            RopeSlice::from_str(text2)
+            text2.into()
         } else {
             let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
             let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
@@ -1022,22 +1023,6 @@ impl Rope {
     }
 
     //-----------------------------------------------------------------------
-    // Conversion methods
-
-    /// Returns the entire text of the `Rope` as a newly allocated String.
-    ///
-    /// Runs in O(N) time.
-    #[inline]
-    pub fn to_string(&self) -> String {
-        use iter::Chunks;
-        let mut text = String::with_capacity(self.len_bytes());
-        for chunk in Chunks::new(&self.root) {
-            text.push_str(chunk);
-        }
-        text
-    }
-
-    //-----------------------------------------------------------------------
     // Debugging
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
@@ -1100,6 +1085,143 @@ impl Rope {
 }
 
 //==============================================================
+// Conversion impls
+
+impl<'a> From<&'a str> for Rope {
+    #[inline]
+    fn from(text: &'a str) -> Self {
+        Rope::from_str(text)
+    }
+}
+
+impl<'a> From<std::borrow::Cow<'a, str>> for Rope {
+    #[inline]
+    fn from(text: std::borrow::Cow<'a, str>) -> Self {
+        Rope::from_str(&text)
+    }
+}
+
+impl From<String> for Rope {
+    #[inline]
+    fn from(text: String) -> Self {
+        Rope::from_str(&text)
+    }
+}
+
+/// Will share data where possible.
+///
+/// Runs in O(log N) time.
+impl<'a> From<RopeSlice<'a>> for Rope {
+    fn from(s: RopeSlice<'a>) -> Self {
+        use slice::RSEnum;
+        match s {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_char,
+                end_char,
+                ..
+            }) => {
+                let mut rope = Rope {
+                    root: Arc::clone(node),
+                };
+
+                // Chop off right end if needed
+                if end_char < node.text_info().chars {
+                    rope.split_off(end_char as usize);
+                }
+
+                // Chop off left end if needed
+                if start_char > 0 {
+                    rope = rope.split_off(start_char as usize);
+                }
+
+                // Return the rope
+                rope
+            }
+            RopeSlice(RSEnum::Light { text, .. }) => Rope::from_str(text),
+        }
+    }
+}
+
+impl From<Rope> for String {
+    #[inline]
+    fn from(r: Rope) -> Self {
+        String::from(&r)
+    }
+}
+
+impl<'a> From<&'a Rope> for String {
+    #[inline]
+    fn from(r: &'a Rope) -> Self {
+        let mut text = String::with_capacity(r.len_bytes());
+        text.extend(r.chunks());
+        text
+    }
+}
+
+impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn from(r: Rope) -> Self {
+        std::borrow::Cow::Owned(String::from(r))
+    }
+}
+
+/// Attempts to borrow the contents of the `Rope`, but will convert to an
+/// owned string if the contents is not contiguous in memory.
+///
+/// Runs in best case O(1), worst case O(N).
+impl<'a> From<&'a Rope> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn from(r: &'a Rope) -> Self {
+        if let Node::Leaf(ref text) = *r.root {
+            std::borrow::Cow::Borrowed(text)
+        } else {
+            std::borrow::Cow::Owned(String::from(r))
+        }
+    }
+}
+
+impl<'a> FromIterator<&'a str> for Rope {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = &'a str>,
+    {
+        let mut builder = RopeBuilder::new();
+        for chunk in iter {
+            builder.append(chunk);
+        }
+        builder.finish()
+    }
+}
+
+impl<'a> FromIterator<std::borrow::Cow<'a, str>> for Rope {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = std::borrow::Cow<'a, str>>,
+    {
+        let mut builder = RopeBuilder::new();
+        for chunk in iter {
+            builder.append(&chunk);
+        }
+        builder.finish()
+    }
+}
+
+impl FromIterator<String> for Rope {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = String>,
+    {
+        let mut builder = RopeBuilder::new();
+        for chunk in iter {
+            builder.append(&chunk);
+        }
+        builder.finish()
+    }
+}
+
+//==============================================================
+// Other impls
 
 impl std::fmt::Debug for Rope {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -2192,6 +2314,82 @@ mod tests {
 
         assert_eq!(r, s);
         assert_eq!(s, r);
+    }
+
+    #[test]
+    fn to_string_01() {
+        let r = Rope::from_str(TEXT);
+        let s: String = (&r).into();
+
+        assert_eq!(r, s);
+    }
+
+    #[test]
+    fn to_cow_01() {
+        use std::borrow::Cow;
+        let r = Rope::from_str(TEXT);
+        let cow: Cow<str> = (&r).into();
+
+        assert_eq!(r, cow);
+    }
+
+    #[test]
+    fn to_cow_02() {
+        use std::borrow::Cow;
+        let r = Rope::from_str("a");
+        let cow: Cow<str> = (&r).into();
+
+        // Make sure it's borrowed.
+        if let Cow::Owned(_) = cow {
+            panic!("Small Cow conversions should result in a borrow.");
+        }
+
+        assert_eq!(r, cow);
+    }
+
+    #[test]
+    fn from_rope_slice_01() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(..);
+        let r2: Rope = s.into();
+
+        assert_eq!(r1, r2);
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn from_rope_slice_02() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(0..24);
+        let r2: Rope = s.into();
+
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn from_rope_slice_03() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(13..89);
+        let r2: Rope = s.into();
+
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn from_rope_slice_04() {
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(13..41);
+        let r2: Rope = s.into();
+
+        assert_eq!(s, r2);
+    }
+
+    #[test]
+    fn from_iter_01() {
+        let r1 = Rope::from_str(TEXT);
+        let r2: Rope = Rope::from_iter(r1.chunks());
+
+        assert_eq!(r1, r2);
     }
 
     // Iterator tests are in the iter module

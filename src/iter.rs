@@ -211,12 +211,12 @@ impl<'a> Iterator for Lines<'a> {
                     return None;
                 } else if text.len() == 0 {
                     *done = true;
-                    return Some(RopeSlice::from_str(""));
+                    return Some("".into());
                 } else {
                     let split_idx = line_to_byte_idx(text, 1);
                     let t = &text[..split_idx];
                     *text = &text[split_idx..];
-                    return Some(RopeSlice::from_str(t));
+                    return Some(t.into());
                 }
             }
         }
