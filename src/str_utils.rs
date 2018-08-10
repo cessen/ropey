@@ -434,7 +434,8 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
     if !sp_1_flags.is_zero() {
         let sp_2_flags = c.cmp_eq_byte(0x80).shift_back_lex(1).bitand(sp_1_flags);
         if !sp_2_flags.is_zero() {
-            let sp_3_flags = c.shr(1)
+            let sp_3_flags = c
+                .shr(1)
                 .bitand(T::splat(!0x80))
                 .cmp_eq_byte(0x54)
                 .shift_back_lex(2);

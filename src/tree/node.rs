@@ -982,12 +982,12 @@ mod tests {
         use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
-        let nodel = Node::Leaf(NodeText::from_str(&iter::repeat("\n")
-            .take(MAX_BYTES - 1)
-            .collect::<String>()));
-        let noder = Node::Leaf(NodeText::from_str(&iter::repeat("\n")
-            .take(MAX_BYTES)
-            .collect::<String>()));
+        let nodel = Node::Leaf(NodeText::from_str(
+            &iter::repeat("\n").take(MAX_BYTES - 1).collect::<String>(),
+        ));
+        let noder = Node::Leaf(NodeText::from_str(
+            &iter::repeat("\n").take(MAX_BYTES).collect::<String>(),
+        ));
         let mut children = NodeChildren::new();
         children.push((nodel.text_info(), Arc::new(nodel)));
         children.push((noder.text_info(), Arc::new(noder)));
@@ -1010,12 +1010,12 @@ mod tests {
         use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
-        let nodel = Node::Leaf(NodeText::from_str(&iter::repeat("\r")
-            .take(MAX_BYTES)
-            .collect::<String>()));
-        let noder = Node::Leaf(NodeText::from_str(&iter::repeat("\r")
-            .take(MAX_BYTES - 1)
-            .collect::<String>()));
+        let nodel = Node::Leaf(NodeText::from_str(
+            &iter::repeat("\r").take(MAX_BYTES).collect::<String>(),
+        ));
+        let noder = Node::Leaf(NodeText::from_str(
+            &iter::repeat("\r").take(MAX_BYTES - 1).collect::<String>(),
+        ));
         let mut children = NodeChildren::new();
         children.push((nodel.text_info(), Arc::new(nodel)));
         children.push((noder.text_info(), Arc::new(noder)));
