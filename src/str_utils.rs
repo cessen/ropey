@@ -21,15 +21,13 @@ use std::arch::x86_64 as sse2;
 /// Any past-the-end index will return the one-past-the-end char index.
 #[inline]
 pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
-    if byte_idx == 0 {
-        return 0;
-    } else if byte_idx >= text.len() {
-        return count_chars(text);
-    } else {
-        return count_chars(unsafe {
-            std::str::from_utf8_unchecked(&text.as_bytes()[0..(byte_idx + 1)])
-        }) - 1;
+    let mut count = count_chars(unsafe {
+        std::str::from_utf8_unchecked(&text.as_bytes()[0..(byte_idx + 1).min(text.len())])
+    });
+    if byte_idx < text.len() {
+        count -= 1;
     }
+    count
 }
 
 /// Converts from byte-index to line-index in a string slice.
