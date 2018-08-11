@@ -582,27 +582,17 @@ impl Rope {
             Rope::new()
         } else {
             // Do the split
-            let mut new_rope_root = Arc::new(Arc::make_mut(&mut self.root).split(char_idx));
+            let mut new_rope = Rope {
+                root: Arc::new(Arc::make_mut(&mut self.root).split(char_idx)),
+            };
 
             // Fix up the edges
             Arc::make_mut(&mut self.root).zip_fix_right();
-            Arc::make_mut(&mut new_rope_root).zip_fix_left();
+            Arc::make_mut(&mut new_rope.root).zip_fix_left();
             self.pull_up_singular_nodes();
+            new_rope.pull_up_singular_nodes();
 
-            while (!new_rope_root.is_leaf()) && new_rope_root.child_count() == 1 {
-                let child = if let Node::Internal(ref children) = *new_rope_root {
-                    Arc::clone(&children.nodes()[0])
-                } else {
-                    unreachable!()
-                };
-
-                new_rope_root = child;
-            }
-
-            // Return right rope
-            Rope {
-                root: new_rope_root,
-            }
+            new_rope
         }
     }
 
@@ -612,7 +602,11 @@ impl Rope {
             let mut other = other;
             std::mem::swap(self, &mut other);
         } else if other.len_chars() > 0 {
-            let seam_byte_i = self.root.text_info().bytes;
+            let seam_byte_i = if other.char(0) == '\n' {
+                Some(self.root.text_info().bytes)
+            } else {
+                None
+            };
 
             let l_depth = self.root.depth();
             let r_depth = other.root.depth();
@@ -639,7 +633,9 @@ impl Rope {
                 *self = other;
             };
 
-            Arc::make_mut(&mut self.root).fix_crlf_seam(seam_byte_i, true);
+            if let Some(i) = seam_byte_i {
+                Arc::make_mut(&mut self.root).fix_crlf_seam(i, true);
+            }
         }
     }
 
@@ -1816,6 +1812,19 @@ mod tests {
 
         r.append(r2);
         assert_eq!(r, TEXT);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn append_07() {
+        let mut r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
+        let r2 = Rope::from_str("\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
+
+        r.append(r2);
+        assert_eq!(r, "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
+        assert_eq!(r.len_lines(), 24);
 
         r.assert_integrity();
         r.assert_invariants();
