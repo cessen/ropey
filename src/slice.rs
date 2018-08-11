@@ -381,12 +381,14 @@ impl<'a> RopeSlice<'a> {
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     #[inline]
     pub fn line(&self, line_idx: usize) -> RopeSlice<'a> {
+        let len_lines = self.len_lines();
+
         // Bounds check
         assert!(
-            line_idx < self.len_lines(),
+            line_idx < len_lines,
             "Attempt to index past end of slice: line index {}, slice line length {}",
             line_idx,
-            self.len_lines()
+            len_lines
         );
 
         let (chunk_1, _, c1, l1) = self.chunk_at_line_break(line_idx);
@@ -394,7 +396,11 @@ impl<'a> RopeSlice<'a> {
         if c1 == c2 {
             let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
             let text2 = &text1[..line_to_byte_idx(text1, 1)];
-            text2.into()
+            RopeSlice(RSEnum::Light {
+                text: text2,
+                char_count: count_chars(text2) as Count,
+                line_break_count: if line_idx == (len_lines - 1) { 0 } else { 1 },
+            })
         } else {
             let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
             let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
@@ -1253,9 +1259,23 @@ mod tests {
         // "'s a fine day, isn't it?\nAren't you glad \
         //  we're alive?\nこんにちは、みん"
 
-        assert_eq!(s.line(0), "'s a fine day, isn't it?\n");
-        assert_eq!(s.line(1), "Aren't you glad we're alive?\n");
-        assert_eq!(s.line(2), "こんにちは、みん");
+        let l0 = s.line(0);
+        assert_eq!(l0, "'s a fine day, isn't it?\n");
+        assert_eq!(l0.len_bytes(), 25);
+        assert_eq!(l0.len_chars(), 25);
+        assert_eq!(l0.len_lines(), 2);
+
+        let l1 = s.line(1);
+        assert_eq!(l1, "Aren't you glad we're alive?\n");
+        assert_eq!(l1.len_bytes(), 29);
+        assert_eq!(l1.len_chars(), 29);
+        assert_eq!(l1.len_lines(), 2);
+
+        let l2 = s.line(2);
+        assert_eq!(l2, "こんにちは、みん");
+        assert_eq!(l2.len_bytes(), 24);
+        assert_eq!(l2.len_chars(), 8);
+        assert_eq!(l2.len_lines(), 1);
     }
 
     #[test]
@@ -1295,6 +1315,20 @@ mod tests {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
         s.line(3);
+    }
+
+    #[test]
+    fn line_06() {
+        let r = Rope::from_str("1\n2\n3\n4\n5\n6\n7\n8");
+        let s = r.slice(1..11);
+        // "\n2\n3\n4\n5\n6"
+
+        assert_eq!(s.line(0).len_lines(), 2);
+        assert_eq!(s.line(1).len_lines(), 2);
+        assert_eq!(s.line(2).len_lines(), 2);
+        assert_eq!(s.line(3).len_lines(), 2);
+        assert_eq!(s.line(4).len_lines(), 2);
+        assert_eq!(s.line(5).len_lines(), 1);
     }
 
     #[test]

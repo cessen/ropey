@@ -854,12 +854,17 @@ impl Rope {
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     #[inline]
     pub fn line(&self, line_idx: usize) -> RopeSlice {
+        use slice::RSEnum;
+        use str_utils::count_chars;
+
+        let len_lines = self.len_lines();
+
         // Bounds check
         assert!(
-            line_idx < self.len_lines(),
+            line_idx < len_lines,
             "Attempt to index past end of Rope: line index {}, Rope line length {}",
             line_idx,
-            self.len_lines()
+            len_lines
         );
 
         let (chunk_1, _, c1, l1) = self.chunk_at_line_break(line_idx);
@@ -867,7 +872,11 @@ impl Rope {
         if c1 == c2 {
             let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
             let text2 = &text1[..line_to_byte_idx(text1, 1)];
-            text2.into()
+            RopeSlice(RSEnum::Light {
+                text: text2,
+                char_count: count_chars(text2) as Count,
+                line_break_count: if line_idx == (len_lines - 1) { 0 } else { 1 },
+            })
         } else {
             let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
             let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
@@ -2086,10 +2095,29 @@ mod tests {
     fn line_01() {
         let r = Rope::from_str(TEXT_LINES);
 
-        assert_eq!(r.line(0), "Hello there!  How're you doing?\n");
-        assert_eq!(r.line(1), "It's a fine day, isn't it?\n");
-        assert_eq!(r.line(2), "Aren't you glad we're alive?\n");
-        assert_eq!(r.line(3), "こんにちは、みんなさん！");
+        let l0 = r.line(0);
+        assert_eq!(l0, "Hello there!  How're you doing?\n");
+        assert_eq!(l0.len_bytes(), 32);
+        assert_eq!(l0.len_chars(), 32);
+        assert_eq!(l0.len_lines(), 2);
+
+        let l1 = r.line(1);
+        assert_eq!(l1, "It's a fine day, isn't it?\n");
+        assert_eq!(l1.len_bytes(), 27);
+        assert_eq!(l1.len_chars(), 27);
+        assert_eq!(l1.len_lines(), 2);
+
+        let l2 = r.line(2);
+        assert_eq!(l2, "Aren't you glad we're alive?\n");
+        assert_eq!(l2.len_bytes(), 29);
+        assert_eq!(l2.len_chars(), 29);
+        assert_eq!(l2.len_lines(), 2);
+
+        let l3 = r.line(3);
+        assert_eq!(l3, "こんにちは、みんなさん！");
+        assert_eq!(l3.len_bytes(), 36);
+        assert_eq!(l3.len_chars(), 12);
+        assert_eq!(l3.len_lines(), 1);
     }
 
     #[test]
@@ -2125,6 +2153,20 @@ mod tests {
     fn line_05() {
         let r = Rope::from_str(TEXT_LINES);
         r.line(4);
+    }
+
+    #[test]
+    fn line_06() {
+        let r = Rope::from_str("1\n2\n3\n4\n5\n6\n7\n8");
+
+        assert_eq!(r.line(0).len_lines(), 2);
+        assert_eq!(r.line(1).len_lines(), 2);
+        assert_eq!(r.line(2).len_lines(), 2);
+        assert_eq!(r.line(3).len_lines(), 2);
+        assert_eq!(r.line(4).len_lines(), 2);
+        assert_eq!(r.line(5).len_lines(), 2);
+        assert_eq!(r.line(6).len_lines(), 2);
+        assert_eq!(r.line(7).len_lines(), 1);
     }
 
     #[test]
