@@ -21,13 +21,12 @@ use std::arch::x86_64 as sse2;
 /// Any past-the-end index will return the one-past-the-end char index.
 #[inline]
 pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
-    let mut count = count_chars(unsafe {
-        std::str::from_utf8_unchecked(&text.as_bytes()[0..(byte_idx + 1).min(text.len())])
-    });
+    let count = count_chars_in_bytes(&text.as_bytes()[0..(byte_idx + 1).min(text.len())]);
     if byte_idx < text.len() {
-        count -= 1;
+        count - 1
+    } else {
+        count
     }
-    count
 }
 
 /// Converts from byte-index to line-index in a string slice.
@@ -202,10 +201,7 @@ fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
             else if byte == 0xE2 {
                 let next1 = unsafe { ptr.offset(1) };
                 let next2 = unsafe { ptr.offset(2) };
-                if next1 < end_ptr
-                    && next2 < end_ptr
-                    && unsafe { *next1 } == 0x80
-                    && (unsafe { *next2 } >> 1) == 0x54
+                if next2 < end_ptr && unsafe { *next1 } == 0x80 && (unsafe { *next2 } >> 1) == 0x54
                 {
                     line_break_count += 1;
                 }
@@ -245,6 +241,11 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
 /// count.
 #[inline]
 pub(crate) fn count_chars(text: &str) -> usize {
+    count_chars_in_bytes(text.as_bytes())
+}
+
+#[inline]
+pub(crate) fn count_chars_in_bytes(text: &[u8]) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         if is_x86_feature_detected!("sse2") {
@@ -257,7 +258,7 @@ pub(crate) fn count_chars(text: &str) -> usize {
 }
 
 #[inline(always)]
-fn count_chars_internal<T: ByteChunk>(text: &str) -> usize {
+fn count_chars_internal<T: ByteChunk>(text: &[u8]) -> usize {
     let len = text.len();
     let mut ptr = text.as_ptr();
     let end_ptr = unsafe { ptr.offset(len as isize) };
@@ -340,13 +341,13 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
             let mut acc = T::splat(0);
             while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
                 acc = acc.add(unsafe { count_line_breaks_in_chunks_from_ptr::<T>(ptr, end_ptr) });
-                ptr = unsafe { ptr.offset(T::size() as isize) };
                 i += 1;
                 if i == T::max_acc() {
                     i = 0;
                     count += acc.sum_bytes();
                     acc = T::splat(0);
                 }
+                ptr = unsafe { ptr.offset(T::size() as isize) };
             }
             count += acc.sum_bytes();
         }
@@ -381,10 +382,7 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
             else if byte == 0xE2 {
                 let next1 = unsafe { ptr.offset(1) };
                 let next2 = unsafe { ptr.offset(2) };
-                if next1 < end_ptr
-                    && next2 < end_ptr
-                    && unsafe { *next1 } == 0x80
-                    && (unsafe { *next2 } >> 1) == 0x54
+                if next2 < end_ptr && unsafe { *next1 } == 0x80 && (unsafe { *next2 } >> 1) == 0x54
                 {
                     count += 1;
                 }
