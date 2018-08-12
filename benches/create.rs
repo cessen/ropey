@@ -46,11 +46,21 @@ fn from_str_linefeeds(bench: &mut Bencher) {
 
 //----
 
+fn clone(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT_LARGE);
+    bench.iter(|| {
+        let _ = rope.clone();
+    })
+}
+
+//----
+
 benchmark_group!(
     benches,
     from_str_small,
     from_str_medium,
     from_str_large,
-    from_str_linefeeds
+    from_str_linefeeds,
+    clone,
 );
 benchmark_main!(benches);

@@ -222,6 +222,25 @@ fn removals_end_large(bench: &mut Bencher) {
 
 //----
 
+fn initial_remove_after_clone(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let mut rope_clone = rope.clone();
+    let mut i = 0;
+    bench.iter(|| {
+        if i > 32 {
+            i = 0;
+            rope_clone = rope.clone();
+        }
+        let len = rope_clone.len_chars();
+        let start = random::<usize>() % (len + 1);
+        let end = (start + 1).min(len);
+        rope_clone.remove(start..end);
+        i += 1;
+    })
+}
+
+//----
+
 benchmark_group!(
     benches,
     removals_random_small,
@@ -235,6 +254,7 @@ benchmark_group!(
     removals_random_large,
     removals_start_large,
     removals_middle_large,
-    removals_end_large
+    removals_end_large,
+    initial_remove_after_clone
 );
 benchmark_main!(benches);

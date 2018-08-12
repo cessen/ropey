@@ -25,15 +25,15 @@ unicode-segmentation = "1.2.1"
 #-----------------------------------------
 
 [[bench]]
+name = "create"
+harness = false
+
+[[bench]]
 name = "insert"
 harness = false
 
 [[bench]]
 name = "remove"
-harness = false
-
-[[bench]]
-name = "from_str"
 harness = false
 
 [[bench]]

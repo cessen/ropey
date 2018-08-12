@@ -145,6 +145,23 @@ fn inserts_end_large(bench: &mut Bencher) {
 
 //----
 
+fn initial_insert_after_clone(bench: &mut Bencher) {
+    let rope = Rope::from_str(TEXT);
+    let mut rope_clone = rope.clone();
+    let mut i = 0;
+    bench.iter(|| {
+        if i > 32 {
+            i = 0;
+            rope_clone = rope.clone();
+        }
+        let len = rope_clone.len_chars();
+        rope_clone.insert(random::<usize>() % len, "a");
+        i += 1;
+    })
+}
+
+//----
+
 benchmark_group!(
     benches,
     inserts_random_char,
@@ -162,6 +179,7 @@ benchmark_group!(
     inserts_random_large,
     inserts_start_large,
     inserts_middle_large,
-    inserts_end_large
+    inserts_end_large,
+    initial_insert_after_clone
 );
 benchmark_main!(benches);
