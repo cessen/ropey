@@ -81,8 +81,8 @@
 //!
 //! Internally, each `Rope` stores text as a segemented collection of utf8
 //! strings.  The chunk-fetching methods and `Chunks` iterator provide direct
-//! access to those chunks as `&str` slices, allowing client code to work
-//! directly with the underlying utf8 data.
+//! access to those strings (or "chunks") as `&str` slices, allowing client
+//! code to work directly with the underlying utf8 data.
 //!
 //! The chunk-fetching methods and `str_utils` functions are the basic
 //! building blocks that Ropey itself uses to build much of its functionality.
@@ -122,9 +122,9 @@
 //! - `U+2029`          &mdash; Paragraph Separator
 //! - `U+000D` `U+000A` &mdash; CRLF (Carriage Return + Line Feed)
 //!
-//! Additionally, Ropey treats line breaks as being a part of the line they
-//! mark the end of.  That is to say, lines begin immediately _after_ a line
-//! break.
+//! Additionally, Ropey treats line breaks as being a part of the line that
+//! they mark the end of.  That is to say, lines begin immediately _after_ a
+//! line break.
 //!
 //! CRLF pairs are always treated as a single line break, and are never split
 //! across chunks.  Note, however, that slicing can still split them.

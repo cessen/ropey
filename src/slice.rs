@@ -1625,7 +1625,7 @@ mod tests {
         use std::borrow::Cow;
         let r = Rope::from_str(TEXT);
         let s = r.slice(13..14);
-        let cow: Cow<str> = s.into();
+        let cow: Cow<str> = r.slice(13..14).into();
 
         // Make sure it's borrowed.
         if let Cow::Owned(_) = cow {

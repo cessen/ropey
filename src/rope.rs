@@ -2387,6 +2387,15 @@ mod tests {
     #[test]
     fn to_cow_02() {
         use std::borrow::Cow;
+        let r = Rope::from_str(TEXT);
+        let cow: Cow<str> = (r.clone()).into();
+
+        assert_eq!(r, cow);
+    }
+
+    #[test]
+    fn to_cow_03() {
+        use std::borrow::Cow;
         let r = Rope::from_str("a");
         let cow: Cow<str> = (&r).into();
 
