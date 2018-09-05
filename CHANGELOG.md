@@ -1,3 +1,20 @@
+# 0.9.0 (2018-09-04)
+
+Performance improvements:
+
+* Minor performance improvements to a few methods on `Rope` and `RopeSlice`.
+
+New features:
+
+* Added `Rope::byte()` for fetching individual bytes by index.
+
+* Added more conversion functions for `Rope` and `RopeSlice`, in the form of `From` impls.
+
+Breaking changes:
+
+* Removed `Rope::to_string()`, `RopeSlice::from_str()`, `RopeSlice::to_string()`, and `RopeSlice::to_rope()` in favor of `From` impls that do the same thing.
+
+
 # 0.8.4 (2018-07-28)
 
 Performance improvements:

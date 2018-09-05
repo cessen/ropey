@@ -4,13 +4,10 @@
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
-Ropey is a utf8 text buffer for Rust, designed to be the backing text buffer
+Ropey is a utf8 text rope for Rust, designed to be the backing text buffer
 for applications such as text editors.  Ropey is fast, Unicode-safe, has low
 memory overhead, and can handle huge texts and memory-incoherent edits
 without trouble.
-
-Internally it's implemented as a b-tree
-[rope](https://en.wikipedia.org/wiki/Rope_(data_structure)).
 
 ## Example Usage
 
@@ -105,7 +102,7 @@ Clones can be sent to other threads for both reading and writing.
 
 ## Unsafe code
 
-Ropey does use unsafe code to help achieve some of its space and performance
+Ropey uses unsafe code to help achieve some of its space and performance
 characteristics.  Although effort has been put into keeping the unsafe code
 compartmentalized and making it correct, it is nevertheless _not_ recommended
 at this time to use Ropey in software that may face adversarial conditions.
