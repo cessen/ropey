@@ -706,14 +706,13 @@ impl Node {
 
                 if pos_in_child == 0 || pos_in_child == child_len {
                     // Left or right edge, get neighbor and fix seam
-                    let l_child_i;
-                    if pos_in_child == 0 {
+                    let l_child_i = if pos_in_child == 0 {
                         debug_assert!(child_i != 0);
-                        l_child_i = child_i - 1;
+                        child_i - 1
                     } else {
                         debug_assert!(child_i < children.len());
-                        l_child_i = child_i;
-                    }
+                        child_i
+                    };
 
                     // Scope for borrow
                     {
@@ -773,9 +772,9 @@ impl Node {
     /// Returns the chunk that contains the given byte, and the offset
     /// of that byte within the chunk.
     pub fn get_chunk_at_byte_mut(&mut self, byte_idx: usize) -> (&mut NodeText, usize) {
-        match self {
-            &mut Node::Leaf(ref mut text) => return (text, byte_idx),
-            &mut Node::Internal(ref mut children) => {
+        match *self {
+            Node::Leaf(ref mut text) => return (text, byte_idx),
+            Node::Internal(ref mut children) => {
                 let (child_i, acc_info) = children.search_byte_idx(byte_idx);
                 Arc::make_mut(&mut children.nodes_mut()[child_i])
                     .get_chunk_at_byte_mut(byte_idx - acc_info.bytes as usize)
@@ -888,11 +887,10 @@ impl Node {
                         let do_merge = match *children.nodes()[child_i] {
                             Node::Leaf(ref text) => text.len() < MIN_BYTES,
                             Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                        }
-                            || match *children.nodes()[child_i + 1] {
-                                Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                                Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                            };
+                        } || match *children.nodes()[child_i + 1] {
+                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                        };
 
                         if do_merge {
                             did_stuff |= children.merge_distribute(child_i, child_i + 1);

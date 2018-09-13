@@ -281,6 +281,7 @@ impl NodeChildren {
         Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
     pub fn combined_info(&self) -> TextInfo {
         let info = self.info();
         let mut acc = TextInfo::new();

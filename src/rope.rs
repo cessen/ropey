@@ -85,6 +85,7 @@ impl Rope {
     ///
     /// Runs in O(N) time.
     #[inline]
+    #[cfg_attr(feature = "cargo-clippy", allow(should_implement_trait))]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
     }
@@ -192,7 +193,7 @@ impl Rope {
     #[allow(unused_mut)]
     pub fn write_to<T: io::Write>(&self, mut writer: T) -> io::Result<()> {
         for chunk in self.chunks() {
-            writer.write(chunk.as_bytes())?;
+            writer.write_all(chunk.as_bytes())?;
         }
 
         Ok(())
@@ -324,7 +325,7 @@ impl Rope {
             // Otherwise, for small-to-medium sized inserts, iteratively insert in
             // chunks.
             let mut text = text;
-            while text.len() > 0 {
+            while !text.is_empty() {
                 let split_idx = crlf::find_good_split(
                     text.len() - (MAX_BYTES - 4).min(text.len()),
                     text.as_bytes(),

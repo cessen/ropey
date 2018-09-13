@@ -209,7 +209,7 @@ impl<'a> Iterator for Lines<'a> {
             }) => {
                 if *done {
                     return None;
-                } else if text.len() == 0 {
+                } else if text.is_empty() {
                     *done = true;
                     return Some("".into());
                 } else {
