@@ -161,7 +161,7 @@ fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
         if ptr == align_ptr(ptr, T::size()) {
             while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
                 let tmp =
-                    unsafe { count_line_breaks_in_chunks_from_ptr::<T>(ptr, end_ptr) }.sum_bytes();
+                    unsafe { count_line_breaks_in_chunk_from_ptr::<T>(ptr, end_ptr) }.sum_bytes();
                 if tmp + line_break_count >= line_idx {
                     break;
                 }
@@ -340,7 +340,7 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
             let mut i = 0;
             let mut acc = T::splat(0);
             while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
-                acc = acc.add(unsafe { count_line_breaks_in_chunks_from_ptr::<T>(ptr, end_ptr) });
+                acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(ptr, end_ptr) });
                 i += 1;
                 if i == T::max_acc() {
                     i = 0;
@@ -399,7 +399,7 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
 ///
 /// ptr MUST be aligned to T alignment.
 #[inline(always)]
-unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
+unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(
     ptr: *const u8,
     end_ptr: *const u8,
 ) -> T {
@@ -410,7 +410,7 @@ unsafe fn count_line_breaks_in_chunks_from_ptr<T: ByteChunk>(
     // Calculate the flags we're going to be working with.
     let nl_1_flags = c.cmp_eq_byte(0xC2);
     let sp_1_flags = c.cmp_eq_byte(0xE2);
-    let all_flags = c.bytes_between(0x09, 0x0E);
+    let all_flags = c.bytes_between_127(0x09, 0x0E);
     let cr_flags = c.cmp_eq_byte(0x0D);
 
     // Next Line: u{0085}
@@ -493,6 +493,8 @@ fn align_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 
 //======================================================================
 
+/// Interface for working with chunks of bytes at a time, providing the
+/// operations needed for the functionality in str_utils.
 trait ByteChunk: Copy + Clone {
     /// Returns the size of the chunk in bytes.
     fn size() -> usize;
@@ -519,13 +521,11 @@ trait ByteChunk: Copy + Clone {
     /// are set to 0.
     fn cmp_eq_byte(&self, byte: u8) -> Self;
 
-    /// Returns true if any of the bytes in the chunk are < n.
-    fn has_bytes_less_than(&self, n: u8) -> bool;
-
-    /// Compares bytes to see if they're in the non-inclusive range (a, b).
+    /// Compares bytes to see if they're in the non-inclusive range (a, b),
+    /// where a < b <= 127.
     ///
     /// Bytes in the range are set to 1, bytes not in the range are set to 0.
-    fn bytes_between(&self, a: u8, b: u8) -> Self;
+    fn bytes_between_127(&self, a: u8, b: u8) -> Self;
 
     /// Performs a bitwise and on two chunks.
     fn bitand(&self, other: Self) -> Self;
@@ -591,18 +591,12 @@ impl ByteChunk for usize {
     }
 
     #[inline(always)]
-    fn has_bytes_less_than(&self, n: u8) -> bool {
-        const ONES: usize = std::usize::MAX / 0xFF;
-        const ONES_HIGH: usize = ONES << 7;
-        ((self.wrapping_sub(ONES * n as usize)) & !*self & ONES_HIGH) != 0
-    }
-
-    #[inline(always)]
-    fn bytes_between(&self, a: u8, b: u8) -> Self {
+    fn bytes_between_127(&self, a: u8, b: u8) -> Self {
         const ONES: usize = std::usize::MAX / 0xFF;
         const ONES_HIGH: usize = ONES << 7;
         let tmp = *self & (ONES * 127);
-        ((ONES * (127 + b as usize) - tmp & !*self & tmp + (ONES * (127 - a as usize))) & ONES_HIGH)
+        (((ONES * (127 + b as usize) - tmp) & !*self & (tmp + (ONES * (127 - a as usize))))
+            & ONES_HIGH)
             >> 7
     }
 
@@ -700,13 +694,7 @@ impl ByteChunk for sse2::__m128i {
     }
 
     #[inline(always)]
-    fn has_bytes_less_than(&self, n: u8) -> bool {
-        let tmp = unsafe { sse2::_mm_cmplt_epi8(*self, Self::splat(n)) };
-        !tmp.is_zero()
-    }
-
-    #[inline(always)]
-    fn bytes_between(&self, a: u8, b: u8) -> Self {
+    fn bytes_between_127(&self, a: u8, b: u8) -> Self {
         let tmp1 = unsafe { sse2::_mm_cmpgt_epi8(*self, Self::splat(a)) };
         let tmp2 = unsafe { sse2::_mm_cmplt_epi8(*self, Self::splat(b)) };
         let tmp3 = unsafe { sse2::_mm_and_si128(tmp1, tmp2) };
@@ -819,14 +807,7 @@ impl ByteChunk for sse2::__m128i {
 //     }
 
 //     #[inline(always)]
-//     fn has_bytes_less_than(&self, n: u8) -> bool {
-//         let tmp1 = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(n + 1)) };
-//         let tmp2 = unsafe { x86_64::_mm256_andnot_si256(tmp1, Self::splat(0xff)) };
-//         !tmp2.is_zero()
-//     }
-
-//     #[inline(always)]
-//     fn bytes_between(&self, a: u8, b: u8) -> Self {
+//     fn bytes_between_127(&self, a: u8, b: u8) -> Self {
 //         let tmp2 = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(a)) };
 //         let tmp1 = {
 //             let tmp = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(b + 1)) };
@@ -1319,20 +1300,20 @@ mod tests {
     }
 
     #[test]
-    fn has_bytes_less_than_01() {
-        let v: usize = 0x0709080905090609;
-        assert!(v.has_bytes_less_than(0x0A));
-        assert!(v.has_bytes_less_than(0x06));
-        assert!(!v.has_bytes_less_than(0x05));
-    }
-
-    #[test]
-    fn flag_bytes_01() {
+    fn usize_flag_bytes_01() {
         let v: usize = 0xE2_09_08_A6_E2_A6_E2_09;
         assert_eq!(0x00_00_00_00_00_00_00_00, v.cmp_eq_byte(0x07));
         assert_eq!(0x00_00_01_00_00_00_00_00, v.cmp_eq_byte(0x08));
         assert_eq!(0x00_01_00_00_00_00_00_01, v.cmp_eq_byte(0x09));
         assert_eq!(0x00_00_00_01_00_01_00_00, v.cmp_eq_byte(0xA6));
         assert_eq!(0x01_00_00_00_01_00_01_00, v.cmp_eq_byte(0xE2));
+    }
+
+    #[test]
+    fn usize_bytes_between_127_01() {
+        let v: usize = 0x7E_09_00_A6_FF_7F_08_07;
+        assert_eq!(0x01_01_00_00_00_00_01_01, v.bytes_between_127(0x00, 0x7F));
+        assert_eq!(0x00_01_00_00_00_00_01_00, v.bytes_between_127(0x07, 0x7E));
+        assert_eq!(0x00_01_00_00_00_00_00_00, v.bytes_between_127(0x08, 0x7E));
     }
 }
