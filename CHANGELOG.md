@@ -1,3 +1,12 @@
+# 0.9.1 (2018-10-03)
+
+Bug fixes:
+
+* The Lines iterator would sometimes emit an extra blank line when created from a small rope slice.
+
+* The `write_to()` convenience method could potentially write only part of the rope, without any error indication.
+
+
 # 0.9.0 (2018-09-04)
 
 Performance improvements:

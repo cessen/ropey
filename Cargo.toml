@@ -1,6 +1,6 @@
 [package]
 name = "ropey"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 description = "A fast, compact, robust text rope for Rust"
 documentation = "https://docs.rs/ropey"
