@@ -234,6 +234,25 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
 // Internal
 //===========================================================================
 
+/// Returns whether the given string ends in a line break or not.
+#[inline]
+pub(crate) fn ends_with_line_break(text: &str) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    // Find the starting boundary of the last codepoint.
+    let mut i = text.len() - 1;
+    while !text.is_char_boundary(i) {
+        i -= 1;
+    }
+
+    // Check if the last codepoint is a line break.
+    match &text[i..] {
+        "u{000A}" | "u{000B}" | "u{000C}" | "u{000D}" | "u{0085}" | "u{2028}" | "u{2029}" => true,
+        _ => false,
+    }
+}
+
 /// Uses bit-fiddling magic to count utf8 chars really quickly.
 /// We actually count the number of non-starting utf8 bytes, since
 /// they have a consistent starting two-bit pattern.  We then
