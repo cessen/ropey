@@ -248,7 +248,8 @@ pub(crate) fn ends_with_line_break(text: &str) -> bool {
 
     // Check if the last codepoint is a line break.
     match &text[i..] {
-        "u{000A}" | "u{000B}" | "u{000C}" | "u{000D}" | "u{0085}" | "u{2028}" | "u{2029}" => true,
+        "\u{000A}" | "\u{000B}" | "\u{000C}" | "\u{000D}" | "\u{0085}" | "\u{2028}"
+        | "\u{2029}" => true,
         _ => false,
     }
 }
@@ -1334,5 +1335,51 @@ mod tests {
         assert_eq!(0x01_01_00_00_00_00_01_01, v.bytes_between_127(0x00, 0x7F));
         assert_eq!(0x00_01_00_00_00_00_01_00, v.bytes_between_127(0x07, 0x7E));
         assert_eq!(0x00_01_00_00_00_00_00_00, v.bytes_between_127(0x08, 0x7E));
+    }
+
+    #[test]
+    fn ends_with_line_break_01() {
+        assert_eq!(true, ends_with_line_break("\n"));
+        assert_eq!(true, ends_with_line_break("\r"));
+        assert_eq!(true, ends_with_line_break("\u{000A}"));
+        assert_eq!(true, ends_with_line_break("\u{000B}"));
+        assert_eq!(true, ends_with_line_break("\u{000C}"));
+        assert_eq!(true, ends_with_line_break("\u{000D}"));
+        assert_eq!(true, ends_with_line_break("\u{0085}"));
+        assert_eq!(true, ends_with_line_break("\u{2028}"));
+        assert_eq!(true, ends_with_line_break("\u{2029}"));
+    }
+
+    #[test]
+    fn ends_with_line_break_02() {
+        assert_eq!(true, ends_with_line_break("Hi there!\n"));
+        assert_eq!(true, ends_with_line_break("Hi there!\r"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{000A}"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{000B}"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{000C}"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{000D}"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{0085}"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{2028}"));
+        assert_eq!(true, ends_with_line_break("Hi there!\u{2029}"));
+    }
+
+    #[test]
+    fn ends_with_line_break_03() {
+        assert_eq!(false, ends_with_line_break(""));
+        assert_eq!(false, ends_with_line_break("a"));
+        assert_eq!(false, ends_with_line_break("Hi there!"));
+    }
+
+    #[test]
+    fn ends_with_line_break_04() {
+        assert_eq!(false, ends_with_line_break("\na"));
+        assert_eq!(false, ends_with_line_break("\ra"));
+        assert_eq!(false, ends_with_line_break("\u{000A}a"));
+        assert_eq!(false, ends_with_line_break("\u{000B}a"));
+        assert_eq!(false, ends_with_line_break("\u{000C}a"));
+        assert_eq!(false, ends_with_line_break("\u{000D}a"));
+        assert_eq!(false, ends_with_line_break("\u{0085}a"));
+        assert_eq!(false, ends_with_line_break("\u{2028}a"));
+        assert_eq!(false, ends_with_line_break("\u{2029}a"));
     }
 }

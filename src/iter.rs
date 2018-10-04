@@ -457,13 +457,14 @@ mod tests {
     #[test]
     fn lines_01() {
         let r = Rope::from_str(TEXT);
+        let s = r.slice(..);
 
         assert_eq!(34, r.lines().count());
+        assert_eq!(34, s.lines().count());
 
+        // Rope
         let mut lines = r.lines();
-
         assert_eq!("\r\n", lines.next().unwrap());
-
         for _ in 0..16 {
             assert_eq!(
                 "Hello there!  How're you doing?  It's a fine day, \
@@ -476,7 +477,24 @@ mod tests {
                 lines.next().unwrap()
             );
         }
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
 
+        // Slice
+        let mut lines = s.lines();
+        assert_eq!("\r\n", lines.next().unwrap());
+        for _ in 0..16 {
+            assert_eq!(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n",
+                lines.next().unwrap()
+            );
+            assert_eq!(
+                "こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+                lines.next().unwrap()
+            );
+        }
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
@@ -485,10 +503,17 @@ mod tests {
     fn lines_02() {
         let text = "Hello there!\nHow goes it?";
         let r = Rope::from_str(text);
+        let s = r.slice(..);
 
         assert_eq!(2, r.lines().count());
+        assert_eq!(2, s.lines().count());
 
         let mut lines = r.lines();
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines();
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?", lines.next().unwrap());
         assert!(lines.next().is_none());
@@ -496,6 +521,28 @@ mod tests {
 
     #[test]
     fn lines_03() {
+        let text = "Hello there!\nHow goes it?\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(3, r.lines().count());
+        assert_eq!(3, s.lines().count());
+
+        let mut lines = r.lines();
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines();
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn lines_04() {
         let text = "Hello there!\nHow goes it?\nYeah!";
         let r = Rope::from_str(text);
         let s1 = r.slice(..25);
@@ -517,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_04() {
+    fn lines_05() {
         let text = "";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -535,7 +582,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_05() {
+    fn lines_06() {
         let text = "a";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -553,7 +600,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_06() {
+    fn lines_07() {
         let text = "a\nb";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -569,6 +616,48 @@ mod tests {
         let mut lines = s.lines();
         assert_eq!("a\n", lines.next().unwrap());
         assert_eq!("b", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn lines_08() {
+        let text = "\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(2, r.lines().count());
+        assert_eq!(2, s.lines().count());
+
+        let mut lines = r.lines();
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines();
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn lines_09() {
+        let text = "a\nb\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(3, r.lines().count());
+        assert_eq!(3, s.lines().count());
+
+        let mut lines = r.lines();
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines();
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
