@@ -1,3 +1,10 @@
+# 0.9.2 (2018-10-04)
+
+Bug fixes:
+
+* Turns out the previous Line iterator bug fix introduced a different bug.  Fixed!
+
+
 # 0.9.1 (2018-10-03)
 
 Bug fixes:
