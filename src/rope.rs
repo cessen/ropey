@@ -1252,6 +1252,8 @@ impl std::default::Default for Rope {
     }
 }
 
+impl std::cmp::Eq for Rope {}
+
 impl std::cmp::PartialEq<Rope> for Rope {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
@@ -1312,6 +1314,20 @@ impl<'a> std::cmp::PartialEq<Rope> for std::borrow::Cow<'a, str> {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         **self == other.slice(..)
+    }
+}
+
+impl std::cmp::Ord for Rope {
+    #[inline]
+    fn cmp(&self, other: &Rope) -> std::cmp::Ordering {
+        self.slice(..).cmp(&other.slice(..))
+    }
+}
+
+impl std::cmp::PartialOrd<Rope> for Rope {
+    #[inline]
+    fn partial_cmp(&self, other: &Rope) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

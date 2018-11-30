@@ -543,6 +543,15 @@ proptest! {
             );
         }
     }
+
+    #[test]
+    fn pt_cmp(ref text1 in "\\PC*", ref text2 in "\\PC*") {
+        let r1 = Rope::from_str(text1);
+        let r2 = Rope::from_str(text2);
+
+        assert_eq!(r1.cmp(&r2), text1.cmp(text2));
+        assert_eq!(r2.cmp(&r1), text2.cmp(text1));
+    }
 }
 
 //===========================================================================

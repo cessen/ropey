@@ -799,8 +799,9 @@ impl<'a> std::fmt::Display for RopeSlice<'a> {
     }
 }
 
+impl<'a> std::cmp::Eq for RopeSlice<'a> {}
+
 impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
-    #[inline]
     fn eq(&self, other: &RopeSlice<'b>) -> bool {
         if self.len_bytes() != other.len_bytes() {
             return false;
@@ -933,6 +934,66 @@ impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
     #[inline]
     fn eq(&self, other: &RopeSlice<'a>) -> bool {
         self.slice(..) == *other
+    }
+}
+
+impl<'a> std::cmp::Ord for RopeSlice<'a> {
+    fn cmp(&self, other: &RopeSlice<'a>) -> std::cmp::Ordering {
+        let mut chunk_itr_1 = self.chunks();
+        let mut chunk_itr_2 = other.chunks();
+        let mut chunk1 = chunk_itr_1.next().unwrap_or("").as_bytes();
+        let mut chunk2 = chunk_itr_2.next().unwrap_or("").as_bytes();
+
+        loop {
+            if chunk1.len() >= chunk2.len() {
+                if &chunk1[..chunk2.len()] < chunk2 {
+                    return std::cmp::Ordering::Less;
+                } else if &chunk1[..chunk2.len()] > chunk2 {
+                    return std::cmp::Ordering::Greater;
+                }
+                chunk1 = &chunk1[chunk2.len()..];
+                chunk2 = &[];
+            } else {
+                if chunk1 < &chunk2[..chunk1.len()] {
+                    return std::cmp::Ordering::Less;
+                } else if chunk1 > &chunk2[..chunk1.len()] {
+                    return std::cmp::Ordering::Greater;
+                }
+                chunk1 = &[];
+                chunk2 = &chunk2[chunk1.len()..];
+            }
+
+            if chunk1.is_empty() {
+                if let Some(chunk) = chunk_itr_1.next() {
+                    chunk1 = chunk.as_bytes();
+                } else {
+                    break;
+                }
+            }
+
+            if chunk2.is_empty() {
+                if let Some(chunk) = chunk_itr_2.next() {
+                    chunk2 = chunk.as_bytes();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        if self.len_bytes() > other.len_bytes() {
+            return std::cmp::Ordering::Greater;
+        } else if self.len_bytes() < other.len_bytes() {
+            return std::cmp::Ordering::Less;
+        } else {
+            return std::cmp::Ordering::Equal;
+        }
+    }
+}
+
+impl<'a, 'b> std::cmp::PartialOrd<RopeSlice<'b>> for RopeSlice<'a> {
+    #[inline]
+    fn partial_cmp(&self, other: &RopeSlice<'b>) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -1571,6 +1632,29 @@ mod tests {
         let s = r.slice(0..0);
 
         assert_eq!(s, s);
+    }
+
+    #[test]
+    fn cmp_rope_slice_01() {
+        let r1 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
+        let r2 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
+        let s1 = r1.slice(..);
+        let s2 = r2.slice(..);
+
+        assert_eq!(s1.cmp(&s2), std::cmp::Ordering::Equal);
+        assert_eq!(s1.slice(..24).cmp(&s2), std::cmp::Ordering::Less);
+        assert_eq!(s1.cmp(&s2.slice(..24)), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn cmp_rope_slice_02() {
+        let r1 = Rope::from_str("abcdefghijklmnzpqrstuvwxyz");
+        let r2 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
+        let s1 = r1.slice(..);
+        let s2 = r2.slice(..);
+
+        assert_eq!(s1.cmp(&s2), std::cmp::Ordering::Greater);
+        assert_eq!(s2.cmp(&s1), std::cmp::Ordering::Less);
     }
 
     #[test]
