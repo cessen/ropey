@@ -1,5 +1,5 @@
 //! Example of basic search-and-replace functionality implemented on top
-//! of a Ropey rope.
+//! of Ropey.
 //!
 //! Usage:
 //!     search_and_replace <search_pattern> <replacement_text> <input_filepath>
@@ -49,7 +49,7 @@ fn main() {
 ///    operation is constant-time and the two ropes will share most of their
 ///    storage in typical cases.  However, this probably isn't the best
 ///    general solution because it will use a lot of additional space if a
-///    large percentage of the text is bring replaced.
+///    large percentage of the text is being replaced.
 ///
 /// 2. A two-stage approach: first find and collect all the matches, then
 ///    do the replacements on the original rope.  This is a good solution
@@ -58,27 +58,25 @@ fn main() {
 ///    matches themselves can become large.
 ///
 /// 3. A piece-meal approach: search for the first match, replace it, then
-///    restart the match from the end of the replacement, repeat.  This is
-///    a good solution for memory-constrained situations.  However,
-///    computationally it is likely the most expensive when there are a large
-///    number of matches and there are costs associated with repeatedly
-///    restarting the search.
+///    restart the search from there, repeat.  This is a good solution for
+///    memory-constrained situations.  However, computationally it is likely
+///    the most expensive when there are a large number of matches and there
+///    are costs associated with repeatedly restarting the search.
 ///
 /// 4. Combine approaches #2 and #3: collect a fixed number of matches and
-///    replace them, then collect another batch matches and replace them, and
-///    so on.  This is probably the best general solution, because it
-///    combines the best of both worlds: it allows you to collect the matches
-///    in a bounded amount of space, and any costs associated with restarting
-///    the search are amortized across multiple matches.
+///    replace them, then collect another batch of matches and replace them,
+///    and so on.  This is probably the best general solution, because it
+///    combines the best of both #2 and #3: it allows you to collect the
+///    matches in a bounded amount of space, and any costs associated with
+///    restarting the search are amortized over multiple matches.
 ///
 /// In this implementation we take approach #4 because it seems the
 /// all-around best.
 fn search_and_replace(rope: &mut Rope, search_pattern: &str, replacement_text: &str) {
     const BATCH_SIZE: usize = 256;
-
     let replacement_text_len = replacement_text.chars().count();
 
-    let mut head = 0; // Char index of the search/replace head.
+    let mut head = 0; // Keep track of where we are between searches
     let mut matches = Vec::with_capacity(BATCH_SIZE);
     loop {
         // Collect the next batch of matches.  Note that we don't use
@@ -124,8 +122,8 @@ fn search_and_replace(rope: &mut Rope, search_pattern: &str, replacement_text: &
 ///
 /// The important thing, however, is the interface.  For example, a regex
 /// implementation providing an equivalent interface could easily be dropped
-/// in, and the search-and-replace function above would then work with it
-/// quite happily.
+/// in, and the search-and-replace function above would work with it quite
+/// happily.
 struct SearchIter<'a> {
     char_iter: Chars<'a>,
     search_pattern: &'a str,
