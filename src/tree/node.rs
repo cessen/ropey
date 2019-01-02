@@ -623,12 +623,14 @@ impl Node {
     pub fn assert_integrity(&self) {
         match *self {
             Node::Leaf(_) => {}
-            Node::Internal(ref children) => for (info, node) in children.iter() {
-                if *info != node.text_info() {
-                    assert_eq!(*info, node.text_info());
+            Node::Internal(ref children) => {
+                for (info, node) in children.iter() {
+                    if *info != node.text_info() {
+                        assert_eq!(*info, node.text_info());
+                    }
+                    node.assert_integrity();
                 }
-                node.assert_integrity();
-            },
+            }
         }
     }
 
@@ -821,10 +823,11 @@ impl Node {
         if let Node::Internal(ref mut children) = *self {
             let mut did_stuff = false;
             loop {
-                let do_merge = (children.len() > 1) && match *children.nodes()[0] {
-                    Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                    Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                };
+                let do_merge = (children.len() > 1)
+                    && match *children.nodes()[0] {
+                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                    };
 
                 if do_merge {
                     did_stuff |= children.merge_distribute(0, 1);
@@ -849,10 +852,11 @@ impl Node {
             let mut did_stuff = false;
             loop {
                 let last_i = children.len() - 1;
-                let do_merge = (children.len() > 1) && match *children.nodes()[last_i] {
-                    Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                    Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                };
+                let do_merge = (children.len() > 1)
+                    && match *children.nodes()[last_i] {
+                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                    };
 
                 if do_merge {
                     did_stuff |= children.merge_distribute(last_i - 1, last_i);

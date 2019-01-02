@@ -198,7 +198,8 @@ impl<'a> Iterator for Lines<'a> {
                         c + line_to_char_idx(chunk, *line_idx + 1 - l)
                     } else {
                         node.char_count()
-                    }.min(end_char);
+                    }
+                    .min(end_char);
 
                     *line_idx += 1;
 
