@@ -4,10 +4,9 @@
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
-Ropey is a utf8 text rope for Rust, designed to be the backing text buffer
-for applications such as text editors.  Ropey is fast, Unicode-safe, has low
-memory overhead, and can handle huge texts and memory-incoherent edits
-without trouble.
+Ropey is a utf8 text rope for Rust.  Ropey is fast, robust, Unicode-safe, has
+low memory overhead, and can handle huge texts and memory-incoherent edits
+with ease.
 
 ## Example Usage
 
@@ -40,6 +39,35 @@ text.write_to(
     BufWriter::new(File::create("my_great_book.txt")?)
 )?;
 ```
+
+## When Should I Use Ropey?
+
+Ropey is designed and built to be the backing text buffer for applications
+such as text editors, and its design trade-offs reflect that.  Ropey is good
+at:
+
+- Handling frequent edits to medium-to-large texts.  Even on texts that are
+  multiple gigabytes large, edits are measured in single-digit microseconds.
+- Handling Unicode correctly.  It is impossible to create invalid utf8 through
+  Ropey, and all Unicode line endings are correctly tracked including CRLF.
+- Having flat, predictable performance characteristics.  Ropey will never be
+  the source of hiccups or stutters in your software.
+
+On the other hand, Ropey is _not_ good at:
+
+- Handling texts smaller than a couple of kilobytes or so.  That is to say,
+  Ropey will handle them fine, but Ropey allocates space in kilobyte chunks,
+  which introduces unnecessary bloat if your texts are almost always small.
+- Handling texts that are larger than available memory.  Ropey is an in-memory
+  data structure.
+- Getting the best performance for every possible use-case.  Ropey puts work
+  into tracking both line endings and unicode scalar values, which is
+  performance overhead you may not need depending on your use-case.
+
+Keep this in mind when selecting Ropey for your project.  Ropey is very good
+at what it does, but like all software it is designed with certain
+applications in mind.
+
 
 ## Features
 
@@ -121,14 +149,14 @@ Ropey is licensed under the MIT license (LICENSE.md or http://opensource.org/lic
 
 ## Contributing
 
-Contributions are absolutely welcome!  However, please open an issue or email me
-to discuss larger changes, to avoid doing a lot of work that may get rejected.
+Contributions are absolutely welcome!  However, please open an issue or email
+me to discuss larger changes, to avoid doing a lot of work that may get
+rejected.
 
 An overview of Ropey's design can be found [here](https://github.com/cessen/ropey/blob/master/design/design.md).
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in Ropey by you will be licensed as above, without any additional
-terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in Ropey by you will be licensed as above, without any additional terms or conditions.
 
 [crates-io-badge]: https://img.shields.io/crates/v/ropey.svg
 [crates-io-url]: https://crates.io/crates/ropey
