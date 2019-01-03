@@ -1,7 +1,5 @@
-//! Ropey is a utf8 text rope library, designed to be the backing text buffer
-//! for applications such as text editors.  Ropey is fast, Unicode-safe, has
-//! low memory overhead, and can handle huge texts and memory-incoherent edits
-//! without trouble.
+//! Ropey is a utf8 text rope for Rust.  It is fast, robust, and can handle
+//! huge texts and memory-incoherent edits with ease.
 //!
 //! Ropey's atomic unit of text is Unicode scalar values (or `char`s in Rust)
 //! encoded as utf8.  All of Ropey's editing and slicing operations are done
@@ -17,6 +15,7 @@
 //! - [`RopeBuilder`](struct.RopeBuilder.html): an efficient incremental
 //!   `Rope` builder.
 //!
+//!
 //! # A Basic Example
 //!
 //! Let's say we want to open up a file, replace the 516th line (the writing
@@ -30,33 +29,29 @@
 //! use ropey::Rope;
 //!
 //! # fn do_stuff() -> Result<()> {
-//! // Load the file into a Rope.
+//! // Load a text file.
 //! let mut text = Rope::from_reader(
 //!     BufReader::new(File::open("my_great_book.txt")?)
 //! )?;
 //!
-//! // Make sure there are at least 516 lines.
-//! if text.len_lines() >= 516 {
-//!     // Print the 516th line (zero-indexed) to see the terrible
-//!     // writing.
-//!     println!("{}", text.line(515));
+//! // Print the 516th line (zero-indexed) to see the terrible
+//! // writing.
+//! println!("{}", text.line(515));
 //!
-//!     // Get the char indices of the start/end of the line.
-//!     let start_idx = text.line_to_char(515);
-//!     let end_idx = text.line_to_char(516);
+//! // Get the start/end char indices of the line.
+//! let start_idx = text.line_to_char(515);
+//! let end_idx = text.line_to_char(516);
 //!
-//!     // Remove that terrible writing!
-//!     text.remove(start_idx..end_idx);
+//! // Remove the line...
+//! text.remove(start_idx..end_idx);
 //!
-//!     // ...and replace it with something better.
-//!     text.insert(start_idx, "The flowers are... so... dunno.\n");
+//! // ...and replace it with something better.
+//! text.insert(start_idx, "The flowers are... so... dunno.\n");
 //!
-//!     // Let's print our changes, along with the previous few lines
-//!     // for context.  Gotta make sure the writing works!
-//!     let start_idx = text.line_to_char(511);
-//!     let end_idx = text.line_to_char(516);
-//!     println!("{}", text.slice(start_idx..end_idx));
-//! }
+//! // Print the changes, along with the previous few lines for context.
+//! let start_idx = text.line_to_char(511);
+//! let end_idx = text.line_to_char(516);
+//! println!("{}", text.slice(start_idx..end_idx));
 //!
 //! // Write the file back out to disk.
 //! text.write_to(
@@ -66,6 +61,12 @@
 //! # }
 //! # do_stuff().unwrap();
 //! ```
+//!
+//! More examples can be found in the `examples` directory of the git
+//! repository.  Many of those examples demonstrate doing non-trivial things
+//! with Ropey such grapheme handling, search-and-replace, and streaming
+//! loading of non-utf8 text files.
+//!
 //!
 //! # Low-level APIs
 //!
@@ -106,6 +107,7 @@
 //! The chunk-fetching methods in particular are among the fastest functions
 //! that Ropey provides, generally operating in the sub-hundred nanosecond
 //! range for medium-sized (~200kB) documents on recent-ish computer systems.
+//!
 //!
 //! # A Note About Line Endings
 //!

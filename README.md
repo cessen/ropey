@@ -4,9 +4,10 @@
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
-Ropey is a utf8 text rope for Rust.  Ropey is fast, robust, Unicode-safe, has
-low memory overhead, and can handle huge texts and memory-incoherent edits
-with ease.
+Ropey is a utf8 text rope for Rust, designed to be the backing text-buffer for
+applications such as text editors.  Ropey is fast, robust, and can handle huge
+texts and memory-incoherent edits with ease.
+
 
 ## Example Usage
 
@@ -71,6 +72,36 @@ applications in mind.
 
 ## Features
 
+### Strong Unicode support
+Ropey's atomic unit of text is
+[Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
+(or [`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
+encoded as utf8.  All of Ropey's editing and slicing operations are done
+in terms of char indices, which prevents accidental creation of invalid
+utf8 data.
+
+### Line-aware
+
+Ropey knows about line breaks, allowing you to index into and iterate over
+lines of text.
+
+Ropey also recognizes all eight Unicode-specified line breaks:
+line feed, carriage return, carriage return + line feed, vertical tab,
+form feed, next line, line separator, and paragraph separator.
+
+### Rope slices
+
+Ropey has rope slices that allow you to work with just parts of a rope, using
+any of the read-only operations of a full rope including iterators and making
+sub-slices.
+
+### Flexible APIs with low-level access
+
+Although Ropey is intentionally limited in scope, it also provides APIs for
+efficiently accessing and working with its internal text chunk
+representation, allowing additional functionality to be efficiently
+implemented by client code with minimal overhead.
+
 ### Efficient
 
 Ropey is fast and minimizes memory usage:
@@ -86,41 +117,6 @@ Ropey is fast and minimizes memory usage:
 - Cloning ropes is _extremely_ cheap.  Rope clones share data, so an initial
   clone only takes 8 bytes of memory.  After that, memory usage will grow
   incrementally as the clones diverge due to edits.
-
-
-### Strong Unicode support
-Ropey's atomic unit of text is
-[Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
-(or [`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
-encoded as utf8.  All of Ropey's editing and slicing operations are done
-in terms of char indices, which prevents accidental creation of invalid
-utf8 data.
-
-
-### Line-aware
-
-Ropey knows about line breaks, allowing you to index into and iterate over
-lines of text.
-
-Ropey also recognizes all eight Unicode-specified line breaks:
-line feed, carriage return, carriage return + line feed, vertical tab,
-form feed, next line, line separator, and paragraph separator.
-
-
-### Slicing
-
-Ropey has rope slices that allow you to work with just parts of a rope, using
-any of the read-only operations of a full rope including iterators and making
-sub-slices.
-
-
-### Flexible APIs with low-level access
-
-Although Ropey is intentionally limited in scope, it also provides APIs for
-efficiently accessing and working with its internal text chunk
-representation, allowing additional functionality to be efficiently
-implemented by client code with minimal overhead.
-
 
 ### Thread safe
 
