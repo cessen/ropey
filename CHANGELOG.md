@@ -1,3 +1,10 @@
+# 1.0.0 (2019-01-03)
+
+New features:
+
+* Implemented `Eq`, `Ord`, and `PartialOrd` traits for `Rope` and `RopeSlice`.
+
+
 # 0.9.2 (2018-10-04)
 
 Bug fixes:
