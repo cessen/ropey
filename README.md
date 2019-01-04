@@ -92,7 +92,7 @@ form feed, next line, line separator, and paragraph separator.
 ### Rope slices
 
 Ropey has rope slices that allow you to work with just parts of a rope, using
-any of the read-only operations of a full rope including iterators and making
+all the read-only operations of a full rope including iterators and making
 sub-slices.
 
 ### Flexible APIs with low-level access
