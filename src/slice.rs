@@ -15,10 +15,11 @@ use tree::{Count, Node};
 /// Just like standard `&str` slices, `RopeSlice`s behave as if the text in
 /// their range is the only text that exists.  All indexing is relative to
 /// the start of their range, and all iterators and methods that return text
-/// content truncate that content to the range of the slice.
+/// truncate that text to the range of the slice.
 ///
 /// In other words, the behavior of a `RopeSlice` is always identical to that
-/// of a full `Rope` with the same content.
+/// of a full `Rope` created from the same text range.  Nothing should be
+/// surprising here.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a>(pub(crate) RSEnum<'a>);
 

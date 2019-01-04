@@ -17,9 +17,15 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
-/// The primary editing operations available for `Rope` are insertion of text,
-/// deletion of text, splitting a `Rope` in two, and appending one `Rope` to
-/// another.  For example:
+/// Except where otherwise documented, all editing and query operations execute
+/// in worst-case `O(log N)` time in the length of the rope.  `Rope` is designed
+/// to work efficiently even for huge (in the gigabytes) and pathological (all
+/// on one line) texts.
+///
+/// # Editing Operations
+///
+/// The primary editing operations on `Rope` are insertion and removal of text.
+/// For example:
 ///
 /// ```
 /// # use ropey::Rope;
@@ -31,39 +37,67 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// assert_eq!(rope, "Hello world!");
 /// ```
 ///
-/// Cloning `Rope`s is extremely cheap, running in `O(1)` time and taking a
-/// constant amount of memory for the new clone, regardless of text size.
-/// This is accomplished by data sharing between `Rope` clones.  The memory
-/// used by clones only grows incrementally as the their contents diverge due
-/// to edits.  All of this is thread safe, so clones can be sent freely
-/// between threads.
+/// You can also split off the end of a `Rope` or append one `Rope` to another:
 ///
-/// `Rope` tracks line endings and utf8 `char` boundaries, and has efficient
-/// APIs for working with both.  For example, you can freely convert between
-/// byte, `char`, and line indices:
+/// ```
+/// # use ropey::Rope;
+/// #
+/// let mut rope = Rope::from_str("Hello みんなさん!");
+/// let right_side = rope.split_off(6);
+///
+/// assert_eq!(rope, "Hello ");
+/// assert_eq!(right_side, "みんなさん!");
+///
+/// rope.append(Rope::from_str("world!"));
+///
+/// assert_eq!(rope, "Hello world!");
+/// ```
+///
+/// Note that `insert()` and `remove()` are generally faster than `split_off()`
+/// and `append()`.
+///
+/// # Query Operations
+///
+/// `Rope` provides a rich set of efficient query functions, including querying
+/// rope length in bytes/`char`s/lines, fetching individual `char`s or lines,
+/// and converting between byte/`char`/line indices.  For example, to find the
+/// starting `char` index of a given line:
 ///
 /// ```
 /// # use ropey::Rope;
 /// #
 /// let rope = Rope::from_str("Hello みんなさん!\nHow are you?\nThis text has multiple lines!");
 ///
-/// assert_eq!(rope.byte_to_char(15), 9);
-/// assert_eq!(rope.byte_to_char(41), 31);
-///
-/// assert_eq!(rope.char_to_line(5), 0);
-/// assert_eq!(rope.char_to_line(21), 1);
-///
 /// assert_eq!(rope.line_to_char(0), 0);
 /// assert_eq!(rope.line_to_char(1), 13);
 /// assert_eq!(rope.line_to_char(2), 26);
 /// ```
 ///
-/// `Rope` is written to be fast and memory efficient.  Except where otherwise
-/// documented, all editing and query operations execute in worst-case
-/// `O(log N)` time in the length of the rope.  It is designed to work
-/// efficiently even for huge (in the gigabytes) and pathological (all on one
-/// line) texts.  It should be able to handle just about anything you can throw
-/// at it.
+/// # Slicing
+///
+/// You can take immutable slices of a `Rope` using `slice()`:
+///
+/// ```
+/// # use ropey::Rope;
+/// #
+/// let mut rope = Rope::from_str("Hello みんなさん!");
+/// let middle = rope.slice(3..8);
+///
+/// assert_eq!(middle, "lo みん");
+/// ```
+///
+/// # Cloning
+///
+/// Cloning `Rope`s is extremely cheap, running in `O(1)` time and taking a
+/// small constant amount of memory for the new clone, regardless of text size.
+/// This is accomplished by data sharing between `Rope` clones.  The memory
+/// used by clones only grows incrementally as the their contents diverge due
+/// to edits.  All of this is thread safe, so clones can be sent freely
+/// between threads.
+///
+/// The primary intended use-case for this feature is to allow asynchronous
+/// processing of `Rope`s.  For example, saving a large document to disk in a
+/// separate thread while the user continues to perform edits.
 #[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Arc<Node>,

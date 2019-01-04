@@ -8,7 +8,7 @@
 //!
 //! The library is made up of four main components:
 //!
-//! - [`Rope`](struct.Rope.html): the main editable text buffer type.
+//! - [`Rope`](struct.Rope.html): the main rope type.
 //! - [`RopeSlice`](struct.RopeSlice.html): an immutable view into part of a
 //!   `Rope`.
 //! - [`iter`](iter/index.html): iterators over `Rope`/`RopeSlice` data.
@@ -18,9 +18,9 @@
 //!
 //! # A Basic Example
 //!
-//! Let's say we want to open up a file, replace the 516th line (the writing
-//! was terrible!), and save it back to disk.  It's contrived, but will give
-//! a good sampling of the APIs and how they work together.
+//! Let's say we want to open up a text file, replace the 516th line (the
+//! writing was terrible!), and save it back to disk.  It's contrived, but will
+//! give a good sampling of the APIs and how they work together.
 //!
 //! ```no_run
 //! # use std::io::Result;
