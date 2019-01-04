@@ -1,3 +1,7 @@
+//! This example shows how to implement a grapeheme iterator over the contents
+//! of a `Rope` or `RopeSlice`.  This also serves as a good starting point for
+//! iterators for other kinds segementation, such as word boundaries.
+
 #![allow(dead_code)]
 
 extern crate ropey;
