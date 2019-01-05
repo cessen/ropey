@@ -67,53 +67,52 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
 
 #[inline(always)]
 fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
-    let mut char_count = 0;
-    let mut ptr = text.as_ptr();
-    let start_ptr = text.as_ptr();
-    let end_ptr = unsafe { ptr.offset(text.len() as isize) };
+    let (start, middle, _) = unsafe { text.as_bytes().align_to::<T>() };
 
-    // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = {
-        let aligned = ptr as usize + (T::size() - (ptr as usize & (T::size() - 1)));
-        (end_ptr as usize).min(aligned) as *const u8
-    };
-    while ptr < end_pre_ptr && char_count <= char_idx {
-        let byte = unsafe { *ptr };
+    let mut byte_count = 0;
+    let mut char_count = 0;
+
+    // Take care of any unaligned bytes at the beginning.
+    for byte in start.iter() {
+        if char_count > char_idx {
+            break;
+        }
         char_count += ((byte & 0xC0) != 0x80) as usize;
-        ptr = unsafe { ptr.offset(1) };
+        byte_count += 1;
     }
 
     // Use chunks to count multiple bytes at once, using bit-fiddling magic.
-    let mut ptr = ptr as *const T;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (T::size() - 1))) as *const T;
     let mut acc = T::splat(0);
     let mut i = 0;
-    while ptr < end_mid_ptr && (char_count + (T::size() * (i + 1))) <= char_idx {
-        // Do the clever counting
-        let n = unsafe { *ptr };
-        let tmp = n.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
+    for chunk in middle.iter() {
+        if (char_count + (T::size() * (i + 1))) > char_idx {
+            break;
+        }
+
+        let tmp = chunk.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
         acc = acc.add(tmp);
         i += 1;
-        if i == T::max_acc() || (char_count + (T::size() * (i + 1))) > char_idx {
+        if i == T::max_acc() || (char_count + (T::size() * (i + 1))) >= char_idx {
             char_count += (T::size() * i) - acc.sum_bytes();
             i = 0;
             acc = T::splat(0);
         }
-        ptr = unsafe { ptr.offset(1) };
+
+        byte_count += T::size();
     }
     char_count += (T::size() * i) - acc.sum_bytes();
 
-    // Take care of any unaligned bytes at the end
-    let mut ptr = ptr as *const u8;
-    while ptr < end_ptr && char_count <= char_idx {
-        let byte = unsafe { *ptr };
+    // Take care of any unaligned bytes at the end.
+    for byte in (&text.as_bytes()[byte_count..]).iter() {
+        if char_count > char_idx {
+            break;
+        }
         char_count += ((byte & 0xC0) != 0x80) as usize;
-        ptr = unsafe { ptr.offset(1) };
+        byte_count += 1;
     }
 
     // Finish up
-    let byte_count = ptr as usize - start_ptr as usize;
-    if ptr == end_ptr && char_count <= char_idx {
+    if byte_count == text.len() && char_count <= char_idx {
         byte_count
     } else {
         byte_count - 1
@@ -279,28 +278,20 @@ pub(crate) fn count_chars_in_bytes(text: &[u8]) -> usize {
 
 #[inline(always)]
 fn count_chars_internal<T: ByteChunk>(text: &[u8]) -> usize {
-    let len = text.len();
-    let mut ptr = text.as_ptr();
-    let end_ptr = unsafe { ptr.offset(len as isize) };
+    let (start, middle, end) = unsafe { text.align_to::<T>() };
+
     let mut inv_count = 0;
 
-    // Take care of any unaligned bytes at the beginning
-    let end_pre_ptr = align_ptr(ptr, T::size()).min(end_ptr);
-    while ptr < end_pre_ptr {
-        let byte = unsafe { *ptr };
+    // Take care of unaligned bytes at the beginning.
+    for byte in start.iter() {
         inv_count += ((byte & 0xC0) == 0x80) as usize;
-        ptr = unsafe { ptr.offset(1) };
     }
 
-    // Use chunks to count multiple bytes at once.
-    let mut ptr = ptr as *const T;
-    let end_mid_ptr = (end_ptr as usize - (end_ptr as usize & (T::size() - 1))) as *const T;
-    let mut acc = T::splat(0);
+    // Take care of the middle bytes in big chunks.
     let mut i = 0;
-    while ptr < end_mid_ptr {
-        // Do the clever counting
-        let n = unsafe { *ptr };
-        let tmp = n.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
+    let mut acc = T::splat(0);
+    for chunk in middle.iter() {
+        let tmp = chunk.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
         acc = acc.add(tmp);
         i += 1;
         if i == T::max_acc() {
@@ -308,19 +299,15 @@ fn count_chars_internal<T: ByteChunk>(text: &[u8]) -> usize {
             inv_count += acc.sum_bytes();
             acc = T::splat(0);
         }
-        ptr = unsafe { ptr.offset(1) };
     }
     inv_count += acc.sum_bytes();
 
-    // Take care of any unaligned bytes at the end
-    let mut ptr = ptr as *const u8;
-    while ptr < end_ptr {
-        let byte = unsafe { *ptr };
+    // Take care of unaligned bytes at the end.
+    for byte in end.iter() {
         inv_count += ((byte & 0xC0) == 0x80) as usize;
-        ptr = unsafe { ptr.offset(1) };
     }
 
-    len - inv_count
+    text.len() - inv_count
 }
 
 /// Uses bit-fiddling magic to count line breaks really quickly.
@@ -426,6 +413,8 @@ unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(
     let mut acc = T::splat(0);
     let c = *(ptr as *const T);
     let next_ptr = ptr.offset(T::size() as isize);
+
+    debug_assert!(end_ptr >= next_ptr);
 
     // Calculate the flags we're going to be working with.
     let nl_1_flags = c.cmp_eq_byte(0xC2);
