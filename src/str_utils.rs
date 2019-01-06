@@ -73,43 +73,38 @@ fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
     let mut char_count = 0;
 
     // Take care of any unaligned bytes at the beginning.
-    for byte in start.iter() {
-        if char_count > char_idx {
-            break;
-        }
-        char_count += ((byte & 0xC0) != 0x80) as usize;
-        byte_count += 1;
+    let mut i = 0;
+    while i < start.len() && char_count <= char_idx {
+        char_count += ((start[i] & 0xC0) != 0x80) as usize;
+        i += 1;
     }
+    byte_count += i;
 
     // Use chunks to count multiple bytes at once, using bit-fiddling magic.
-    let mut acc = T::splat(0);
     let mut i = 0;
-    for chunk in middle.iter() {
-        if (char_count + (T::size() * (i + 1))) > char_idx {
-            break;
-        }
-
-        let tmp = chunk.bitand(T::splat(0xc0)).cmp_eq_byte(0x80);
-        acc = acc.add(tmp);
-        i += 1;
-        if i == T::max_acc() || (char_count + (T::size() * (i + 1))) >= char_idx {
-            char_count += (T::size() * i) - acc.sum_bytes();
-            i = 0;
+    let mut acc = T::splat(0);
+    let mut acc_i = 0;
+    while i < middle.len() && (char_count + (T::size() * (acc_i + 1))) <= char_idx {
+        acc = acc.add(middle[i].bitand(T::splat(0xc0)).cmp_eq_byte(0x80));
+        acc_i += 1;
+        if acc_i == T::max_acc() || (char_count + (T::size() * (acc_i + 1))) >= char_idx {
+            char_count += (T::size() * acc_i) - acc.sum_bytes();
+            acc_i = 0;
             acc = T::splat(0);
         }
-
-        byte_count += T::size();
+        i += 1;
     }
-    char_count += (T::size() * i) - acc.sum_bytes();
+    char_count += (T::size() * acc_i) - acc.sum_bytes();
+    byte_count += i * T::size();
 
     // Take care of any unaligned bytes at the end.
-    for byte in (&text.as_bytes()[byte_count..]).iter() {
-        if char_count > char_idx {
-            break;
-        }
-        char_count += ((byte & 0xC0) != 0x80) as usize;
-        byte_count += 1;
+    let end = &text.as_bytes()[byte_count..];
+    let mut i = 0;
+    while i < end.len() && char_count <= char_idx {
+        char_count += ((end[i] & 0xC0) != 0x80) as usize;
+        i += 1;
     }
+    byte_count += i;
 
     // Finish up
     if byte_count == text.len() && char_count <= char_idx {
