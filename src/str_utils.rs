@@ -154,8 +154,13 @@ fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
         // Count line breaks in big chunks.
         if ptr == align_ptr(ptr, T::size()) {
             while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
-                let tmp =
-                    unsafe { count_line_breaks_in_chunk_from_ptr::<T>(ptr, end_ptr) }.sum_bytes();
+                let tmp = unsafe {
+                    count_line_breaks_in_chunk_from_ptr::<T>(std::slice::from_raw_parts(
+                        ptr,
+                        end_ptr as usize - ptr as usize,
+                    ))
+                }
+                .sum_bytes();
                 if tmp + line_break_count >= line_idx {
                     break;
                 }
@@ -331,33 +336,41 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
 
 #[inline(always)]
 fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
-    let len = text.len();
-    let mut ptr = text.as_ptr();
-    let end_ptr = unsafe { ptr.offset(len as isize) };
+    let mut text = text.as_bytes();
     let mut count = 0;
 
-    while ptr < end_ptr {
+    while text.len() > 0 {
         // Count line breaks in big chunks.
-        if ptr == align_ptr(ptr, T::size()) {
+        if unsafe { text.align_to::<T>() }.0.len() == 0 {
             let mut i = 0;
             let mut acc = T::splat(0);
-            while unsafe { ptr.offset(T::size() as isize) } < end_ptr {
-                acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(ptr, end_ptr) });
+            while text.len() >= T::size() {
+                acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(text) });
                 i += 1;
                 if i == T::max_acc() {
                     i = 0;
                     count += acc.sum_bytes();
                     acc = T::splat(0);
                 }
-                ptr = unsafe { ptr.offset(T::size() as isize) };
+                text = &text[T::size()..];
             }
             count += acc.sum_bytes();
         }
 
         // Count line breaks a byte at a time.
-        let end_aligned_ptr = next_aligned_ptr(ptr, T::size()).min(end_ptr);
+        let end_aligned_ptr = {
+            let tmp = unsafe { text.align_to::<T>() };
+            if tmp.0.len() > 0 {
+                tmp.0.len()
+            } else if tmp.1.len() == 0 {
+                tmp.2.len()
+            } else {
+                0
+            }
+        };
+        let mut ptr = 0;
         while ptr < end_aligned_ptr {
-            let byte = unsafe { *ptr };
+            let byte = text[ptr];
 
             // Handle u{000A}, u{000B}, u{000C}, and u{000D}
             if (byte <= 0x0D) && (byte >= 0x0A) {
@@ -366,32 +379,26 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
                 // Check for CRLF and and subtract 1 if it is,
                 // since it will be caught in the next iteration
                 // with the LF.
-                if byte == 0x0D {
-                    let next = unsafe { ptr.offset(1) };
-                    if next < end_ptr && unsafe { *next } == 0x0A {
-                        count -= 1;
-                    }
+                if byte == 0x0D && (ptr + 1) < text.len() && text[ptr + 1] == 0x0A {
+                    count -= 1;
                 }
             }
             // Handle u{0085}
-            else if byte == 0xC2 {
-                let next = unsafe { ptr.offset(1) };
-                if next < end_ptr && unsafe { *next } == 0x85 {
-                    count += 1;
-                }
+            else if byte == 0xC2 && (ptr + 1) < text.len() && text[ptr + 1] == 0x85 {
+                count += 1;
             }
             // Handle u{2028} and u{2029}
-            else if byte == 0xE2 {
-                let next1 = unsafe { ptr.offset(1) };
-                let next2 = unsafe { ptr.offset(2) };
-                if next2 < end_ptr && unsafe { *next1 } == 0x80 && (unsafe { *next2 } >> 1) == 0x54
-                {
-                    count += 1;
-                }
+            else if byte == 0xE2
+                && (ptr + 2) < text.len()
+                && text[ptr + 1] == 0x80
+                && (text[ptr + 2] >> 1) == 0x54
+            {
+                count += 1;
             }
 
-            ptr = unsafe { ptr.offset(1) };
+            ptr += 1;
         }
+        text = &text[ptr..];
     }
 
     count
@@ -399,17 +406,21 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
 
 /// Used internally in the line-break counting functions.
 ///
-/// ptr MUST be aligned to T alignment.
+/// The start of `bytes` must be aligned as type T, and `bytes` must be at
+/// least as large (in bytes) as T.
 #[inline(always)]
-unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(
-    ptr: *const u8,
-    end_ptr: *const u8,
-) -> T {
-    let mut acc = T::splat(0);
-    let c = *(ptr as *const T);
-    let next_ptr = ptr.offset(T::size() as isize);
+unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(bytes: &[u8]) -> T {
+    let c = {
+        // The only unsafe bits of the function are in this block.
+        debug_assert!(bytes.align_to::<T>().0.len() == 0);
+        debug_assert!(bytes.len() >= T::size());
+        // This unsafe cast is for performance reasons: going through e.g.
+        // `align_to()` results in a significant drop in performance.
+        *(bytes.as_ptr() as *const T)
+    };
+    let end_i = T::size();
 
-    debug_assert!(end_ptr >= next_ptr);
+    let mut acc = T::splat(0);
 
     // Calculate the flags we're going to be working with.
     let nl_1_flags = c.cmp_eq_byte(0xC2);
@@ -424,7 +435,7 @@ unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(
         acc = acc.add(flags);
 
         // Handle ending boundary
-        if next_ptr < end_ptr && *next_ptr.offset(-1) == 0xC2 && *next_ptr == 0x85 {
+        if bytes.len() > end_i && bytes[end_i - 1] == 0xC2 && bytes[end_i] == 0x85 {
             acc = acc.inc_nth_from_end_lex_byte(0);
         }
     }
@@ -444,16 +455,16 @@ unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(
         }
 
         // Handle ending boundary
-        if next_ptr < end_ptr
-            && *next_ptr.offset(-2) == 0xE2
-            && *next_ptr.offset(-1) == 0x80
-            && (*next_ptr >> 1) == 0x54
+        if bytes.len() > end_i
+            && bytes[end_i - 2] == 0xE2
+            && bytes[end_i - 1] == 0x80
+            && (bytes[end_i] >> 1) == 0x54
         {
             acc = acc.inc_nth_from_end_lex_byte(1);
-        } else if next_ptr.offset(1) < end_ptr
-            && *next_ptr.offset(-1) == 0xE2
-            && *next_ptr == 0x80
-            && (*next_ptr.offset(1) >> 1) == 0x54
+        } else if bytes.len() > (end_i + 1)
+            && bytes[end_i - 1] == 0xE2
+            && bytes[end_i] == 0x80
+            && (bytes[end_i + 1] >> 1) == 0x54
         {
             acc = acc.inc_nth_from_end_lex_byte(0);
         }
@@ -470,7 +481,7 @@ unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(
         let lf_flags = c.cmp_eq_byte(0x0A);
         let crlf_flags = cr_flags.bitand(lf_flags.shift_back_lex(1));
         acc = acc.sub(crlf_flags);
-        if next_ptr < end_ptr && *next_ptr.offset(-1) == 0x0D && *next_ptr == 0x0A {
+        if bytes.len() > end_i && bytes[end_i - 1] == 0x0D && bytes[end_i] == 0x0A {
             acc = acc.dec_last_lex_byte();
         }
     }
@@ -499,7 +510,7 @@ fn align_ptr<T>(ptr: *const T, alignment: usize) -> *const T {
 
 /// Interface for working with chunks of bytes at a time, providing the
 /// operations needed for the functionality in str_utils.
-trait ByteChunk: Copy + Clone {
+trait ByteChunk: Copy + Clone + std::fmt::Debug {
     /// Returns the size of the chunk in bytes.
     fn size() -> usize;
 
