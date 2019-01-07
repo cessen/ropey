@@ -311,21 +311,19 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
     }
 
     // Count line breaks in big chunks.
-    if alignment_diff::<T>(bytes) == 0 {
-        let mut i = 0;
-        let mut acc = T::splat(0);
-        while bytes.len() >= T::size() {
-            acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(bytes) });
-            i += 1;
-            if i == T::max_acc() {
-                i = 0;
-                count += acc.sum_bytes();
-                acc = T::splat(0);
-            }
-            bytes = &bytes[T::size()..];
+    let mut i = 0;
+    let mut acc = T::splat(0);
+    while bytes.len() >= T::size() {
+        acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(bytes) });
+        i += 1;
+        if i == T::max_acc() {
+            i = 0;
+            count += acc.sum_bytes();
+            acc = T::splat(0);
         }
-        count += acc.sum_bytes();
+        bytes = &bytes[T::size()..];
     }
+    count += acc.sum_bytes();
 
     // Handle unaligned bytes at the end.
     count += count_line_breaks_up_to(bytes, bytes.len(), bytes.len()).0;
