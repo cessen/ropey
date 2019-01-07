@@ -939,6 +939,7 @@ impl<'a> std::cmp::PartialEq<RopeSlice<'a>> for Rope {
 }
 
 impl<'a> std::cmp::Ord for RopeSlice<'a> {
+    #[allow(clippy::op_ref)] // Erroneously thinks with can directly use a slice.
     fn cmp(&self, other: &RopeSlice<'a>) -> std::cmp::Ordering {
         let mut chunk_itr_1 = self.chunks();
         let mut chunk_itr_2 = other.chunks();

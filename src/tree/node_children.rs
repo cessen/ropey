@@ -281,7 +281,7 @@ impl NodeChildren {
         Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
+    #[allow(clippy::needless_range_loop)]
     pub fn combined_info(&self) -> TextInfo {
         let info = self.info();
         let mut acc = TextInfo::new();
@@ -592,13 +592,13 @@ mod inner {
             let len = self.len();
             unsafe {
                 ptr::copy(
-                    self.nodes.as_ptr().offset(idx as isize),
-                    self.nodes.as_mut_ptr().offset((idx + 1) as isize),
+                    self.nodes.as_ptr().add(idx),
+                    self.nodes.as_mut_ptr().add(idx + 1),
                     len - idx,
                 );
                 ptr::copy(
-                    self.info.as_ptr().offset(idx as isize),
-                    self.info.as_mut_ptr().offset((idx + 1) as isize),
+                    self.info.as_ptr().add(idx),
+                    self.info.as_mut_ptr().add(idx + 1),
                     len - idx,
                 );
             }
@@ -622,13 +622,13 @@ mod inner {
             let len = self.len();
             unsafe {
                 ptr::copy(
-                    self.nodes.as_ptr().offset(idx as isize + 1),
-                    self.nodes.as_mut_ptr().offset(idx as isize),
+                    self.nodes.as_ptr().add(idx + 1),
+                    self.nodes.as_mut_ptr().add(idx),
                     len - idx - 1,
                 );
                 ptr::copy(
-                    self.info.as_ptr().offset(idx as isize + 1),
-                    self.info.as_mut_ptr().offset(idx as isize),
+                    self.info.as_ptr().add(idx + 1),
+                    self.info.as_mut_ptr().add(idx),
                     len - idx - 1,
                 );
             }

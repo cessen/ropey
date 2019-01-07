@@ -119,7 +119,7 @@ impl Rope {
     ///
     /// Runs in O(N) time.
     #[inline]
-    #[cfg_attr(feature = "cargo-clippy", allow(should_implement_trait))]
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
     }
@@ -168,7 +168,7 @@ impl Rope {
                     if valid_count < fill_idx {
                         unsafe {
                             ptr::copy(
-                                buffer.as_ptr().offset(valid_count as isize),
+                                buffer.as_ptr().add(valid_count),
                                 buffer.as_mut_ptr().offset(0),
                                 fill_idx - valid_count,
                             );

@@ -338,6 +338,7 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
 /// Counts line breaks a byte at a time up to a maximum number of bytes and
 /// line breaks, and returns the counted lines and how many bytes were processed.
 #[inline(always)]
+#[allow(clippy::if_same_then_else)]
 fn count_line_breaks_up_to(bytes: &[u8], max_bytes: usize, max_breaks: usize) -> (usize, usize) {
     let mut ptr = 0;
     let mut count = 0;
@@ -382,7 +383,7 @@ fn count_line_breaks_up_to(bytes: &[u8], max_bytes: usize, max_breaks: usize) ->
 unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(bytes: &[u8]) -> T {
     let c = {
         // The only unsafe bits of the function are in this block.
-        debug_assert!(bytes.align_to::<T>().0.len() == 0);
+        debug_assert_eq!(bytes.align_to::<T>().0.len(), 0);
         debug_assert!(bytes.len() >= T::size());
         // This unsafe cast is for performance reasons: going through e.g.
         // `align_to()` results in a significant drop in performance.

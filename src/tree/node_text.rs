@@ -340,15 +340,11 @@ mod inner {
 
             unsafe {
                 ptr::copy(
-                    self.buffer.as_ptr().offset(byte_idx as isize),
-                    self.buffer.as_mut_ptr().offset((byte_idx + amt) as isize),
+                    self.buffer.as_ptr().add(byte_idx),
+                    self.buffer.as_mut_ptr().add(byte_idx + amt),
                     len - byte_idx,
                 );
-                ptr::copy(
-                    string.as_ptr(),
-                    self.buffer.as_mut_ptr().offset(byte_idx as isize),
-                    amt,
-                );
+                ptr::copy(string.as_ptr(), self.buffer.as_mut_ptr().add(byte_idx), amt);
                 self.buffer.set_len(len + amt);
             }
         }
@@ -367,8 +363,8 @@ mod inner {
 
             unsafe {
                 ptr::copy(
-                    self.buffer.as_ptr().offset(end_byte_idx as isize),
-                    self.buffer.as_mut_ptr().offset(start_byte_idx as isize),
+                    self.buffer.as_ptr().add(end_byte_idx),
+                    self.buffer.as_mut_ptr().add(start_byte_idx),
                     len - end_byte_idx,
                 );
                 self.buffer.set_len(len - amt);
@@ -395,7 +391,7 @@ mod inner {
             let mut other = NodeSmallString::with_capacity(len - byte_idx);
             unsafe {
                 ptr::copy_nonoverlapping(
-                    self.buffer.as_ptr().offset(byte_idx as isize),
+                    self.buffer.as_ptr().add(byte_idx),
                     other.buffer.as_mut_ptr().offset(0),
                     len - byte_idx,
                 );

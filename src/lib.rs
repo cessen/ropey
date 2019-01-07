@@ -131,11 +131,11 @@
 //! CRLF pairs are always treated as a single line break, and are never split
 //! across chunks.  Note, however, that slicing can still split them.
 
-#![cfg_attr(feature = "cargo-clippy", allow(collapsible_if))]
-#![cfg_attr(feature = "cargo-clippy", allow(inline_always))]
-#![cfg_attr(feature = "cargo-clippy", allow(needless_return))]
-#![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
-#![cfg_attr(feature = "cargo-clippy", allow(type_complexity))]
+#![allow(clippy::collapsible_if)]
+#![allow(clippy::inline_always)]
+#![allow(clippy::needless_return)]
+#![allow(clippy::redundant_field_names)]
+#![allow(clippy::type_complexity)]
 
 extern crate smallvec;
 
