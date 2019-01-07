@@ -145,62 +145,37 @@ pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
 
 #[inline(always)]
 fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
-    let original_text = text;
-    let mut text = text.as_bytes();
+    let mut bytes = text.as_bytes();
     let mut line_break_count = 0;
 
-    while text.len() > 0 && line_break_count < line_idx {
-        // Count line breaks in big chunks.
-        if alignment_diff::<T>(text) == 0 {
-            while text.len() >= T::size() {
-                let tmp = unsafe { count_line_breaks_in_chunk_from_ptr::<T>(text) }.sum_bytes();
-                if tmp + line_break_count >= line_idx {
-                    break;
-                }
-                line_break_count += tmp;
-
-                text = &text[T::size()..];
-            }
-        }
-
-        // Count line breaks a byte at a time.
-        let end_aligned_ptr = alignment_diff_next::<T>(text);
-        let mut ptr = 0;
-        while ptr < end_aligned_ptr && line_break_count < line_idx {
-            let byte = text[ptr];
-
-            // Handle u{000A}, u{000B}, u{000C}, and u{000D}
-            if (byte <= 0x0D) && (byte >= 0x0A) {
-                line_break_count += 1;
-
-                // Check for CRLF and and subtract 1 if it is,
-                // since it will be caught in the next iteration
-                // with the LF.
-                if byte == 0x0D && (ptr + 1) < text.len() && text[ptr + 1] == 0x0A {
-                    line_break_count -= 1;
-                }
-            }
-            // Handle u{0085}
-            else if byte == 0xC2 && (ptr + 1) < text.len() && text[ptr + 1] == 0x85 {
-                line_break_count += 1;
-            }
-            // Handle u{2028} and u{2029}
-            else if byte == 0xE2
-                && (ptr + 2) < text.len()
-                && text[ptr + 1] == 0x80
-                && (text[ptr + 2] >> 1) == 0x54
-            {
-                line_break_count += 1;
-            }
-
-            ptr += 1;
-        }
-        text = &text[ptr..];
+    // Handle unaligned bytes at the start.
+    let aligned_idx = alignment_diff::<T>(bytes);
+    if aligned_idx > 0 {
+        let result = count_line_breaks_up_to(bytes, aligned_idx, line_idx);
+        line_break_count += result.0;
+        bytes = &bytes[result.1..];
     }
 
+    // Count line breaks in big chunks.
+    if alignment_diff::<T>(bytes) == 0 {
+        while bytes.len() >= T::size() {
+            let tmp = unsafe { count_line_breaks_in_chunk_from_ptr::<T>(bytes) }.sum_bytes();
+            if tmp + line_break_count >= line_idx {
+                break;
+            }
+            line_break_count += tmp;
+
+            bytes = &bytes[T::size()..];
+        }
+    }
+
+    // Handle unaligned bytes at the end.
+    let result = count_line_breaks_up_to(bytes, bytes.len(), line_idx - line_break_count);
+    bytes = &bytes[result.1..];
+
     // Finish up
-    let mut byte_idx = original_text.len() - text.len();
-    while !original_text.is_char_boundary(byte_idx) {
+    let mut byte_idx = text.len() - bytes.len();
+    while !text.is_char_boundary(byte_idx) {
         byte_idx += 1;
     }
     byte_idx
@@ -324,63 +299,79 @@ pub(crate) fn count_line_breaks(text: &str) -> usize {
 
 #[inline(always)]
 fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
-    let mut text = text.as_bytes();
+    let mut bytes = text.as_bytes();
     let mut count = 0;
 
-    while text.len() > 0 {
-        // Count line breaks in big chunks.
-        if alignment_diff::<T>(text) == 0 {
-            let mut i = 0;
-            let mut acc = T::splat(0);
-            while text.len() >= T::size() {
-                acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(text) });
-                i += 1;
-                if i == T::max_acc() {
-                    i = 0;
-                    count += acc.sum_bytes();
-                    acc = T::splat(0);
-                }
-                text = &text[T::size()..];
-            }
-            count += acc.sum_bytes();
-        }
-
-        // Count line breaks a byte at a time.
-        let end_aligned_ptr = alignment_diff_next::<T>(text);
-        let mut ptr = 0;
-        while ptr < end_aligned_ptr {
-            let byte = text[ptr];
-
-            // Handle u{000A}, u{000B}, u{000C}, and u{000D}
-            if (byte <= 0x0D) && (byte >= 0x0A) {
-                count += 1;
-
-                // Check for CRLF and and subtract 1 if it is,
-                // since it will be caught in the next iteration
-                // with the LF.
-                if byte == 0x0D && (ptr + 1) < text.len() && text[ptr + 1] == 0x0A {
-                    count -= 1;
-                }
-            }
-            // Handle u{0085}
-            else if byte == 0xC2 && (ptr + 1) < text.len() && text[ptr + 1] == 0x85 {
-                count += 1;
-            }
-            // Handle u{2028} and u{2029}
-            else if byte == 0xE2
-                && (ptr + 2) < text.len()
-                && text[ptr + 1] == 0x80
-                && (text[ptr + 2] >> 1) == 0x54
-            {
-                count += 1;
-            }
-
-            ptr += 1;
-        }
-        text = &text[ptr..];
+    // Handle unaligned bytes at the start.
+    let aligned_idx = alignment_diff::<T>(bytes);
+    if aligned_idx > 0 {
+        let result = count_line_breaks_up_to(bytes, aligned_idx, bytes.len());
+        count += result.0;
+        bytes = &bytes[result.1..];
     }
 
+    // Count line breaks in big chunks.
+    if alignment_diff::<T>(bytes) == 0 {
+        let mut i = 0;
+        let mut acc = T::splat(0);
+        while bytes.len() >= T::size() {
+            acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(bytes) });
+            i += 1;
+            if i == T::max_acc() {
+                i = 0;
+                count += acc.sum_bytes();
+                acc = T::splat(0);
+            }
+            bytes = &bytes[T::size()..];
+        }
+        count += acc.sum_bytes();
+    }
+
+    // Handle unaligned bytes at the end.
+    count += count_line_breaks_up_to(bytes, bytes.len(), bytes.len()).0;
+
     count
+}
+
+/// Used internally in the line-break counting functions.
+///
+/// Counts line breaks a byte at a time up to a maximum number of bytes and
+/// line breaks, and returns the counted lines and how many bytes were processed.
+#[inline(always)]
+fn count_line_breaks_up_to(bytes: &[u8], max_bytes: usize, max_breaks: usize) -> (usize, usize) {
+    let mut ptr = 0;
+    let mut count = 0;
+    while ptr < max_bytes && count < max_breaks {
+        let byte = bytes[ptr];
+
+        // Handle u{000A}, u{000B}, u{000C}, and u{000D}
+        if (byte <= 0x0D) && (byte >= 0x0A) {
+            count += 1;
+
+            // Check for CRLF and and subtract 1 if it is,
+            // since it will be caught in the next iteration
+            // with the LF.
+            if byte == 0x0D && (ptr + 1) < bytes.len() && bytes[ptr + 1] == 0x0A {
+                count -= 1;
+            }
+        }
+        // Handle u{0085}
+        else if byte == 0xC2 && (ptr + 1) < bytes.len() && bytes[ptr + 1] == 0x85 {
+            count += 1;
+        }
+        // Handle u{2028} and u{2029}
+        else if byte == 0xE2
+            && (ptr + 2) < bytes.len()
+            && bytes[ptr + 1] == 0x80
+            && (bytes[ptr + 2] >> 1) == 0x54
+        {
+            count += 1;
+        }
+
+        ptr += 1;
+    }
+
+    (count, ptr)
 }
 
 /// Used internally in the line-break counting functions.
@@ -481,16 +472,6 @@ fn alignment_diff<T>(bytes: &[u8]) -> usize {
     let alignment = std::mem::align_of::<T>();
     let ptr = bytes.as_ptr() as usize;
     (alignment - ((ptr - 1) & (alignment - 1)) - 1).min(bytes.len())
-}
-
-/// Same as `alignment_diff()` except that it always skips the beginning of the
-/// array as a possible alignment.  In other words, it always gives the "next"
-/// alignment from the start of `bytes`.
-#[inline(always)]
-fn alignment_diff_next<T>(bytes: &[u8]) -> usize {
-    let alignment = std::mem::align_of::<T>();
-    let ptr = bytes.as_ptr() as usize;
-    (alignment - (ptr & (alignment - 1))).min(bytes.len())
 }
 
 //======================================================================
