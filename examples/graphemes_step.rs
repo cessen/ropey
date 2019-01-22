@@ -1,6 +1,6 @@
 //! This example shows how to implement functions that make queries about
 //! grapheme boundaries on a `Rope` or `RopeSlice`.  This also serves as a
-//! good starting point for similar functions for other kinds segementation,
+//! good starting point for similar functions for other kinds of segementation,
 //! such as word boundaries.
 
 #![allow(dead_code)]
