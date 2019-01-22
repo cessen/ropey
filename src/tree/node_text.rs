@@ -135,6 +135,7 @@ impl NodeText {
         self.0.inline_if_possible();
     }
 
+    /// Same as `remove_range()` except using char indices.
     pub fn remove_char_range(&mut self, char_start: usize, char_end: usize) {
         debug_assert!(char_start <= char_end);
         debug_assert!(char_end <= count_chars(self));
@@ -273,6 +274,12 @@ mod inner {
     /// The backing internal buffer type for `NodeText`.
     #[derive(Copy, Clone)]
     struct BackingArray([u8; MAX_BYTES]);
+
+    /// We need a very specific size of array, which is not necessarily
+    /// supported directly by the impls in the smallvec crate.  We therefore
+    /// have to implement this unsafe trait for our specific array size.
+    /// TODO: once integer const generics land, and smallvec updates its APIs
+    /// to use them, switch over and get rid of this unsafe impl.
     unsafe impl Array for BackingArray {
         type Item = u8;
         fn size() -> usize {
@@ -321,8 +328,8 @@ mod inner {
 
         #[inline(always)]
         pub fn as_str(&self) -> &str {
-            // NodeSmallString's methods don't allow `buffer` to become invalid utf8,
-            // so this is safe.
+            // NodeSmallString's methods don't allow `buffer` to become invalid
+            // utf8, so this is safe.
             unsafe { str::from_utf8_unchecked(self.buffer.as_ref()) }
         }
 
@@ -338,15 +345,29 @@ mod inner {
             let amt = string.len();
             self.buffer.reserve(amt);
 
+            // Enlarge buffer and shift bytes over to make room for the
+            // insertion string.
+            //
+            // There are two uses of unsafe here:
+            // - `set_len()`, which is used to avoid having to actually
+            //   initialize bytes that we know we're immediately going to
+            //   write to in the next step.
+            // - `ptr::copy()` to efficiently shift bytes over to make room
+            //   for the insertion data.  This can be replaced with a safe call
+            //   to `copy_within()` on the slice once that API is stabalized in
+            //   the standard library.
             unsafe {
+                self.buffer.set_len(len + amt);
                 ptr::copy(
                     self.buffer.as_ptr().add(byte_idx),
                     self.buffer.as_mut_ptr().add(byte_idx + amt),
                     len - byte_idx,
                 );
-                ptr::copy(string.as_ptr(), self.buffer.as_mut_ptr().add(byte_idx), amt);
-                self.buffer.set_len(len + amt);
             }
+
+            // Copy bytes from `string` into the appropriate space in the
+            // buffer.
+            (&mut self.buffer[byte_idx..(byte_idx + amt)]).copy_from_slice(string.as_bytes());
         }
 
         /// Removes text in range `[start_byte_idx, end_byte_idx)`
@@ -361,14 +382,18 @@ mod inner {
             let len = self.len();
             let amt = end_byte_idx - start_byte_idx;
 
+            // The unsafe here is just used for efficiency.  This can be
+            // replaced with a safe call to `copy_within()` on the slice once
+            // that API is stabalized in the standard library.
             unsafe {
                 ptr::copy(
                     self.buffer.as_ptr().add(end_byte_idx),
                     self.buffer.as_mut_ptr().add(start_byte_idx),
                     len - end_byte_idx,
                 );
-                self.buffer.set_len(len - amt);
             }
+
+            self.buffer.truncate(len - amt);
         }
 
         /// Removes text after `byte_idx`.
@@ -389,15 +414,13 @@ mod inner {
             assert!(self.as_str().is_char_boundary(byte_idx));
             let len = self.len();
             let mut other = NodeSmallString::with_capacity(len - byte_idx);
-            unsafe {
-                ptr::copy_nonoverlapping(
-                    self.buffer.as_ptr().add(byte_idx),
-                    other.buffer.as_mut_ptr().offset(0),
-                    len - byte_idx,
-                );
-                self.buffer.set_len(byte_idx);
-                other.buffer.set_len(len - byte_idx);
-            }
+
+            // We're using unsafe `set_len()` to avoid having to actually
+            // initialize bytes that we know we're immediately going to write
+            // to in the next step anyway.
+            unsafe { other.buffer.set_len(len - byte_idx) };
+            (&mut other.buffer[..]).copy_from_slice(&self.buffer[byte_idx..]);
+            self.buffer.truncate(byte_idx);
             other
         }
 

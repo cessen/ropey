@@ -151,7 +151,7 @@ impl Rope {
                 Ok(read_count) => {
                     fill_idx += read_count;
 
-                    // Determine how much of the buffer is valid utf8
+                    // Determine how much of the buffer is valid utf8.
                     let valid_count = match std::str::from_utf8(&buffer[..fill_idx]) {
                         Ok(_) => fill_idx,
                         Err(e) => e.valid_up_to(),
@@ -159,13 +159,21 @@ impl Rope {
 
                     // Append the valid part of the buffer to the rope.
                     if valid_count > 0 {
+                        // The unsafe block here is reinterpreting the bytes as
+                        // utf8.  This is safe because the bytes being
+                        // reinterpreted have already been validated as utf8
+                        // just above.
                         builder.append(unsafe {
                             std::str::from_utf8_unchecked(&buffer[..valid_count])
                         });
                     }
 
-                    // Shift the un-read part of the buffer to the beginning
+                    // Shift the un-read part of the buffer to the beginning.
                     if valid_count < fill_idx {
+                        // The unsafe here is just used for efficiency.  This
+                        // can be replaced with a safe call to `copy_within()`
+                        // on the slice once that API is stabalized in the
+                        // standard library.
                         unsafe {
                             ptr::copy(
                                 buffer.as_ptr().add(valid_count),
@@ -192,7 +200,7 @@ impl Rope {
                             // We couldn't consume all data.
                             return Err(io::Error::new(
                                 io::ErrorKind::InvalidData,
-                                "stream did not contain valid UTF-8",
+                                "stream contained invalid UTF-8",
                             ));
                         } else {
                             return Ok(builder.finish());
@@ -336,10 +344,8 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
     pub fn insert(&mut self, char_idx: usize, text: &str) {
-        // TODO: handle large insertions more efficiently, instead of doing a split
-        // and appends.
-
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
@@ -348,164 +354,48 @@ impl Rope {
             self.len_chars()
         );
 
+        // We have three cases here:
+        // 1. The insertion text is very large, in which case building a new
+        //    Rope out of it and splicing it into the existing Rope is most
+        //    efficient.
+        // 2. The insertion text is somewhat large, in which case splitting it
+        //    up into chunks and repeatedly inserting them is the most
+        //    efficient.  The splitting is necessary because the insertion code
+        //    only works correctly below a certain insertion size.
+        // 3. The insertion text is small, in which case we can simply insert
+        //    it.
+        //
+        // Cases #2 and #3 are rolled into one case here, where case #3 just
+        // results in the text being "split" into only one chunk.
+        //
+        // The boundary for what constitutes "very large" text was arrived at
+        // experimentally, by testing at what point Rope build + splice becomes
+        // faster than split + repeated insert.  This constant is likely worth
+        // revisiting from time to time as Ropey evolves.
         if text.len() > MAX_BYTES * 6 {
-            // For huge insertion texts, build a tree out of it and then
-            // split and join.
+            // Case #1: very large text, build rope and splice it in.
             let text_rope = Rope::from_str(text);
             let right = self.split_off(char_idx);
             self.append(text_rope);
             self.append(right);
         } else {
-            // Otherwise, for small-to-medium sized inserts, iteratively insert in
-            // chunks.
+            // Cases #2 and #3: split into chunks and repeatedly insert.
             let mut text = text;
             while !text.is_empty() {
+                // Split a chunk off from the end of the text.
+                // We do this from the end instead of the front so that
+                // the repeated insertions can keep re-using the same
+                // insertion point.
                 let split_idx = crlf::find_good_split(
                     text.len() - (MAX_BYTES - 4).min(text.len()),
                     text.as_bytes(),
                     false,
                 );
-                let mut ins_text = &text[split_idx..];
+                let ins_text = &text[split_idx..];
                 text = &text[..split_idx];
-                let mut left_seam = false;
 
-                // Do the insertion
-                let root_info = self.root.text_info();
-                let (l_info, residual) = Arc::make_mut(&mut self.root).edit_chunk_at_char(
-                    char_idx,
-                    root_info,
-                    |idx, cur_info, leaf_text| {
-                        // First check if we have a left seam.
-                        if idx == 0 && char_idx > 0 && ins_text.as_bytes()[0] == 0x0A {
-                            left_seam = true;
-                            ins_text = &ins_text[1..];
-                            // Early out if it was only an LF
-                            if ins_text.is_empty() {
-                                return (cur_info, None);
-                            }
-                        }
-
-                        // Find our byte index
-                        let byte_idx = char_to_byte_idx(leaf_text, idx);
-
-                        // No node splitting
-                        if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
-                            // Calculate new info without doing a full re-scan of cur_text
-                            let new_info = {
-                                // Get summed info of current text and to-be-inserted text
-                                let mut info = cur_info + TextInfo::from_str(ins_text);
-                                // Check for CRLF pairs on the insertion seams, and
-                                // adjust line break counts accordingly
-                                if byte_idx > 0 {
-                                    if leaf_text.as_bytes()[byte_idx - 1] == 0x0D
-                                        && ins_text.as_bytes()[0] == 0x0A
-                                    {
-                                        info.line_breaks -= 1;
-                                    }
-                                    if byte_idx < leaf_text.len()
-                                        && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
-                                        && leaf_text.as_bytes()[byte_idx] == 0x0A
-                                    {
-                                        info.line_breaks += 1;
-                                    }
-                                }
-                                if byte_idx < leaf_text.len()
-                                    && *ins_text.as_bytes().last().unwrap() == 0x0D
-                                    && leaf_text.as_bytes()[byte_idx] == 0x0A
-                                {
-                                    info.line_breaks -= 1;
-                                }
-                                info
-                            };
-                            // Insert the text and return the new info
-                            leaf_text.insert_str(byte_idx, ins_text);
-                            (new_info, None)
-                        }
-                        // We're splitting the node
-                        else {
-                            let r_text = leaf_text.insert_str_split(byte_idx, ins_text);
-                            let l_text_info = TextInfo::from_str(&leaf_text);
-                            if r_text.len() > 0 {
-                                let r_text_info = TextInfo::from_str(&r_text);
-                                (
-                                    l_text_info,
-                                    Some((r_text_info, Arc::new(Node::Leaf(r_text)))),
-                                )
-                            } else {
-                                // Leaf couldn't be validly split, so leave it oversized
-                                (l_text_info, None)
-                            }
-                        }
-                    },
-                );
-
-                // Handle root splitting, if any.
-                if let Some((r_info, r_node)) = residual {
-                    let mut l_node = Arc::new(Node::new());
-                    std::mem::swap(&mut l_node, &mut self.root);
-
-                    let mut children = NodeChildren::new();
-                    children.push((l_info, l_node));
-                    children.push((r_info, r_node));
-
-                    *Arc::make_mut(&mut self.root) = Node::Internal(children);
-                }
-
-                // Insert the LF to the left.
-                // TODO: this code feels fairly redundant with above.  Can we DRY this
-                // better?
-                if left_seam {
-                    // Do the insertion
-                    let root_info = self.root.text_info();
-                    let (l_info, residual) = Arc::make_mut(&mut self.root).edit_chunk_at_char(
-                        char_idx - 1,
-                        root_info,
-                        |_, cur_info, leaf_text| {
-                            let byte_idx = leaf_text.len();
-
-                            // No node splitting
-                            if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
-                                // Calculate new info without doing a full re-scan of cur_text
-                                let mut new_info = cur_info;
-                                new_info.bytes += 1;
-                                new_info.chars += 1;
-                                if *leaf_text.as_bytes().last().unwrap() != 0x0D {
-                                    new_info.line_breaks += 1;
-                                }
-                                // Insert the text and return the new info
-                                leaf_text.insert_str(byte_idx, "\n");
-                                (new_info, None)
-                            }
-                            // We're splitting the node
-                            else {
-                                let r_text = leaf_text.insert_str_split(byte_idx, "\n");
-                                let l_text_info = TextInfo::from_str(&leaf_text);
-                                if r_text.len() > 0 {
-                                    let r_text_info = TextInfo::from_str(&r_text);
-                                    (
-                                        l_text_info,
-                                        Some((r_text_info, Arc::new(Node::Leaf(r_text)))),
-                                    )
-                                } else {
-                                    // Leaf couldn't be validly split, so leave it oversized
-                                    (l_text_info, None)
-                                }
-                            }
-                        },
-                    );
-
-                    // Handle root splitting, if any.
-                    if let Some((r_info, r_node)) = residual {
-                        let mut l_node = Arc::new(Node::new());
-                        std::mem::swap(&mut l_node, &mut self.root);
-
-                        let mut children = NodeChildren::new();
-                        children.push((l_info, l_node));
-                        children.push((r_info, r_node));
-
-                        *Arc::make_mut(&mut self.root) = Node::Internal(children);
-                    }
-                }
+                // Do the insertion.
+                self.insert_internal(char_idx, ins_text);
             }
         }
     }
@@ -519,8 +409,167 @@ impl Rope {
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn insert_char(&mut self, char_idx: usize, ch: char) {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
+            char_idx,
+            self.len_chars()
+        );
+
         let mut buf = [0u8; 4];
-        self.insert(char_idx, ch.encode_utf8(&mut buf));
+        self.insert_internal(char_idx, ch.encode_utf8(&mut buf));
+    }
+
+    /// Private internal-only method that does a single insertion of
+    /// sufficiently small text.
+    ///
+    /// This only works correctly for insertion texts smaller than or equal to
+    /// `MAX_BYTES - 4`.
+    ///
+    /// Note that a lot of the complexity in this method comes from avoiding
+    /// splitting CRLF pairs and, when possible, avoiding re-scanning text for
+    /// text info.  It is otherwise conceptually fairly straightforward.
+    fn insert_internal(&mut self, char_idx: usize, ins_text: &str) {
+        let mut ins_text = ins_text;
+        let mut left_seam = false;
+        let root_info = self.root.text_info();
+
+        let (l_info, residual) = Arc::make_mut(&mut self.root).edit_chunk_at_char(
+            char_idx,
+            root_info,
+            |idx, cur_info, leaf_text| {
+                // First check if we have a left seam.
+                if idx == 0 && char_idx > 0 && ins_text.as_bytes()[0] == 0x0A {
+                    left_seam = true;
+                    ins_text = &ins_text[1..];
+                    // Early out if it was only an LF.
+                    if ins_text.is_empty() {
+                        return (cur_info, None);
+                    }
+                }
+
+                // Find our byte index
+                let byte_idx = char_to_byte_idx(leaf_text, idx);
+
+                // No node splitting
+                if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
+                    // Calculate new info without doing a full re-scan of cur_text
+                    let new_info = {
+                        // Get summed info of current text and to-be-inserted text
+                        let mut info = cur_info + TextInfo::from_str(ins_text);
+                        // Check for CRLF pairs on the insertion seams, and
+                        // adjust line break counts accordingly
+                        if byte_idx > 0 {
+                            if leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                && ins_text.as_bytes()[0] == 0x0A
+                            {
+                                info.line_breaks -= 1;
+                            }
+                            if byte_idx < leaf_text.len()
+                                && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                && leaf_text.as_bytes()[byte_idx] == 0x0A
+                            {
+                                info.line_breaks += 1;
+                            }
+                        }
+                        if byte_idx < leaf_text.len()
+                            && *ins_text.as_bytes().last().unwrap() == 0x0D
+                            && leaf_text.as_bytes()[byte_idx] == 0x0A
+                        {
+                            info.line_breaks -= 1;
+                        }
+                        info
+                    };
+                    // Insert the text and return the new info
+                    leaf_text.insert_str(byte_idx, ins_text);
+                    (new_info, None)
+                }
+                // We're splitting the node
+                else {
+                    let r_text = leaf_text.insert_str_split(byte_idx, ins_text);
+                    let l_text_info = TextInfo::from_str(&leaf_text);
+                    if r_text.len() > 0 {
+                        let r_text_info = TextInfo::from_str(&r_text);
+                        (
+                            l_text_info,
+                            Some((r_text_info, Arc::new(Node::Leaf(r_text)))),
+                        )
+                    } else {
+                        // Leaf couldn't be validly split, so leave it oversized
+                        (l_text_info, None)
+                    }
+                }
+            },
+        );
+
+        // Handle root splitting, if any.
+        if let Some((r_info, r_node)) = residual {
+            let mut l_node = Arc::new(Node::new());
+            std::mem::swap(&mut l_node, &mut self.root);
+
+            let mut children = NodeChildren::new();
+            children.push((l_info, l_node));
+            children.push((r_info, r_node));
+
+            *Arc::make_mut(&mut self.root) = Node::Internal(children);
+        }
+
+        // Insert the LF to the left.
+        // TODO: this code feels fairly redundant with above.  Can we DRY this
+        // better?
+        if left_seam {
+            // Do the insertion
+            let root_info = self.root.text_info();
+            let (l_info, residual) = Arc::make_mut(&mut self.root).edit_chunk_at_char(
+                char_idx - 1,
+                root_info,
+                |_, cur_info, leaf_text| {
+                    let byte_idx = leaf_text.len();
+
+                    // No node splitting
+                    if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
+                        // Calculate new info without doing a full re-scan of cur_text
+                        let mut new_info = cur_info;
+                        new_info.bytes += 1;
+                        new_info.chars += 1;
+                        if *leaf_text.as_bytes().last().unwrap() != 0x0D {
+                            new_info.line_breaks += 1;
+                        }
+                        // Insert the text and return the new info
+                        leaf_text.insert_str(byte_idx, "\n");
+                        (new_info, None)
+                    }
+                    // We're splitting the node
+                    else {
+                        let r_text = leaf_text.insert_str_split(byte_idx, "\n");
+                        let l_text_info = TextInfo::from_str(&leaf_text);
+                        if r_text.len() > 0 {
+                            let r_text_info = TextInfo::from_str(&r_text);
+                            (
+                                l_text_info,
+                                Some((r_text_info, Arc::new(Node::Leaf(r_text)))),
+                            )
+                        } else {
+                            // Leaf couldn't be validly split, so leave it oversized
+                            (l_text_info, None)
+                        }
+                    }
+                },
+            );
+
+            // Handle root splitting, if any.
+            if let Some((r_info, r_node)) = residual {
+                let mut l_node = Arc::new(Node::new());
+                std::mem::swap(&mut l_node, &mut self.root);
+
+                let mut children = NodeChildren::new();
+                children.push((l_info, l_node));
+                children.push((r_info, r_node));
+
+                *Arc::make_mut(&mut self.root) = Node::Internal(children);
+            }
+        }
     }
 
     /// Removes the text in the given char index range.
@@ -576,10 +625,6 @@ impl Rope {
             let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
 
             if crlf_seam {
-                // TODO: make fix_crlf_seam() work in terms of char indices,
-                // to avoid this conversion.  In practice this is unlikely
-                // to have any real performance impact, because it runs very
-                // rarely.  But still!
                 let seam_idx = root.char_to_byte_and_line(start).0;
                 root.fix_crlf_seam(seam_idx as Count, false);
             }
@@ -634,6 +679,7 @@ impl Rope {
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
     pub fn append(&mut self, other: Self) {
         if self.len_chars() == 0 {
+            // Special case
             let mut other = other;
             std::mem::swap(self, &mut other);
         } else if other.len_chars() > 0 {
@@ -1167,12 +1213,22 @@ impl<'a> From<RopeSlice<'a>> for Rope {
 
                 // Chop off right end if needed
                 if end_char < node.text_info().chars {
-                    rope.split_off(end_char as usize);
+                    {
+                        let mut root = Arc::make_mut(&mut rope.root);
+                        root.split(end_char as usize);
+                        root.zip_fix_right();
+                    }
+                    rope.pull_up_singular_nodes();
                 }
 
                 // Chop off left end if needed
                 if start_char > 0 {
-                    rope = rope.split_off(start_char as usize);
+                    {
+                        let mut root = Arc::make_mut(&mut rope.root);
+                        *root = root.split(start_char as usize);
+                        root.zip_fix_left();
+                    }
+                    rope.pull_up_singular_nodes();
                 }
 
                 // Return the rope

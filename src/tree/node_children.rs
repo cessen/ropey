@@ -501,6 +501,9 @@ mod inner {
     use std::ptr;
     use std::sync::Arc;
 
+    /// This is essentially a fixed-capacity, stack-allocated `Vec`.  However,
+    /// it actually containts _two_ arrays rather than just one, but which
+    /// share a length.
     pub(crate) struct NodeChildrenInternal {
         nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
         info: [TextInfo; MAX_LEN],
@@ -575,9 +578,15 @@ mod inner {
         pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
             assert!(self.len() > 0);
             self.len -= 1;
-            (self.info[self.len()], unsafe {
-                ptr::read(&self.nodes[self.len()])
-            })
+            (
+                self.info[self.len()],
+                // We use unsafe here to move the value out of the array.
+                // We can't do this with a normal move because even though it
+                // is semantically moved out of the array and will never be
+                // accessed from the array again, we can't prove that to the
+                // borrow checker.
+                unsafe { ptr::read(&self.nodes[self.len()]) },
+            )
         }
 
         /// Inserts an item into the the array at the given index.
@@ -590,6 +599,12 @@ mod inner {
             assert!(self.len() < MAX_LEN);
 
             let len = self.len();
+            // This unsafe code simply shifts the elements of the arrays over
+            // to make space for the new inserted value.  The `.info` array
+            // shifting can be replaced with a safe call to `copy_within()`
+            // once that API is stabalized in the standard library.  However,
+            // the `.nodes` array shift cannot, because of the specific drop
+            // semantics needed for safety.
             unsafe {
                 ptr::copy(
                     self.nodes.as_ptr().add(idx),
@@ -604,6 +619,9 @@ mod inner {
             }
 
             self.info[idx] = item.0;
+            // The `mem::forget()` here is critical, since the value being
+            // replaced is not actually a valid value, so dropping it would be
+            // UB.
             mem::forget(mem::replace(&mut self.nodes[idx], item.1));
 
             self.len += 1;
@@ -617,9 +635,23 @@ mod inner {
             assert!(self.len() > 0);
             assert!(idx < self.len());
 
-            let item = (self.info[idx], unsafe { ptr::read(&self.nodes[idx]) });
+            let item = (
+                self.info[idx],
+                // We use unsafe here to move the value out of the array.
+                // We can't do this with a normal move because even though it
+                // is semantically moved out of the array and will never be
+                // accessed from the array again, we can't prove that to the
+                // borrow checker.
+                unsafe { ptr::read(&self.nodes[idx]) },
+            );
 
             let len = self.len();
+            // This unsafe code simply shifts the elements of the arrays over
+            // to fill in the gap left by the removed element.  The `.info`
+            // array shifting can be replaced with a safe call to
+            // `copy_within()` once that API is stabalized in the standard
+            // library.  However, the `.nodes` array shift cannot, because of
+            // the specific drop semantics needed for safety.
             unsafe {
                 ptr::copy(
                     self.nodes.as_ptr().add(idx + 1),
@@ -640,8 +672,20 @@ mod inner {
 
     impl Drop for NodeChildrenInternal {
         fn drop(&mut self) {
+            // The `.nodes` array is wrapped in `ManuallyDrop` so that
+            // items in the array that are semantically invalid don't get
+            // auto-dropped (which would be UB).  However, that means we have to
+            // manually drop the ones that _are_ valid.
             for node in &mut self.nodes[..self.len as usize] {
-                let mptr: *mut Arc<Node> = node; // Make sure we have the right dereference
+                // Get the right kind of pointer to the Arc.  We're explicitly
+                // specifying the type signature here essentially out of
+                // paranoia: I don't completely trust Rust's auto-dereferencing
+                // to get this right, since there are multiple "right" answers
+                // from a type perspective.  But it's critical to get this
+                // _actually_ right, otherwise we're just dropping pointers
+                // rather than the actual Arcs.
+                let mptr: *mut Arc<Node> = node;
+
                 unsafe { ptr::drop_in_place(mptr) };
             }
         }
@@ -656,6 +700,9 @@ mod inner {
                 clone_array.nodes[..self.len()].iter_mut(),
                 self.nodes[..self.len()].iter(),
             ) {
+                // The `mem::forget()` here is critical, since the value being
+                // replaced is not actually a valid value, so dropping it would
+                // be UB.
                 mem::forget(mem::replace(clone_arc, Arc::clone(arc)));
             }
 

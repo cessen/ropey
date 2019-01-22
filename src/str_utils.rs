@@ -67,6 +67,10 @@ pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
 
 #[inline(always)]
 fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
+    // Get `middle` so we can do more efficient chunk-based counting.
+    // We can't use this to get `end`, however, because the start index of
+    // `end` actually depends on the accumulating char counts during the
+    // counting process.
     let (start, middle, _) = unsafe { text.as_bytes().align_to::<T>() };
 
     let mut byte_count = 0;
@@ -159,6 +163,7 @@ fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
     // Count line breaks in big chunks.
     if alignment_diff::<T>(bytes) == 0 {
         while bytes.len() >= T::size() {
+            // Unsafe because the called function depends on correct alignment.
             let tmp = unsafe { count_line_breaks_in_chunk_from_ptr::<T>(bytes) }.sum_bytes();
             if tmp + line_break_count >= line_idx {
                 break;
@@ -241,6 +246,7 @@ pub(crate) fn count_chars_in_bytes(text: &[u8]) -> usize {
 
 #[inline(always)]
 fn count_chars_internal<T: ByteChunk>(text: &[u8]) -> usize {
+    // Get `middle` for more efficient chunk-based counting.
     let (start, middle, end) = unsafe { text.align_to::<T>() };
 
     let mut inv_count = 0;
@@ -314,6 +320,7 @@ fn count_line_breaks_internal<T: ByteChunk>(text: &str) -> usize {
     let mut i = 0;
     let mut acc = T::splat(0);
     while bytes.len() >= T::size() {
+        // Unsafe because the called function depends on correct alignment.
         acc = acc.add(unsafe { count_line_breaks_in_chunk_from_ptr::<T>(bytes) });
         i += 1;
         if i == T::max_acc() {
@@ -376,7 +383,8 @@ fn count_line_breaks_up_to(bytes: &[u8], max_bytes: usize, max_breaks: usize) ->
 /// Used internally in the line-break counting functions.
 ///
 /// The start of `bytes` MUST be aligned as type T, and `bytes` MUST be at
-/// least as large (in bytes) as T.
+/// least as large (in bytes) as T.  If these invariants are not met, bad
+/// things could potentially happen.  Hence why this function is unsafe.
 #[inline(always)]
 unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(bytes: &[u8]) -> T {
     let c = {

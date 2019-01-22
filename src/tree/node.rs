@@ -42,17 +42,16 @@ impl Node {
     ///
     /// There are three parameters:
     /// - char_idx: the chunk that contains this char is fetched,
-    /// - node_info: this is the text info of the current node.  This
-    ///              makes it a little awkward to call, because you
-    ///              need to calculate the TextInfo of the node you're
-    ///              calling it on, but it's part of the recursion, to
-    ///              make things efficient.
+    /// - node_info: this is the text info of the node it's being called on.
+    ///              This makes it a little awkward to call, but is needed since
+    ///              it's actually the parent node that contains the text info,
+    ///              so the info needs to be passed in.
     /// - edit: the closure that receives the chunk and does the edits.
     ///
     /// The closure is effectively the termination case for the recursion,
     /// and takes essentially same parameters and returns the same things as
     /// the method itself.  In particular, the closure receives the char offset
-    /// within the given chunk that char_idx is, the TextInfo of the chunk.
+    /// of char_idx within the given chunk and the TextInfo of the chunk.
     /// The main difference is that it receives a NodeText instead of a node.
     ///
     /// The closure is expected to return the updated text info of the node,
@@ -93,12 +92,12 @@ impl Node {
                 let (child_i, acc_char_idx) = children.search_char_idx_only(char_idx);
                 let info = children.info()[child_i];
 
-                // Handle residual node, if any, and return.
+                // Recurse into the child.
                 let (l_info, mut residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
                     .edit_chunk_at_char(char_idx - acc_char_idx, info, edit);
                 children.info_mut()[child_i] = l_info;
 
-                // Handle the CRLF and main insertion residuals
+                // Handle the residual node if there is one and return.
                 if let Some((r_info, r_node)) = residual {
                     if children.len() < MAX_CHILDREN {
                         children.insert(child_i + 1, (r_info, r_node));
@@ -463,7 +462,7 @@ impl Node {
                         info.bytes as usize,
                         info.chars as usize,
                         info.line_breaks as usize,
-                    )
+                    );
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_byte_idx(byte_idx);
@@ -492,7 +491,7 @@ impl Node {
                         info.bytes as usize,
                         info.chars as usize,
                         info.line_breaks as usize,
-                    )
+                    );
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_char_idx(char_idx);
@@ -525,7 +524,7 @@ impl Node {
                         info.bytes as usize,
                         info.chars as usize,
                         info.line_breaks as usize,
-                    )
+                    );
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_line_break_idx(line_break_idx);
