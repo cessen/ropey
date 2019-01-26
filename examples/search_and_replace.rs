@@ -23,7 +23,7 @@ fn main() {
             std::env::args().nth(3).unwrap(),
         )
     } else {
-        println!(
+        eprintln!(
             "Usage:\n    search_and_replace <search_pattern> <replacement_text> <input_filepath>"
         );
         return;
