@@ -15,7 +15,7 @@ fn main() {
     let filepath = if std::env::args().count() > 1 {
         std::env::args().nth(1).unwrap()
     } else {
-        println!(
+        eprintln!(
             "You must pass a filepath!  Only recieved {} arguments.",
             std::env::args().count()
         );
