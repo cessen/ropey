@@ -197,6 +197,45 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
 }
 
+/// Counts lines backwards from end of `&str`.
+/// The start and end of a `&str` are counted as line-breaks.
+/// If a `&str` is terminated with a line-break it will appear at index `0`.
+///
+/// An index greater than the count of line-breaks in `text` will return `0`.
+#[inline]
+pub fn reverse_line_to_byte_idx(text: &str, reversed_line_idx: usize) -> usize {
+    // TODO optimized
+
+    if reversed_line_idx == 0 {
+        return text.len();        
+    }
+
+    let mut i = text.len() - 1;
+    let mut line_count = 0;
+    while i > 0 {
+        let mut byte_count = 0;
+        while !text.is_char_boundary(i) {
+            i -= 1;
+            byte_count += 1;
+        }
+
+        match &text[i..=i + byte_count] {
+            "\u{000A}" | "\u{000B}" | "\u{000C}" | "\u{000D}" | "\u{0085}" | "\u{2028}"
+            | "\u{2029}" => {
+                line_count += 1;
+                if line_count == reversed_line_idx {
+                    return i + 1;
+                };
+            }
+            _ => {}
+        };
+
+        // Move to preceding codepoint.
+        i -= 1;
+    }
+    0
+}
+
 //===========================================================================
 // Internal
 //===========================================================================
@@ -1241,6 +1280,36 @@ mod tests {
         assert_eq!(124, line_to_byte_idx(TEXT_LINES, 5));
         assert_eq!(124, line_to_byte_idx(TEXT_LINES, 6));
     }
+
+    #[test]
+    fn reverse_line_to_byte_idx_01() {
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 0), reverse_line_to_byte_idx(TEXT_LINES, 4));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 1), reverse_line_to_byte_idx(TEXT_LINES, 3));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 2), reverse_line_to_byte_idx(TEXT_LINES, 2));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 3), reverse_line_to_byte_idx(TEXT_LINES, 1));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 4), reverse_line_to_byte_idx(TEXT_LINES, 0));
+
+        // Before start
+        assert_eq!(0, reverse_line_to_byte_idx(TEXT_LINES, 5));
+    }
+
+    #[test]
+    fn reverse_line_to_byte_idx_02() {
+        const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
+                                  a fine day, isn't it?\nAren't you glad \
+                                  we're alive?\nこんにちは、みんなさん！\n";
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 0), reverse_line_to_byte_idx(TEXT_LINES, 5));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 1), reverse_line_to_byte_idx(TEXT_LINES, 4));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 2), reverse_line_to_byte_idx(TEXT_LINES, 3));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 3), reverse_line_to_byte_idx(TEXT_LINES, 2));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 4), reverse_line_to_byte_idx(TEXT_LINES, 1));
+        assert_eq!(line_to_byte_idx(TEXT_LINES, 5), reverse_line_to_byte_idx(TEXT_LINES, 0));
+
+        // Before start
+        assert_eq!(0, reverse_line_to_byte_idx(TEXT_LINES, 6));
+    }
+
+
 
     #[test]
     fn line_to_char_idx_01() {
