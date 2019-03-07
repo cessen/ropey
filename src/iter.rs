@@ -12,6 +12,7 @@ use std::sync::Arc;
 use slice::RopeSlice;
 use str_utils::{
     char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx, line_to_char_idx,
+    reverse_line_to_byte_idx,
 };
 use tree::Node;
 
@@ -127,6 +128,7 @@ enum LinesEnum<'a> {
         start_char: usize,
         end_char: usize,
         line_idx: usize,
+        rev_line_idx: usize,
     },
     Light {
         text: &'a str,
@@ -141,6 +143,7 @@ impl<'a> Lines<'a> {
             start_char: 0,
             end_char: node.text_info().chars as usize,
             line_idx: 0,
+            rev_line_idx: node.line_break_count(),
         })
     }
 
@@ -152,6 +155,10 @@ impl<'a> Lines<'a> {
             line_idx: {
                 let (chunk, _, c, l) = node.get_chunk_at_char(start_char);
                 l + char_to_line_idx(chunk, start_char - c)
+            },
+            rev_line_idx: {
+                let (chunk, _, c, l) = node.get_chunk_at_char(end_char);
+                l + char_to_line_idx(chunk, end_char - c)
             },
         })
     }
@@ -174,8 +181,9 @@ impl<'a> Iterator for Lines<'a> {
                 start_char,
                 end_char,
                 ref mut line_idx,
+                rev_line_idx,
             }) => {
-                if *line_idx > node.line_break_count() {
+                if *line_idx > rev_line_idx {
                     return None;
                 } else {
                     let a = {
@@ -185,14 +193,14 @@ impl<'a> Iterator for Lines<'a> {
 
                         // Early out if we're past the specified end char
                         if a > end_char {
-                            *line_idx = node.line_break_count() + 1;
+                            *line_idx = rev_line_idx + 1;
                             return None;
                         }
 
                         a
                     };
 
-                    let b = if *line_idx < node.line_break_count() {
+                    let b = if *line_idx < rev_line_idx {
                         // Find the char that corresponds to the end of the line.
                         let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx + 1);
                         c + line_to_char_idx(chunk, *line_idx + 1 - l)
@@ -216,9 +224,60 @@ impl<'a> Iterator for Lines<'a> {
                     let split_idx = line_to_byte_idx(text, 1);
                     let t = &text[..split_idx];
                     *text = &text[split_idx..];
-                    if text.is_empty() {
+                    if text.is_empty() && !*done {
                         *done = !ends_with_line_break(t);
                     }
+                    return Some(t.into());
+                }
+            }
+        }
+    }
+}
+
+impl<'a> DoubleEndedIterator for Lines<'a> {
+    fn next_back(&mut self) -> Option<RopeSlice<'a>> {
+        match *self {
+            Lines(LinesEnum::Full {
+                ref mut node,
+                start_char,
+                end_char,
+                ref line_idx,
+                ref mut rev_line_idx,
+            }) => {
+                if *line_idx >= *rev_line_idx {
+                    return None;
+                } else {
+                    let a = {
+                        // Find the char that corresponds to the start of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*rev_line_idx - 1);
+                        (c + line_to_char_idx(chunk, *rev_line_idx - 1 - l)).max(start_char)
+                    };
+
+                    let b = if *rev_line_idx != node.line_break_count() {
+                        // Find the char that corresponds to the end of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*rev_line_idx);
+                        c + line_to_char_idx(chunk, *rev_line_idx - l)
+                    } else {
+                        node.char_count()
+                    }
+                    .min(end_char);
+
+                    *rev_line_idx -= 1;
+
+                    return Some(RopeSlice::new_with_range(node, a, b));
+                }
+            }
+            Lines(LinesEnum::Light {
+                ref mut text,
+                ref mut done,
+            }) => {
+                if *done {
+                    return None;
+                } else {
+                    let split_idx = reverse_line_to_byte_idx(text, 1);
+                    let t = &text[..split_idx];
+                    *text = &text[split_idx..];
+                    *done = true;
                     return Some(t.into());
                 }
             }
@@ -660,6 +719,51 @@ mod tests {
         assert_eq!("b\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn lines_10() {
+        let eq = |text: &str| {
+            let forward: Vec<&str> = text.lines().collect();
+            let mut reverse: Vec<&str> = text.lines().rev().collect();
+            reverse.reverse();
+            assert_eq!(forward, reverse);
+        };
+
+        eq(TEXT);
+        eq("");
+        eq("\n");
+        eq("\n \r\n");
+        eq("\u{000A}");
+        eq("\u{000B}");
+        eq("\u{000C}");
+        eq("\u{000D}");
+        eq("\u{0085}");
+        eq("\u{2028}");
+        eq("\u{2029}");
+    }
+
+    #[test]
+    fn lines_11() {
+        let mut switch = true;
+        let mut lines = TEXT.lines();
+        let mut next = |front: &mut Vec<&str>, back: &mut Vec<&str>| {
+            switch = !switch;
+            if switch {
+                lines.next().map(|l| front.push(l))
+            } else {
+                lines.next_back().map(|l| back.push(l))
+            }
+        };
+
+        let mut front = vec![];
+        let mut back: Vec<&str> = vec![];
+        while let Some(_) = next(&mut front, &mut back) {}
+        back.reverse();
+        front.append(&mut back);
+
+        let forward: Vec<&str> = TEXT.lines().collect();
+        assert_eq!(forward, front);
     }
 
     #[test]
