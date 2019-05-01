@@ -1,3 +1,10 @@
+# 1.0.1 (2019-05-01)
+
+Other:
+
+* Converted a lot of unsafe code to safe code, with minimal performance impact.
+
+
 # 1.0.0 (2019-01-03)
 
 New features:
