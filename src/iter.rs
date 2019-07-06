@@ -720,7 +720,7 @@ mod tests {
         let s2 = &TEXT[s_start_byte..s_end_byte];
 
         for (liner, linet) in s1.lines().zip(s2.lines()) {
-            assert_eq!(liner.to_string().trim_right(), linet);
+            assert_eq!(liner.to_string().trim_end(), linet);
         }
     }
 

@@ -93,7 +93,7 @@ impl Node {
                 let info = children.info()[child_i];
 
                 // Recurse into the child.
-                let (l_info, mut residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
+                let (l_info, residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
                     .edit_chunk_at_char(char_idx - acc_char_idx, info, edit);
                 children.info_mut()[child_i] = l_info;
 
@@ -198,9 +198,9 @@ impl Node {
                 // - Whether there's a possible CRLF seam that needs fixing.
                 // - Whether the tree may need invariant fixing.
                 // - Updated TextInfo of the node.
-                let mut handle_child = |children: &mut NodeChildren,
-                                        child_i: usize,
-                                        c_char_acc: usize|
+                let handle_child = |children: &mut NodeChildren,
+                                    child_i: usize,
+                                    c_char_acc: usize|
                  -> (bool, bool, TextInfo) {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];

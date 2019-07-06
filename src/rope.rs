@@ -1214,7 +1214,7 @@ impl<'a> From<RopeSlice<'a>> for Rope {
                 // Chop off right end if needed
                 if end_char < node.text_info().chars {
                     {
-                        let mut root = Arc::make_mut(&mut rope.root);
+                        let root = Arc::make_mut(&mut rope.root);
                         root.split(end_char as usize);
                         root.zip_fix_right();
                     }
@@ -1224,7 +1224,7 @@ impl<'a> From<RopeSlice<'a>> for Rope {
                 // Chop off left end if needed
                 if start_char > 0 {
                     {
-                        let mut root = Arc::make_mut(&mut rope.root);
+                        let root = Arc::make_mut(&mut rope.root);
                         *root = root.split(start_char as usize);
                         root.zip_fix_left();
                     }
