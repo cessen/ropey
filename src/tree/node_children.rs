@@ -497,7 +497,7 @@ impl fmt::Debug for NodeChildren {
 mod inner {
     use super::{Node, TextInfo, MAX_LEN};
     use std::mem;
-    use std::mem::ManuallyDrop;
+    use std::mem::MaybeUninit;
     use std::ptr;
     use std::sync::Arc;
 
@@ -505,8 +505,8 @@ mod inner {
     /// it actually containts _two_ arrays rather than just one, but which
     /// share a length.
     pub(crate) struct NodeChildrenInternal {
-        nodes: ManuallyDrop<[Arc<Node>; MAX_LEN]>,
-        info: [TextInfo; MAX_LEN],
+        nodes: [MaybeUninit<Arc<Node>>; MAX_LEN],
+        info: [MaybeUninit<TextInfo>; MAX_LEN],
         len: u8,
     }
 
@@ -515,8 +515,8 @@ mod inner {
         #[inline(always)]
         pub fn new() -> NodeChildrenInternal {
             NodeChildrenInternal {
-                nodes: ManuallyDrop::new(unsafe { mem::uninitialized() }),
-                info: unsafe { mem::uninitialized() },
+                nodes: unsafe { MaybeUninit::uninit().assume_init() },
+                info: unsafe { MaybeUninit::uninit().assume_init() },
                 len: 0,
             }
         }
@@ -529,34 +529,34 @@ mod inner {
 
         /// Access to the nodes array.
         #[inline(always)]
-        pub fn nodes(&self) -> &[Arc<Node>] {
-            &self.nodes[..(self.len())]
+        pub fn nodes<'a>(&'a self) -> &'a [Arc<Node>] {
+            unsafe { mem::transmute(&self.nodes[..(self.len())]) }
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
-        pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
-            &mut self.nodes[..(self.len as usize)]
+        pub fn nodes_mut<'a>(&'a mut self) -> &'a mut [Arc<Node>] {
+            unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) }
         }
 
         /// Access to the info array.
         #[inline(always)]
-        pub fn info(&self) -> &[TextInfo] {
-            &self.info[..(self.len())]
+        pub fn info<'a>(&'a self) -> &'a [TextInfo] {
+            unsafe { mem::transmute(&self.info[..(self.len())]) }
         }
 
         /// Mutable access to the info array.
         #[inline(always)]
-        pub fn info_mut(&mut self) -> &mut [TextInfo] {
-            &mut self.info[..(self.len as usize)]
+        pub fn info_mut<'a>(&'a mut self) -> &'a mut [TextInfo] {
+            unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) }
         }
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
-        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+        pub fn data_mut<'a>(&'a mut self) -> (&'a mut [TextInfo], &'a mut [Arc<Node>]) {
             (
-                &mut self.info[..(self.len as usize)],
-                &mut self.nodes[..(self.len as usize)],
+                unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) },
+                unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) },
             )
         }
 
@@ -566,8 +566,8 @@ mod inner {
         #[inline(always)]
         pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
             assert!(self.len() < MAX_LEN);
-            self.info[self.len()] = item.0;
-            mem::forget(mem::replace(&mut self.nodes[self.len as usize], item.1));
+            self.info[self.len()] = MaybeUninit::new(item.0);
+            self.nodes[self.len as usize] = MaybeUninit::new(item.1);
             self.len += 1;
         }
 
@@ -578,15 +578,9 @@ mod inner {
         pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
             assert!(self.len() > 0);
             self.len -= 1;
-            (
-                self.info[self.len()],
-                // We use unsafe here to move the value out of the array.
-                // We can't do this with a normal move because even though it
-                // is semantically moved out of the array and will never be
-                // accessed from the array again, we can't prove that to the
-                // borrow checker.
-                unsafe { ptr::read(&self.nodes[self.len()]) },
-            )
+            (unsafe { self.info[self.len()].assume_init() }, unsafe {
+                ptr::read(&self.nodes[self.len()]).assume_init()
+            })
         }
 
         /// Inserts an item into the the array at the given index.
@@ -618,11 +612,8 @@ mod inner {
                 );
             }
 
-            self.info[idx] = item.0;
-            // The `mem::forget()` here is critical, since the value being
-            // replaced is not actually a valid value, so dropping it would be
-            // UB.
-            mem::forget(mem::replace(&mut self.nodes[idx], item.1));
+            self.info[idx] = MaybeUninit::new(item.0);
+            self.nodes[idx] = MaybeUninit::new(item.1);
 
             self.len += 1;
         }
@@ -635,15 +626,9 @@ mod inner {
             assert!(self.len() > 0);
             assert!(idx < self.len());
 
-            let item = (
-                self.info[idx],
-                // We use unsafe here to move the value out of the array.
-                // We can't do this with a normal move because even though it
-                // is semantically moved out of the array and will never be
-                // accessed from the array again, we can't prove that to the
-                // borrow checker.
-                unsafe { ptr::read(&self.nodes[idx]) },
-            );
+            let item = (unsafe { self.info[idx].assume_init() }, unsafe {
+                ptr::read(&self.nodes[idx]).assume_init()
+            });
 
             let len = self.len();
             // This unsafe code simply shifts the elements of the arrays over
@@ -672,21 +657,11 @@ mod inner {
 
     impl Drop for NodeChildrenInternal {
         fn drop(&mut self) {
-            // The `.nodes` array is wrapped in `ManuallyDrop` so that
-            // items in the array that are semantically invalid don't get
-            // auto-dropped (which would be UB).  However, that means we have to
-            // manually drop the ones that _are_ valid.
+            // The `.nodes` array contains `MaybeUninit` wrappers, which need
+            // to be manually dropped if valid.  We drop only the valid ones
+            // here.
             for node in &mut self.nodes[..self.len as usize] {
-                // Get the right kind of pointer to the Arc.  We're explicitly
-                // specifying the type signature here essentially out of
-                // paranoia: I don't completely trust Rust's auto-dereferencing
-                // to get this right, since there are multiple "right" answers
-                // from a type perspective.  But it's critical to get this
-                // _actually_ right, otherwise we're just dropping pointers
-                // rather than the actual Arcs.
-                let mptr: *mut Arc<Node> = node;
-
-                unsafe { ptr::drop_in_place(mptr) };
+                unsafe { ptr::drop_in_place(node.as_mut_ptr()) };
             }
         }
     }
@@ -700,10 +675,7 @@ mod inner {
                 clone_array.nodes[..self.len()].iter_mut(),
                 self.nodes[..self.len()].iter(),
             ) {
-                // The `mem::forget()` here is critical, since the value being
-                // replaced is not actually a valid value, so dropping it would
-                // be UB.
-                mem::forget(mem::replace(clone_arc, Arc::clone(arc)));
+                *clone_arc = MaybeUninit::new(Arc::clone(unsafe { &*arc.as_ptr() }));
             }
 
             // Copy TextInfo
@@ -724,14 +696,16 @@ mod inner {
                     (&clone_array.info[..clone_array.len()]).iter(),
                     (&self.info[..self.len()]).iter(),
                 ) {
-                    assert_eq!(a, b);
+                    assert_eq!(unsafe { a.assume_init() }, unsafe { b.assume_init() },);
                 }
 
                 for (a, b) in Iterator::zip(
                     (&clone_array.nodes[..clone_array.len()]).iter(),
                     (&self.nodes[..clone_array.len()]).iter(),
                 ) {
-                    assert!(Arc::ptr_eq(a, b));
+                    assert!(Arc::ptr_eq(unsafe { &*a.as_ptr() }, unsafe {
+                        &*b.as_ptr()
+                    },));
                 }
             }
 
