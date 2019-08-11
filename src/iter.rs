@@ -261,31 +261,61 @@ pub struct Chunks<'a>(ChunksEnum<'a>);
 #[derive(Debug, Clone)]
 enum ChunksEnum<'a> {
     Full {
-        node_stack: Vec<&'a Arc<Node>>,
-        start: usize,
-        end: usize,
-        idx: usize,
+        node_stack: Vec<(&'a Arc<Node>, usize)>, // (node ref, index of current child)
+        total_bytes: usize,                      // Total bytes in the data range of the iterator.
+        byte_idx: isize, // The index of the current byte relative to the data range start.
     },
     Light {
         text: &'a str,
+        is_end: bool,
     },
 }
 
 impl<'a> Chunks<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Chunks {
+        // If root is a leaf, return light version of the iter.
+        if node.is_leaf() {
+            return Chunks(ChunksEnum::Light {
+                text: node.leaf_text(),
+                is_end: false,
+            });
+        }
+
+        // Create and populate the node stack.
+        let node_stack = {
+            let mut node_stack = Vec::new();
+            let mut node_ref = node;
+            loop {
+                match **node_ref {
+                    Node::Internal(ref children) => {
+                        node_stack.push((node_ref, 0));
+                        node_ref = &children.nodes()[0];
+                    }
+                    Node::Leaf(_) => {
+                        break;
+                    }
+                }
+            }
+            node_stack
+        };
+
+        // Create the iterator.
         Chunks(ChunksEnum::Full {
-            node_stack: vec![node],
-            start: 0,
-            end: node.text_info().bytes as usize,
-            idx: 0,
+            node_stack: node_stack,
+            total_bytes: node.text_info().bytes as usize,
+            byte_idx: 0,
         })
     }
 
     pub(crate) fn new_empty() -> Chunks<'static> {
-        Chunks(ChunksEnum::Light { text: "" })
+        Chunks(ChunksEnum::Light {
+            text: "",
+            is_end: false,
+        })
     }
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+        // Calculate the start and end bytes of the iterator.
         let start_byte = {
             let (chunk, b, c, _) = node.get_chunk_at_char(start_char);
             b + char_to_byte_idx(chunk, start_char - c)
@@ -294,16 +324,50 @@ impl<'a> Chunks<'a> {
             let (chunk, b, c, _) = node.get_chunk_at_char(end_char);
             b + char_to_byte_idx(chunk, end_char - c)
         };
+
+        // If root is a leaf, return light version of the iter.
+        if node.is_leaf() {
+            return Chunks(ChunksEnum::Light {
+                text: &node.leaf_text()[start_byte..end_byte],
+                is_end: false,
+            });
+        }
+
+        // Create and populate the node stack, and determine the byte index
+        // within the first chunk.
+        let mut byte_idx = start_byte;
+        let node_stack = {
+            let mut node_stack = Vec::new();
+            let mut node_ref = node;
+            loop {
+                match **node_ref {
+                    Node::Leaf(ref text) => {
+                        break;
+                    }
+                    Node::Internal(ref children) => {
+                        let (child_i, acc_info) = children.search_byte_idx(byte_idx);
+                        node_stack.push((node_ref, child_i));
+                        node_ref = &children.nodes()[child_i];
+                        byte_idx -= acc_info.bytes as usize;
+                    }
+                }
+            }
+            node_stack
+        };
+
+        // Create the iterator.
         Chunks(ChunksEnum::Full {
-            node_stack: vec![node],
-            start: start_byte,
-            end: end_byte,
-            idx: 0,
+            node_stack: node_stack,
+            total_bytes: end_byte - start_byte,
+            byte_idx: -(byte_idx as isize),
         })
     }
 
     pub(crate) fn from_str(text: &str) -> Chunks {
-        Chunks(ChunksEnum::Light { text: text })
+        Chunks(ChunksEnum::Light {
+            text: text,
+            is_end: false,
+        })
     }
 }
 
@@ -314,58 +378,64 @@ impl<'a> Iterator for Chunks<'a> {
         match *self {
             Chunks(ChunksEnum::Full {
                 ref mut node_stack,
-                start,
-                end,
-                ref mut idx,
+                total_bytes,
+                ref mut byte_idx,
             }) => {
-                if *idx >= end {
+                if *byte_idx >= total_bytes as isize {
                     return None;
                 }
 
-                loop {
-                    if let Some(node) = node_stack.pop() {
-                        match **node {
-                            Node::Leaf(ref text) => {
-                                let start_byte = if start <= *idx { 0 } else { start - *idx };
-                                let end_byte = if end >= (*idx + text.len()) {
-                                    text.len()
-                                } else {
-                                    end - *idx
-                                };
-                                *idx += text.len();
-                                return Some(&text[start_byte..end_byte]);
-                            }
-
-                            Node::Internal(ref children) => {
-                                // Find the first child that isn't before `start`,
-                                // updating `idx` as we go.
-                                let mut child_i = 0;
-                                for inf in children.info().iter() {
-                                    if (*idx + inf.bytes as usize) > start {
-                                        break;
-                                    } else {
-                                        *idx += inf.bytes as usize;
-                                        child_i += 1;
-                                    }
-                                }
-                                // Push relevant children to the stack.
-                                for child in (&children.nodes()[child_i..]).iter().rev() {
-                                    node_stack.push(child);
-                                }
-                            }
+                // Progress the node stack if needed.
+                let mut stack_idx = node_stack.len() - 1;
+                if node_stack[stack_idx].1 >= node_stack[stack_idx].0.child_count() {
+                    while node_stack[stack_idx].1 >= (node_stack[stack_idx].0.child_count() - 1) {
+                        if stack_idx == 0 {
+                            return None;
+                        } else {
+                            stack_idx -= 1;
                         }
-                    } else {
-                        return None;
+                    }
+                    node_stack[stack_idx].1 += 1;
+                    while stack_idx < (node_stack.len() - 1) {
+                        let child_i = node_stack[stack_idx].1;
+                        let node = &node_stack[stack_idx].0.children().nodes()[child_i];
+                        node_stack[stack_idx + 1] = (node, 0);
+                        stack_idx += 1;
                     }
                 }
+
+                // Fetch the node and child index.
+                let (node, ref mut child_i) = node_stack.last_mut().unwrap();
+
+                // Get the text, sliced to the appropriate range.
+                let text = node.children().nodes()[*child_i].leaf_text();
+                let text_slice = {
+                    let start_byte = if *byte_idx < 0 {
+                        (-*byte_idx) as usize
+                    } else {
+                        0
+                    };
+                    let end_byte = text.len().min((total_bytes as isize - *byte_idx) as usize);
+                    &text[start_byte..end_byte]
+                };
+
+                // Book keeping.
+                *byte_idx += text.len() as isize;
+                *child_i += 1;
+
+                // Return the text.
+                return Some(text_slice);
             }
-            Chunks(ChunksEnum::Light { ref mut text }) => {
-                if text.is_empty() {
+
+            Chunks(ChunksEnum::Light {
+                text,
+                ref mut is_end,
+            }) => {
+                if *is_end {
                     return None;
                 } else {
-                    let t = *text;
-                    *text = "";
-                    return Some(t);
+                    *is_end = true;
+                    return Some(text);
                 }
             }
         }
@@ -677,6 +747,15 @@ mod tests {
             assert_eq!(chunk, &TEXT[idx..(idx + chunk.len())]);
             idx += chunk.len();
         }
+    }
+
+    #[test]
+    fn chunks_02() {
+        let r = Rope::from_str("");
+        let mut itr = r.chunks();
+
+        assert_eq!(Some(""), itr.next());
+        assert_eq!(None, itr.next());
     }
 
     #[test]

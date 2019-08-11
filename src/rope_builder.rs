@@ -230,14 +230,14 @@ impl RopeBuilder {
                     } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
                         // There's room to add a child, so do that.
                         Arc::make_mut(&mut self.stack[stack_idx as usize])
-                            .children()
+                            .children_mut()
                             .push((left.text_info(), left));
                         break;
                     } else {
                         // Not enough room to fit a child, so split.
                         left = Arc::new(Node::Internal(
                             Arc::make_mut(&mut self.stack[stack_idx as usize])
-                                .children()
+                                .children_mut()
                                 .push_split((left.text_info(), left)),
                         ));
                         std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);

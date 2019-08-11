@@ -246,11 +246,11 @@ proptest! {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert_eq!(rope, rope_clone);
 
         let max_leaf_bytes = 1024 - 33;
-        assert!((rope.capacity() - rope.len_bytes()) < max_leaf_bytes);
+        assert!((rope.capacity() - rope.len_bytes()) <= max_leaf_bytes);
         assert!(rope.capacity() <= capacity_before);
-        assert_eq!(rope, rope_clone);
     }
 
     #[test]
@@ -269,12 +269,12 @@ proptest! {
 
         rope.assert_integrity();
         rope.assert_invariants();
+        assert_eq!(rope, rope_clone);
 
         let max_leaf_bytes = 1024 - 33;
         let max_diff = max_leaf_bytes + ((rope.len_bytes() / max_leaf_bytes) * ins_text.len());
 
-        assert!((rope.capacity() - rope.len_bytes()) < max_diff);
-        assert_eq!(rope, rope_clone);
+        assert!((rope.capacity() - rope.len_bytes()) <= max_diff);
     }
 
     #[test]
@@ -551,6 +551,31 @@ proptest! {
 
         assert_eq!(r1.cmp(&r2), text1.cmp(text2));
         assert_eq!(r2.cmp(&r1), text2.cmp(text1));
+    }
+
+    #[test]
+    fn pt_chunks_iter(ref text in
+        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
+         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
+         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        idx1 in 0usize..20000, idx2 in 0usize..20000,
+    ) {
+        let len_chars = byte_to_char_idx(text, text.len());
+        let idx1 = if len_chars == 0 { 0 } else { idx1 % len_chars };
+        let idx2 = if len_chars == 0 { 0 } else { idx2 % len_chars };
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+
+        let r = Rope::from_str(text);
+        let text = string_slice(text, start, end);
+        let s = r.slice(start..end);
+
+        let mut idx = 0;
+        for chunk in s.chunks() {
+            assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
+            idx += chunk.len();
+        }
     }
 }
 

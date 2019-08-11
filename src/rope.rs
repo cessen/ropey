@@ -324,7 +324,7 @@ impl Rope {
                 node_stack.pop();
             } else {
                 let (_, next_node) = Arc::make_mut(node_stack.last_mut().unwrap())
-                    .children()
+                    .children_mut()
                     .remove(0);
                 node_stack.push(next_node);
             }

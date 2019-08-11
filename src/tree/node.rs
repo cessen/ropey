@@ -561,7 +561,14 @@ impl Node {
         }
     }
 
-    pub fn children(&mut self) -> &mut NodeChildren {
+    pub fn children(&self) -> &NodeChildren {
+        match *self {
+            Node::Internal(ref children) => children,
+            _ => panic!(),
+        }
+    }
+
+    pub fn children_mut(&mut self) -> &mut NodeChildren {
         match *self {
             Node::Internal(ref mut children) => children,
             _ => panic!(),
