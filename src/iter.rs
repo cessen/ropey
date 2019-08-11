@@ -34,7 +34,7 @@ impl<'a> Bytes<'a> {
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
         Bytes {
-            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
+            chunk_iter: Chunks::new_with_range(node, (start_char, end_char)),
             cur_chunk: "".bytes(),
         }
     }
@@ -83,7 +83,7 @@ impl<'a> Chars<'a> {
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
         Chars {
-            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
+            chunk_iter: Chunks::new_with_range(node, (start_char, end_char)),
             cur_chunk: "".chars(),
         }
     }
@@ -273,38 +273,7 @@ enum ChunksEnum<'a> {
 
 impl<'a> Chunks<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Chunks {
-        // If root is a leaf, return light version of the iter.
-        if node.is_leaf() {
-            return Chunks(ChunksEnum::Light {
-                text: node.leaf_text(),
-                is_end: false,
-            });
-        }
-
-        // Create and populate the node stack.
-        let node_stack = {
-            let mut node_stack = Vec::new();
-            let mut node_ref = node;
-            loop {
-                match **node_ref {
-                    Node::Internal(ref children) => {
-                        node_stack.push((node_ref, 0));
-                        node_ref = &children.nodes()[0];
-                    }
-                    Node::Leaf(_) => {
-                        break;
-                    }
-                }
-            }
-            node_stack
-        };
-
-        // Create the iterator.
-        Chunks(ChunksEnum::Full {
-            node_stack: node_stack,
-            total_bytes: node.text_info().bytes as usize,
-            byte_idx: 0,
-        })
+        Chunks::new_with_range(node, (0, node.char_count()))
     }
 
     pub(crate) fn new_empty() -> Chunks<'static> {
@@ -314,28 +283,57 @@ impl<'a> Chunks<'a> {
         })
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+    pub(crate) fn new_with_range(node: &Arc<Node>, char_idx_range: (usize, usize)) -> Chunks {
+        Chunks::new_with_range_at(node, char_idx_range.0, char_idx_range).0
+    }
+
+    /// The main workhorse function for creating new `Chunks` iterators.
+    ///
+    /// Creates a new `Chunks` iterator from the given node, starting the
+    /// iterator at the chunk containing the `at_char` char index (i.e. the
+    /// `next()` method will yield the chunk containing that char).  The range
+    /// of the iterator is bounded by `char_idx_range`.
+    ///
+    /// Both `at_char` and `char_idx_range` are relative to the beginning of
+    /// of the passed node.
+    ///
+    /// Passing an `at_char` equal to the max of `char_idx_range` creates an
+    /// iterator at the end of forward iteration.
+    ///
+    /// Returns the iterator and the char index of its start relative to the
+    /// start of the node.
+    pub(crate) fn new_with_range_at(
+        node: &Arc<Node>,
+        at_char: usize,
+        char_idx_range: (usize, usize),
+    ) -> (Chunks, usize) {
+        debug_assert!(at_char >= char_idx_range.0 && at_char <= char_idx_range.1);
+
         // Calculate the start and end bytes of the iterator.
         let start_byte = {
-            let (chunk, b, c, _) = node.get_chunk_at_char(start_char);
-            b + char_to_byte_idx(chunk, start_char - c)
+            let (chunk, b, c, _) = node.get_chunk_at_char(char_idx_range.0);
+            b + char_to_byte_idx(chunk, char_idx_range.0 - c)
         };
         let end_byte = {
-            let (chunk, b, c, _) = node.get_chunk_at_char(end_char);
-            b + char_to_byte_idx(chunk, end_char - c)
+            let (chunk, b, c, _) = node.get_chunk_at_char(char_idx_range.1);
+            b + char_to_byte_idx(chunk, char_idx_range.1 - c)
         };
 
         // If root is a leaf, return light version of the iter.
         if node.is_leaf() {
-            return Chunks(ChunksEnum::Light {
-                text: &node.leaf_text()[start_byte..end_byte],
-                is_end: false,
-            });
+            return (
+                Chunks(ChunksEnum::Light {
+                    text: &node.leaf_text()[start_byte..end_byte],
+                    is_end: at_char == char_idx_range.1 && end_byte > start_byte,
+                }),
+                char_idx_range.0,
+            );
         }
 
-        // Create and populate the node stack, and determine the byte index
-        // within the first chunk.
-        let mut byte_idx = start_byte;
+        // Create and populate the node stack, and determine the char index
+        // within the first chunk, and byte index of the start of that chunk.
+        let mut byte_idx = 0;
+        let mut char_idx = at_char;
         let node_stack = {
             let mut node_stack = Vec::new();
             let mut node_ref = node;
@@ -345,10 +343,11 @@ impl<'a> Chunks<'a> {
                         break;
                     }
                     Node::Internal(ref children) => {
-                        let (child_i, acc_info) = children.search_byte_idx(byte_idx);
+                        let (child_i, acc_info) = children.search_char_idx(char_idx);
                         node_stack.push((node_ref, child_i));
                         node_ref = &children.nodes()[child_i];
-                        byte_idx -= acc_info.bytes as usize;
+                        byte_idx += acc_info.bytes as usize;
+                        char_idx -= acc_info.chars as usize;
                     }
                 }
             }
@@ -356,17 +355,20 @@ impl<'a> Chunks<'a> {
         };
 
         // Create the iterator.
-        Chunks(ChunksEnum::Full {
-            node_stack: node_stack,
-            total_bytes: end_byte - start_byte,
-            byte_idx: -(byte_idx as isize),
-        })
+        (
+            Chunks(ChunksEnum::Full {
+                node_stack: node_stack,
+                total_bytes: end_byte - start_byte,
+                byte_idx: byte_idx as isize - start_byte as isize,
+            }),
+            at_char - char_idx,
+        )
     }
 
-    pub(crate) fn from_str(text: &str) -> Chunks {
+    pub(crate) fn from_str(text: &str, at_end: bool) -> Chunks {
         Chunks(ChunksEnum::Light {
             text: text,
-            is_end: false,
+            is_end: at_end,
         })
     }
 

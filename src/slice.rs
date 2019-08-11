@@ -703,8 +703,8 @@ impl<'a> RopeSlice<'a> {
                 start_char,
                 end_char,
                 ..
-            }) => Chunks::new_with_range(node, start_char as usize, end_char as usize),
-            RopeSlice(RSEnum::Light { text, .. }) => Chunks::from_str(text),
+            }) => Chunks::new_with_range(node, (start_char as usize, end_char as usize)),
+            RopeSlice(RSEnum::Light { text, .. }) => Chunks::from_str(text, false),
         }
     }
 }
