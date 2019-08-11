@@ -26,8 +26,9 @@ fn string_remove(text: &mut String, char_start: usize, char_end: usize) {
 
 fn string_slice(text: &str, char_start: usize, char_end: usize) -> &str {
     let byte_start = char_to_byte_idx(text, char_start);
-    let byte_end = char_to_byte_idx(text, char_end);
-    &text[byte_start..byte_end]
+    let text = &text[byte_start..];
+    let byte_end = char_to_byte_idx(text, char_end - char_start);
+    &text[..byte_end]
 }
 
 /// A slower, but easy-to-verify, byte->line index converter.
@@ -554,7 +555,7 @@ proptest! {
     }
 
     #[test]
-    fn pt_chunks_iter(ref text in
+    fn pt_chunks_iter_next_01(ref text in
         "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
          \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
          \\PC*\\PC*\\PC*\\PC*\\PC*",
@@ -577,14 +578,86 @@ proptest! {
             idx += chunk.len();
         }
     }
+
+    #[test]
+    fn pt_chunks_iter_next_02(idx1 in 0usize..CHAR_LEN, idx2 in 0usize..CHAR_LEN) {
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+        let r = Rope::from_str(TEXT);
+        let text = string_slice(TEXT, start, end);
+        let s = r.slice(start..end);
+
+        let mut idx = 0;
+        for chunk in s.chunks() {
+            assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
+            idx += chunk.len();
+        }
+    }
+
+    #[test]
+    fn pt_chunks_iter_prev_01(ref text in
+        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
+         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
+         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        ref directions in vec(0u8..2, 0..1000),
+        idx1 in 0usize..20000, idx2 in 0usize..20000,
+    ) {
+
+        let r = Rope::from_str(text);
+
+        let idx1 = if r.len_chars() == 0 { 0 } else { idx1 % r.len_chars() };
+        let idx2 = if r.len_chars() == 0 { 0 } else { idx2 % r.len_chars() };
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+        let s = r.slice(start..end);
+
+        let mut itr = s.chunks();
+        let mut chunks = Vec::new();
+        for i in directions {
+            if *i == 0 {
+                assert_eq!(itr.prev(), chunks.pop());
+            } else {
+                if let Some(chunk) = itr.next() {
+                    chunks.push(chunk);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn pt_chunks_iter_prev_02(
+        ref directions in vec(0u8..2, 0..1000),
+        idx1 in 0usize..CHAR_LEN,
+        idx2 in 0usize..CHAR_LEN,
+    ) {
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(start..end);
+
+        let mut itr = s.chunks();
+        let mut chunks = Vec::new();
+        for i in directions {
+            if *i == 0 {
+                assert_eq!(itr.prev(), chunks.pop());
+            } else {
+                if let Some(chunk) = itr.next() {
+                    chunks.push(chunk);
+                }
+            }
+        }
+    }
 }
 
 //===========================================================================
 
 // Char count of TEXT, below
-const CHAR_LEN: usize = 18352;
+const CHAR_LEN: usize = 18267;
 
-// 31624 bytes, 18352 chars, 95 lines
+// 31539 bytes, 18267 chars, 95 lines
 // Contains many long graphemes.
 const TEXT: &str = "
 T̴̷͚͖̜͈̪͎͔̝̫̦̹͔̻̮͂ͬͬ̌ͣ̿ͤ͌ͥ͑̀̂ͬ̚͘͜͞ô̵͚̤̯̹͖͍̦̼̦̖̞̺͕̳̬͇͕̟̜̅̌̈́̑̏̕͘͝ ͍̼̗̫͈̭̦̱̬͚̱̞͓̜̭̼͇̰̞ͮ͗ͣ́ͪ̔ͪ̍̑̏́̀̽̍̔͘͜͜͝ȋ̐̽ͦ̓̔̅͏̧̢̖̭̝̳̹̯̤͈̫͔͔̠͓͉̠͖̠͜ͅn̷̯̗̗̠̱̥͕͉̥͉̳̫̙̅͗̌̒͂̏͑̎̌̌̊͌͘͘ͅͅv̧̜͕͍͙͍̬͕͍̳͉̠͍̹̮̻̜ͨ̏͒̍ͬ̈́͒̈ͥ͗ͣ̄̃ͤ͊̌͆̓o̸̧̎̓͂̊͢҉͍̼̘͇̱̪̠͎̥̹ķ̈́͗͆ͥ͐͑̆̎́͌ͩͯ̊̓͐ͬ̇̕҉̢͏͚̲̰̗̦e̿̀͐̽ͪ̈ͤͬ҉́͟͏̵̫̲̱̻̰̲̦͇̭̟̺͈̞̫̰̜͕͖ͅ ̡̰͎͓͚͓͉͈̮̻̣̮̟̩̬̮̈̋̊͆ͪ̄ͪ͒ͨͧ̇ͪ̇̑̚t̷̬̟͎̞͈̯͙̹̜ͩ̓ͪ͛͐̐ͤ̾̄̈͒̽̈́̑͒̏h̨̢̳͇͓͉̝ͫ̐̓̆̓ͮ̔̓̈́̇ͫe̟̬̣̗͚̬̾̉͋̽ͯ̌ͯͬ̂ͯͭ̓͛́̚͡ ̨̭̱͉̭͈̈̽̆̂͒͗̀ͥͩ͡h̻̼̱̹̗͖̙̗̲̤͓͇͚͚̻̞̥ͥ͛͌ͧ̚͟i̢̯̹̹̘̳̙ͩ̉ͥ͆̽̇̾̎͗̔̓͂͂́̓̌ͬv̧̡̛̟̜̠͉͖̘̲̻̯͚͍͓̯̻̲̹̥͇̻̿̓͛̊̌ͩͩ́ͩ̍͌̚e̵̾́̈́̏͌͌̊͗̏͋ͦ͘͡͏͚̜͚͎͉͍̱͙̖̹̣̘̥̤̹̟͠-̔̌͐́͒ͦͮ̇ͭ̄̏̊̇̍̕͏̩̥̰͚̟m̨̒ͫͦ̔̔͋҉̱̩̗͇̥̰̩̭͍͚͠į̵̷̻̗͉͕͚̣̼̺͉̦̮̠̆̀̐ͩ͒ͯͩͯ͞ͅn̢̫̤̝̝͚̺͍̱̦͚͂̿ͨ̇ͤ͠d̡ͯ͋̋ͧ̈́̒̈͏̛͏̵̤̬͍̗̞̠̟̞̺̠̥̹̱͉̜͍͎̤ ̷̸̢̰͓̘̯͎̤̫̘͓̙̟̳͇̹̥͈͙̮̩̅̋͌͗̓͊̓ͨͣ͗̓͐̈́ͩ̓ͣrͫ͂͌ͪ̏̐̍̾ͥ̓͗̈͆̈ͥ̀̾̚̚҉̴̶̭͇̗͙̘̯̦̭̮̪͚̥̙̯̠͙̪͡e̵̸̲͉̳̙͖͖̫̘̪͕̳͓̻̙͙ͥ̍͂̽ͨ̓̒̒̏ͬ͗ͧ̑̀͠p̵̸̛̦̣͙̳̳̩̣̼̘͈͂ͪͭͤ̎r̶̩̟̞̙͔̼ͫ̆ͦ̐̀̏̾̉̍ͬ̅ͧ͊ͪ̒̈́ͬ̃͞ẻ̴̼͙͍͎̠̀̅̔̃̒͐ͦ̏̆̅̓͋͢ͅš̆̈̆̋ͨ̅̍̇͂̒ͩͨ̂̐̓ͩ͏̸͔͔̯͇͚̤̪̬̗͈̰̦̯͚̕ę̢̱̠͙̲͉̗͚̮̪͖̙̞̦͉͕̗̳͙ͦ̆̋͌ͣ̅̊́ͅņ̴̷̫̪̦͇̺̹͉̗̬̞̲̭̜̪͒̏͂̂̎͊́̋͒̏̅̋̚͘t̷̶̨̟̦̗̦̱͌͌ͩ̀i̴̴̢̖͓͙̘͇̠̦̙̭̼͖̹̾̒̎̐ͥͭ͋ͥ̅͟ͅņ̫͙̹̦̳͈͙̬̫̮͕̰̩̣̘̘͐̀̓ͭͩͬͯ̎͛̿ͫ̊̔̅́̕͠gͥͩ̂͌̒̊̕͏̻͙͖̣͙͍̹͕̝͖̼̙̘͝ ͤ͐̓̒̓͋̐̃̇͊̓ͦ͐̚͢҉̢̨̟̠͉̳͖̲̩͙̕ć̷̡̫̩̞̯̼̝̼͖̤̳̻̘̪̤͈̦̭ͣ́͂͐̽͆̔̀̚͜h̶̢̹̹̙͔̱̓ͦ͌̋̎ͭ͒͋̒ͭ̌̃͌̿ͣ̆̅͑ą̙̳̬̞̬͚̜̤̱̙͇̠̟̈ͤ͋̃̀̓̓ͯ̍̀̽ͣ̐̈̿̌̕ǫ͋͂͐ͬ̿ͯ̂̈́͌̓̌ͧ̕͏̜͔̗͚͔̘̣͕̘̲͖̼͇͖̗̳ͅͅs̷̸̝̙̭̦̣̦̯̭̦͙̹̻͍͇̣̼͗̌͆ͨͭ̃ͮ͐̿̕.̮̝̠̱̺͖͓̼̦̱̉͂͛̓̑̔̓ͮ̈̊̔͗́͝\r

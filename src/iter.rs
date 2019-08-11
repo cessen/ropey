@@ -369,6 +369,72 @@ impl<'a> Chunks<'a> {
             is_end: false,
         })
     }
+
+    pub fn prev(&mut self) -> Option<&'a str> {
+        match *self {
+            Chunks(ChunksEnum::Full {
+                ref mut node_stack,
+                total_bytes,
+                ref mut byte_idx,
+            }) => {
+                if *byte_idx <= 0 {
+                    return None;
+                }
+
+                // Progress the node stack if needed.
+                let mut stack_idx = node_stack.len() - 1;
+                if node_stack[stack_idx].1 == 0 {
+                    while node_stack[stack_idx].1 == 0 {
+                        if stack_idx == 0 {
+                            return None;
+                        } else {
+                            stack_idx -= 1;
+                        }
+                    }
+                    node_stack[stack_idx].1 -= 1;
+                    while stack_idx < (node_stack.len() - 1) {
+                        let child_i = node_stack[stack_idx].1;
+                        let node = &node_stack[stack_idx].0.children().nodes()[child_i];
+                        node_stack[stack_idx + 1] = (node, node.child_count() - 1);
+                        stack_idx += 1;
+                    }
+                    node_stack[stack_idx].1 += 1;
+                }
+
+                // Fetch the node and child index.
+                let (node, ref mut child_i) = node_stack.last_mut().unwrap();
+                *child_i -= 1;
+
+                // Get the text, sliced to the appropriate range.
+                let text = node.children().nodes()[*child_i].leaf_text();
+                *byte_idx -= text.len() as isize;
+                let text_slice = {
+                    let start_byte = if *byte_idx < 0 {
+                        (-*byte_idx) as usize
+                    } else {
+                        0
+                    };
+                    let end_byte = text.len().min((total_bytes as isize - *byte_idx) as usize);
+                    &text[start_byte..end_byte]
+                };
+
+                // Return the text.
+                return Some(text_slice);
+            }
+
+            Chunks(ChunksEnum::Light {
+                text,
+                ref mut is_end,
+            }) => {
+                if !*is_end {
+                    return None;
+                } else {
+                    *is_end = false;
+                    return Some(text);
+                }
+            }
+        }
+    }
 }
 
 impl<'a> Iterator for Chunks<'a> {
@@ -756,6 +822,33 @@ mod tests {
 
         assert_eq!(Some(""), itr.next());
         assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chunks_03() {
+        let r = Rope::from_str(TEXT);
+
+        let mut itr = r.chunks();
+
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chunks_04() {
+        let r = Rope::from_str(TEXT);
+
+        let mut chunks = Vec::new();
+        let mut itr = r.chunks();
+
+        while let Some(text) = itr.next() {
+            chunks.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, chunks.pop().unwrap());
+        }
+
+        assert!(chunks.is_empty());
     }
 
     #[test]
