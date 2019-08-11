@@ -18,6 +18,7 @@ use tree::Node;
 //==========================================================
 
 /// An iterator over a `Rope`'s bytes.
+#[derive(Debug, Clone)]
 pub struct Bytes<'a> {
     chunk_iter: Chunks<'a>,
     cur_chunk: str::Bytes<'a>,
@@ -66,6 +67,7 @@ impl<'a> Iterator for Bytes<'a> {
 //==========================================================
 
 /// An iterator over a `Rope`'s chars.
+#[derive(Debug, Clone)]
 pub struct Chars<'a> {
     chunk_iter: Chunks<'a>,
     cur_chunk: str::Chars<'a>,
@@ -119,8 +121,10 @@ impl<'a> Iterator for Chars<'a> {
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
+#[derive(Debug, Clone)]
 pub struct Lines<'a>(LinesEnum<'a>);
 
+#[derive(Debug, Clone)]
 enum LinesEnum<'a> {
     Full {
         node: &'a Arc<Node>,
@@ -251,8 +255,10 @@ impl<'a> Iterator for Lines<'a> {
 /// CRLF pairs there are no guarantees about where the chunks are split.  For
 /// example, they may be zero-sized, they don't necessarily align with line
 /// breaks, etc.
+#[derive(Debug, Clone)]
 pub struct Chunks<'a>(ChunksEnum<'a>);
 
+#[derive(Debug, Clone)]
 enum ChunksEnum<'a> {
     Full {
         node_stack: Vec<&'a Arc<Node>>,
