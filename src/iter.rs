@@ -341,7 +341,7 @@ impl<'a> Chunks<'a> {
             let mut node_ref = node;
             loop {
                 match **node_ref {
-                    Node::Leaf(ref text) => {
+                    Node::Leaf(_) => {
                         break;
                     }
                     Node::Internal(ref children) => {
