@@ -1634,15 +1634,10 @@ mod tests {
     fn remove_01() {
         let mut r = Rope::from_str(TEXT);
 
-        // println!("{:?}\n", r);
         r.remove(5..11);
-        // println!("{:?}\n", r);
         r.remove(24..31);
-        // println!("{:?}\n", r);
         r.remove(19..25);
-        println!("{:?}\n", r);
         r.remove(75..79);
-        println!("{:?}\n", r);
         assert_eq!(
             r,
             "Hello!  How're you \
