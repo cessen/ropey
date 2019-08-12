@@ -11,9 +11,10 @@ use std::sync::Arc;
 
 use slice::RopeSlice;
 use str_utils::{
-    char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx, line_to_char_idx,
+    byte_to_line_idx, char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx,
+    line_to_char_idx,
 };
-use tree::Node;
+use tree::{Node, TextInfo};
 
 //==========================================================
 
@@ -300,13 +301,13 @@ impl<'a> Chunks<'a> {
     /// Passing an `at_char` equal to the max of `char_idx_range` creates an
     /// iterator at the end of forward iteration.
     ///
-    /// Returns the iterator and the char index of its start relative to the
-    /// start of the node.
+    /// Returns the iterator and the byte/char/line index of its start relative
+    /// to the start of the node.
     pub(crate) fn new_with_range_at(
         node: &Arc<Node>,
         at_char: usize,
         char_idx_range: (usize, usize),
-    ) -> (Chunks, usize) {
+    ) -> (Chunks, usize, usize, usize) {
         debug_assert!(at_char >= char_idx_range.0 && at_char <= char_idx_range.1);
 
         // Calculate the start and end bytes of the iterator.
@@ -321,18 +322,35 @@ impl<'a> Chunks<'a> {
 
         // If root is a leaf, return light version of the iter.
         if node.is_leaf() {
-            return (
-                Chunks(ChunksEnum::Light {
-                    text: &node.leaf_text()[start_byte..end_byte],
-                    is_end: at_char == char_idx_range.1 && end_byte > start_byte,
-                }),
-                char_idx_range.0,
-            );
+            if at_char == char_idx_range.1 && end_byte > start_byte {
+                return (
+                    Chunks(ChunksEnum::Light {
+                        text: &node.leaf_text()[start_byte..end_byte],
+                        is_end: true,
+                    }),
+                    end_byte - start_byte,
+                    char_idx_range.1 - char_idx_range.0,
+                    byte_to_line_idx(
+                        &node.leaf_text()[start_byte..end_byte],
+                        end_byte - start_byte,
+                    ),
+                );
+            } else {
+                return (
+                    Chunks(ChunksEnum::Light {
+                        text: &node.leaf_text()[start_byte..end_byte],
+                        is_end: false,
+                    }),
+                    0,
+                    0,
+                    0,
+                );
+            }
         }
 
         // Create and populate the node stack, and determine the char index
         // within the first chunk, and byte index of the start of that chunk.
-        let mut byte_idx = 0;
+        let mut info = TextInfo::new();
         let mut char_idx = at_char;
         let node_stack = {
             let mut node_stack = Vec::new();
@@ -346,7 +364,7 @@ impl<'a> Chunks<'a> {
                         let (child_i, acc_info) = children.search_char_idx(char_idx);
                         node_stack.push((node_ref, child_i));
                         node_ref = &children.nodes()[child_i];
-                        byte_idx += acc_info.bytes as usize;
+                        info += acc_info;
                         char_idx -= acc_info.chars as usize;
                     }
                 }
@@ -359,9 +377,11 @@ impl<'a> Chunks<'a> {
             Chunks(ChunksEnum::Full {
                 node_stack: node_stack,
                 total_bytes: end_byte - start_byte,
-                byte_idx: byte_idx as isize - start_byte as isize,
+                byte_idx: info.bytes as isize - start_byte as isize,
             }),
-            at_char - char_idx,
+            info.bytes as usize,
+            info.chars as usize,
+            info.line_breaks as usize,
         )
     }
 
@@ -851,6 +871,37 @@ mod tests {
         }
 
         assert!(chunks.is_empty());
+    }
+
+    #[test]
+    fn chunks_at_char_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..r.len_chars() {
+            let (chunk, b, c, l) = r.chunk_at_char(i);
+            let (mut chunks, bs, cs, ls) = r.chunks_at_char(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
+    }
+
+    #[test]
+    fn chunks_at_char_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..s.len_chars() {
+            let (chunk, b, c, l) = s.chunk_at_char(i);
+            let (mut chunks, bs, cs, ls) = s.chunks_at_char(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
     }
 
     #[test]

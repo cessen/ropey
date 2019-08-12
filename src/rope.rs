@@ -1108,6 +1108,21 @@ impl Rope {
         Chunks::new(&self.root)
     }
 
+    /// Creates an iterator over the chunks of the `Rope`, with the
+    /// iterator starting on the chunk containing `char_idx`.
+    #[inline]
+    pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        Chunks::new_with_range_at(&self.root, char_idx, (0, self.len_chars()))
+    }
+
     //-----------------------------------------------------------------------
     // Debugging
 

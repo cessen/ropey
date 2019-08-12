@@ -707,6 +707,62 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Light { text, .. }) => Chunks::from_str(text, false),
         }
     }
+
+    /// Creates an iterator over the chunks of the `RopeSlice`, with the
+    /// iterator starting on the chunk containing `char_idx`.
+    #[inline]
+    pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks<'a>, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_byte,
+                start_char,
+                end_char,
+                start_line_break,
+                ..
+            }) => {
+                let (chunks, byte_idx, char_idx, line_break_idx) = Chunks::new_with_range_at(
+                    node,
+                    char_idx + start_char as usize,
+                    (start_char as usize, end_char as usize),
+                );
+
+                (
+                    chunks,
+                    byte_idx - (start_byte as usize).min(byte_idx),
+                    char_idx - (start_char as usize).min(char_idx),
+                    line_break_idx - (start_line_break as usize).min(line_break_idx),
+                )
+            }
+
+            RopeSlice(RSEnum::Light {
+                text,
+                char_count,
+                line_break_count,
+            }) => {
+                let chunks = Chunks::from_str(text, char_idx == char_count as usize);
+
+                if char_idx == char_count as usize {
+                    (
+                        chunks,
+                        text.len(),
+                        char_count as usize,
+                        line_break_count as usize,
+                    )
+                } else {
+                    (chunks, 0, 0, 0)
+                }
+            }
+        }
+    }
 }
 
 //==============================================================
