@@ -122,28 +122,76 @@ impl<'a> Iterator for Bytes<'a> {
 #[derive(Debug, Clone)]
 pub struct Chars<'a> {
     chunk_iter: Chunks<'a>,
-    cur_chunk: str::Chars<'a>,
+    cur_chunk: &'a str,
+    byte_idx: usize,
+    last_op_was_prev: bool,
 }
 
 impl<'a> Chars<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Chars {
+        let mut chunk_iter = Chunks::new(node);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Chars {
-            chunk_iter: Chunks::new(node),
-            cur_chunk: "".chars(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: 0,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
+        let mut chunk_iter = Chunks::new_with_range(node, (start_char, end_char));
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Chars {
-            chunk_iter: Chunks::new_with_range(node, (start_char, end_char)),
-            cur_chunk: "".chars(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: 0,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn from_str(text: &str) -> Chars {
+        let mut chunk_iter = Chunks::from_str(text, false);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Chars {
-            chunk_iter: Chunks::new_empty(),
-            cur_chunk: text.chars(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: 0,
+            last_op_was_prev: false,
+        }
+    }
+
+    pub fn prev(&mut self) -> Option<char> {
+        if !self.last_op_was_prev {
+            self.chunk_iter.prev();
+            self.last_op_was_prev = true;
+        }
+
+        loop {
+            if self.byte_idx > 0 {
+                self.byte_idx -= 1;
+                while !self.cur_chunk.is_char_boundary(self.byte_idx) {
+                    self.byte_idx -= 1;
+                }
+                return (&self.cur_chunk[self.byte_idx..]).chars().next();
+            } else if let Some(chunk) = self.chunk_iter.prev() {
+                self.cur_chunk = chunk;
+                self.byte_idx = self.cur_chunk.len();
+            } else {
+                return None;
+            }
         }
     }
 }
@@ -152,11 +200,22 @@ impl<'a> Iterator for Chars<'a> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
+        if self.last_op_was_prev {
+            self.chunk_iter.next();
+            self.last_op_was_prev = false;
+        }
+
         loop {
-            if let Some(c) = self.cur_chunk.next() {
-                return Some(c);
+            if self.byte_idx < self.cur_chunk.len() {
+                let start = self.byte_idx;
+                self.byte_idx += 1;
+                while !self.cur_chunk.is_char_boundary(self.byte_idx) {
+                    self.byte_idx += 1;
+                }
+                return (&self.cur_chunk[start..]).chars().next();
             } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = chunk.chars();
+                self.cur_chunk = chunk;
+                self.byte_idx = 0;
                 continue;
             } else {
                 return None;
@@ -736,6 +795,72 @@ mod tests {
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
             assert_eq!(cr, ct);
         }
+    }
+
+    #[test]
+    fn chars_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        let mut text_itr = TEXT.chars();
+        while let Some(_) = itr.next() {}
+
+        while let Some(b) = itr.prev() {
+            assert_eq!(b, text_itr.next_back().unwrap());
+        }
+    }
+
+    #[test]
+    fn chars_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chars_04() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        while let Some(_) = itr.next() {}
+
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chars_05() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+
+        assert_eq!(None, itr.prev());
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chars_06() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        while let Some(_) = itr.next() {}
+
+        assert_eq!(None, itr.next());
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chars_07() {
+        let mut itr = Chars::from_str("a");
+
+        assert_eq!(Some('a'), itr.next());
+        assert_eq!(None, itr.next());
+        assert_eq!(Some('a'), itr.prev());
+        assert_eq!(None, itr.prev());
     }
 
     #[test]

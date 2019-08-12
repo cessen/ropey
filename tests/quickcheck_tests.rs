@@ -605,6 +605,54 @@ proptest! {
     }
 
     #[test]
+    fn pt_chars_iter_next(ref text in
+        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
+         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
+         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        idx1 in 0usize..20000, idx2 in 0usize..20000,
+    ) {
+        let len_chars = byte_to_char_idx(text, text.len());
+        let idx1 = if len_chars == 0 { 0 } else { idx1 % len_chars };
+        let idx2 = if len_chars == 0 { 0 } else { idx2 % len_chars };
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+
+        let r = Rope::from_str(text);
+        let text = string_slice(text, start, end);
+        let s = r.slice(start..end);
+
+        for (c1, c2) in s.chars().zip(text.chars()) {
+            assert_eq!(c1, c2);
+        }
+    }
+
+    #[test]
+    fn pt_chars_iter_prev(
+        ref directions in vec(0u8..2, 0..1000),
+        idx1 in 0usize..CHAR_LEN,
+        idx2 in 0usize..CHAR_LEN,
+    ) {
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(start..end);
+
+        let mut itr = s.chars();
+        let mut chars = Vec::new();
+        for i in directions {
+            if *i == 0 {
+                assert_eq!(itr.prev(), chars.pop());
+            } else {
+                if let Some(c) = itr.next() {
+                    chars.push(c);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn pt_chunks_iter_next_01(ref text in
         "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
          \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
