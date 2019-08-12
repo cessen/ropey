@@ -2,7 +2,7 @@
 //!
 //! All iterators here can also be used with `RopeSlice`'s.  When used
 //! with a `RopeSlice`, they iterate over only the data that the
-//! `RopeSlice` refers to.  For the line and chunk, iterators, the data
+//! `RopeSlice` refers to.  For the line and chunk iterators, the data
 //! of the first and last yielded item will be truncated to match the
 //! `RopeSlice`.
 
