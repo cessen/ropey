@@ -1090,10 +1090,40 @@ impl Rope {
         Bytes::new(&self.root)
     }
 
+    /// Creates an iterator over the bytes of the `Rope`, starting at byte
+    /// `byte_idx`.
+    #[inline]
+    pub fn bytes_at(&self, byte_idx: usize) -> Bytes {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of rope: byte index {}, rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        Bytes::new_with_range_at(&self.root, byte_idx, (0, self.len_chars()))
+    }
+
     /// Creates an iterator over the chars of the `Rope`.
     #[inline]
     pub fn chars(&self) -> Chars {
         Chars::new(&self.root)
+    }
+
+    /// Creates an iterator over the chars of the `Rope`, starting at char
+    /// `char_idx`.
+    #[inline]
+    pub fn chars_at(&self, char_idx: usize) -> Chars {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of rope: char index {}, rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        Chars::new_with_range_at(&self.root, char_idx, (0, self.len_chars()))
     }
 
     /// Creates an iterator over the lines of the `Rope`.
@@ -1120,7 +1150,7 @@ impl Rope {
             self.len_chars()
         );
 
-        Chunks::new_with_range_at(&self.root, char_idx, (0, self.len_chars()))
+        Chunks::new_with_range_at_char(&self.root, char_idx, (0, self.len_chars()))
     }
 
     //-----------------------------------------------------------------------

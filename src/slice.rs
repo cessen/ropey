@@ -666,6 +666,35 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    /// Creates an iterator over the bytes of the `RopeSlice`, starting at byte
+    /// `byte_idx`.
+    #[inline]
+    pub fn bytes_at(&self, byte_idx: usize) -> Bytes {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_byte,
+                start_char,
+                end_char,
+                ..
+            }) => Bytes::new_with_range_at(
+                node,
+                start_byte as usize + byte_idx,
+                (start_char as usize, end_char as usize),
+            ),
+
+            RopeSlice(RSEnum::Light { text, .. }) => Bytes::from_str_at(text, byte_idx),
+        }
+    }
+
     /// Creates an iterator over the chars of the `RopeSlice`.
     #[inline]
     pub fn chars(&self) -> Chars<'a> {
@@ -677,6 +706,36 @@ impl<'a> RopeSlice<'a> {
                 ..
             }) => Chars::new_with_range(node, start_char as usize, end_char as usize),
             RopeSlice(RSEnum::Light { text, .. }) => Chars::from_str(text),
+        }
+    }
+
+    /// Creates an iterator over the chars of the `RopeSlice`, starting at char
+    /// `char_idx`.
+    #[inline]
+    pub fn chars_at(&self, char_idx: usize) -> Chars {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        // Chars::new_with_range_at(&self.root, char_idx, (0, self.len_chars()))
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_char,
+                end_char,
+                ..
+            }) => Chars::new_with_range_at(
+                node,
+                start_char as usize + char_idx,
+                (start_char as usize, end_char as usize),
+            ),
+
+            RopeSlice(RSEnum::Light { text, .. }) => Chars::from_str_at(text, char_idx),
         }
     }
 
@@ -729,7 +788,7 @@ impl<'a> RopeSlice<'a> {
                 start_line_break,
                 ..
             }) => {
-                let (chunks, byte_idx, char_idx, line_break_idx) = Chunks::new_with_range_at(
+                let (chunks, byte_idx, char_idx, line_break_idx) = Chunks::new_with_range_at_char(
                     node,
                     char_idx + start_char as usize,
                     (start_char as usize, end_char as usize),
