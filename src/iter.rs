@@ -22,28 +22,73 @@ use tree::{Node, TextInfo};
 #[derive(Debug, Clone)]
 pub struct Bytes<'a> {
     chunk_iter: Chunks<'a>,
-    cur_chunk: str::Bytes<'a>,
+    cur_chunk: &'a [u8],
+    byte_idx: usize,
+    last_op_was_prev: bool,
 }
 
 impl<'a> Bytes<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Bytes {
+        let mut chunk_iter = Chunks::new(node);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Bytes {
-            chunk_iter: Chunks::new(node),
-            cur_chunk: "".bytes(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: 0,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
+        let mut chunk_iter = Chunks::new_with_range(node, (start_char, end_char));
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Bytes {
-            chunk_iter: Chunks::new_with_range(node, (start_char, end_char)),
-            cur_chunk: "".bytes(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: 0,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn from_str(text: &str) -> Bytes {
+        let mut chunk_iter = Chunks::from_str(text, false);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Bytes {
-            chunk_iter: Chunks::new_empty(),
-            cur_chunk: text.bytes(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: 0,
+            last_op_was_prev: false,
+        }
+    }
+
+    pub fn prev(&mut self) -> Option<u8> {
+        if !self.last_op_was_prev {
+            self.chunk_iter.prev();
+            self.last_op_was_prev = true;
+        }
+
+        loop {
+            if self.byte_idx > 0 {
+                self.byte_idx -= 1;
+                return Some(self.cur_chunk[self.byte_idx]);
+            } else if let Some(chunk) = self.chunk_iter.prev() {
+                self.cur_chunk = chunk.as_bytes();
+                self.byte_idx = self.cur_chunk.len();
+            } else {
+                return None;
+            }
         }
     }
 }
@@ -52,12 +97,18 @@ impl<'a> Iterator for Bytes<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<u8> {
+        if self.last_op_was_prev {
+            self.chunk_iter.next();
+            self.last_op_was_prev = false;
+        }
+
         loop {
-            if let Some(c) = self.cur_chunk.next() {
-                return Some(c);
+            if let Some(c) = self.cur_chunk.get(self.byte_idx) {
+                self.byte_idx += 1;
+                return Some(*c);
             } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = chunk.bytes();
-                continue;
+                self.cur_chunk = chunk.as_bytes();
+                self.byte_idx = 0;
             } else {
                 return None;
             }
@@ -534,6 +585,7 @@ impl<'a> Iterator for Chunks<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use Rope;
 
     const TEXT: &str = "\r\n\
@@ -609,6 +661,73 @@ mod tests {
         for (br, bt) in r.bytes().zip(TEXT.bytes()) {
             assert_eq!(br, bt);
         }
+    }
+
+    #[test]
+    fn bytes_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        while let Some(_) = itr.next() {}
+
+        let mut i = TEXT.len();
+        while let Some(b) = itr.prev() {
+            i -= 1;
+            assert_eq!(b, TEXT.as_bytes()[i]);
+        }
+    }
+
+    #[test]
+    fn bytes_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn bytes_04() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        while let Some(_) = itr.next() {}
+
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn bytes_05() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+
+        assert_eq!(None, itr.prev());
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn bytes_06() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        while let Some(_) = itr.next() {}
+
+        assert_eq!(None, itr.next());
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn bytes_07() {
+        let mut itr = Bytes::from_str("a");
+
+        assert_eq!(Some(0x61), itr.next());
+        assert_eq!(None, itr.next());
+        assert_eq!(Some(0x61), itr.prev());
+        assert_eq!(None, itr.prev());
     }
 
     #[test]
