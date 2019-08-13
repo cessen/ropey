@@ -1139,7 +1139,22 @@ impl Rope {
     }
 
     /// Creates an iterator over the chunks of the `Rope`, with the
-    /// iterator starting on the chunk containing `char_idx`.
+    /// iterator starting at the chunk containing `byte_idx`.
+    #[inline]
+    pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        Chunks::new_with_range_at_byte(&self.root, byte_idx, (0, self.len_chars()))
+    }
+
+    /// Creates an iterator over the chunks of the `Rope`, with the
+    /// iterator starting at the chunk containing `char_idx`.
     #[inline]
     pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks, usize, usize, usize) {
         // Bounds check
@@ -1151,6 +1166,21 @@ impl Rope {
         );
 
         Chunks::new_with_range_at_char(&self.root, char_idx, (0, self.len_chars()))
+    }
+
+    /// Creates an iterator over the chunks of the `Rope`, with the
+    /// iterator starting at the chunk containing `line_break_idx`.
+    #[inline]
+    pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            line_break_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line break index {}, max index {}",
+            line_break_idx,
+            self.len_lines()
+        );
+
+        Chunks::new_with_range_at_line_break(&self.root, line_break_idx, (0, self.len_chars()))
     }
 
     //-----------------------------------------------------------------------

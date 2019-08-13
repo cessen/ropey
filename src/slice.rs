@@ -768,6 +768,63 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates an iterator over the chunks of the `RopeSlice`, with the
+    /// iterator starting at the byte containing `byte_idx`.
+    #[inline]
+    pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks<'a>, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_byte,
+                start_char,
+                end_char,
+                start_line_break,
+                ..
+            }) => {
+                let (chunks, chunk_byte_idx, chunk_char_idx, chunk_line_idx) =
+                    Chunks::new_with_range_at_byte(
+                        node,
+                        byte_idx + start_byte as usize,
+                        (start_char as usize, end_char as usize),
+                    );
+
+                (
+                    chunks,
+                    chunk_byte_idx - (start_byte as usize).min(chunk_byte_idx),
+                    chunk_char_idx - (start_char as usize).min(chunk_char_idx),
+                    chunk_line_idx - (start_line_break as usize).min(chunk_line_idx),
+                )
+            }
+
+            RopeSlice(RSEnum::Light {
+                text,
+                char_count,
+                line_break_count,
+            }) => {
+                let chunks = Chunks::from_str(text, byte_idx == text.len());
+
+                if byte_idx == text.len() {
+                    (
+                        chunks,
+                        text.len(),
+                        char_count as usize,
+                        line_break_count as usize,
+                    )
+                } else {
+                    (chunks, 0, 0, 0)
+                }
+            }
+        }
+    }
+
+    /// Creates an iterator over the chunks of the `RopeSlice`, with the
     /// iterator starting on the chunk containing `char_idx`.
     #[inline]
     pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks<'a>, usize, usize, usize) {
@@ -788,17 +845,18 @@ impl<'a> RopeSlice<'a> {
                 start_line_break,
                 ..
             }) => {
-                let (chunks, byte_idx, char_idx, line_break_idx) = Chunks::new_with_range_at_char(
-                    node,
-                    char_idx + start_char as usize,
-                    (start_char as usize, end_char as usize),
-                );
+                let (chunks, chunk_byte_idx, chunk_char_idx, chunk_line_idx) =
+                    Chunks::new_with_range_at_char(
+                        node,
+                        char_idx + start_char as usize,
+                        (start_char as usize, end_char as usize),
+                    );
 
                 (
                     chunks,
-                    byte_idx - (start_byte as usize).min(byte_idx),
-                    char_idx - (start_char as usize).min(char_idx),
-                    line_break_idx - (start_line_break as usize).min(line_break_idx),
+                    chunk_byte_idx - (start_byte as usize).min(chunk_byte_idx),
+                    chunk_char_idx - (start_char as usize).min(chunk_char_idx),
+                    chunk_line_idx - (start_line_break as usize).min(chunk_line_idx),
                 )
             }
 
@@ -810,6 +868,78 @@ impl<'a> RopeSlice<'a> {
                 let chunks = Chunks::from_str(text, char_idx == char_count as usize);
 
                 if char_idx == char_count as usize {
+                    (
+                        chunks,
+                        text.len(),
+                        char_count as usize,
+                        line_break_count as usize,
+                    )
+                } else {
+                    (chunks, 0, 0, 0)
+                }
+            }
+        }
+    }
+
+    /// Creates an iterator over the chunks of the `RopeSlice`, with the
+    /// iterator starting at the chunk containing `line_break_idx`.
+    #[inline]
+    pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            line_break_idx <= self.len_lines(),
+            "Attempt to index past end of RopeSlice: line break index {}, max index {}",
+            line_break_idx,
+            self.len_lines()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_byte,
+                start_char,
+                end_char,
+                start_line_break,
+                ..
+            }) => {
+                // Get the chunk.
+                let (chunks, chunk_byte_idx, chunk_char_idx, chunk_line_idx) =
+                    if line_break_idx == 0 {
+                        Chunks::new_with_range_at_char(
+                            node,
+                            start_char as usize,
+                            (start_char as usize, end_char as usize),
+                        )
+                    } else if line_break_idx == self.len_lines() {
+                        Chunks::new_with_range_at_char(
+                            node,
+                            end_char as usize,
+                            (start_char as usize, end_char as usize),
+                        )
+                    } else {
+                        Chunks::new_with_range_at_line_break(
+                            node,
+                            line_break_idx + start_line_break as usize,
+                            (start_char as usize, end_char as usize),
+                        )
+                    };
+
+                (
+                    chunks,
+                    chunk_byte_idx - (start_byte as usize).min(chunk_byte_idx),
+                    chunk_char_idx - (start_char as usize).min(chunk_char_idx),
+                    chunk_line_idx - (start_line_break as usize).min(chunk_line_idx),
+                )
+            }
+
+            RopeSlice(RSEnum::Light {
+                text,
+                char_count,
+                line_break_count,
+            }) => {
+                let chunks = Chunks::from_str(text, line_break_idx == line_break_count as usize);
+
+                if line_break_idx == line_break_count as usize {
                     (
                         chunks,
                         text.len(),
