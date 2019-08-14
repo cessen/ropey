@@ -324,7 +324,7 @@ impl Rope {
                 node_stack.pop();
             } else {
                 let (_, next_node) = Arc::make_mut(node_stack.last_mut().unwrap())
-                    .children()
+                    .children_mut()
                     .remove(0);
                 node_stack.push(next_node);
             }
@@ -1090,10 +1090,40 @@ impl Rope {
         Bytes::new(&self.root)
     }
 
+    /// Creates an iterator over the bytes of the `Rope`, starting at byte
+    /// `byte_idx`.
+    #[inline]
+    pub fn bytes_at(&self, byte_idx: usize) -> Bytes {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        Bytes::new_with_range_at(&self.root, byte_idx, (0, self.len_chars()))
+    }
+
     /// Creates an iterator over the chars of the `Rope`.
     #[inline]
     pub fn chars(&self) -> Chars {
         Chars::new(&self.root)
+    }
+
+    /// Creates an iterator over the chars of the `Rope`, starting at char
+    /// `char_idx`.
+    #[inline]
+    pub fn chars_at(&self, char_idx: usize) -> Chars {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        Chars::new_with_range_at(&self.root, char_idx, (0, self.len_chars()))
     }
 
     /// Creates an iterator over the lines of the `Rope`.
@@ -1102,10 +1132,70 @@ impl Rope {
         Lines::new(&self.root)
     }
 
+    /// Creates an iterator over the lines of the `Rope`, starting at line
+    /// `line_idx`.
+    #[inline]
+    pub fn lines_at(&self, line_idx: usize) -> Lines {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line index {}, Rope line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
+        Lines::new_with_range_at(&self.root, line_idx, (0, self.len_chars()))
+    }
+
     /// Creates an iterator over the chunks of the `Rope`.
     #[inline]
     pub fn chunks(&self) -> Chunks {
         Chunks::new(&self.root)
+    }
+
+    /// Creates an iterator over the chunks of the `Rope`, with the
+    /// iterator starting at the chunk containing `byte_idx`.
+    #[inline]
+    pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+            byte_idx,
+            self.len_bytes()
+        );
+
+        Chunks::new_with_range_at_byte(&self.root, byte_idx, (0, self.len_chars()))
+    }
+
+    /// Creates an iterator over the chunks of the `Rope`, with the
+    /// iterator starting at the chunk containing `char_idx`.
+    #[inline]
+    pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        Chunks::new_with_range_at_char(&self.root, char_idx, (0, self.len_chars()))
+    }
+
+    /// Creates an iterator over the chunks of the `Rope`, with the
+    /// iterator starting at the chunk containing `line_break_idx`.
+    #[inline]
+    pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks, usize, usize, usize) {
+        // Bounds check
+        assert!(
+            line_break_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line break index {}, max index {}",
+            line_break_idx,
+            self.len_lines()
+        );
+
+        Chunks::new_with_range_at_line_break(&self.root, line_break_idx, (0, self.len_chars()))
     }
 
     //-----------------------------------------------------------------------

@@ -11,9 +11,10 @@ use std::sync::Arc;
 
 use slice::RopeSlice;
 use str_utils::{
-    char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx, line_to_char_idx,
+    byte_to_line_idx, char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx,
+    line_to_char_idx, prev_line_end_char_idx,
 };
-use tree::Node;
+use tree::{Node, TextInfo};
 
 //==========================================================
 
@@ -21,28 +22,99 @@ use tree::Node;
 #[derive(Debug, Clone)]
 pub struct Bytes<'a> {
     chunk_iter: Chunks<'a>,
-    cur_chunk: str::Bytes<'a>,
+    cur_chunk: &'a [u8],
+    byte_idx: usize,
+    last_op_was_prev: bool,
 }
 
 impl<'a> Bytes<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Bytes {
+        let mut chunk_iter = Chunks::new(node);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Bytes {
-            chunk_iter: Chunks::new(node),
-            cur_chunk: "".bytes(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: 0,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Bytes {
+        let mut chunk_iter = Chunks::new_with_range(node, (start_char, end_char));
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Bytes {
-            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
-            cur_chunk: "".bytes(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: 0,
+            last_op_was_prev: false,
+        }
+    }
+
+    pub(crate) fn new_with_range_at(
+        node: &Arc<Node>,
+        at_byte: usize,
+        char_idx_range: (usize, usize),
+    ) -> Bytes {
+        let (mut chunk_iter, chunk_byte_start, _, _) =
+            Chunks::new_with_range_at_byte(node, at_byte, char_idx_range);
+
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
+
+        Bytes {
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: at_byte - chunk_byte_start,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn from_str(text: &str) -> Bytes {
+        Bytes::from_str_at(text, 0)
+    }
+
+    pub(crate) fn from_str_at(text: &str, byte_idx: usize) -> Bytes {
+        let mut chunk_iter = Chunks::from_str(text, false);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Bytes {
-            chunk_iter: Chunks::new_empty(),
-            cur_chunk: text.bytes(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk.as_bytes(),
+            byte_idx: byte_idx,
+            last_op_was_prev: false,
+        }
+    }
+
+    pub fn prev(&mut self) -> Option<u8> {
+        if !self.last_op_was_prev {
+            self.chunk_iter.prev();
+            self.last_op_was_prev = true;
+        }
+
+        loop {
+            if self.byte_idx > 0 {
+                self.byte_idx -= 1;
+                return Some(self.cur_chunk[self.byte_idx]);
+            } else if let Some(chunk) = self.chunk_iter.prev() {
+                self.cur_chunk = chunk.as_bytes();
+                self.byte_idx = self.cur_chunk.len();
+            } else {
+                return None;
+            }
         }
     }
 }
@@ -51,12 +123,18 @@ impl<'a> Iterator for Bytes<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<u8> {
+        if self.last_op_was_prev {
+            self.chunk_iter.next();
+            self.last_op_was_prev = false;
+        }
+
         loop {
-            if let Some(c) = self.cur_chunk.next() {
-                return Some(c);
+            if let Some(c) = self.cur_chunk.get(self.byte_idx) {
+                self.byte_idx += 1;
+                return Some(*c);
             } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = chunk.bytes();
-                continue;
+                self.cur_chunk = chunk.as_bytes();
+                self.byte_idx = 0;
             } else {
                 return None;
             }
@@ -70,28 +148,102 @@ impl<'a> Iterator for Bytes<'a> {
 #[derive(Debug, Clone)]
 pub struct Chars<'a> {
     chunk_iter: Chunks<'a>,
-    cur_chunk: str::Chars<'a>,
+    cur_chunk: &'a str,
+    byte_idx: usize,
+    last_op_was_prev: bool,
 }
 
 impl<'a> Chars<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Chars {
+        let mut chunk_iter = Chunks::new(node);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Chars {
-            chunk_iter: Chunks::new(node),
-            cur_chunk: "".chars(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: 0,
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chars {
+        let mut chunk_iter = Chunks::new_with_range(node, (start_char, end_char));
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Chars {
-            chunk_iter: Chunks::new_with_range(node, start_char, end_char),
-            cur_chunk: "".chars(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: 0,
+            last_op_was_prev: false,
+        }
+    }
+
+    pub(crate) fn new_with_range_at(
+        node: &Arc<Node>,
+        at_char: usize,
+        char_idx_range: (usize, usize),
+    ) -> Chars {
+        let (mut chunk_iter, _, chunk_char_start, _) =
+            Chunks::new_with_range_at_char(node, at_char, char_idx_range);
+
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
+
+        Chars {
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: char_to_byte_idx(cur_chunk, at_char - chunk_char_start),
+            last_op_was_prev: false,
         }
     }
 
     pub(crate) fn from_str(text: &str) -> Chars {
+        Chars::from_str_at(text, 0)
+    }
+
+    pub(crate) fn from_str_at(text: &str, char_idx: usize) -> Chars {
+        let mut chunk_iter = Chunks::from_str(text, false);
+        let cur_chunk = if let Some(chunk) = chunk_iter.next() {
+            chunk
+        } else {
+            ""
+        };
         Chars {
-            chunk_iter: Chunks::new_empty(),
-            cur_chunk: text.chars(),
+            chunk_iter: chunk_iter,
+            cur_chunk: cur_chunk,
+            byte_idx: char_to_byte_idx(text, char_idx),
+            last_op_was_prev: false,
+        }
+    }
+
+    pub fn prev(&mut self) -> Option<char> {
+        if !self.last_op_was_prev {
+            self.chunk_iter.prev();
+            self.last_op_was_prev = true;
+        }
+
+        loop {
+            if self.byte_idx > 0 {
+                self.byte_idx -= 1;
+                while !self.cur_chunk.is_char_boundary(self.byte_idx) {
+                    self.byte_idx -= 1;
+                }
+                return (&self.cur_chunk[self.byte_idx..]).chars().next();
+            } else if let Some(chunk) = self.chunk_iter.prev() {
+                self.cur_chunk = chunk;
+                self.byte_idx = self.cur_chunk.len();
+            } else {
+                return None;
+            }
         }
     }
 }
@@ -100,11 +252,22 @@ impl<'a> Iterator for Chars<'a> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
+        if self.last_op_was_prev {
+            self.chunk_iter.next();
+            self.last_op_was_prev = false;
+        }
+
         loop {
-            if let Some(c) = self.cur_chunk.next() {
-                return Some(c);
+            if self.byte_idx < self.cur_chunk.len() {
+                let start = self.byte_idx;
+                self.byte_idx += 1;
+                while !self.cur_chunk.is_char_boundary(self.byte_idx) {
+                    self.byte_idx += 1;
+                }
+                return (&self.cur_chunk[start..]).chars().next();
             } else if let Some(chunk) = self.chunk_iter.next() {
-                self.cur_chunk = chunk.chars();
+                self.cur_chunk = chunk;
+                self.byte_idx = 0;
                 continue;
             } else {
                 return None;
@@ -130,11 +293,13 @@ enum LinesEnum<'a> {
         node: &'a Arc<Node>,
         start_char: usize,
         end_char: usize,
+        start_line: usize,
         line_idx: usize,
     },
     Light {
         text: &'a str,
-        done: bool,
+        byte_idx: usize,
+        at_end: bool,
     },
 }
 
@@ -144,27 +309,101 @@ impl<'a> Lines<'a> {
             node: node,
             start_char: 0,
             end_char: node.text_info().chars as usize,
+            start_line: 0,
             line_idx: 0,
         })
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Lines {
+    pub(crate) fn new_with_range(node: &Arc<Node>, char_idx_range: (usize, usize)) -> Lines {
+        Lines::new_with_range_at(node, 0, char_idx_range)
+    }
+
+    pub(crate) fn new_with_range_at(
+        node: &Arc<Node>,
+        at_line: usize,
+        char_idx_range: (usize, usize),
+    ) -> Lines {
+        let start_line = {
+            let (chunk, _, c, l) = node.get_chunk_at_char(char_idx_range.0);
+            l + char_to_line_idx(chunk, char_idx_range.0 - c)
+        };
         Lines(LinesEnum::Full {
             node: node,
-            start_char: start_char,
-            end_char: end_char,
-            line_idx: {
-                let (chunk, _, c, l) = node.get_chunk_at_char(start_char);
-                l + char_to_line_idx(chunk, start_char - c)
-            },
+            start_char: char_idx_range.0,
+            end_char: char_idx_range.1,
+            start_line: start_line,
+            line_idx: start_line + at_line,
         })
     }
 
     pub(crate) fn from_str(text: &str) -> Lines {
         Lines(LinesEnum::Light {
             text: text,
-            done: false,
+            byte_idx: 0,
+            at_end: false,
         })
+    }
+
+    pub(crate) fn from_str_at(text: &str, line_idx: usize) -> Lines {
+        let mut lines_iter = Lines::from_str(text);
+        for _ in 0..line_idx {
+            lines_iter.next();
+        }
+        lines_iter
+    }
+
+    pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
+        match *self {
+            Lines(LinesEnum::Full {
+                ref mut node,
+                start_char,
+                end_char,
+                start_line,
+                ref mut line_idx,
+            }) => {
+                if *line_idx == start_line {
+                    return None;
+                } else {
+                    *line_idx -= 1;
+
+                    let a = {
+                        // Find the char that corresponds to the start of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx);
+                        (c + line_to_char_idx(chunk, *line_idx - l)).max(start_char)
+                    };
+
+                    let b = if *line_idx < node.line_break_count() {
+                        // Find the char that corresponds to the end of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx + 1);
+                        c + line_to_char_idx(chunk, *line_idx + 1 - l)
+                    } else {
+                        node.char_count()
+                    }
+                    .min(end_char);
+
+                    return Some(RopeSlice::new_with_range(node, a, b));
+                }
+            }
+            Lines(LinesEnum::Light {
+                ref mut text,
+                ref mut byte_idx,
+                ref mut at_end,
+            }) => {
+                // Special cases.
+                if *at_end && (text.len() == 0 || ends_with_line_break(text)) {
+                    *at_end = false;
+                    return Some("".into());
+                } else if *byte_idx == 0 {
+                    return None;
+                }
+
+                let end_idx = *byte_idx;
+                let start_idx = prev_line_end_char_idx(&text[..end_idx]);
+                *byte_idx = start_idx;
+
+                return Some((&text[start_idx..end_idx]).into());
+            }
+        }
     }
 }
 
@@ -178,6 +417,7 @@ impl<'a> Iterator for Lines<'a> {
                 start_char,
                 end_char,
                 ref mut line_idx,
+                ..
             }) => {
                 if *line_idx > node.line_break_count() {
                     return None;
@@ -189,7 +429,6 @@ impl<'a> Iterator for Lines<'a> {
 
                         // Early out if we're past the specified end char
                         if a > end_char {
-                            *line_idx = node.line_break_count() + 1;
                             return None;
                         }
 
@@ -212,19 +451,25 @@ impl<'a> Iterator for Lines<'a> {
             }
             Lines(LinesEnum::Light {
                 ref mut text,
-                ref mut done,
+                ref mut byte_idx,
+                ref mut at_end,
             }) => {
-                if *done {
+                if *at_end {
                     return None;
-                } else {
-                    let split_idx = line_to_byte_idx(text, 1);
-                    let t = &text[..split_idx];
-                    *text = &text[split_idx..];
-                    if text.is_empty() {
-                        *done = !ends_with_line_break(t);
-                    }
-                    return Some(t.into());
+                } else if *byte_idx == text.len() {
+                    *at_end = true;
+                    return Some("".into());
                 }
+
+                let start_idx = *byte_idx;
+                let end_idx = line_to_byte_idx(&text[start_idx..], 1) + start_idx;
+                *byte_idx = end_idx;
+
+                if end_idx == text.len() {
+                    *at_end = !ends_with_line_break(text);
+                }
+
+                return Some((&text[start_idx..end_idx]).into());
             }
         }
     }
@@ -261,49 +506,216 @@ pub struct Chunks<'a>(ChunksEnum<'a>);
 #[derive(Debug, Clone)]
 enum ChunksEnum<'a> {
     Full {
-        node_stack: Vec<&'a Arc<Node>>,
-        start: usize,
-        end: usize,
-        idx: usize,
+        node_stack: Vec<(&'a Arc<Node>, usize)>, // (node ref, index of current child)
+        total_bytes: usize,                      // Total bytes in the data range of the iterator.
+        byte_idx: isize, // The index of the current byte relative to the data range start.
     },
     Light {
         text: &'a str,
+        is_end: bool,
     },
 }
 
 impl<'a> Chunks<'a> {
+    #[inline(always)]
     pub(crate) fn new(node: &Arc<Node>) -> Chunks {
-        Chunks(ChunksEnum::Full {
-            node_stack: vec![node],
-            start: 0,
-            end: node.text_info().bytes as usize,
-            idx: 0,
-        })
+        Chunks::new_with_range_at_char(node, 0, (0, node.char_count())).0
     }
 
-    pub(crate) fn new_empty() -> Chunks<'static> {
-        Chunks(ChunksEnum::Light { text: "" })
+    #[inline(always)]
+    pub(crate) fn new_with_range(node: &Arc<Node>, char_idx_range: (usize, usize)) -> Chunks {
+        Chunks::new_with_range_at_char(node, char_idx_range.0, char_idx_range).0
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Chunks {
+    #[inline(always)]
+    pub(crate) fn new_with_range_at_byte(
+        node: &Arc<Node>,
+        at_byte: usize,
+        char_idx_range: (usize, usize),
+    ) -> (Chunks, usize, usize, usize) {
+        let (_, _, c, _) = node.get_chunk_at_byte(at_byte);
+        Chunks::new_with_range_at_char(node, c.max(char_idx_range.0), char_idx_range)
+    }
+
+    /// The main workhorse function for creating new `Chunks` iterators.
+    ///
+    /// Creates a new `Chunks` iterator from the given node, starting the
+    /// iterator at the chunk containing the `at_char` char index (i.e. the
+    /// `next()` method will yield the chunk containing that char).  The range
+    /// of the iterator is bounded by `char_idx_range`.
+    ///
+    /// Both `at_char` and `char_idx_range` are relative to the beginning of
+    /// of the passed node.
+    ///
+    /// Passing an `at_char` equal to the max of `char_idx_range` creates an
+    /// iterator at the end of forward iteration.
+    ///
+    /// Returns the iterator and the byte/char/line index of its start relative
+    /// to the start of the node.
+    pub(crate) fn new_with_range_at_char(
+        node: &Arc<Node>,
+        at_char: usize,
+        char_idx_range: (usize, usize),
+    ) -> (Chunks, usize, usize, usize) {
+        debug_assert!(at_char >= char_idx_range.0);
+        debug_assert!(at_char <= char_idx_range.1);
+
+        // Calculate the start and end bytes of the iterator.
         let start_byte = {
-            let (chunk, b, c, _) = node.get_chunk_at_char(start_char);
-            b + char_to_byte_idx(chunk, start_char - c)
+            let (chunk, b, c, _) = node.get_chunk_at_char(char_idx_range.0);
+            b + char_to_byte_idx(chunk, char_idx_range.0 - c)
         };
         let end_byte = {
-            let (chunk, b, c, _) = node.get_chunk_at_char(end_char);
-            b + char_to_byte_idx(chunk, end_char - c)
+            let (chunk, b, c, _) = node.get_chunk_at_char(char_idx_range.1);
+            b + char_to_byte_idx(chunk, char_idx_range.1 - c)
         };
-        Chunks(ChunksEnum::Full {
-            node_stack: vec![node],
-            start: start_byte,
-            end: end_byte,
-            idx: 0,
+
+        // If root is a leaf, return light version of the iter.
+        if node.is_leaf() {
+            if at_char == char_idx_range.1 && end_byte > start_byte {
+                return (
+                    Chunks(ChunksEnum::Light {
+                        text: &node.leaf_text()[start_byte..end_byte],
+                        is_end: true,
+                    }),
+                    end_byte - start_byte,
+                    char_idx_range.1 - char_idx_range.0,
+                    byte_to_line_idx(
+                        &node.leaf_text()[start_byte..end_byte],
+                        end_byte - start_byte,
+                    ),
+                );
+            } else {
+                return (
+                    Chunks(ChunksEnum::Light {
+                        text: &node.leaf_text()[start_byte..end_byte],
+                        is_end: false,
+                    }),
+                    0,
+                    0,
+                    0,
+                );
+            }
+        }
+
+        // Create and populate the node stack, and determine the char index
+        // within the first chunk, and byte index of the start of that chunk.
+        let mut info = TextInfo::new();
+        let mut char_idx = at_char;
+        let node_stack = {
+            let mut node_stack = Vec::new();
+            let mut node_ref = node;
+            loop {
+                match **node_ref {
+                    Node::Leaf(_) => {
+                        break;
+                    }
+                    Node::Internal(ref children) => {
+                        let (child_i, acc_info) = children.search_char_idx(char_idx);
+                        node_stack.push((node_ref, child_i));
+                        node_ref = &children.nodes()[child_i];
+                        info += acc_info;
+                        char_idx -= acc_info.chars as usize;
+                    }
+                }
+            }
+            node_stack
+        };
+
+        // Create the iterator.
+        (
+            Chunks(ChunksEnum::Full {
+                node_stack: node_stack,
+                total_bytes: end_byte - start_byte,
+                byte_idx: info.bytes as isize - start_byte as isize,
+            }),
+            info.bytes as usize,
+            info.chars as usize,
+            info.line_breaks as usize,
+        )
+    }
+
+    #[inline(always)]
+    pub(crate) fn new_with_range_at_line_break(
+        node: &Arc<Node>,
+        at_line_break: usize,
+        char_idx_range: (usize, usize),
+    ) -> (Chunks, usize, usize, usize) {
+        let (_, _, c, _) = node.get_chunk_at_line_break(at_line_break);
+        Chunks::new_with_range_at_char(node, c.max(char_idx_range.0), char_idx_range)
+    }
+
+    pub(crate) fn from_str(text: &str, at_end: bool) -> Chunks {
+        Chunks(ChunksEnum::Light {
+            text: text,
+            is_end: at_end,
         })
     }
 
-    pub(crate) fn from_str(text: &str) -> Chunks {
-        Chunks(ChunksEnum::Light { text: text })
+    pub fn prev(&mut self) -> Option<&'a str> {
+        match *self {
+            Chunks(ChunksEnum::Full {
+                ref mut node_stack,
+                total_bytes,
+                ref mut byte_idx,
+            }) => {
+                if *byte_idx <= 0 {
+                    return None;
+                }
+
+                // Progress the node stack if needed.
+                let mut stack_idx = node_stack.len() - 1;
+                if node_stack[stack_idx].1 == 0 {
+                    while node_stack[stack_idx].1 == 0 {
+                        if stack_idx == 0 {
+                            return None;
+                        } else {
+                            stack_idx -= 1;
+                        }
+                    }
+                    node_stack[stack_idx].1 -= 1;
+                    while stack_idx < (node_stack.len() - 1) {
+                        let child_i = node_stack[stack_idx].1;
+                        let node = &node_stack[stack_idx].0.children().nodes()[child_i];
+                        node_stack[stack_idx + 1] = (node, node.child_count() - 1);
+                        stack_idx += 1;
+                    }
+                    node_stack[stack_idx].1 += 1;
+                }
+
+                // Fetch the node and child index.
+                let (node, ref mut child_i) = node_stack.last_mut().unwrap();
+                *child_i -= 1;
+
+                // Get the text, sliced to the appropriate range.
+                let text = node.children().nodes()[*child_i].leaf_text();
+                *byte_idx -= text.len() as isize;
+                let text_slice = {
+                    let start_byte = if *byte_idx < 0 {
+                        (-*byte_idx) as usize
+                    } else {
+                        0
+                    };
+                    let end_byte = text.len().min((total_bytes as isize - *byte_idx) as usize);
+                    &text[start_byte..end_byte]
+                };
+
+                // Return the text.
+                return Some(text_slice);
+            }
+
+            Chunks(ChunksEnum::Light {
+                text,
+                ref mut is_end,
+            }) => {
+                if !*is_end {
+                    return None;
+                } else {
+                    *is_end = false;
+                    return Some(text);
+                }
+            }
+        }
     }
 }
 
@@ -314,58 +726,64 @@ impl<'a> Iterator for Chunks<'a> {
         match *self {
             Chunks(ChunksEnum::Full {
                 ref mut node_stack,
-                start,
-                end,
-                ref mut idx,
+                total_bytes,
+                ref mut byte_idx,
             }) => {
-                if *idx >= end {
+                if *byte_idx >= total_bytes as isize {
                     return None;
                 }
 
-                loop {
-                    if let Some(node) = node_stack.pop() {
-                        match **node {
-                            Node::Leaf(ref text) => {
-                                let start_byte = if start <= *idx { 0 } else { start - *idx };
-                                let end_byte = if end >= (*idx + text.len()) {
-                                    text.len()
-                                } else {
-                                    end - *idx
-                                };
-                                *idx += text.len();
-                                return Some(&text[start_byte..end_byte]);
-                            }
-
-                            Node::Internal(ref children) => {
-                                // Find the first child that isn't before `start`,
-                                // updating `idx` as we go.
-                                let mut child_i = 0;
-                                for inf in children.info().iter() {
-                                    if (*idx + inf.bytes as usize) > start {
-                                        break;
-                                    } else {
-                                        *idx += inf.bytes as usize;
-                                        child_i += 1;
-                                    }
-                                }
-                                // Push relevant children to the stack.
-                                for child in (&children.nodes()[child_i..]).iter().rev() {
-                                    node_stack.push(child);
-                                }
-                            }
+                // Progress the node stack if needed.
+                let mut stack_idx = node_stack.len() - 1;
+                if node_stack[stack_idx].1 >= node_stack[stack_idx].0.child_count() {
+                    while node_stack[stack_idx].1 >= (node_stack[stack_idx].0.child_count() - 1) {
+                        if stack_idx == 0 {
+                            return None;
+                        } else {
+                            stack_idx -= 1;
                         }
-                    } else {
-                        return None;
+                    }
+                    node_stack[stack_idx].1 += 1;
+                    while stack_idx < (node_stack.len() - 1) {
+                        let child_i = node_stack[stack_idx].1;
+                        let node = &node_stack[stack_idx].0.children().nodes()[child_i];
+                        node_stack[stack_idx + 1] = (node, 0);
+                        stack_idx += 1;
                     }
                 }
+
+                // Fetch the node and child index.
+                let (node, ref mut child_i) = node_stack.last_mut().unwrap();
+
+                // Get the text, sliced to the appropriate range.
+                let text = node.children().nodes()[*child_i].leaf_text();
+                let text_slice = {
+                    let start_byte = if *byte_idx < 0 {
+                        (-*byte_idx) as usize
+                    } else {
+                        0
+                    };
+                    let end_byte = text.len().min((total_bytes as isize - *byte_idx) as usize);
+                    &text[start_byte..end_byte]
+                };
+
+                // Book keeping.
+                *byte_idx += text.len() as isize;
+                *child_i += 1;
+
+                // Return the text.
+                return Some(text_slice);
             }
-            Chunks(ChunksEnum::Light { ref mut text }) => {
-                if text.is_empty() {
+
+            Chunks(ChunksEnum::Light {
+                text,
+                ref mut is_end,
+            }) => {
+                if *is_end {
                     return None;
                 } else {
-                    let t = *text;
-                    *text = "";
-                    return Some(t);
+                    *is_end = true;
+                    return Some(text);
                 }
             }
         }
@@ -376,6 +794,7 @@ impl<'a> Iterator for Chunks<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use Rope;
 
     const TEXT: &str = "\r\n\
@@ -454,10 +873,165 @@ mod tests {
     }
 
     #[test]
+    fn bytes_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        while let Some(_) = itr.next() {}
+
+        let mut i = TEXT.len();
+        while let Some(b) = itr.prev() {
+            i -= 1;
+            assert_eq!(b, TEXT.as_bytes()[i]);
+        }
+    }
+
+    #[test]
+    fn bytes_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn bytes_04() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        while let Some(_) = itr.next() {}
+
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn bytes_05() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+
+        assert_eq!(None, itr.prev());
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn bytes_06() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        while let Some(_) = itr.next() {}
+
+        assert_eq!(None, itr.next());
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn bytes_07() {
+        let mut itr = Bytes::from_str("a");
+
+        assert_eq!(Some(0x61), itr.next());
+        assert_eq!(None, itr.next());
+        assert_eq!(Some(0x61), itr.prev());
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn bytes_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        let mut bytes_1 = TEXT.bytes();
+        for i in 0..(r.len_bytes() + 1) {
+            let mut bytes_2 = r.bytes_at(i);
+            assert_eq!(bytes_1.next(), bytes_2.next());
+        }
+    }
+
+    #[test]
     fn chars_01() {
         let r = Rope::from_str(TEXT);
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
             assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn chars_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        let mut text_itr = TEXT.chars();
+        while let Some(_) = itr.next() {}
+
+        while let Some(b) = itr.prev() {
+            assert_eq!(b, text_itr.next_back().unwrap());
+        }
+    }
+
+    #[test]
+    fn chars_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chars_04() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        while let Some(_) = itr.next() {}
+
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chars_05() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+
+        assert_eq!(None, itr.prev());
+        itr.next();
+        itr.prev();
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chars_06() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        while let Some(_) = itr.next() {}
+
+        assert_eq!(None, itr.next());
+        itr.prev();
+        itr.next();
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chars_07() {
+        let mut itr = Chars::from_str("a");
+
+        assert_eq!(Some('a'), itr.next());
+        assert_eq!(None, itr.next());
+        assert_eq!(Some('a'), itr.prev());
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chars_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        let mut chars_1 = TEXT.chars();
+        for i in 0..(r.len_chars() + 1) {
+            let mut chars_2 = r.chars_at(i);
+            assert_eq!(chars_1.next(), chars_2.next());
         }
     }
 
@@ -669,6 +1243,182 @@ mod tests {
     }
 
     #[test]
+    fn lines_10() {
+        let r = Rope::from_str(TEXT);
+
+        let mut itr = r.lines();
+
+        assert_eq!(None, itr.prev());
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn lines_11() {
+        let r = Rope::from_str(TEXT);
+
+        let mut lines = Vec::new();
+        let mut itr = r.lines();
+
+        while let Some(line) = itr.next() {
+            lines.push(line);
+        }
+
+        while let Some(line) = itr.prev() {
+            assert_eq!(line, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_12() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(line) = itr.next() {
+            lines.push(line);
+        }
+
+        while let Some(line) = itr.prev() {
+            assert_eq!(line, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_13() {
+        let text = "";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_14() {
+        let text = "a";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_15() {
+        let text = "a\nb";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_16() {
+        let text = "\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_17() {
+        let text = "a\nb\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..r.len_lines() {
+            let line = r.line(i);
+            let mut lines = r.lines_at(i);
+            assert_eq!(Some(line), lines.next());
+        }
+
+        let mut lines = r.lines_at(r.len_lines());
+        assert_eq!(None, lines.next());
+    }
+
+    #[test]
+    fn lines_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..s.len_lines() {
+            let line = s.line(i);
+            let mut lines = s.lines_at(i);
+            assert_eq!(Some(line), lines.next());
+        }
+
+        let mut lines = s.lines_at(s.len_lines());
+        assert_eq!(None, lines.next());
+    }
+
+    #[test]
     fn chunks_01() {
         let r = Rope::from_str(TEXT);
 
@@ -676,6 +1426,135 @@ mod tests {
         for chunk in r.chunks() {
             assert_eq!(chunk, &TEXT[idx..(idx + chunk.len())]);
             idx += chunk.len();
+        }
+    }
+
+    #[test]
+    fn chunks_02() {
+        let r = Rope::from_str("");
+        let mut itr = r.chunks();
+
+        assert_eq!(Some(""), itr.next());
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chunks_03() {
+        let r = Rope::from_str(TEXT);
+
+        let mut itr = r.chunks();
+
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn chunks_04() {
+        let r = Rope::from_str(TEXT);
+
+        let mut chunks = Vec::new();
+        let mut itr = r.chunks();
+
+        while let Some(text) = itr.next() {
+            chunks.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, chunks.pop().unwrap());
+        }
+
+        assert!(chunks.is_empty());
+    }
+
+    #[test]
+    fn chunks_at_byte_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..(r.len_bytes() + 1) {
+            let (chunk, b, c, l) = r.chunk_at_byte(i);
+            let (mut chunks, bs, cs, ls) = r.chunks_at_byte(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
+    }
+
+    #[test]
+    fn chunks_at_byte_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..(s.len_chars() + 1) {
+            let (chunk, b, c, l) = s.chunk_at_byte(i);
+            let (mut chunks, bs, cs, ls) = s.chunks_at_byte(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
+    }
+
+    #[test]
+    fn chunks_at_char_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..(r.len_chars() + 1) {
+            let (chunk, b, c, l) = r.chunk_at_char(i);
+            let (mut chunks, bs, cs, ls) = r.chunks_at_char(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
+    }
+
+    #[test]
+    fn chunks_at_char_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..(s.len_chars() + 1) {
+            let (chunk, b, c, l) = s.chunk_at_char(i);
+            let (mut chunks, bs, cs, ls) = s.chunks_at_char(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
+    }
+
+    #[test]
+    fn chunks_at_line_break_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..(r.len_lines() + 1) {
+            let (chunk, b, c, l) = r.chunk_at_line_break(i);
+            let (mut chunks, bs, cs, ls) = r.chunks_at_line_break(i);
+
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
+            assert_eq!(Some(chunk), chunks.next());
+        }
+    }
+
+    #[test]
+    fn chunks_at_line_break_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..(s.len_lines() + 1) {
+            let (chunk, b, c, l) = s.chunk_at_line_break(i);
+            let (mut chunks, bs, cs, ls) = s.chunks_at_line_break(i);
+
+            assert_eq!(Some(chunk), chunks.next());
+            assert_eq!(b, bs);
+            assert_eq!(c, cs);
+            assert_eq!(l, ls);
         }
     }
 
@@ -697,6 +1576,25 @@ mod tests {
     }
 
     #[test]
+    fn bytes_at_sliced_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start..s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        let mut bytes_1 = s2.bytes();
+        for i in 0..(s1.len_bytes() + 1) {
+            let mut bytes_2 = s1.bytes_at(i);
+            assert_eq!(bytes_1.next(), bytes_2.next());
+        }
+    }
+
+    #[test]
     fn chars_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -710,6 +1608,25 @@ mod tests {
 
         for (cr, ct) in s1.chars().zip(s2.chars()) {
             assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn chars_at_sliced_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 116;
+        let s_end = 331;
+        let s_start_byte = r.char_to_byte(s_start);
+        let s_end_byte = r.char_to_byte(s_end);
+
+        let s1 = r.slice(s_start..s_end);
+        let s2 = &TEXT[s_start_byte..s_end_byte];
+
+        let mut chars_1 = s2.chars();
+        for i in 0..(s1.len_chars() + 1) {
+            let mut chars_2 = s1.chars_at(i);
+            assert_eq!(chars_1.next(), chars_2.next());
         }
     }
 
