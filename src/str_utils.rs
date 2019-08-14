@@ -197,6 +197,49 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
 }
 
+/// Returns the byte position just after the second-to-last line break
+/// in `text`, or zero of there is no second-to-last line break.
+///
+/// This function is narrow in scope, only being used for iterating
+/// backwards over the lines of a `str`.
+pub(crate) fn prev_line_end_char_idx(text: &str) -> usize {
+    let mut itr = text.bytes().enumerate().rev();
+
+    let first_byte = if let Some((_, byte)) = itr.next() {
+        byte
+    } else {
+        return 0;
+    };
+
+    while let Some((idx, byte)) = itr.next() {
+        match byte {
+            0x0A | 0x0B | 0x0C => {
+                return idx + 1;
+            }
+            0x0D => {
+                if first_byte != 0x0A {
+                    return idx + 1;
+                }
+            }
+            0x85 => {
+                if let Some((_, 0xC2)) = itr.next() {
+                    return idx + 1;
+                }
+            }
+            0xA8 | 0xA9 => {
+                if let Some((_, 0x80)) = itr.next() {
+                    if let Some((_, 0xE2)) = itr.next() {
+                        return idx + 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    return 0;
+}
+
 //===========================================================================
 // Internal
 //===========================================================================
@@ -959,6 +1002,30 @@ mod tests {
         assert_eq!(Some(32), itr.next());
         assert_eq!(Some(48), itr.next());
         assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn prev_line_end_char_idx_01() {
+        let mut text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
+                        There\u{2028}is something.\u{2029}";
+
+        assert_eq!(48, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(32, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(22, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(17, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(13, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(9, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(8, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(1, text.len());
+        text = &text[..prev_line_end_char_idx(text)];
+        assert_eq!(0, text.len());
     }
 
     #[test]

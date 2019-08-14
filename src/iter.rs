@@ -12,7 +12,7 @@ use std::sync::Arc;
 use slice::RopeSlice;
 use str_utils::{
     byte_to_line_idx, char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx,
-    line_to_char_idx,
+    line_to_char_idx, prev_line_end_char_idx,
 };
 use tree::{Node, TextInfo};
 
@@ -297,7 +297,8 @@ enum LinesEnum<'a> {
     },
     Light {
         text: &'a str,
-        done: bool,
+        byte_idx: usize,
+        at_end: bool,
     },
 }
 
@@ -326,8 +327,70 @@ impl<'a> Lines<'a> {
     pub(crate) fn from_str(text: &str) -> Lines {
         Lines(LinesEnum::Light {
             text: text,
-            done: false,
+            byte_idx: 0,
+            at_end: false,
         })
+    }
+
+    pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
+        match *self {
+            Lines(LinesEnum::Full {
+                ref mut node,
+                start_char,
+                end_char,
+                ref mut line_idx,
+            }) => {
+                if *line_idx == 0 {
+                    return None;
+                } else {
+                    *line_idx -= 1;
+
+                    let a = {
+                        // Find the char that corresponds to the start of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx);
+                        let a = (c + line_to_char_idx(chunk, *line_idx - l)).max(start_char);
+
+                        // Early out if we're past the specified end char
+                        if a > end_char {
+                            *line_idx = node.line_break_count() + 1;
+                            return None;
+                        }
+
+                        a
+                    };
+
+                    let b = if *line_idx < node.line_break_count() {
+                        // Find the char that corresponds to the end of the line.
+                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx + 1);
+                        c + line_to_char_idx(chunk, *line_idx + 1 - l)
+                    } else {
+                        node.char_count()
+                    }
+                    .min(end_char);
+
+                    return Some(RopeSlice::new_with_range(node, a, b));
+                }
+            }
+            Lines(LinesEnum::Light {
+                ref mut text,
+                ref mut byte_idx,
+                ref mut at_end,
+            }) => {
+                // Special cases.
+                if *at_end && (text.len() == 0 || ends_with_line_break(text)) {
+                    *at_end = false;
+                    return Some("".into());
+                } else if *byte_idx == 0 {
+                    return None;
+                }
+
+                let end_idx = *byte_idx;
+                let start_idx = prev_line_end_char_idx(&text[..end_idx]);
+                *byte_idx = start_idx;
+
+                return Some((&text[start_idx..end_idx]).into());
+            }
+        }
     }
 }
 
@@ -375,19 +438,25 @@ impl<'a> Iterator for Lines<'a> {
             }
             Lines(LinesEnum::Light {
                 ref mut text,
-                ref mut done,
+                ref mut byte_idx,
+                ref mut at_end,
             }) => {
-                if *done {
+                if *at_end {
                     return None;
-                } else {
-                    let split_idx = line_to_byte_idx(text, 1);
-                    let t = &text[..split_idx];
-                    *text = &text[split_idx..];
-                    if text.is_empty() {
-                        *done = !ends_with_line_break(t);
-                    }
-                    return Some(t.into());
+                } else if *byte_idx == text.len() {
+                    *at_end = true;
+                    return Some("".into());
                 }
+
+                let start_idx = *byte_idx;
+                let end_idx = line_to_byte_idx(&text[start_idx..], 1) + start_idx;
+                *byte_idx = end_idx;
+
+                if end_idx == text.len() {
+                    *at_end = !ends_with_line_break(text);
+                }
+
+                return Some((&text[start_idx..end_idx]).into());
             }
         }
     }
@@ -1158,6 +1227,134 @@ mod tests {
         assert_eq!("b\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn lines_10() {
+        let r = Rope::from_str(TEXT);
+
+        let mut itr = r.lines();
+
+        assert_eq!(None, itr.prev());
+        assert_eq!(None, itr.prev());
+    }
+
+    #[test]
+    fn lines_11() {
+        let r = Rope::from_str(TEXT);
+
+        let mut lines = Vec::new();
+        let mut itr = r.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_12() {
+        let text = "";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_13() {
+        let text = "a";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_14() {
+        let text = "a\nb";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_15() {
+        let text = "\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_16() {
+        let text = "a\nb\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
     }
 
     #[test]
