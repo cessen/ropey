@@ -748,8 +748,33 @@ impl<'a> RopeSlice<'a> {
                 start_char,
                 end_char,
                 ..
-            }) => Lines::new_with_range(node, start_char as usize, end_char as usize),
+            }) => Lines::new_with_range(node, (start_char as usize, end_char as usize)),
             RopeSlice(RSEnum::Light { text, .. }) => Lines::from_str(text),
+        }
+    }
+
+    /// Creates an iterator over the lines of the `RopeSlice`, starting at line
+    /// `line_idx`.
+    #[inline]
+    pub fn lines_at(&self, line_idx: usize) -> Lines {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of RopeSlice: line index {}, RopeSlice line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node,
+                start_char,
+                end_char,
+                ..
+            }) => {
+                Lines::new_with_range_at(node, line_idx, (start_char as usize, end_char as usize))
+            }
+            RopeSlice(RSEnum::Light { text, .. }) => Lines::from_str_at(text, line_idx),
         }
     }
 

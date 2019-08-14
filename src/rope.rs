@@ -1097,7 +1097,7 @@ impl Rope {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
-            "Attempt to index past end of rope: byte index {}, rope byte length {}",
+            "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
             byte_idx,
             self.len_bytes()
         );
@@ -1118,7 +1118,7 @@ impl Rope {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
-            "Attempt to index past end of rope: char index {}, rope char length {}",
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
             char_idx,
             self.len_chars()
         );
@@ -1130,6 +1130,21 @@ impl Rope {
     #[inline]
     pub fn lines(&self) -> Lines {
         Lines::new(&self.root)
+    }
+
+    /// Creates an iterator over the lines of the `Rope`, starting at line
+    /// `line_idx`.
+    #[inline]
+    pub fn lines_at(&self, line_idx: usize) -> Lines {
+        // Bounds check
+        assert!(
+            line_idx <= self.len_lines(),
+            "Attempt to index past end of Rope: line index {}, Rope line length {}",
+            line_idx,
+            self.len_lines()
+        );
+
+        Lines::new_with_range_at(&self.root, line_idx, (0, self.len_chars()))
     }
 
     /// Creates an iterator over the chunks of the `Rope`.

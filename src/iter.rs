@@ -293,6 +293,7 @@ enum LinesEnum<'a> {
         node: &'a Arc<Node>,
         start_char: usize,
         end_char: usize,
+        start_line: usize,
         line_idx: usize,
     },
     Light {
@@ -308,19 +309,30 @@ impl<'a> Lines<'a> {
             node: node,
             start_char: 0,
             end_char: node.text_info().chars as usize,
+            start_line: 0,
             line_idx: 0,
         })
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, start_char: usize, end_char: usize) -> Lines {
+    pub(crate) fn new_with_range(node: &Arc<Node>, char_idx_range: (usize, usize)) -> Lines {
+        Lines::new_with_range_at(node, 0, char_idx_range)
+    }
+
+    pub(crate) fn new_with_range_at(
+        node: &Arc<Node>,
+        at_line: usize,
+        char_idx_range: (usize, usize),
+    ) -> Lines {
+        let start_line = {
+            let (chunk, _, c, l) = node.get_chunk_at_char(char_idx_range.0);
+            l + char_to_line_idx(chunk, char_idx_range.0 - c)
+        };
         Lines(LinesEnum::Full {
             node: node,
-            start_char: start_char,
-            end_char: end_char,
-            line_idx: {
-                let (chunk, _, c, l) = node.get_chunk_at_char(start_char);
-                l + char_to_line_idx(chunk, start_char - c)
-            },
+            start_char: char_idx_range.0,
+            end_char: char_idx_range.1,
+            start_line: start_line,
+            line_idx: start_line + at_line,
         })
     }
 
@@ -332,15 +344,24 @@ impl<'a> Lines<'a> {
         })
     }
 
+    pub(crate) fn from_str_at(text: &str, line_idx: usize) -> Lines {
+        let mut lines_iter = Lines::from_str(text);
+        for _ in 0..line_idx {
+            lines_iter.next();
+        }
+        lines_iter
+    }
+
     pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
         match *self {
             Lines(LinesEnum::Full {
                 ref mut node,
                 start_char,
                 end_char,
+                start_line,
                 ref mut line_idx,
             }) => {
-                if *line_idx == 0 {
+                if *line_idx == start_line {
                     return None;
                 } else {
                     *line_idx -= 1;
@@ -348,15 +369,7 @@ impl<'a> Lines<'a> {
                     let a = {
                         // Find the char that corresponds to the start of the line.
                         let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx);
-                        let a = (c + line_to_char_idx(chunk, *line_idx - l)).max(start_char);
-
-                        // Early out if we're past the specified end char
-                        if a > end_char {
-                            *line_idx = node.line_break_count() + 1;
-                            return None;
-                        }
-
-                        a
+                        (c + line_to_char_idx(chunk, *line_idx - l)).max(start_char)
                     };
 
                     let b = if *line_idx < node.line_break_count() {
@@ -404,6 +417,7 @@ impl<'a> Iterator for Lines<'a> {
                 start_char,
                 end_char,
                 ref mut line_idx,
+                ..
             }) => {
                 if *line_idx > node.line_break_count() {
                     return None;
@@ -415,7 +429,6 @@ impl<'a> Iterator for Lines<'a> {
 
                         // Early out if we're past the specified end char
                         if a > end_char {
-                            *line_idx = node.line_break_count() + 1;
                             return None;
                         }
 
@@ -1246,12 +1259,12 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = r.lines();
 
-        while let Some(text) = itr.next() {
-            lines.push(text);
+        while let Some(line) = itr.next() {
+            lines.push(line);
         }
 
-        while let Some(text) = itr.prev() {
-            assert_eq!(text, lines.pop().unwrap());
+        while let Some(line) = itr.prev() {
+            assert_eq!(line, lines.pop().unwrap());
         }
 
         assert!(lines.is_empty());
@@ -1259,6 +1272,25 @@ mod tests {
 
     #[test]
     fn lines_12() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines();
+
+        while let Some(line) = itr.next() {
+            lines.push(line);
+        }
+
+        while let Some(line) = itr.prev() {
+            assert_eq!(line, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_13() {
         let text = "";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1278,7 +1310,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_13() {
+    fn lines_14() {
         let text = "a";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1298,7 +1330,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_14() {
+    fn lines_15() {
         let text = "a\nb";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1318,7 +1350,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_15() {
+    fn lines_16() {
         let text = "\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1338,7 +1370,7 @@ mod tests {
     }
 
     #[test]
-    fn lines_16() {
+    fn lines_17() {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1355,6 +1387,35 @@ mod tests {
         }
 
         assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn lines_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..r.len_lines() {
+            let line = r.line(i);
+            let mut lines = r.lines_at(i);
+            assert_eq!(Some(line), lines.next());
+        }
+
+        let mut lines = r.lines_at(r.len_lines());
+        assert_eq!(None, lines.next());
+    }
+
+    #[test]
+    fn lines_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..s.len_lines() {
+            let line = s.line(i);
+            let mut lines = s.lines_at(i);
+            assert_eq!(Some(line), lines.next());
+        }
+
+        let mut lines = s.lines_at(s.len_lines());
+        assert_eq!(None, lines.next());
     }
 
     #[test]
