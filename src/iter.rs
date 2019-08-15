@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use slice::RopeSlice;
 use str_utils::{
-    byte_to_line_idx, char_to_byte_idx, char_to_line_idx, ends_with_line_break, line_to_byte_idx,
-    line_to_char_idx, prev_line_end_char_idx,
+    byte_to_line_idx, char_to_byte_idx, char_to_line_idx, count_chars, ends_with_line_break,
+    line_to_byte_idx, line_to_char_idx, prev_line_end_char_idx,
 };
 use tree::{Node, TextInfo};
 
@@ -25,6 +25,7 @@ pub struct Bytes<'a> {
     cur_chunk: &'a [u8],
     byte_idx: usize,
     last_op_was_prev: bool,
+    bytes_remaining: usize,
 }
 
 impl<'a> Bytes<'a> {
@@ -40,6 +41,7 @@ impl<'a> Bytes<'a> {
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: 0,
             last_op_was_prev: false,
+            bytes_remaining: node.text_info().bytes as usize,
         }
     }
 
@@ -55,6 +57,7 @@ impl<'a> Bytes<'a> {
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: 0,
             last_op_was_prev: false,
+            bytes_remaining: node.char_to_byte(end_char) - node.char_to_byte(start_char),
         }
     }
 
@@ -77,6 +80,7 @@ impl<'a> Bytes<'a> {
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: at_byte - chunk_byte_start,
             last_op_was_prev: false,
+            bytes_remaining: node.char_to_byte(char_idx_range.1) - at_byte,
         }
     }
 
@@ -96,6 +100,7 @@ impl<'a> Bytes<'a> {
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: byte_idx,
             last_op_was_prev: false,
+            bytes_remaining: text.len() - byte_idx,
         }
     }
 
@@ -108,6 +113,7 @@ impl<'a> Bytes<'a> {
         loop {
             if self.byte_idx > 0 {
                 self.byte_idx -= 1;
+                self.bytes_remaining += 1;
                 return Some(self.cur_chunk[self.byte_idx]);
             } else if let Some(chunk) = self.chunk_iter.prev() {
                 self.cur_chunk = chunk.as_bytes();
@@ -131,6 +137,7 @@ impl<'a> Iterator for Bytes<'a> {
         loop {
             if let Some(c) = self.cur_chunk.get(self.byte_idx) {
                 self.byte_idx += 1;
+                self.bytes_remaining -= 1;
                 return Some(*c);
             } else if let Some(chunk) = self.chunk_iter.next() {
                 self.cur_chunk = chunk.as_bytes();
@@ -140,7 +147,13 @@ impl<'a> Iterator for Bytes<'a> {
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.bytes_remaining, Some(self.bytes_remaining))
+    }
 }
+
+impl<'a> ExactSizeIterator for Bytes<'a> {}
 
 //==========================================================
 
@@ -151,6 +164,7 @@ pub struct Chars<'a> {
     cur_chunk: &'a str,
     byte_idx: usize,
     last_op_was_prev: bool,
+    chars_remaining: usize,
 }
 
 impl<'a> Chars<'a> {
@@ -166,6 +180,7 @@ impl<'a> Chars<'a> {
             cur_chunk: cur_chunk,
             byte_idx: 0,
             last_op_was_prev: false,
+            chars_remaining: node.text_info().chars as usize,
         }
     }
 
@@ -181,6 +196,7 @@ impl<'a> Chars<'a> {
             cur_chunk: cur_chunk,
             byte_idx: 0,
             last_op_was_prev: false,
+            chars_remaining: end_char - start_char,
         }
     }
 
@@ -203,6 +219,7 @@ impl<'a> Chars<'a> {
             cur_chunk: cur_chunk,
             byte_idx: char_to_byte_idx(cur_chunk, at_char - chunk_char_start),
             last_op_was_prev: false,
+            chars_remaining: char_idx_range.1 - at_char,
         }
     }
 
@@ -217,11 +234,14 @@ impl<'a> Chars<'a> {
         } else {
             ""
         };
+        let start_byte_idx = char_to_byte_idx(text, char_idx);
+
         Chars {
             chunk_iter: chunk_iter,
             cur_chunk: cur_chunk,
-            byte_idx: char_to_byte_idx(text, char_idx),
+            byte_idx: start_byte_idx,
             last_op_was_prev: false,
+            chars_remaining: count_chars(&text[start_byte_idx..]),
         }
     }
 
@@ -237,6 +257,7 @@ impl<'a> Chars<'a> {
                 while !self.cur_chunk.is_char_boundary(self.byte_idx) {
                     self.byte_idx -= 1;
                 }
+                self.chars_remaining += 1;
                 return (&self.cur_chunk[self.byte_idx..]).chars().next();
             } else if let Some(chunk) = self.chunk_iter.prev() {
                 self.cur_chunk = chunk;
@@ -264,6 +285,7 @@ impl<'a> Iterator for Chars<'a> {
                 while !self.cur_chunk.is_char_boundary(self.byte_idx) {
                     self.byte_idx += 1;
                 }
+                self.chars_remaining -= 1;
                 return (&self.cur_chunk[start..]).chars().next();
             } else if let Some(chunk) = self.chunk_iter.next() {
                 self.cur_chunk = chunk;
@@ -274,7 +296,13 @@ impl<'a> Iterator for Chars<'a> {
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.chars_remaining, Some(self.chars_remaining))
+    }
 }
+
+impl<'a> ExactSizeIterator for Chars<'a> {}
 
 //==========================================================
 
@@ -951,6 +979,36 @@ mod tests {
     }
 
     #[test]
+    fn bytes_exact_size_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut byte_count = s.len_bytes();
+        let mut bytes = s.bytes();
+
+        assert_eq!(byte_count, bytes.len());
+
+        while let Some(_) = bytes.next() {
+            byte_count -= 1;
+            assert_eq!(byte_count, bytes.len());
+        }
+
+        assert_eq!(byte_count, 0);
+        assert_eq!(bytes.len(), 0);
+    }
+
+    #[test]
+    fn bytes_exact_size_iter_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..=s.len_bytes() {
+            let bytes = s.bytes_at(i);
+            assert_eq!(s.len_bytes() - i, bytes.len());
+        }
+    }
+
+    #[test]
     fn chars_01() {
         let r = Rope::from_str(TEXT);
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
@@ -1032,6 +1090,36 @@ mod tests {
         for i in 0..(r.len_chars() + 1) {
             let mut chars_2 = r.chars_at(i);
             assert_eq!(chars_1.next(), chars_2.next());
+        }
+    }
+
+    #[test]
+    fn chars_exact_size_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut char_count = s.len_chars();
+        let mut chars = s.chars();
+
+        assert_eq!(char_count, chars.len());
+
+        while let Some(_) = chars.next() {
+            char_count -= 1;
+            assert_eq!(char_count, chars.len());
+        }
+
+        assert_eq!(char_count, 0);
+        assert_eq!(chars.len(), 0);
+    }
+
+    #[test]
+    fn chars_exact_size_iter_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..=s.len_chars() {
+            let chars = s.chars_at(i);
+            assert_eq!(s.len_chars() - i, chars.len());
         }
     }
 

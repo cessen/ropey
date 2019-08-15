@@ -536,6 +536,13 @@ impl Node {
         }
     }
 
+    /// Returns the byte index of the given char.
+    #[inline(always)]
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        let (chunk, b, c, _) = self.get_chunk_at_char(char_idx);
+        b + char_to_byte_idx(chunk, char_idx - c)
+    }
+
     /// Returns the byte and line index of the given char.
     #[inline(always)]
     pub fn char_to_byte_and_line(&self, char_idx: usize) -> (usize, usize) {
