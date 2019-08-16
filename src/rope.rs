@@ -1102,7 +1102,7 @@ impl Rope {
             self.len_bytes()
         );
 
-        Bytes::new_with_range_at(&self.root, byte_idx, (0, self.len_chars()))
+        Bytes::new_with_range_at(&self.root, byte_idx, (0, self.len_bytes()))
     }
 
     /// Creates an iterator over the chars of the `Rope`.
@@ -1123,7 +1123,7 @@ impl Rope {
             self.len_chars()
         );
 
-        Chars::new_with_range_at(&self.root, char_idx, (0, self.len_chars()))
+        Chars::new_with_range_at(&self.root, char_idx, (0, self.len_bytes()))
     }
 
     /// Creates an iterator over the lines of the `Rope`.
@@ -1144,7 +1144,7 @@ impl Rope {
             self.len_lines()
         );
 
-        Lines::new_with_range_at(&self.root, line_idx, (0, self.len_chars()))
+        Lines::new_with_range_at(&self.root, line_idx, (0, self.len_bytes()))
     }
 
     /// Creates an iterator over the chunks of the `Rope`.
@@ -1165,7 +1165,7 @@ impl Rope {
             self.len_bytes()
         );
 
-        Chunks::new_with_range_at_byte(&self.root, byte_idx, (0, self.len_chars()))
+        Chunks::new_with_range_at_byte(&self.root, byte_idx, (0, self.len_bytes()))
     }
 
     /// Creates an iterator over the chunks of the `Rope`, with the
@@ -1180,7 +1180,7 @@ impl Rope {
             self.len_chars()
         );
 
-        Chunks::new_with_range_at_char(&self.root, char_idx, (0, self.len_chars()))
+        Chunks::new_with_range_at_char(&self.root, char_idx, (0, self.len_bytes()))
     }
 
     /// Creates an iterator over the chunks of the `Rope`, with the
@@ -1195,7 +1195,7 @@ impl Rope {
             self.len_lines()
         );
 
-        Chunks::new_with_range_at_line_break(&self.root, line_break_idx, (0, self.len_chars()))
+        Chunks::new_with_range_at_line_break(&self.root, line_break_idx, (0, self.len_bytes()))
     }
 
     //-----------------------------------------------------------------------

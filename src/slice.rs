@@ -658,10 +658,10 @@ impl<'a> RopeSlice<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
-                start_char,
-                end_char,
+                start_byte,
+                end_byte,
                 ..
-            }) => Bytes::new_with_range(node, start_char as usize, end_char as usize),
+            }) => Bytes::new_with_range(node, (start_byte as usize, end_byte as usize)),
             RopeSlice(RSEnum::Light { text, .. }) => Bytes::from_str(text),
         }
     }
@@ -673,7 +673,7 @@ impl<'a> RopeSlice<'a> {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
-            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            "Attempt to index past end of RopeSlice: byte index {}, RopeSlice byte length {}",
             byte_idx,
             self.len_bytes()
         );
@@ -682,13 +682,12 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Full {
                 node,
                 start_byte,
-                start_char,
-                end_char,
+                end_byte,
                 ..
             }) => Bytes::new_with_range_at(
                 node,
                 start_byte as usize + byte_idx,
-                (start_char as usize, end_char as usize),
+                (start_byte as usize, end_byte as usize),
             ),
 
             RopeSlice(RSEnum::Light { text, .. }) => Bytes::from_str_at(text, byte_idx),
@@ -701,10 +700,10 @@ impl<'a> RopeSlice<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
-                start_char,
-                end_char,
+                start_byte,
+                end_byte,
                 ..
-            }) => Chars::new_with_range(node, start_char as usize, end_char as usize),
+            }) => Chars::new_with_range(node, (start_byte as usize, end_byte as usize)),
             RopeSlice(RSEnum::Light { text, .. }) => Chars::from_str(text),
         }
     }
@@ -716,7 +715,7 @@ impl<'a> RopeSlice<'a> {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
-            "Attempt to index past end of slice: char index {}, slice char length {}",
+            "Attempt to index past end of RopeSlice: char index {}, RopeSlice char length {}",
             char_idx,
             self.len_chars()
         );
@@ -727,12 +726,13 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Full {
                 node,
                 start_char,
-                end_char,
+                start_byte,
+                end_byte,
                 ..
             }) => Chars::new_with_range_at(
                 node,
                 start_char as usize + char_idx,
-                (start_char as usize, end_char as usize),
+                (start_byte as usize, end_byte as usize),
             ),
 
             RopeSlice(RSEnum::Light { text, .. }) => Chars::from_str_at(text, char_idx),
@@ -784,10 +784,10 @@ impl<'a> RopeSlice<'a> {
         match *self {
             RopeSlice(RSEnum::Full {
                 node,
-                start_char,
-                end_char,
+                start_byte,
+                end_byte,
                 ..
-            }) => Chunks::new_with_range(node, (start_char as usize, end_char as usize)),
+            }) => Chunks::new_with_range(node, (start_byte as usize, end_byte as usize)),
             RopeSlice(RSEnum::Light { text, .. }) => Chunks::from_str(text, false),
         }
     }
@@ -799,7 +799,7 @@ impl<'a> RopeSlice<'a> {
         // Bounds check
         assert!(
             byte_idx <= self.len_bytes(),
-            "Attempt to index past end of slice: byte index {}, slice byte length {}",
+            "Attempt to index past end of RopeSlice: byte index {}, RopeSlice byte length {}",
             byte_idx,
             self.len_bytes()
         );
@@ -808,8 +808,8 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Full {
                 node,
                 start_byte,
+                end_byte,
                 start_char,
-                end_char,
                 start_line_break,
                 ..
             }) => {
@@ -817,7 +817,7 @@ impl<'a> RopeSlice<'a> {
                     Chunks::new_with_range_at_byte(
                         node,
                         byte_idx + start_byte as usize,
-                        (start_char as usize, end_char as usize),
+                        (start_byte as usize, end_byte as usize),
                     );
 
                 (
@@ -856,7 +856,7 @@ impl<'a> RopeSlice<'a> {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
-            "Attempt to index past end of slice: char index {}, slice char length {}",
+            "Attempt to index past end of RopeSlice: char index {}, RopeSlice char length {}",
             char_idx,
             self.len_chars()
         );
@@ -865,8 +865,8 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Full {
                 node,
                 start_byte,
+                end_byte,
                 start_char,
-                end_char,
                 start_line_break,
                 ..
             }) => {
@@ -874,7 +874,7 @@ impl<'a> RopeSlice<'a> {
                     Chunks::new_with_range_at_char(
                         node,
                         char_idx + start_char as usize,
-                        (start_char as usize, end_char as usize),
+                        (start_byte as usize, end_byte as usize),
                     );
 
                 (
@@ -913,7 +913,7 @@ impl<'a> RopeSlice<'a> {
         // Bounds check
         assert!(
             line_break_idx <= self.len_lines(),
-            "Attempt to index past end of RopeSlice: line break index {}, max index {}",
+            "Attempt to index past end of RopeSlice: line break index {}, RopeSlice line break max index {}",
             line_break_idx,
             self.len_lines()
         );
@@ -922,30 +922,30 @@ impl<'a> RopeSlice<'a> {
             RopeSlice(RSEnum::Full {
                 node,
                 start_byte,
+                end_byte,
                 start_char,
-                end_char,
                 start_line_break,
                 ..
             }) => {
                 // Get the chunk.
                 let (chunks, chunk_byte_idx, chunk_char_idx, chunk_line_idx) =
                     if line_break_idx == 0 {
-                        Chunks::new_with_range_at_char(
+                        Chunks::new_with_range_at_byte(
                             node,
-                            start_char as usize,
-                            (start_char as usize, end_char as usize),
+                            start_byte as usize,
+                            (start_byte as usize, end_byte as usize),
                         )
                     } else if line_break_idx == self.len_lines() {
-                        Chunks::new_with_range_at_char(
+                        Chunks::new_with_range_at_byte(
                             node,
-                            end_char as usize,
-                            (start_char as usize, end_char as usize),
+                            end_byte as usize,
+                            (start_byte as usize, end_byte as usize),
                         )
                     } else {
                         Chunks::new_with_range_at_line_break(
                             node,
                             line_break_idx + start_line_break as usize,
-                            (start_char as usize, end_char as usize),
+                            (start_byte as usize, end_byte as usize),
                         )
                     };
 
