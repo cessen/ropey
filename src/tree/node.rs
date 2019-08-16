@@ -1,7 +1,7 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{byte_to_char_idx, byte_to_line_idx, char_to_byte_idx};
+use str_utils::{byte_to_line_idx, char_to_byte_idx};
 use tree::node_text::fix_segment_seam;
 use tree::{
     Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
@@ -534,23 +534,6 @@ impl Node {
                 }
             }
         }
-    }
-
-    /// Returns the byte index of the given char.
-    #[inline(always)]
-    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        let (chunk, b, c, _) = self.get_chunk_at_byte(byte_idx);
-        c + byte_to_char_idx(chunk, byte_idx - b)
-    }
-
-    /// Returns the byte index of the given char.
-    #[inline(always)]
-    pub fn byte_to_char_and_line(&self, byte_idx: usize) -> (usize, usize) {
-        let (chunk, b, c, l) = self.get_chunk_at_byte(byte_idx);
-        (
-            c + byte_to_char_idx(chunk, byte_idx - b),
-            l + byte_to_line_idx(chunk, byte_idx - b),
-        )
     }
 
     /// Returns the byte and line index of the given char.
