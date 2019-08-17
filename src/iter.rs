@@ -265,7 +265,7 @@ impl<'a> Chars<'a> {
             node,
             at_char,
             byte_idx_range,
-            char_idx_range.0,
+            char_idx_range,
             start_line_break,
         );
 
@@ -585,7 +585,7 @@ impl<'a> Iterator for Lines<'a> {
 ///
 /// There are precisely two guarantees about the yielded chunks:
 ///
-/// - All chunks are yielded, and they are yielded in order.
+/// - All non-empty chunks are yielded, and they are yielded in order.
 /// - CRLF pairs are never split across chunks.
 ///
 /// There are no guarantees about the size of yielded chunks, and except for
@@ -611,7 +611,7 @@ enum ChunksEnum<'a> {
 impl<'a> Chunks<'a> {
     #[inline(always)]
     pub(crate) fn new(node: &Arc<Node>) -> Chunks {
-        Chunks::new_with_range_at_char(node, 0, (0, node.byte_count()), 0, 0).0
+        Chunks::new_with_range_at_byte(node, 0, (0, node.byte_count()), 0, 0).0
     }
 
     #[inline(always)]
@@ -660,10 +660,23 @@ impl<'a> Chunks<'a> {
         let start_byte = byte_idx_range.0;
         let end_byte = byte_idx_range.1;
 
+        // Special-case for empty text contents.
+        if start_byte == end_byte {
+            return (
+                Chunks(ChunksEnum::Light {
+                    text: "",
+                    is_end: false,
+                }),
+                0,
+                0,
+                0,
+            );
+        }
+
         // If root is a leaf, return light version of the iter.
         if node.is_leaf() {
             let text = &node.leaf_text()[start_byte..end_byte];
-            if at_byte == end_byte && !text.is_empty() {
+            if at_byte == end_byte {
                 return (
                     Chunks(ChunksEnum::Light {
                         text: text,
@@ -689,21 +702,27 @@ impl<'a> Chunks<'a> {
         // Create and populate the node stack, and determine the char index
         // within the first chunk, and byte index of the start of that chunk.
         let mut info = TextInfo::new();
-        let mut byte_idx = at_byte;
+        let mut byte_idx = at_byte as isize;
         let node_stack = {
-            let mut node_stack = Vec::new();
+            let mut node_stack: Vec<(&Arc<Node>, usize)> = Vec::new();
             let mut node_ref = node;
             loop {
                 match **node_ref {
                     Node::Leaf(_) => {
+                        if at_byte < end_byte {
+                            byte_idx = info.bytes as isize - start_byte as isize;
+                        } else {
+                            byte_idx = end_byte as isize - start_byte as isize;
+                            (*node_stack.last_mut().unwrap()).1 += 1;
+                        }
                         break;
                     }
                     Node::Internal(ref children) => {
-                        let (child_i, acc_info) = children.search_byte_idx(byte_idx);
+                        let (child_i, acc_info) = children.search_byte_idx(byte_idx as usize);
                         info += acc_info;
                         node_stack.push((node_ref, child_i));
                         node_ref = &children.nodes()[child_i];
-                        byte_idx -= acc_info.bytes as usize;
+                        byte_idx -= acc_info.bytes as isize;
                     }
                 }
             }
@@ -715,7 +734,7 @@ impl<'a> Chunks<'a> {
             Chunks(ChunksEnum::Full {
                 node_stack: node_stack,
                 total_bytes: end_byte - start_byte,
-                byte_idx: info.bytes as isize - start_byte as isize,
+                byte_idx: byte_idx,
             }),
             (info.bytes as usize).max(byte_idx_range.0),
             (info.chars as usize).max(start_char),
@@ -728,15 +747,20 @@ impl<'a> Chunks<'a> {
         node: &Arc<Node>,
         at_char: usize,
         byte_idx_range: (usize, usize),
-        start_char: usize,
+        char_idx_range: (usize, usize),
         start_line_break: usize,
     ) -> (Chunks, usize, usize, usize) {
-        let (_, b, _, _) = node.get_chunk_at_char(at_char);
+        let at_byte = if at_char == char_idx_range.1 {
+            byte_idx_range.1
+        } else {
+            node.get_chunk_at_char(at_char).1.max(byte_idx_range.0)
+        };
+
         Chunks::new_with_range_at_byte(
             node,
-            b.max(byte_idx_range.0),
+            at_byte,
             byte_idx_range,
-            start_char,
+            char_idx_range.0,
             start_line_break,
         )
     }
@@ -747,15 +771,22 @@ impl<'a> Chunks<'a> {
         at_line_break: usize,
         byte_idx_range: (usize, usize),
         start_char: usize,
-        start_line_break: usize,
+        line_break_idx_range: (usize, usize),
     ) -> (Chunks, usize, usize, usize) {
-        let (_, b, _, _) = node.get_chunk_at_line_break(at_line_break);
+        let at_byte = if at_line_break == line_break_idx_range.1 {
+            byte_idx_range.1
+        } else {
+            node.get_chunk_at_line_break(at_line_break)
+                .1
+                .max(byte_idx_range.0)
+        };
+
         Chunks::new_with_range_at_byte(
             node,
-            b.max(byte_idx_range.0),
+            at_byte,
             byte_idx_range,
             start_char,
-            start_line_break,
+            line_break_idx_range.0,
         )
     }
 
@@ -823,7 +854,7 @@ impl<'a> Chunks<'a> {
                 text,
                 ref mut is_end,
             }) => {
-                if !*is_end {
+                if !*is_end || text.is_empty() {
                     return None;
                 } else {
                     *is_end = false;
@@ -894,7 +925,7 @@ impl<'a> Iterator for Chunks<'a> {
                 text,
                 ref mut is_end,
             }) => {
-                if *is_end {
+                if *is_end || text.is_empty() {
                     return None;
                 } else {
                     *is_end = true;
@@ -1066,6 +1097,13 @@ mod tests {
     }
 
     #[test]
+    fn bytes_at_02() {
+        let r = Rope::from_str(TEXT);
+        let mut bytes = r.bytes_at(r.len_bytes());
+        assert_eq!(bytes.next(), None);
+    }
+
+    #[test]
     fn bytes_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1185,6 +1223,13 @@ mod tests {
             let mut chars_2 = r.chars_at(i);
             assert_eq!(chars_1.next(), chars_2.next());
         }
+    }
+
+    #[test]
+    fn chars_at_02() {
+        let r = Rope::from_str(TEXT);
+        let mut chars = r.chars_at(r.len_chars());
+        assert_eq!(chars.next(), None);
     }
 
     #[test]
@@ -1601,6 +1646,18 @@ mod tests {
     }
 
     #[test]
+    fn lines_at_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..34);
+
+        let mut lines = s.lines_at(0);
+        assert_eq!("", lines.next().unwrap());
+
+        let mut lines = s.lines_at(1);
+        assert_eq!(None, lines.next());
+    }
+
+    #[test]
     fn chunks_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1616,7 +1673,6 @@ mod tests {
         let r = Rope::from_str("");
         let mut itr = r.chunks();
 
-        assert_eq!(Some(""), itr.next());
         assert_eq!(None, itr.next());
     }
 
@@ -1651,7 +1707,7 @@ mod tests {
     fn chunks_at_byte_01() {
         let r = Rope::from_str(TEXT);
 
-        for i in 0..(r.len_bytes() + 1) {
+        for i in 0..r.len_bytes() {
             let (chunk, b, c, l) = r.chunk_at_byte(i);
             let (mut chunks, bs, cs, ls) = r.chunks_at_byte(i);
 
@@ -1679,10 +1735,31 @@ mod tests {
     }
 
     #[test]
+    fn chunks_at_byte_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let (mut chunks, _, _, _) = s.chunks_at_byte(s.len_bytes());
+        assert_eq!(chunks.next(), None);
+    }
+
+    #[test]
+    fn chunks_at_byte_04() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..34);
+
+        let (mut chunks, _, _, _) = s.chunks_at_byte(0);
+        assert_eq!(chunks.next(), None);
+
+        let (mut chunks, _, _, _) = s.chunks_at_byte(0);
+        assert_eq!(chunks.prev(), None);
+    }
+
+    #[test]
     fn chunks_at_char_01() {
         let r = Rope::from_str(TEXT);
 
-        for i in 0..(r.len_chars() + 1) {
+        for i in 0..r.len_chars() {
             let (chunk, b, c, l) = r.chunk_at_char(i);
             let (mut chunks, bs, cs, ls) = r.chunks_at_char(i);
 
@@ -1698,7 +1775,7 @@ mod tests {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
 
-        for i in 0..(s.len_chars() + 1) {
+        for i in 0..s.len_chars() {
             let (chunk, b, c, l) = s.chunk_at_char(i);
             let (mut chunks, bs, cs, ls) = s.chunks_at_char(i);
 
@@ -1710,10 +1787,31 @@ mod tests {
     }
 
     #[test]
+    fn chunks_at_char_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let (mut chunks, _, _, _) = s.chunks_at_char(s.len_chars());
+        assert_eq!(chunks.next(), None);
+    }
+
+    #[test]
+    fn chunks_at_char_04() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..34);
+
+        let (mut chunks, _, _, _) = s.chunks_at_char(0);
+        assert_eq!(chunks.next(), None);
+
+        let (mut chunks, _, _, _) = s.chunks_at_char(0);
+        assert_eq!(chunks.prev(), None);
+    }
+
+    #[test]
     fn chunks_at_line_break_01() {
         let r = Rope::from_str(TEXT);
 
-        for i in 0..(r.len_lines() + 1) {
+        for i in 0..r.len_lines() {
             let (chunk, b, c, l) = r.chunk_at_line_break(i);
             let (mut chunks, bs, cs, ls) = r.chunks_at_line_break(i);
 
@@ -1729,7 +1827,7 @@ mod tests {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
 
-        for i in 0..(s.len_lines() + 1) {
+        for i in 0..s.len_lines() {
             let (chunk, b, c, l) = s.chunk_at_line_break(i);
             let (mut chunks, bs, cs, ls) = s.chunks_at_line_break(i);
 
@@ -1738,6 +1836,27 @@ mod tests {
             assert_eq!(c, cs);
             assert_eq!(l, ls);
         }
+    }
+
+    #[test]
+    fn chunks_at_line_break_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let (mut chunks, _, _, _) = s.chunks_at_line_break(s.len_lines());
+        assert_eq!(chunks.next(), None);
+    }
+
+    #[test]
+    fn chunks_at_line_break_04() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..34);
+
+        let (mut chunks, _, _, _) = s.chunks_at_line_break(0);
+        assert_eq!(chunks.next(), None);
+
+        let (mut chunks, _, _, _) = s.chunks_at_line_break(0);
+        assert_eq!(chunks.prev(), None);
     }
 
     #[test]
@@ -1785,6 +1904,14 @@ mod tests {
             let mut bytes_2 = s1.bytes_at(i);
             assert_eq!(bytes_1.next(), bytes_2.next());
         }
+    }
+
+    #[test]
+    fn bytes_at_sliced_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+        let mut bytes = s.bytes_at(s.len_bytes());
+        assert_eq!(bytes.next(), None);
     }
 
     #[test]

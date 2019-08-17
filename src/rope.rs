@@ -1228,7 +1228,13 @@ impl Rope {
             self.len_chars()
         );
 
-        Chunks::new_with_range_at_char(&self.root, char_idx, (0, self.len_bytes()), 0, 0)
+        Chunks::new_with_range_at_char(
+            &self.root,
+            char_idx,
+            (0, self.len_bytes()),
+            (0, self.len_chars()),
+            0,
+        )
     }
 
     /// Creates an iterator over the chunks of the `Rope`, with the
@@ -1263,7 +1269,7 @@ impl Rope {
             line_break_idx,
             (0, self.len_bytes()),
             0,
-            0,
+            (0, self.len_lines()),
         )
     }
 

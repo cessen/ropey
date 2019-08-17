@@ -921,6 +921,7 @@ impl<'a> RopeSlice<'a> {
                 start_byte,
                 end_byte,
                 start_char,
+                end_char,
                 start_line_break,
                 ..
             }) => {
@@ -929,7 +930,7 @@ impl<'a> RopeSlice<'a> {
                         node,
                         char_idx + start_char as usize,
                         (start_byte as usize, end_byte as usize),
-                        start_char as usize,
+                        (start_char as usize, end_char as usize),
                         start_line_break as usize,
                     );
 
@@ -981,6 +982,7 @@ impl<'a> RopeSlice<'a> {
                 end_byte,
                 start_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => {
                 // Get the chunk.
@@ -1007,7 +1009,7 @@ impl<'a> RopeSlice<'a> {
                             line_break_idx + start_line_break as usize,
                             (start_byte as usize, end_byte as usize),
                             start_char as usize,
-                            start_line_break as usize,
+                            (start_line_break as usize, end_line_break as usize + 1),
                         )
                     };
 
