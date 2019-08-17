@@ -673,8 +673,16 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Creates an iterator over the bytes of the `RopeSlice`, starting at byte
-    /// `byte_idx`.
+    /// Creates an iterator over the bytes of the `RopeSlice`, starting at
+    /// byte `byte_idx`.
+    ///
+    /// If `byte_idx == len_bytes()` then an iterator at the end of the
+    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
+    /// will start iterating backwards over all the bytes).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
     pub fn bytes_at(&self, byte_idx: usize) -> Bytes {
         // Bounds check
@@ -727,8 +735,16 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Creates an iterator over the chars of the `RopeSlice`, starting at char
-    /// `char_idx`.
+    /// Creates an iterator over the chars of the `RopeSlice`, starting at
+    /// char `char_idx`.
+    ///
+    /// If `char_idx == len_chars()` then an iterator at the end of the
+    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
+    /// will start iterating backwards over all the chars).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn chars_at(&self, char_idx: usize) -> Chars {
         // Bounds check
@@ -774,8 +790,16 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Creates an iterator over the lines of the `RopeSlice`, starting at line
-    /// `line_idx`.
+    /// Creates an iterator over the lines of the `RopeSlice`, starting at
+    /// line `line_idx`.
+    ///
+    /// If `line_idx == len_lines()` then an iterator at the end of the
+    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
+    /// will start iterating backwards over all the lines).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     #[inline]
     pub fn lines_at(&self, line_idx: usize) -> Lines {
         // Bounds check

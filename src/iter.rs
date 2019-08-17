@@ -1,10 +1,55 @@
 //! Iterators over a `Rope`'s data.
 //!
-//! All iterators here can also be used with `RopeSlice`'s.  When used
-//! with a `RopeSlice`, they iterate over only the data that the
-//! `RopeSlice` refers to.  For the line and chunk iterators, the data
-//! of the first and last yielded item will be truncated to match the
-//! `RopeSlice`.
+//! The iterators in Ropey can be created from both `Rope`s and `RopeSlice`s.
+//! When created from a `RopeSlice`, they iterate over only the data that the
+//! `RopeSlice` refers to.  For the `Lines` and `Chunks` iterators, the data
+//! of the first and last yielded item will be correctly truncated to match
+//! the bounds of the `RopeSlice`.
+//!
+//! # Reverse iteration
+//!
+//! All iterators in Ropey operate as a cursor that can move both forwards
+//! and backwards over its contents.  Doing this is accomplished via the
+//! `next()` and `prev()` methods of each iterator.  (Note: `next()` is
+//! in the `Iterator` trait `impl` on each iterator, whereas `prev()` is
+//! in the main `impl` of each iterator.  These methods are nevertheless
+//! directly complementary and designed to be used together.)
+//!
+//! Conceptually, an iterator in Ropey is always positioned *between* the
+//! elements it iterates over, and returns an element when it jumps over it
+//! via the `next()` or `prev()` methods.
+//!
+//! For example, given the text `"abc"` and a `Chars` iterator starting at
+//! beginning of the text, you would get the following sequence of states and
+//! return values by repeatedly calling `next()` (the vertical bar represents
+//! the position of the iterator):
+//!
+//! 0. `|abc`
+//! 1. `a|bc` -> `Some('a')`
+//! 2. `ab|c` -> `Some('b')`
+//! 3. `abc|` -> `Some('c')`
+//! 4. `abc|` -> `None`
+//!
+//! The `prev()` method operates identically, except moving in the opposite
+//! direction.
+//!
+//! # Creating iterators at any position
+//!
+//! Iterators in Ropey can be created starting at any position in the text.
+//! This is accomplished with the various `bytes_at()`, `chars_at()`, etc.
+//! methods of `Rope` and `RopeSlice`.
+//!
+//! When the iterators are created this way, they are positioned such that an
+//! immediate call to `next()` would return the specified element, and an
+//! immediate call to `prev()` would return the element just before the
+//! specified one.
+//!
+//! Importantly, iterators created this way still have access to the entire
+//! contents of the `Rope`/`RopeSlice` they were created from&mdash;the
+//! contents before the specified position is not truncated, just skipped
+//! over.  For example, you can create a `Chars` iterator starting at the
+//! very end of a `Rope`, and then iterate backwards over the `Rope`'s entire
+//! contents via the iterator's `prev()` method.
 
 use std::str;
 use std::sync::Arc;
@@ -112,6 +157,7 @@ impl<'a> Bytes<'a> {
         }
     }
 
+    /// Advances the iterator backwards and returns the previous value.
     pub fn prev(&mut self) -> Option<u8> {
         if !self.last_op_was_prev {
             self.chunk_iter.prev();
@@ -261,6 +307,7 @@ impl<'a> Chars<'a> {
         }
     }
 
+    /// Advances the iterator backwards and returns the previous value.
     pub fn prev(&mut self) -> Option<char> {
         if !self.last_op_was_prev {
             self.chunk_iter.prev();
@@ -396,6 +443,7 @@ impl<'a> Lines<'a> {
         lines_iter
     }
 
+    /// Advances the iterator backwards and returns the previous value.
     pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
         match *self {
             Lines(LinesEnum::Full {
@@ -718,6 +766,7 @@ impl<'a> Chunks<'a> {
         })
     }
 
+    /// Advances the iterator backwards and returns the previous value.
     pub fn prev(&mut self) -> Option<&'a str> {
         match *self {
             Chunks(ChunksEnum::Full {

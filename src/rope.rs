@@ -1092,6 +1092,14 @@ impl Rope {
 
     /// Creates an iterator over the bytes of the `Rope`, starting at byte
     /// `byte_idx`.
+    ///
+    /// If `byte_idx == len_bytes()` then an iterator at the end of the
+    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
+    /// will start iterating backwards over all the bytes).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
     pub fn bytes_at(&self, byte_idx: usize) -> Bytes {
         // Bounds check
@@ -1113,6 +1121,14 @@ impl Rope {
 
     /// Creates an iterator over the chars of the `Rope`, starting at char
     /// `char_idx`.
+    ///
+    /// If `char_idx == len_chars()` then an iterator at the end of the
+    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
+    /// will start iterating backwards over all the chars).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn chars_at(&self, char_idx: usize) -> Chars {
         // Bounds check
@@ -1140,6 +1156,14 @@ impl Rope {
 
     /// Creates an iterator over the lines of the `Rope`, starting at line
     /// `line_idx`.
+    ///
+    /// If `line_idx == len_lines()` then an iterator at the end of the
+    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
+    /// will start iterating backwards over all the lines).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     #[inline]
     pub fn lines_at(&self, line_idx: usize) -> Lines {
         // Bounds check
@@ -1161,6 +1185,15 @@ impl Rope {
 
     /// Creates an iterator over the chunks of the `Rope`, with the
     /// iterator starting at the chunk containing `byte_idx`.
+    ///
+    /// Also returns the byte and char indices of the beginning of the first
+    /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
     pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks, usize, usize, usize) {
         // Bounds check
@@ -1176,6 +1209,15 @@ impl Rope {
 
     /// Creates an iterator over the chunks of the `Rope`, with the
     /// iterator starting at the chunk containing `char_idx`.
+    ///
+    /// Also returns the byte and char indices of the beginning of the first
+    /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks, usize, usize, usize) {
         // Bounds check
@@ -1191,6 +1233,21 @@ impl Rope {
 
     /// Creates an iterator over the chunks of the `Rope`, with the
     /// iterator starting at the chunk containing `line_break_idx`.
+    ///
+    /// Also returns the byte and char indices of the beginning of the first
+    /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// Note: for convenience, both the beginning and end of the slice are
+    /// considered line breaks for the purposes of indexing.  For example, in
+    /// the string `"Hello \n world!"` 0 would give the first chunk, 1 would
+    /// give the chunk containing the newline character, and 2 would give the
+    /// last chunk.
+    ///
+    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_break_idx` is out of bounds (i.e. `line_break_idx > len_lines()`).
     #[inline]
     pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks, usize, usize, usize) {
         // Bounds check
