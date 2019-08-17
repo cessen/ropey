@@ -414,7 +414,8 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
@@ -463,7 +464,8 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
@@ -518,7 +520,8 @@ impl<'a> RopeSlice<'a> {
     /// give the chunk containing the newline character, and 2 would give the
     /// last chunk.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
@@ -677,8 +680,7 @@ impl<'a> RopeSlice<'a> {
     /// byte `byte_idx`.
     ///
     /// If `byte_idx == len_bytes()` then an iterator at the end of the
-    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
-    /// will start iterating backwards over all the bytes).
+    /// `RopeSlice` is created (i.e. `next()` will return `None`).
     ///
     /// # Panics
     ///
@@ -739,8 +741,7 @@ impl<'a> RopeSlice<'a> {
     /// char `char_idx`.
     ///
     /// If `char_idx == len_chars()` then an iterator at the end of the
-    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
-    /// will start iterating backwards over all the chars).
+    /// `RopeSlice` is created (i.e. `next()` will return `None`).
     ///
     /// # Panics
     ///
@@ -794,8 +795,7 @@ impl<'a> RopeSlice<'a> {
     /// line `line_idx`.
     ///
     /// If `line_idx == len_lines()` then an iterator at the end of the
-    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
-    /// will start iterating backwards over all the lines).
+    /// `RopeSlice` is created (i.e. `next()` will return `None`).
     ///
     /// # Panics
     ///
@@ -846,6 +846,19 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the chunks of the `RopeSlice`, with the
     /// iterator starting at the byte containing `byte_idx`.
+    ///
+    /// Also returns the byte and char indices of the beginning of the first
+    /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// If `byte_idx == len_bytes()` an iterator at the end of the `RopeSlice`
+    /// (yielding `None` on a call to `next()`) is created.
+    ///
+    /// The return value is organized as
+    /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
     pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks<'a>, usize, usize, usize) {
         // Bounds check
@@ -905,6 +918,18 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the chunks of the `RopeSlice`, with the
     /// iterator starting on the chunk containing `char_idx`.
+    ///
+    /// Also returns the byte and char indices of the beginning of the first
+    /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// If `char_idx == len_chars()` an iterator at the end of the `RopeSlice`
+    /// (yielding `None` on a call to `next()`) is created.
+    ///
+    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks<'a>, usize, usize, usize) {
         // Bounds check
@@ -965,6 +990,23 @@ impl<'a> RopeSlice<'a> {
 
     /// Creates an iterator over the chunks of the `RopeSlice`, with the
     /// iterator starting at the chunk containing `line_break_idx`.
+    ///
+    /// Also returns the byte and char indices of the beginning of the first
+    /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// Note: for convenience, both the beginning and end of the `RopeSlice` are
+    /// considered line breaks for the purposes of indexing.  For example, in
+    /// the string `"Hello \n world!"` 0 would create an iterator starting on
+    /// the first chunk, 1 would create an iterator starting on the chunk
+    /// containing the newline character, and 2 would create an iterator at
+    /// the end of the `RopeSlice` (yielding `None` on a call to `next()`).
+    ///
+    /// The return value is organized as
+    /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line_break_idx` is out of bounds (i.e. `line_break_idx > len_lines()`).
     #[inline]
     pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks, usize, usize, usize) {
         // Bounds check

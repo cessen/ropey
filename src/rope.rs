@@ -1094,8 +1094,7 @@ impl Rope {
     /// `byte_idx`.
     ///
     /// If `byte_idx == len_bytes()` then an iterator at the end of the
-    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
-    /// will start iterating backwards over all the bytes).
+    /// `Rope` is created (i.e. `next()` will return `None`).
     ///
     /// # Panics
     ///
@@ -1123,8 +1122,7 @@ impl Rope {
     /// `char_idx`.
     ///
     /// If `char_idx == len_chars()` then an iterator at the end of the
-    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
-    /// will start iterating backwards over all the chars).
+    /// `Rope` is created (i.e. `next()` will return `None`).
     ///
     /// # Panics
     ///
@@ -1158,8 +1156,7 @@ impl Rope {
     /// `line_idx`.
     ///
     /// If `line_idx == len_lines()` then an iterator at the end of the
-    /// `Rope` is created (i.e. `next()` will return `None`, and `prev()`
-    /// will start iterating backwards over all the lines).
+    /// `Rope` is created (i.e. `next()` will return `None`).
     ///
     /// # Panics
     ///
@@ -1189,7 +1186,11 @@ impl Rope {
     /// Also returns the byte and char indices of the beginning of the first
     /// chunk to be yielded, and the index of the line that chunk starts on.
     ///
-    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// If `byte_idx == len_bytes()` an iterator at the end of the `Rope`
+    /// (yielding `None` on a call to `next()`) is created.
+    ///
+    /// The return value is organized as
+    /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
@@ -1212,6 +1213,9 @@ impl Rope {
     ///
     /// Also returns the byte and char indices of the beginning of the first
     /// chunk to be yielded, and the index of the line that chunk starts on.
+    ///
+    /// If `char_idx == len_chars()` an iterator at the end of the `Rope`
+    /// (yielding `None` on a call to `next()`) is created.
     ///
     /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
@@ -1243,13 +1247,15 @@ impl Rope {
     /// Also returns the byte and char indices of the beginning of the first
     /// chunk to be yielded, and the index of the line that chunk starts on.
     ///
-    /// Note: for convenience, both the beginning and end of the slice are
+    /// Note: for convenience, both the beginning and end of the `Rope` are
     /// considered line breaks for the purposes of indexing.  For example, in
-    /// the string `"Hello \n world!"` 0 would give the first chunk, 1 would
-    /// give the chunk containing the newline character, and 2 would give the
-    /// last chunk.
+    /// the string `"Hello \n world!"` 0 would create an iterator starting on
+    /// the first chunk, 1 would create an iterator starting on the chunk
+    /// containing the newline character, and 2 would create an iterator at
+    /// the end of the `Rope` (yielding `None` on a call to `next()`).
     ///
-    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
     ///
     /// # Panics
     ///
