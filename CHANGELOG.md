@@ -3,6 +3,15 @@
 
 ## [Unreleased]
 
+### New features
+- Iterators can now be created directly to start at any position in the `Rope` or `RopeSlice`.
+- All iterators can now also iterate backwards via a new `prev()` method.
+- All iterators now implement `Clone` and `Debug` traits.
+- `Bytes`, `Chars`, and `Lines` iterators now implement `ExactSizeIterator`.
+
+### Changes
+- The `Chunks` iterator no longer yields empty chunks, for example if the `Rope` or `RopeSlice` it was created from is also empty.
+
 
 ## [1.0.1] - 2019-05-01
 
