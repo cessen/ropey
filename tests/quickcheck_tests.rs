@@ -748,6 +748,52 @@ proptest! {
             }
         }
     }
+
+    #[test]
+    fn pt_bytes_at_01(idx in 0usize..TEXT.len()) {
+        let r = Rope::from_str(TEXT);
+        let mut bytes_r = r.bytes_at(idx);
+        let text_bytes = TEXT.as_bytes();
+
+        for i in idx..r.len_bytes() {
+            assert_eq!(bytes_r.next(), Some(text_bytes[i]));
+        }
+    }
+
+    #[test]
+    fn pt_bytes_at_02(idx in 0usize..TEXT.len()) {
+        let r = Rope::from_str(TEXT);
+        let mut bytes_r = r.bytes_at(idx + 1);
+        let text_bytes = TEXT.as_bytes();
+
+        let mut i = idx + 1;
+        while i > 0 {
+            i -= 1;
+            assert_eq!(bytes_r.prev(), Some(text_bytes[i]));
+        }
+    }
+
+    #[test]
+    fn pt_chars_at_01(idx in 0usize..CHAR_LEN) {
+        let r = Rope::from_str(TEXT);
+        let mut chars_r = r.chars_at(idx);
+        let mut chars_t = (&TEXT[char_to_byte_idx(TEXT, idx)..]).chars();
+
+        while let Some(c) = chars_t.next() {
+            assert_eq!(chars_r.next(), Some(c));
+        }
+    }
+
+    #[test]
+    fn pt_chars_at_02(idx in 0usize..CHAR_LEN) {
+        let r = Rope::from_str(TEXT);
+        let mut chars_r = r.chars_at(idx);
+        let mut chars_t = (&TEXT[..char_to_byte_idx(TEXT, idx)]).chars();
+
+        while let Some(c) = chars_t.next_back() {
+            assert_eq!(chars_r.prev(), Some(c));
+        }
+    }
 }
 
 //===========================================================================

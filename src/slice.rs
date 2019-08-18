@@ -664,13 +664,15 @@ impl<'a> RopeSlice<'a> {
                 start_byte,
                 end_byte,
                 start_char,
+                end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => Bytes::new_with_range(
                 node,
                 (start_byte as usize, end_byte as usize),
-                start_char as usize,
-                start_line_break as usize,
+                (start_char as usize, end_char as usize),
+                (start_line_break as usize, end_line_break as usize + 1),
             ),
             RopeSlice(RSEnum::Light { text, .. }) => Bytes::from_str(text),
         }
@@ -701,14 +703,16 @@ impl<'a> RopeSlice<'a> {
                 start_byte,
                 end_byte,
                 start_char,
+                end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => Bytes::new_with_range_at(
                 node,
                 start_byte as usize + byte_idx,
                 (start_byte as usize, end_byte as usize),
-                start_char as usize,
-                start_line_break as usize,
+                (start_char as usize, end_char as usize),
+                (start_line_break as usize, end_line_break as usize + 1),
             ),
 
             RopeSlice(RSEnum::Light { text, .. }) => Bytes::from_str_at(text, byte_idx),
@@ -726,12 +730,13 @@ impl<'a> RopeSlice<'a> {
                 start_char,
                 end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => Chars::new_with_range(
                 node,
                 (start_byte as usize, end_byte as usize),
                 (start_char as usize, end_char as usize),
-                start_line_break as usize,
+                (start_line_break as usize, end_line_break as usize + 1),
             ),
             RopeSlice(RSEnum::Light { text, .. }) => Chars::from_str(text),
         }
@@ -764,13 +769,14 @@ impl<'a> RopeSlice<'a> {
                 start_char,
                 end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => Chars::new_with_range_at(
                 node,
                 start_char as usize + char_idx,
                 (start_byte as usize, end_byte as usize),
                 (start_char as usize, end_char as usize),
-                start_line_break as usize,
+                (start_line_break as usize, end_line_break as usize + 1),
             ),
 
             RopeSlice(RSEnum::Light { text, .. }) => Chars::from_str_at(text, char_idx),
@@ -832,13 +838,15 @@ impl<'a> RopeSlice<'a> {
                 start_byte,
                 end_byte,
                 start_char,
+                end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => Chunks::new_with_range(
                 node,
                 (start_byte as usize, end_byte as usize),
-                start_char as usize,
-                start_line_break as usize,
+                (start_char as usize, end_char as usize),
+                (start_line_break as usize, end_line_break as usize + 1),
             ),
             RopeSlice(RSEnum::Light { text, .. }) => Chunks::from_str(text, false),
         }
@@ -875,7 +883,9 @@ impl<'a> RopeSlice<'a> {
                 start_byte,
                 end_byte,
                 start_char,
+                end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => {
                 let (chunks, chunk_byte_idx, chunk_char_idx, chunk_line_idx) =
@@ -883,8 +893,8 @@ impl<'a> RopeSlice<'a> {
                         node,
                         byte_idx + start_byte as usize,
                         (start_byte as usize, end_byte as usize),
-                        start_char as usize,
-                        start_line_break as usize,
+                        (start_char as usize, end_char as usize),
+                        (start_line_break as usize, end_line_break as usize + 1),
                     );
 
                 (
@@ -948,6 +958,7 @@ impl<'a> RopeSlice<'a> {
                 start_char,
                 end_char,
                 start_line_break,
+                end_line_break,
                 ..
             }) => {
                 let (chunks, chunk_byte_idx, chunk_char_idx, chunk_line_idx) =
@@ -956,7 +967,7 @@ impl<'a> RopeSlice<'a> {
                         char_idx + start_char as usize,
                         (start_byte as usize, end_byte as usize),
                         (start_char as usize, end_char as usize),
-                        start_line_break as usize,
+                        (start_line_break as usize, end_line_break as usize + 1),
                     );
 
                 (
@@ -1023,6 +1034,7 @@ impl<'a> RopeSlice<'a> {
                 start_byte,
                 end_byte,
                 start_char,
+                end_char,
                 start_line_break,
                 end_line_break,
                 ..
@@ -1034,23 +1046,23 @@ impl<'a> RopeSlice<'a> {
                             node,
                             start_byte as usize,
                             (start_byte as usize, end_byte as usize),
-                            start_char as usize,
-                            start_line_break as usize,
+                            (start_char as usize, end_char as usize),
+                            (start_line_break as usize, end_line_break as usize + 1),
                         )
                     } else if line_break_idx == self.len_lines() {
                         Chunks::new_with_range_at_byte(
                             node,
                             end_byte as usize,
                             (start_byte as usize, end_byte as usize),
-                            start_char as usize,
-                            start_line_break as usize,
+                            (start_char as usize, end_char as usize),
+                            (start_line_break as usize, end_line_break as usize + 1),
                         )
                     } else {
                         Chunks::new_with_range_at_line_break(
                             node,
                             line_break_idx + start_line_break as usize,
                             (start_byte as usize, end_byte as usize),
-                            start_char as usize,
+                            (start_char as usize, end_char as usize),
                             (start_line_break as usize, end_line_break as usize + 1),
                         )
                     };

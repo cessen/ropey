@@ -27,6 +27,14 @@ fn create_bytes_iter_at(bench: &mut Bencher) {
     });
 }
 
+fn create_bytes_iter_at_end(bench: &mut Bencher) {
+    let r = Rope::from_str(TEXT);
+    let len = r.len_bytes();
+    bench.iter(|| {
+        r.bytes_at(len);
+    });
+}
+
 fn create_chars_iter(bench: &mut Bencher) {
     let r = Rope::from_str(TEXT);
     bench.iter(|| {
@@ -41,6 +49,14 @@ fn create_chars_iter_at(bench: &mut Bencher) {
     bench.iter(|| {
         r.chars_at(i % (len + 1));
         i += 1;
+    });
+}
+
+fn create_chars_iter_at_end(bench: &mut Bencher) {
+    let r = Rope::from_str(TEXT);
+    let len = r.len_chars();
+    bench.iter(|| {
+        r.chars_at(len);
     });
 }
 
@@ -201,8 +217,10 @@ benchmark_group!(
     benches,
     create_bytes_iter,
     create_bytes_iter_at,
+    create_bytes_iter_at_end,
     create_chars_iter,
     create_chars_iter_at,
+    create_chars_iter_at_end,
     create_lines_iter,
     create_lines_iter_at,
     create_chunks_iter,

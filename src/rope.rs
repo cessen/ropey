@@ -1109,7 +1109,14 @@ impl Rope {
             self.len_bytes()
         );
 
-        Bytes::new_with_range_at(&self.root, byte_idx, (0, self.len_bytes()), 0, 0)
+        let info = self.root.text_info();
+        Bytes::new_with_range_at(
+            &self.root,
+            byte_idx,
+            (0, info.bytes as usize),
+            (0, info.chars as usize),
+            (0, info.line_breaks as usize + 1),
+        )
     }
 
     /// Creates an iterator over the chars of the `Rope`.
@@ -1137,12 +1144,13 @@ impl Rope {
             self.len_chars()
         );
 
+        let info = self.root.text_info();
         Chars::new_with_range_at(
             &self.root,
             char_idx,
-            (0, self.len_bytes()),
-            (0, self.len_chars()),
-            0,
+            (0, info.bytes as usize),
+            (0, info.chars as usize),
+            (0, info.line_breaks as usize + 1),
         )
     }
 
@@ -1205,7 +1213,13 @@ impl Rope {
             self.len_bytes()
         );
 
-        Chunks::new_with_range_at_byte(&self.root, byte_idx, (0, self.len_bytes()), 0, 0)
+        Chunks::new_with_range_at_byte(
+            &self.root,
+            byte_idx,
+            (0, self.len_bytes()),
+            (0, self.len_chars()),
+            (0, self.len_lines()),
+        )
     }
 
     /// Creates an iterator over the chunks of the `Rope`, with the
@@ -1237,7 +1251,7 @@ impl Rope {
             char_idx,
             (0, self.len_bytes()),
             (0, self.len_chars()),
-            0,
+            (0, self.len_lines()),
         )
     }
 
@@ -1274,7 +1288,7 @@ impl Rope {
             &self.root,
             line_break_idx,
             (0, self.len_bytes()),
-            0,
+            (0, self.len_chars()),
             (0, self.len_lines()),
         )
     }
