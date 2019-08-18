@@ -10,16 +10,13 @@
 //!
 //! All iterators in Ropey operate as a cursor that can move both forwards
 //! and backwards over its contents.  Doing this is accomplished via the
-//! `next()` and `prev()` methods of each iterator.  (Note: `next()` is
-//! in the `Iterator` trait `impl` on each iterator, whereas `prev()` is
-//! in the main `impl` of each iterator.  These methods are nevertheless
-//! directly complementary and designed to be used together.)
+//! `next()` and `prev()` methods of each iterator.
 //!
 //! Conceptually, an iterator in Ropey is always positioned *between* the
 //! elements it iterates over, and returns an element when it jumps over it
 //! via the `next()` or `prev()` methods.
 //!
-//! For example, given the text `"abc"` and a `Chars` iterator starting at
+//! For example, given the text `"abc"` and a `Chars` iterator starting at the
 //! beginning of the text, you would get the following sequence of states and
 //! return values by repeatedly calling `next()` (the vertical bar represents
 //! the position of the iterator):
@@ -46,10 +43,10 @@
 //!
 //! Importantly, iterators created this way still have access to the entire
 //! contents of the `Rope`/`RopeSlice` they were created from&mdash;the
-//! contents before the specified position is not truncated, just skipped
-//! over.  For example, you can create a `Chars` iterator starting at the
-//! very end of a `Rope`, and then iterate backwards over the `Rope`'s entire
-//! contents via the iterator's `prev()` method.
+//! contents before the specified position is not truncated.  For example, you
+//! can create a `Chars` iterator starting at the end of a `Rope`, and then
+//! use the `prev()` method to iterate backwards over all of that `Rope`'s
+//! chars.
 
 use std::str;
 use std::sync::Arc;
@@ -163,6 +160,8 @@ impl<'a> Bytes<'a> {
     }
 
     /// Advances the iterator backwards and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     pub fn prev(&mut self) -> Option<u8> {
         if !self.last_op_was_prev {
             self.chunk_iter.prev();
@@ -187,6 +186,9 @@ impl<'a> Bytes<'a> {
 impl<'a> Iterator for Bytes<'a> {
     type Item = u8;
 
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     fn next(&mut self) -> Option<u8> {
         if self.last_op_was_prev {
             self.chunk_iter.next();
@@ -318,6 +320,8 @@ impl<'a> Chars<'a> {
     }
 
     /// Advances the iterator backwards and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     pub fn prev(&mut self) -> Option<char> {
         if !self.last_op_was_prev {
             self.chunk_iter.prev();
@@ -345,6 +349,9 @@ impl<'a> Chars<'a> {
 impl<'a> Iterator for Chars<'a> {
     type Item = char;
 
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     fn next(&mut self) -> Option<char> {
         if self.last_op_was_prev {
             self.chunk_iter.next();
@@ -378,6 +385,11 @@ impl<'a> Iterator for Chars<'a> {
 impl<'a> ExactSizeIterator for Chars<'a> {}
 
 //==========================================================
+
+// TODO: the lines iterator is currently O(log N) per iteration, and generally
+// is fairly slow.  It should be possible to make this linear, or close to
+// linear, and much faster.  The implementation will likely be complex / subtle,
+// but it should be worth it.
 
 /// An iterator over a `Rope`'s lines.
 ///
@@ -454,6 +466,8 @@ impl<'a> Lines<'a> {
     }
 
     /// Advances the iterator backwards and returns the previous value.
+    ///
+    /// Runs in O(log N) time.
     pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
         match *self {
             Lines(LinesEnum::Full {
@@ -512,6 +526,9 @@ impl<'a> Lines<'a> {
 impl<'a> Iterator for Lines<'a> {
     type Item = RopeSlice<'a>;
 
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in O(log N) time.
     fn next(&mut self) -> Option<RopeSlice<'a>> {
         match *self {
             Lines(LinesEnum::Full {
@@ -822,6 +839,8 @@ impl<'a> Chunks<'a> {
     }
 
     /// Advances the iterator backwards and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     pub fn prev(&mut self) -> Option<&'a str> {
         match *self {
             Chunks(ChunksEnum::Full {
@@ -892,6 +911,9 @@ impl<'a> Chunks<'a> {
 impl<'a> Iterator for Chunks<'a> {
     type Item = &'a str;
 
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     fn next(&mut self) -> Option<&'a str> {
         match *self {
             Chunks(ChunksEnum::Full {

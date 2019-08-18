@@ -179,6 +179,8 @@ impl<'a> RopeSlice<'a> {
     /// - `byte_idx` can be one-past-the-end, which will return one-past-the-end
     ///   char index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -205,6 +207,8 @@ impl<'a> RopeSlice<'a> {
     /// - `byte_idx` can be one-past-the-end, which will return the
     ///   last line index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -228,6 +232,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// - `char_idx` can be one-past-the-end, which will return
     ///   one-past-the-end byte index.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -255,6 +261,8 @@ impl<'a> RopeSlice<'a> {
     /// - `char_idx` can be one-past-the-end, which will return the
     ///   last line index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
@@ -279,6 +287,8 @@ impl<'a> RopeSlice<'a> {
     /// - Lines are zero-indexed.
     /// - `line_idx` can be one-past-the-end, which will return
     ///   one-past-the-end byte index.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -309,6 +319,8 @@ impl<'a> RopeSlice<'a> {
     /// - `line_idx` can be one-past-the-end, which will return
     ///   one-past-the-end char index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
@@ -335,6 +347,8 @@ impl<'a> RopeSlice<'a> {
 
     /// Returns the byte at `byte_idx`.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
@@ -354,6 +368,8 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Returns the char at `char_idx`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -376,6 +392,8 @@ impl<'a> RopeSlice<'a> {
     /// Returns the line at `line_idx`.
     ///
     /// Note: lines are zero-indexed.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -414,8 +432,13 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
+    /// Note: for convenience, a one-past-the-end `byte_idx` returns the last
+    /// chunk of the `RopeSlice`.
+    ///
     /// The return value is organized as
     /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -464,8 +487,13 @@ impl<'a> RopeSlice<'a> {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
+    /// Note: for convenience, a one-past-the-end `char_idx` returns the last
+    /// chunk of the `RopeSlice`.
+    ///
     /// The return value is organized as
     /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -522,6 +550,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// The return value is organized as
     /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -599,6 +629,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Uses range syntax, e.g. `2..7`, `2..`, etc.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if the start of the range is greater than the end, or the end
@@ -656,6 +688,8 @@ impl<'a> RopeSlice<'a> {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `RopeSlice`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn bytes(&self) -> Bytes<'a> {
         match *self {
@@ -683,6 +717,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// If `byte_idx == len_bytes()` then an iterator at the end of the
     /// `RopeSlice` is created (i.e. `next()` will return `None`).
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -720,6 +756,8 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates an iterator over the chars of the `RopeSlice`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn chars(&self) -> Chars<'a> {
         match *self {
@@ -747,6 +785,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// If `char_idx == len_chars()` then an iterator at the end of the
     /// `RopeSlice` is created (i.e. `next()` will return `None`).
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -784,6 +824,8 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates an iterator over the lines of the `RopeSlice`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn lines(&self) -> Lines<'a> {
         match *self {
@@ -802,6 +844,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// If `line_idx == len_lines()` then an iterator at the end of the
     /// `RopeSlice` is created (i.e. `next()` will return `None`).
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -830,6 +874,8 @@ impl<'a> RopeSlice<'a> {
     }
 
     /// Creates an iterator over the chunks of the `RopeSlice`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn chunks(&self) -> Chunks<'a> {
         match *self {
@@ -863,6 +909,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// The return value is organized as
     /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -935,7 +983,10 @@ impl<'a> RopeSlice<'a> {
     /// If `char_idx == len_chars()` an iterator at the end of the `RopeSlice`
     /// (yielding `None` on a call to `next()`) is created.
     ///
-    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1014,6 +1065,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// The return value is organized as
     /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///

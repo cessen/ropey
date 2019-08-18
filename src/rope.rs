@@ -17,10 +17,10 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
-/// Except where otherwise documented, all editing and query operations execute
-/// in worst-case `O(log N)` time in the length of the rope.  `Rope` is designed
-/// to work efficiently even for huge (in the gigabytes) and pathological (all
-/// on one line) texts.
+/// The time complexity of nearly all edit and query operations on `Rope` are
+/// worst-case `O(log N)` in the length of the rope.  `Rope` is designed to
+/// work efficiently even for huge (in the gigabytes) and pathological (all on
+/// one line) texts.
 ///
 /// # Editing Operations
 ///
@@ -402,7 +402,7 @@ impl Rope {
 
     /// Inserts a single char `ch` at char index `char_idx`.
     ///
-    /// Runs in O(log N) time, where N is the length of the `Rope`.
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -640,6 +640,8 @@ impl Rope {
     /// Splits the `Rope` at `char_idx`, returning the right part of
     /// the split.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
@@ -677,6 +679,8 @@ impl Rope {
     }
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
+    ///
+    /// Runs in O(log N) time.
     pub fn append(&mut self, other: Self) {
         if self.len_chars() == 0 {
             // Special case
@@ -732,6 +736,8 @@ impl Rope {
     /// - `byte_idx` can be one-past-the-end, which will return
     ///   one-past-the-end char index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -758,6 +764,8 @@ impl Rope {
     /// - `byte_idx` can be one-past-the-end, which will return the
     ///   last line index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
@@ -781,6 +789,8 @@ impl Rope {
     ///
     /// - `char_idx` can be one-past-the-end, which will return
     ///   one-past-the-end byte index.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -808,6 +818,8 @@ impl Rope {
     /// - `char_idx` can be one-past-the-end, which will return the
     ///   last line index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
@@ -832,6 +844,8 @@ impl Rope {
     /// - Lines are zero-indexed.
     /// - `line_idx` can be one-past-the-end, which will return
     ///   one-past-the-end byte index.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -862,6 +876,8 @@ impl Rope {
     /// - `line_idx` can be one-past-the-end, which will return
     ///   one-past-the-end char index.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
@@ -888,6 +904,8 @@ impl Rope {
 
     /// Returns the byte at `byte_idx`.
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
@@ -907,6 +925,8 @@ impl Rope {
     }
 
     /// Returns the char at `char_idx`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -929,6 +949,8 @@ impl Rope {
     /// Returns the line at `line_idx`.
     ///
     /// Note: lines are zero-indexed.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -970,7 +992,13 @@ impl Rope {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// Note: for convenience, a one-past-the-end `byte_idx` returns the last
+    /// chunk of the `RopeSlice`.
+    ///
+    /// The return value is organized as
+    /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -993,7 +1021,13 @@ impl Rope {
     /// Also returns the byte and char indices of the beginning of the chunk
     /// and the index of the line that the chunk starts on.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// Note: for convenience, a one-past-the-end `char_idx` returns the last
+    /// chunk of the `RopeSlice`.
+    ///
+    /// The return value is organized as
+    /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1022,7 +1056,10 @@ impl Rope {
     /// give the chunk containing the newline character, and 2 would give the
     /// last chunk.
     ///
-    /// The return value is organized as `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(chunk, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1057,6 +1094,8 @@ impl Rope {
     /// assert_eq!("Hello", slice);
     /// ```
     ///
+    /// Runs in O(log N) time.
+    ///
     /// # Panics
     ///
     /// Panics if the start of the range is greater than the end, or if the
@@ -1085,6 +1124,8 @@ impl Rope {
     // Iterator methods
 
     /// Creates an iterator over the bytes of the `Rope`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn bytes(&self) -> Bytes {
         Bytes::new(&self.root)
@@ -1095,6 +1136,8 @@ impl Rope {
     ///
     /// If `byte_idx == len_bytes()` then an iterator at the end of the
     /// `Rope` is created (i.e. `next()` will return `None`).
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1120,6 +1163,8 @@ impl Rope {
     }
 
     /// Creates an iterator over the chars of the `Rope`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn chars(&self) -> Chars {
         Chars::new(&self.root)
@@ -1130,6 +1175,8 @@ impl Rope {
     ///
     /// If `char_idx == len_chars()` then an iterator at the end of the
     /// `Rope` is created (i.e. `next()` will return `None`).
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1155,6 +1202,8 @@ impl Rope {
     }
 
     /// Creates an iterator over the lines of the `Rope`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn lines(&self) -> Lines {
         Lines::new(&self.root)
@@ -1165,6 +1214,8 @@ impl Rope {
     ///
     /// If `line_idx == len_lines()` then an iterator at the end of the
     /// `Rope` is created (i.e. `next()` will return `None`).
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1183,6 +1234,8 @@ impl Rope {
     }
 
     /// Creates an iterator over the chunks of the `Rope`.
+    ///
+    /// Runs in O(log N) time.
     #[inline]
     pub fn chunks(&self) -> Chunks {
         Chunks::new(&self.root)
@@ -1199,6 +1252,8 @@ impl Rope {
     ///
     /// The return value is organized as
     /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1231,7 +1286,10 @@ impl Rope {
     /// If `char_idx == len_chars()` an iterator at the end of the `Rope`
     /// (yielding `None` on a call to `next()`) is created.
     ///
-    /// The return value is organized as `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    /// The return value is organized as
+    /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
@@ -1270,6 +1328,8 @@ impl Rope {
     ///
     /// The return value is organized as
     /// `(iterator, chunk_byte_idx, chunk_char_idx, chunk_line_idx)`.
+    ///
+    /// Runs in O(log N) time.
     ///
     /// # Panics
     ///
