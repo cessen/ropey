@@ -53,8 +53,8 @@ use std::sync::Arc;
 
 use slice::RopeSlice;
 use str_utils::{
-    byte_to_line_idx, char_to_byte_idx, char_to_line_idx, count_chars, ends_with_line_break,
-    line_to_byte_idx, line_to_char_idx, prev_line_end_char_idx,
+    byte_to_line_idx, char_to_byte_idx, count_chars, ends_with_line_break, line_to_byte_idx,
+    line_to_char_idx, prev_line_end_char_idx,
 };
 use tree::{Node, TextInfo};
 
@@ -407,10 +407,13 @@ enum LinesEnum<'a> {
         start_char: usize,
         end_char: usize,
         start_line: usize,
+        total_line_breaks: usize,
         line_idx: usize,
     },
     Light {
         text: &'a str,
+        total_line_breaks: usize,
+        line_idx: usize,
         byte_idx: usize,
         at_end: bool,
     },
@@ -423,35 +426,45 @@ impl<'a> Lines<'a> {
             start_char: 0,
             end_char: node.text_info().chars as usize,
             start_line: 0,
+            total_line_breaks: node.line_break_count(),
             line_idx: 0,
         })
     }
 
-    pub(crate) fn new_with_range(node: &Arc<Node>, char_idx_range: (usize, usize)) -> Lines {
-        Lines::new_with_range_at(node, 0, char_idx_range)
+    pub(crate) fn new_with_range(
+        node: &Arc<Node>,
+        char_idx_range: (usize, usize),
+        line_break_idx_range: (usize, usize),
+    ) -> Lines {
+        Lines::new_with_range_at(
+            node,
+            line_break_idx_range.0,
+            char_idx_range,
+            line_break_idx_range,
+        )
     }
 
     pub(crate) fn new_with_range_at(
         node: &Arc<Node>,
         at_line: usize,
         char_idx_range: (usize, usize),
+        line_break_idx_range: (usize, usize),
     ) -> Lines {
-        let start_line = {
-            let (chunk, _, c, l) = node.get_chunk_at_char(char_idx_range.0);
-            l + char_to_line_idx(chunk, char_idx_range.0 - c)
-        };
         Lines(LinesEnum::Full {
             node: node,
             start_char: char_idx_range.0,
             end_char: char_idx_range.1,
-            start_line: start_line,
-            line_idx: start_line + at_line,
+            start_line: line_break_idx_range.0,
+            total_line_breaks: line_break_idx_range.1 - line_break_idx_range.0 - 1,
+            line_idx: at_line,
         })
     }
 
     pub(crate) fn from_str(text: &str) -> Lines {
         Lines(LinesEnum::Light {
             text: text,
+            total_line_breaks: byte_to_line_idx(text, text.len()),
+            line_idx: 0,
             byte_idx: 0,
             at_end: false,
         })
@@ -476,6 +489,7 @@ impl<'a> Lines<'a> {
                 end_char,
                 start_line,
                 ref mut line_idx,
+                ..
             }) => {
                 if *line_idx == start_line {
                     return None;
@@ -502,11 +516,14 @@ impl<'a> Lines<'a> {
             }
             Lines(LinesEnum::Light {
                 ref mut text,
+                ref mut line_idx,
                 ref mut byte_idx,
                 ref mut at_end,
+                ..
             }) => {
                 // Special cases.
                 if *at_end && (text.len() == 0 || ends_with_line_break(text)) {
+                    *line_idx -= 1;
                     *at_end = false;
                     return Some("".into());
                 } else if *byte_idx == 0 {
@@ -516,6 +533,7 @@ impl<'a> Lines<'a> {
                 let end_idx = *byte_idx;
                 let start_idx = prev_line_end_char_idx(&text[..end_idx]);
                 *byte_idx = start_idx;
+                *line_idx -= 1;
 
                 return Some((&text[start_idx..end_idx]).into());
             }
@@ -570,19 +588,23 @@ impl<'a> Iterator for Lines<'a> {
             }
             Lines(LinesEnum::Light {
                 ref mut text,
+                ref mut line_idx,
                 ref mut byte_idx,
                 ref mut at_end,
+                ..
             }) => {
                 if *at_end {
                     return None;
                 } else if *byte_idx == text.len() {
                     *at_end = true;
+                    *line_idx += 1;
                     return Some("".into());
                 }
 
                 let start_idx = *byte_idx;
                 let end_idx = line_to_byte_idx(&text[start_idx..], 1) + start_idx;
                 *byte_idx = end_idx;
+                *line_idx += 1;
 
                 if end_idx == text.len() {
                     *at_end = !ends_with_line_break(text);
@@ -592,7 +614,27 @@ impl<'a> Iterator for Lines<'a> {
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let lines_remaining = match *self {
+            Lines(LinesEnum::Full {
+                start_line,
+                total_line_breaks,
+                line_idx,
+                ..
+            }) => total_line_breaks + 1 - (line_idx - start_line),
+            Lines(LinesEnum::Light {
+                total_line_breaks,
+                line_idx,
+                ..
+            }) => total_line_breaks + 1 - line_idx,
+        };
+
+        (lines_remaining, Some(lines_remaining))
+    }
 }
+
+impl<'a> ExactSizeIterator for Lines<'a> {}
 
 //==========================================================
 
@@ -744,7 +786,7 @@ impl<'a> Chunks<'a> {
             loop {
                 match **node_ref {
                     Node::Leaf(ref text) => {
-                        if at_byte < end_byte {
+                        if at_byte < end_byte || byte_idx == 0 {
                             byte_idx = info.bytes as isize - start_byte as isize;
                         } else {
                             byte_idx =
@@ -1198,6 +1240,33 @@ mod tests {
     }
 
     #[test]
+    fn bytes_exact_size_iter_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut byte_count = 0;
+        let mut bytes = s.bytes_at(s.len_bytes());
+
+        assert_eq!(byte_count, bytes.len());
+
+        while let Some(_) = bytes.prev() {
+            byte_count += 1;
+            assert_eq!(byte_count, bytes.len());
+        }
+
+        assert_eq!(bytes.len(), s.len_bytes());
+        bytes.prev();
+        bytes.prev();
+        bytes.prev();
+        bytes.prev();
+        bytes.prev();
+        bytes.prev();
+        bytes.prev();
+        assert_eq!(bytes.len(), s.len_bytes());
+        assert_eq!(byte_count, s.len_bytes());
+    }
+
+    #[test]
     fn chars_01() {
         let r = Rope::from_str(TEXT);
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
@@ -1328,6 +1397,27 @@ mod tests {
             let chars = s.chars_at(i);
             assert_eq!(s.len_chars() - i, chars.len());
         }
+    }
+
+    #[test]
+    fn chars_exact_size_iter_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut char_count = 0;
+        let mut chars = s.chars_at(s.len_chars());
+
+        assert_eq!(char_count, chars.len());
+
+        while let Some(_) = chars.prev() {
+            char_count += 1;
+            assert_eq!(char_count, chars.len());
+        }
+
+        assert_eq!(char_count, s.len_chars());
+        assert_eq!(chars.len(), s.len_chars());
+        chars.prev();
+        assert_eq!(chars.len(), s.len_chars());
     }
 
     #[test]
@@ -1723,6 +1813,71 @@ mod tests {
 
         let mut lines = s.lines_at(1);
         assert_eq!(None, lines.next());
+    }
+
+    #[test]
+    fn lines_exact_size_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut line_count = s.len_lines();
+        let mut lines = s.lines();
+
+        assert_eq!(line_count, lines.len());
+
+        while let Some(_) = lines.next() {
+            line_count -= 1;
+            assert_eq!(line_count, lines.len());
+        }
+
+        assert_eq!(lines.len(), 0);
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        assert_eq!(lines.len(), 0);
+        assert_eq!(line_count, 0);
+    }
+
+    #[test]
+    fn lines_exact_size_iter_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        for i in 0..=s.len_lines() {
+            let lines = s.lines_at(i);
+            assert_eq!(s.len_lines() - i, lines.len());
+        }
+    }
+
+    #[test]
+    fn lines_exact_size_iter_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut line_count = 0;
+        let mut lines = s.lines_at(s.len_lines());
+
+        assert_eq!(line_count, lines.len());
+
+        while let Some(_) = lines.prev() {
+            line_count += 1;
+            assert_eq!(line_count, lines.len());
+        }
+
+        assert_eq!(lines.len(), s.len_lines());
+        lines.prev();
+        lines.prev();
+        lines.prev();
+        lines.prev();
+        lines.prev();
+        lines.prev();
+        lines.prev();
+        assert_eq!(lines.len(), s.len_lines());
+        assert_eq!(line_count, s.len_lines());
     }
 
     #[test]

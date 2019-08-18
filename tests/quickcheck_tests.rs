@@ -794,6 +794,118 @@ proptest! {
             assert_eq!(chars_r.prev(), Some(c));
         }
     }
+
+    #[test]
+    fn pt_bytes_iter_exact_01(idx in 1024usize..(CHAR_LEN - 1024)) {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(idx..(idx + 373));
+
+        // Forward
+        {
+            let mut byte_count = s.len_bytes();
+            let mut bytes = s.bytes();
+
+            assert_eq!(byte_count, bytes.len());
+
+            while let Some(_) = bytes.next() {
+                byte_count -= 1;
+                assert_eq!(byte_count, bytes.len());
+            }
+
+            assert_eq!(byte_count, 0);
+            assert_eq!(bytes.len(), 0);
+        }
+
+        // Backward
+        {
+            let mut byte_count = 0;
+            let mut bytes = s.bytes_at(s.len_bytes());
+
+            assert_eq!(byte_count, bytes.len());
+
+            while let Some(_) = bytes.prev() {
+                byte_count += 1;
+                assert_eq!(byte_count, bytes.len());
+            }
+
+            assert_eq!(byte_count, s.len_bytes());
+            assert_eq!(bytes.len(), s.len_bytes());
+            bytes.prev();
+            assert_eq!(bytes.len(), s.len_bytes());
+        }
+    }
+
+    #[test]
+    fn pt_chars_iter_exact_01(idx in 1024usize..(CHAR_LEN - 1024)) {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(idx..(idx + 373));
+
+        // Forward
+        let mut char_count = s.len_chars();
+        let mut chars = s.chars();
+
+        assert_eq!(char_count, chars.len());
+
+        while let Some(_) = chars.next() {
+            char_count -= 1;
+            assert_eq!(char_count, chars.len());
+        }
+
+        assert_eq!(char_count, 0);
+        assert_eq!(chars.len(), 0);
+
+        // Backward
+        let mut char_count = 0;
+        let mut chars = s.chars_at(s.len_chars());
+
+        assert_eq!(char_count, chars.len());
+
+        while let Some(_) = chars.prev() {
+            char_count += 1;
+            assert_eq!(char_count, chars.len());
+        }
+
+        assert_eq!(char_count, s.len_chars());
+        assert_eq!(chars.len(), s.len_chars());
+        chars.prev();
+        assert_eq!(chars.len(), s.len_chars());
+    }
+
+    #[test]
+    fn pt_lines_iter_exact_01(idx in 1024usize..(CHAR_LEN - 1024)) {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(idx..(idx + 373));
+
+        // Forward
+        let mut line_count = s.len_lines();
+        let mut lines = s.lines();
+
+        assert_eq!(line_count, lines.len());
+
+        while let Some(_) = lines.next() {
+            line_count -= 1;
+            assert_eq!(line_count, lines.len());
+        }
+
+        assert_eq!(line_count, 0);
+        assert_eq!(lines.len(), 0);
+
+        // Backward
+        let mut line_count = 0;
+        let mut lines = s.lines_at(s.len_lines());
+
+        assert_eq!(line_count, lines.len());
+
+        while let Some(_) = lines.prev() {
+            line_count += 1;
+            assert_eq!(line_count, lines.len());
+        }
+
+        assert_eq!(line_count, s.len_lines());
+        assert_eq!(lines.len(), s.len_lines());
+        lines.prev();
+        assert_eq!(lines.len(), s.len_lines());
+    }
 }
 
 //===========================================================================

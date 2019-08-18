@@ -1230,7 +1230,12 @@ impl Rope {
             self.len_lines()
         );
 
-        Lines::new_with_range_at(&self.root, line_idx, (0, self.len_bytes()))
+        Lines::new_with_range_at(
+            &self.root,
+            line_idx,
+            (0, self.len_bytes()),
+            (0, self.len_lines()),
+        )
     }
 
     /// Creates an iterator over the chunks of the `Rope`.

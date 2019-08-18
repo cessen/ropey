@@ -833,8 +833,14 @@ impl<'a> RopeSlice<'a> {
                 node,
                 start_char,
                 end_char,
+                start_line_break,
+                end_line_break,
                 ..
-            }) => Lines::new_with_range(node, (start_char as usize, end_char as usize)),
+            }) => Lines::new_with_range(
+                node,
+                (start_char as usize, end_char as usize),
+                (start_line_break as usize, end_line_break as usize + 1),
+            ),
             RopeSlice(RSEnum::Light { text, .. }) => Lines::from_str(text),
         }
     }
@@ -865,10 +871,15 @@ impl<'a> RopeSlice<'a> {
                 node,
                 start_char,
                 end_char,
+                start_line_break,
+                end_line_break,
                 ..
-            }) => {
-                Lines::new_with_range_at(node, line_idx, (start_char as usize, end_char as usize))
-            }
+            }) => Lines::new_with_range_at(
+                node,
+                start_line_break as usize + line_idx,
+                (start_char as usize, end_char as usize),
+                (start_line_break as usize, end_line_break as usize + 1),
+            ),
             RopeSlice(RSEnum::Light { text, .. }) => Lines::from_str_at(text, line_idx),
         }
     }
