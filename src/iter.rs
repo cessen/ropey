@@ -163,23 +163,26 @@ impl<'a> Bytes<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     pub fn prev(&mut self) -> Option<u8> {
+        // Put us back into a "prev" progression.
         if !self.last_op_was_prev {
             self.chunk_iter.prev();
             self.last_op_was_prev = true;
         }
 
-        loop {
-            if self.byte_idx > 0 {
-                self.byte_idx -= 1;
-                self.bytes_remaining += 1;
-                return Some(self.cur_chunk[self.byte_idx]);
-            } else if let Some(chunk) = self.chunk_iter.prev() {
+        // Progress the chunks iterator back if needed.
+        if self.byte_idx == 0 {
+            if let Some(chunk) = self.chunk_iter.prev() {
                 self.cur_chunk = chunk.as_bytes();
                 self.byte_idx = self.cur_chunk.len();
             } else {
                 return None;
             }
         }
+
+        // Progress the byte counts and return the previous byte.
+        self.byte_idx -= 1;
+        self.bytes_remaining += 1;
+        return Some(self.cur_chunk[self.byte_idx]);
     }
 }
 
@@ -190,23 +193,27 @@ impl<'a> Iterator for Bytes<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     fn next(&mut self) -> Option<u8> {
+        // Put us back into a "next" progression.
         if self.last_op_was_prev {
             self.chunk_iter.next();
             self.last_op_was_prev = false;
         }
 
-        loop {
-            if let Some(c) = self.cur_chunk.get(self.byte_idx) {
-                self.byte_idx += 1;
-                self.bytes_remaining -= 1;
-                return Some(*c);
-            } else if let Some(chunk) = self.chunk_iter.next() {
+        // Progress the chunks iterator forward if needed.
+        if self.byte_idx >= self.cur_chunk.len() {
+            if let Some(chunk) = self.chunk_iter.next() {
                 self.cur_chunk = chunk.as_bytes();
                 self.byte_idx = 0;
             } else {
                 return None;
             }
         }
+
+        // Progress the byte counts and return the next byte.
+        let byte = self.cur_chunk[self.byte_idx];
+        self.byte_idx += 1;
+        self.bytes_remaining -= 1;
+        return Some(byte);
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -323,26 +330,30 @@ impl<'a> Chars<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     pub fn prev(&mut self) -> Option<char> {
+        // Put us back into a "prev" progression.
         if !self.last_op_was_prev {
             self.chunk_iter.prev();
             self.last_op_was_prev = true;
         }
 
-        loop {
-            if self.byte_idx > 0 {
-                self.byte_idx -= 1;
-                while !self.cur_chunk.is_char_boundary(self.byte_idx) {
-                    self.byte_idx -= 1;
-                }
-                self.chars_remaining += 1;
-                return (&self.cur_chunk[self.byte_idx..]).chars().next();
-            } else if let Some(chunk) = self.chunk_iter.prev() {
+        // Progress the chunks iterator back if needed.
+        if self.byte_idx == 0 {
+            if let Some(chunk) = self.chunk_iter.prev() {
                 self.cur_chunk = chunk;
                 self.byte_idx = self.cur_chunk.len();
             } else {
                 return None;
             }
         }
+
+        // Find the previous char boundary, updating counters as needed, and
+        // return the previous char.
+        self.byte_idx -= 1;
+        while !self.cur_chunk.is_char_boundary(self.byte_idx) {
+            self.byte_idx -= 1;
+        }
+        self.chars_remaining += 1;
+        return (&self.cur_chunk[self.byte_idx..]).chars().next();
     }
 }
 
@@ -353,28 +364,31 @@ impl<'a> Iterator for Chars<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     fn next(&mut self) -> Option<char> {
+        // Put us back into a "next" progression.
         if self.last_op_was_prev {
             self.chunk_iter.next();
             self.last_op_was_prev = false;
         }
 
-        loop {
-            if self.byte_idx < self.cur_chunk.len() {
-                let start = self.byte_idx;
-                self.byte_idx += 1;
-                while !self.cur_chunk.is_char_boundary(self.byte_idx) {
-                    self.byte_idx += 1;
-                }
-                self.chars_remaining -= 1;
-                return (&self.cur_chunk[start..]).chars().next();
-            } else if let Some(chunk) = self.chunk_iter.next() {
+        // Progress the chunks iterator forward if needed.
+        if self.byte_idx >= self.cur_chunk.len() {
+            if let Some(chunk) = self.chunk_iter.next() {
                 self.cur_chunk = chunk;
                 self.byte_idx = 0;
-                continue;
             } else {
                 return None;
             }
         }
+
+        // Find the next char boundary, updating counters as needed, and
+        // return the next char.
+        let start = self.byte_idx;
+        self.byte_idx += 1;
+        while !self.cur_chunk.is_char_boundary(self.byte_idx) {
+            self.byte_idx += 1;
+        }
+        self.chars_remaining -= 1;
+        return (&self.cur_chunk[start..]).chars().next();
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
