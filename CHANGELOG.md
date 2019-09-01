@@ -3,9 +3,12 @@
 
 ## [Unreleased]
 
+
+## [1.1.0] - 2019-09-01
+
 ### New features
 - Iterators can now be created directly to start at any position in the `Rope` or `RopeSlice`.
-- All iterators can now also iterate backwards via a new `prev()` method.
+- All iterators can now iterate backwards via a new `prev()` method.
 - All iterators now implement `Clone` and `Debug` traits.
 - `Bytes`, `Chars`, and `Lines` iterators now implement `ExactSizeIterator`.
 
@@ -235,7 +238,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/cessen/ropey/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/cessen/ropey/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/cessen/ropey/compare/v0.9.2...v1.0.0
 [0.9.2]: https://github.com/cessen/ropey/compare/v0.9.1...v0.9.2
