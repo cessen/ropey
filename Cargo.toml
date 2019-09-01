@@ -17,10 +17,10 @@ travis-ci = { repository = "cessen/ropey" }
 smallvec = "0.6"
 
 [dev-dependencies]
-rand = "0.5"
-proptest = "0.8"
+rand = "0.7"
+proptest = "0.9"
 bencher = "0.1.5"
-unicode-segmentation = "1.2.1"
+unicode-segmentation = "1.3"
 
 #-----------------------------------------
 
