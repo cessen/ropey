@@ -36,10 +36,9 @@
 //! This is accomplished with the various `bytes_at()`, `chars_at()`, etc.
 //! methods of `Rope` and `RopeSlice`.
 //!
-//! When the iterators are created this way, they are positioned such that an
-//! immediate call to `next()` would return the specified element, and an
-//! immediate call to `prev()` would return the element just before the
-//! specified one.
+//! When an iterator is created this way, it is positioned such that a call to
+//! `next()` will return the specified element, and a call to `prev()` will
+//! return the element just before the specified one.
 //!
 //! Importantly, iterators created this way still have access to the entire
 //! contents of the `Rope`/`RopeSlice` they were created from&mdash;the
