@@ -807,6 +807,7 @@ impl<'a> Chunks<'a> {
                             info = TextInfo {
                                 bytes: byte_idx_range.1 as u64,
                                 chars: char_idx_range.1 as u64,
+                                utf16_surrogates: 0, // Bogus value, not needed
                                 line_breaks: line_break_idx_range.1 as u64 - 1,
                             };
                             (*node_stack.last_mut().unwrap()).1 += 1;

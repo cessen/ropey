@@ -1,12 +1,13 @@
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use str_utils::{count_chars, count_line_breaks};
+use str_utils::{count_chars, count_line_breaks, count_utf16_surrogates};
 use tree::Count;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TextInfo {
     pub(crate) bytes: Count,
     pub(crate) chars: Count,
+    pub(crate) utf16_surrogates: Count,
     pub(crate) line_breaks: Count,
 }
 
@@ -16,6 +17,7 @@ impl TextInfo {
         TextInfo {
             bytes: 0,
             chars: 0,
+            utf16_surrogates: 0,
             line_breaks: 0,
         }
     }
@@ -25,6 +27,7 @@ impl TextInfo {
         TextInfo {
             bytes: text.len() as Count,
             chars: count_chars(text) as Count,
+            utf16_surrogates: count_utf16_surrogates(text) as Count,
             line_breaks: count_line_breaks(text) as Count,
         }
     }
@@ -37,6 +40,7 @@ impl Add for TextInfo {
         TextInfo {
             bytes: self.bytes + rhs.bytes,
             chars: self.chars + rhs.chars,
+            utf16_surrogates: self.utf16_surrogates + rhs.utf16_surrogates,
             line_breaks: self.line_breaks + rhs.line_breaks,
         }
     }
@@ -56,6 +60,7 @@ impl Sub for TextInfo {
         TextInfo {
             bytes: self.bytes - rhs.bytes,
             chars: self.chars - rhs.chars,
+            utf16_surrogates: self.utf16_surrogates - rhs.utf16_surrogates,
             line_breaks: self.line_breaks - rhs.line_breaks,
         }
     }
