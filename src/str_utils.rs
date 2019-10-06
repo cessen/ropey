@@ -197,6 +197,77 @@ pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
 }
 
+// /// Counts the utf16 surrogate pairs that would be in `text` if it were encoded
+// /// as utf16.
+// pub(crate) fn count_utf16_surrogates_slow(text: &str) -> usize {
+//     let mut utf16_surrogate_count = 0;
+//
+//     for byte in text.bytes() {
+//         utf16_surrogate_count += ((byte & 0xf0) == 0xf0) as usize;
+//     }
+//
+//     utf16_surrogate_count
+// }
+
+/// Counts the utf16 surrogate pairs that would be in `text` if it were encoded
+/// as utf16.
+#[inline]
+pub(crate) fn count_utf16_surrogates(text: &str) -> usize {
+    count_utf16_surrogates_in_bytes(text.as_bytes())
+}
+
+#[inline]
+pub(crate) fn count_utf16_surrogates_in_bytes(text: &[u8]) -> usize {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("sse2") {
+            return count_utf16_surrogates_internal::<sse2::__m128i>(text);
+        }
+    }
+
+    // Fallback for non-sse2 platforms.
+    count_utf16_surrogates_internal::<usize>(text)
+}
+
+#[inline(always)]
+fn count_utf16_surrogates_internal<T: ByteChunk>(text: &[u8]) -> usize {
+    // Get `middle` for more efficient chunk-based counting.
+    let (start, middle, end) = unsafe { text.align_to::<T>() };
+
+    let mut utf16_surrogate_count = 0;
+
+    // Take care of unaligned bytes at the beginning.
+    for byte in start.iter() {
+        utf16_surrogate_count += ((byte & 0xf0) == 0xf0) as usize;
+    }
+
+    // Take care of the middle bytes in big chunks.
+    let mut i = 0;
+    let mut acc = T::splat(0);
+    for chunk in middle.iter() {
+        let tmp = chunk.bitand(T::splat(0xf0)).cmp_eq_byte(0xf0);
+        acc = acc.add(tmp);
+        i += 1;
+        if i == T::max_acc() {
+            i = 0;
+            utf16_surrogate_count += acc.sum_bytes();
+            acc = T::splat(0);
+        }
+    }
+    utf16_surrogate_count += acc.sum_bytes();
+
+    // Take care of unaligned bytes at the end.
+    for byte in end.iter() {
+        utf16_surrogate_count += ((byte & 0xf0) == 0xf0) as usize;
+    }
+
+    utf16_surrogate_count
+}
+
+//===========================================================================
+// Internal
+//===========================================================================
+
 /// Returns the byte position just after the second-to-last line break
 /// in `text`, or zero of there is no second-to-last line break.
 ///
@@ -239,10 +310,6 @@ pub(crate) fn prev_line_end_char_idx(text: &str) -> usize {
 
     return 0;
 }
-
-//===========================================================================
-// Internal
-//===========================================================================
 
 /// Returns whether the given string ends in a line break or not.
 #[inline]

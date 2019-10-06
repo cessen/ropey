@@ -958,7 +958,7 @@ impl Rope {
     #[inline]
     pub fn line(&self, line_idx: usize) -> RopeSlice {
         use slice::RSEnum;
-        use str_utils::count_chars;
+        use str_utils::{count_chars, count_utf16_surrogates};
 
         let len_lines = self.len_lines();
 
@@ -978,6 +978,7 @@ impl Rope {
             RopeSlice(RSEnum::Light {
                 text: text2,
                 char_count: count_chars(text2) as Count,
+                utf16_surrogate_count: count_utf16_surrogates(text2) as Count,
                 line_break_count: if line_idx == (len_lines - 1) { 0 } else { 1 },
             })
         } else {
