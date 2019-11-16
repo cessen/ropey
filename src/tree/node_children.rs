@@ -27,7 +27,6 @@ impl NodeChildren {
     }
 
     /// Returns whether the array is full or not.
-    #[allow(dead_code)]
     pub fn is_full(&self) -> bool {
         self.len() == MAX_LEN
     }

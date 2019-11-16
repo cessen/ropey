@@ -5,7 +5,6 @@ use std::ops::Deref;
 use std::str;
 
 use crlf;
-use str_utils::{char_to_byte_idx, count_chars};
 
 /// A custom small string.  The unsafe guts of this are in `NodeSmallString`
 /// further down in this file.
@@ -19,13 +18,6 @@ impl NodeText {
         NodeText(inner::NodeSmallString::new())
     }
 
-    /// Creates a new empty `NodeText` with at least `capacity` bytes
-    /// of capacity.
-    #[inline(always)]
-    pub fn with_capacity(capacity: usize) -> Self {
-        NodeText(inner::NodeSmallString::with_capacity(capacity))
-    }
-
     /// Creates a new `NodeText` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
         NodeText(inner::NodeSmallString::from_str(string))
@@ -34,12 +26,6 @@ impl NodeText {
     /// Inserts a `&str` at byte offset `byte_idx`.
     pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
         self.0.insert_str(byte_idx, string);
-    }
-
-    /// Inserts the given text into the given string at the given char index.
-    pub fn insert_str_at_char(&mut self, text: &str, char_idx: usize) {
-        let byte_idx = char_to_byte_idx(self, char_idx);
-        self.insert_str(byte_idx, text);
     }
 
     /// Inserts `string` at `byte_idx` and splits the resulting string in half,
@@ -135,18 +121,6 @@ impl NodeText {
         self.0.inline_if_possible();
     }
 
-    /// Same as `remove_range()` except using char indices.
-    pub fn remove_char_range(&mut self, char_start: usize, char_end: usize) {
-        debug_assert!(char_start <= char_end);
-        debug_assert!(char_end <= count_chars(self));
-
-        let byte_start = char_to_byte_idx(self, char_start);
-        let byte_end = char_to_byte_idx(&self[char_start..], char_end - char_start);
-
-        self.0.remove_range(byte_start, byte_end);
-        self.0.inline_if_possible();
-    }
-
     /// Splits the `NodeText` at `byte_idx`.
     ///
     /// The left part remains in the original, and the right part is
@@ -155,15 +129,6 @@ impl NodeText {
         let other = NodeText(self.0.split_off(byte_idx));
         self.0.inline_if_possible();
         other
-    }
-
-    /// Splits a string into two strings at the char index given.
-    /// The first section of the split is stored in the original string,
-    /// while the second section of the split is returned as a new string.
-    pub fn split_off_at_char(&mut self, char_idx: usize) -> Self {
-        debug_assert!(char_idx <= count_chars(self));
-        let byte_idx = char_to_byte_idx(self, char_idx);
-        self.split_off(byte_idx)
     }
 }
 
