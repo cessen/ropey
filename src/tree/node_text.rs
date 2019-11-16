@@ -250,12 +250,6 @@ mod inner {
         fn size() -> usize {
             MAX_BYTES
         }
-        fn ptr(&self) -> *const u8 {
-            &self.0[0]
-        }
-        fn ptr_mut(&mut self) -> *mut u8 {
-            &mut self.0[0]
-        }
     }
 
     /// Internal small string for `NodeText`.
