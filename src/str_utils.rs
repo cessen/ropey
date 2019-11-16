@@ -976,8 +976,7 @@ mod tests {
 
     #[test]
     fn count_chars_01() {
-        let text =
-            "Hello せかい! Hello せかい! Hello せかい! Hello せかい! Hello せかい!";
+        let text = "Hello せかい! Hello せかい! Hello せかい! Hello せかい! Hello せかい!";
 
         assert_eq!(54, count_chars(text));
     }
