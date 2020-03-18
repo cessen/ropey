@@ -10,8 +10,8 @@ use iter::{Bytes, Chars, Chunks, Lines};
 use rope_builder::RopeBuilder;
 use slice::{end_bound_to_num, start_bound_to_num, RopeSlice};
 use str_utils::{
-    byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx, line_to_byte_idx,
-    line_to_char_idx,
+    byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
+    char_to_line_idx, line_to_byte_idx, line_to_char_idx,
 };
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -266,6 +266,21 @@ impl Rope {
     #[inline]
     pub fn len_lines(&self) -> usize {
         self.root.line_break_count() + 1
+    }
+
+    /// Total number of utf16 code units that would be in `Rope` if it were
+    /// encoded as utf16.
+    ///
+    /// Ropey stores text internally as utf8, but sometimes it is necessary
+    /// to interact with external APIs that still use utf16.  This function is
+    /// primarily intended for such situations, and is otherwise not very
+    /// useful.
+    ///
+    /// Runs in O(1) time.
+    #[inline]
+    pub fn len_utf16_code_units(&self) -> usize {
+        let info = self.root.text_info();
+        (info.chars + info.utf16_surrogates) as usize
     }
 
     //-----------------------------------------------------------------------
@@ -835,6 +850,71 @@ impl Rope {
 
         let (chunk, _, c, l) = self.chunk_at_char(char_idx);
         l + char_to_line_idx(chunk, char_idx - c)
+    }
+
+    /// Returns the utf16 code unit index of the given char.
+    ///
+    /// Ropey stores text internally as utf8, but sometimes it is necessary
+    /// to interact with external APIs that still use utf16.  This function is
+    /// primarily intended for such situations, and is otherwise not very
+    /// useful.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
+    pub fn char_to_utf16_code_unit(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of Rope: char index {}, Rope char length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        let (chunk, chunk_start_info) = self.root.get_chunk_at_char(char_idx);
+        let chunk_byte_idx = char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
+        let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
+
+        char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count
+    }
+
+    /// Returns the char index of the given utf16 code unit.
+    ///
+    /// Ropey stores text internally as utf8, but sometimes it is necessary
+    /// to interact with external APIs that still use utf16.  This function is
+    /// primarily intended for such situations, and is otherwise not very
+    /// useful.
+    ///
+    /// Note: since utf16 code units can be in the middle of a char, this
+    /// returns the char index of a the char that the utf16 code unit is a
+    /// part of.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `utf16_idx` is out of bounds
+    /// (i.e. `utf16_idx > len_utf16_code_units()`).
+    #[inline]
+    pub fn utf16_code_unit_to_char(&self, utf16_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            utf16_idx <= self.len_utf16_code_units(),
+            "Attempt to index past end of Rope: utf16 code unit index {}, Rope utf16 code unit length {}",
+            utf16_idx,
+            self.len_utf16_code_units()
+        );
+
+        todo!();
+
+        // let (chunk, chunk_start_info) = self.root.get_chunk_at_char(char_idx);
+        // let chunk_byte_idx = char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
+        // let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
+
+        // char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count
     }
 
     /// Returns the byte index of the start of the given line.
@@ -1704,6 +1784,10 @@ mod tests {
     const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
                               a fine day, isn't it?\nAren't you glad \
                               we're alive?\nこんにちは、みんなさん！";
+    // 127 bytes, 107 chars, 111 utf16 code units, 1 line
+    const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
+                              a fine day, isn't it?🐸  Aren't you glad \
+                              we're alive?🐸  こんにちは、みんなさん！";
 
     #[test]
     fn new_01() {
@@ -1757,6 +1841,24 @@ mod tests {
     fn len_lines_02() {
         let r = Rope::from_str("");
         assert_eq!(r.len_lines(), 1);
+    }
+
+    #[test]
+    fn len_utf16_code_units_01() {
+        let r = Rope::from_str(TEXT);
+        assert_eq!(r.len_utf16_code_units(), 103);
+    }
+
+    #[test]
+    fn len_utf16_code_units_02() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        assert_eq!(r.len_utf16_code_units(), 111);
+    }
+
+    #[test]
+    fn len_utf16_code_units_03() {
+        let r = Rope::from_str("");
+        assert_eq!(r.len_utf16_code_units(), 0);
     }
 
     #[test]
@@ -2409,6 +2511,40 @@ mod tests {
     fn line_to_char_03() {
         let r = Rope::from_str(TEXT_LINES);
         r.line_to_char(5);
+    }
+
+    #[test]
+    fn char_to_utf16_code_unit_01() {
+        let r = Rope::from_str("");
+        assert_eq!(0, r.char_to_utf16_code_unit(0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_utf16_code_unit_02() {
+        let r = Rope::from_str("");
+        r.char_to_utf16_code_unit(1);
+    }
+
+    #[test]
+    fn char_to_utf16_code_unit_03() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(0, r.char_to_utf16_code_unit(0));
+
+        assert_eq!(12, r.char_to_utf16_code_unit(12));
+        assert_eq!(14, r.char_to_utf16_code_unit(13));
+
+        assert_eq!(33, r.char_to_utf16_code_unit(32));
+        assert_eq!(35, r.char_to_utf16_code_unit(33));
+
+        assert_eq!(63, r.char_to_utf16_code_unit(61));
+        assert_eq!(65, r.char_to_utf16_code_unit(62));
+
+        assert_eq!(95, r.char_to_utf16_code_unit(92));
+        assert_eq!(97, r.char_to_utf16_code_unit(93));
+
+        assert_eq!(111, r.char_to_utf16_code_unit(107));
     }
 
     #[test]
