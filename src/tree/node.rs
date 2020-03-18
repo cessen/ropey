@@ -495,6 +495,28 @@ impl Node {
         }
     }
 
+    /// Returns the chunk that contains the given utf16 code unit, and the
+    /// TextInfo corresponding to the start of the chunk.
+    pub fn get_chunk_at_utf16_code_unit(&self, utf16_idx: usize) -> (&str, TextInfo) {
+        let mut node = self;
+        let mut utf16_idx = utf16_idx;
+        let mut info = TextInfo::new();
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => {
+                    return (text, info);
+                }
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) = children.search_utf16_code_unit_idx(utf16_idx);
+                    info += acc_info;
+                    node = &*children.nodes()[child_i];
+                    utf16_idx -= (acc_info.chars + acc_info.utf16_surrogates) as usize;
+                }
+            }
+        }
+    }
+
     /// Returns the chunk that contains the given line break, and the TextInfo
     /// corresponding to the start of the chunk.
     ///
