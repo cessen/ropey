@@ -365,9 +365,8 @@ impl<'a> RopeSlice<'a> {
     /// primarily intended for such situations, and is otherwise not very
     /// useful.
     ///
-    /// Note: since utf16 code units can be in the middle of a char, this
-    /// returns the char index of a the char that the utf16 code unit is a
-    /// part of.
+    /// Note: if the utf16 code unit is in the middle of a char, returns the
+    /// index of the char that it belongs to.
     ///
     /// Runs in O(log N) time.
     ///
