@@ -348,6 +348,37 @@ impl NodeChildren {
         (idx, accum)
     }
 
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given utf16 code unit offset.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
+        debug_assert!(self.len() > 0);
+
+        let mut accum = TextInfo::new();
+        let mut idx = 0;
+        for info in self.info()[0..(self.len() - 1)].iter() {
+            let next_accum = accum + *info;
+            if utf16_idx < (next_accum.chars + next_accum.utf16_surrogates) as usize {
+                break;
+            }
+            accum = next_accum;
+            idx += 1;
+        }
+
+        #[cfg(any(test, debug_assertions))]
+        assert!(
+            utf16_idx
+                <= (accum.chars
+                    + accum.utf16_surrogates
+                    + self.info()[idx].chars
+                    + self.info()[idx].utf16_surrogates) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
     /// Same as `search_char_idx()` above, except that it only calulates the
     /// left-side-accumulated _char_ index rather than the full text info.
     ///

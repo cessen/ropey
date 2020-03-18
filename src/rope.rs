@@ -11,7 +11,7 @@ use rope_builder::RopeBuilder;
 use slice::{end_bound_to_num, start_bound_to_num, RopeSlice};
 use str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
-    char_to_line_idx, line_to_byte_idx, line_to_char_idx,
+    char_to_line_idx, line_to_byte_idx, line_to_char_idx, utf16_code_unit_to_char_idx,
 };
 use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
@@ -908,13 +908,12 @@ impl Rope {
             self.len_utf16_code_units()
         );
 
-        todo!();
+        let (chunk, chunk_start_info) = self.root.get_chunk_at_utf16_code_unit(utf16_idx);
+        let chunk_utf16_idx =
+            utf16_idx - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
+        let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_idx);
 
-        // let (chunk, chunk_start_info) = self.root.get_chunk_at_char(char_idx);
-        // let chunk_byte_idx = char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
-        // let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
-
-        // char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count
+        chunk_start_info.chars as usize + chunk_char_idx
     }
 
     /// Returns the byte index of the start of the given line.
@@ -2545,6 +2544,58 @@ mod tests {
         assert_eq!(97, r.char_to_utf16_code_unit(93));
 
         assert_eq!(111, r.char_to_utf16_code_unit(107));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_utf16_code_unit_04() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        r.char_to_utf16_code_unit(108);
+    }
+
+    #[test]
+    fn utf16_code_unit_to_char_01() {
+        let r = Rope::from_str("");
+        assert_eq!(0, r.utf16_code_unit_to_char(0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn utf16_code_unit_to_char_02() {
+        let r = Rope::from_str("");
+        r.utf16_code_unit_to_char(1);
+    }
+
+    #[test]
+    fn utf16_code_unit_to_char_03() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(0, r.utf16_code_unit_to_char(0));
+
+        assert_eq!(12, r.utf16_code_unit_to_char(12));
+        assert_eq!(12, r.utf16_code_unit_to_char(13));
+        assert_eq!(13, r.utf16_code_unit_to_char(14));
+
+        assert_eq!(32, r.utf16_code_unit_to_char(33));
+        assert_eq!(32, r.utf16_code_unit_to_char(34));
+        assert_eq!(33, r.utf16_code_unit_to_char(35));
+
+        assert_eq!(61, r.utf16_code_unit_to_char(63));
+        assert_eq!(61, r.utf16_code_unit_to_char(64));
+        assert_eq!(62, r.utf16_code_unit_to_char(65));
+
+        assert_eq!(92, r.utf16_code_unit_to_char(95));
+        assert_eq!(92, r.utf16_code_unit_to_char(96));
+        assert_eq!(93, r.utf16_code_unit_to_char(97));
+
+        assert_eq!(107, r.utf16_code_unit_to_char(111));
+    }
+
+    #[test]
+    #[should_panic]
+    fn utf16_code_unit_to_char_04() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        r.utf16_code_unit_to_char(112);
     }
 
     #[test]

@@ -269,6 +269,28 @@ pub(crate) fn byte_to_utf16_surrogate_idx(text: &str, byte_idx: usize) -> usize 
     count_utf16_surrogates(&text[..byte_idx])
 }
 
+#[inline(always)]
+pub(crate) fn utf16_code_unit_to_char_idx(text: &str, utf16_idx: usize) -> usize {
+    // TODO: optimized version.  This is pretty slow.  It isn't expected to be
+    // used in performance critical functionality, so this isn't urgent.  But
+    // might as well make it faster when we get the chance.
+    let mut char_i = 0;
+    let mut utf16_i = 0;
+    for c in text.chars() {
+        if utf16_idx <= utf16_i {
+            break;
+        }
+        char_i += 1;
+        utf16_i += c.len_utf16();
+    }
+
+    if utf16_idx < utf16_i {
+        char_i -= 1;
+    }
+
+    char_i
+}
+
 //===========================================================================
 // Internal
 //===========================================================================
