@@ -1,7 +1,7 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{byte_to_line_idx, char_to_byte_idx};
+use str_utils::{byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx};
 use tree::node_text::fix_segment_seam;
 use tree::{
     Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
@@ -36,6 +36,12 @@ impl Node {
     #[inline(always)]
     pub fn line_break_count(&self) -> usize {
         self.text_info().line_breaks as usize
+    }
+
+    /// Total number of line breaks in the Rope.
+    #[inline(always)]
+    pub fn utf16_surrogate_count(&self) -> usize {
+        self.text_info().utf16_surrogates as usize
     }
 
     /// Fetches a chunk mutably, and allows it to be edited via a closure.
@@ -445,11 +451,9 @@ impl Node {
         }
     }
 
-    /// Returns the chunk that contains the given byte, and the chunk's starting
-    /// byte and char indices and the index of the line that the chunk starts on.
-    ///
-    /// Return takes the form of `(chunk, chunk_char_idx, chunk_byte_idx, chunk_line_idx)`.
-    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize, usize) {
+    /// Returns the chunk that contains the given byte, and the TextInfo
+    /// corresponding to the start of the chunk.
+    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
         let mut node = self;
         let mut byte_idx = byte_idx;
         let mut info = TextInfo::new();
@@ -457,12 +461,7 @@ impl Node {
         loop {
             match *node {
                 Node::Leaf(ref text) => {
-                    return (
-                        text,
-                        info.bytes as usize,
-                        info.chars as usize,
-                        info.line_breaks as usize,
-                    );
+                    return (text, info);
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_byte_idx(byte_idx);
@@ -474,11 +473,9 @@ impl Node {
         }
     }
 
-    /// Returns the chunk that contains the given char, and the chunk's starting
-    /// byte and char indices and the index of the line that the chunk starts on.
-    ///
-    /// Return takes the form of `(chunk, chunk_char_idx, chunk_byte_idx, chunk_line_idx)`.
-    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize, usize) {
+    /// Returns the chunk that contains the given char, and the TextInfo
+    /// corresponding to the start of the chunk.
+    pub fn get_chunk_at_char(&self, char_idx: usize) -> (&str, TextInfo) {
         let mut node = self;
         let mut char_idx = char_idx;
         let mut info = TextInfo::new();
@@ -486,12 +483,7 @@ impl Node {
         loop {
             match *node {
                 Node::Leaf(ref text) => {
-                    return (
-                        text,
-                        info.bytes as usize,
-                        info.chars as usize,
-                        info.line_breaks as usize,
-                    );
+                    return (text, info);
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_char_idx(char_idx);
@@ -503,15 +495,12 @@ impl Node {
         }
     }
 
-    /// Returns the chunk that contains the given line break, and the chunk's
-    /// starting byte and char indices and the index of the line that the
-    /// chunk starts on.
+    /// Returns the chunk that contains the given line break, and the TextInfo
+    /// corresponding to the start of the chunk.
     ///
     /// Note: for convenience, both the beginning and end of the rope are
     /// considered line breaks for indexing.
-    ///
-    /// Return takes the form of `(chunk, chunk_char_idx, chunk_byte_idx, chunk_line_idx)`.
-    pub fn get_chunk_at_line_break(&self, line_break_idx: usize) -> (&str, usize, usize, usize) {
+    pub fn get_chunk_at_line_break(&self, line_break_idx: usize) -> (&str, TextInfo) {
         let mut node = self;
         let mut line_break_idx = line_break_idx;
         let mut info = TextInfo::new();
@@ -519,12 +508,7 @@ impl Node {
         loop {
             match *node {
                 Node::Leaf(ref text) => {
-                    return (
-                        text,
-                        info.bytes as usize,
-                        info.chars as usize,
-                        info.line_breaks as usize,
-                    );
+                    return (text, info);
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_line_break_idx(line_break_idx);
@@ -536,12 +520,18 @@ impl Node {
         }
     }
 
-    /// Returns the byte and line index of the given char.
+    /// Returns the TextInfo at the given char index.
     #[inline(always)]
-    pub fn char_to_byte_and_line(&self, char_idx: usize) -> (usize, usize) {
-        let (chunk, b, c, l) = self.get_chunk_at_char(char_idx);
-        let bi = char_to_byte_idx(chunk, char_idx - c);
-        (b + bi, l + byte_to_line_idx(chunk, bi))
+    pub fn char_to_text_info(&self, char_idx: usize) -> TextInfo {
+        let (chunk, info) = self.get_chunk_at_char(char_idx);
+        let bi = char_to_byte_idx(chunk, char_idx - info.chars as usize);
+        TextInfo {
+            bytes: info.bytes + bi as Count,
+            chars: char_idx as Count,
+            utf16_surrogates: info.utf16_surrogates
+                + byte_to_utf16_surrogate_idx(chunk, bi) as Count,
+            line_breaks: info.line_breaks + byte_to_line_idx(chunk, bi) as Count,
+        }
     }
 
     pub fn text_info(&self) -> TextInfo {

@@ -264,6 +264,11 @@ fn count_utf16_surrogates_internal<T: ByteChunk>(text: &[u8]) -> usize {
     utf16_surrogate_count
 }
 
+#[inline(always)]
+pub(crate) fn byte_to_utf16_surrogate_idx(text: &str, byte_idx: usize) -> usize {
+    count_utf16_surrogates(&text[..byte_idx])
+}
+
 //===========================================================================
 // Internal
 //===========================================================================

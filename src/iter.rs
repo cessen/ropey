@@ -289,7 +289,8 @@ impl<'a> Chars<'a> {
         } else {
             let chunk = chunk_iter.prev().unwrap();
             chunk_iter.next();
-            chunk_char_start = node.get_chunk_at_char(at_char - 1).2.max(char_idx_range.0);
+            chunk_char_start =
+                (node.get_chunk_at_char(at_char - 1).1.chars as usize).max(char_idx_range.0);
             chunk
         };
 
@@ -511,14 +512,20 @@ impl<'a> Lines<'a> {
 
                     let a = {
                         // Find the char that corresponds to the start of the line.
-                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx);
-                        (c + line_to_char_idx(chunk, *line_idx - l)).max(start_char)
+                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx);
+                        (chunk_info.chars as usize
+                            + line_to_char_idx(chunk, *line_idx - chunk_info.line_breaks as usize))
+                        .max(start_char)
                     };
 
                     let b = if *line_idx < node.line_break_count() {
                         // Find the char that corresponds to the end of the line.
-                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx + 1);
-                        c + line_to_char_idx(chunk, *line_idx + 1 - l)
+                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx + 1);
+                        chunk_info.chars as usize
+                            + line_to_char_idx(
+                                chunk,
+                                *line_idx + 1 - chunk_info.line_breaks as usize,
+                            )
                     } else {
                         node.char_count()
                     }
@@ -574,8 +581,10 @@ impl<'a> Iterator for Lines<'a> {
                 } else {
                     let a = {
                         // Find the char that corresponds to the start of the line.
-                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx);
-                        let a = (c + line_to_char_idx(chunk, *line_idx - l)).max(start_char);
+                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx);
+                        let a = (chunk_info.chars as usize
+                            + line_to_char_idx(chunk, *line_idx - chunk_info.line_breaks as usize))
+                        .max(start_char);
 
                         // Early out if we're past the specified end char
                         if a > end_char {
@@ -587,8 +596,12 @@ impl<'a> Iterator for Lines<'a> {
 
                     let b = if *line_idx < node.line_break_count() {
                         // Find the char that corresponds to the end of the line.
-                        let (chunk, _, c, l) = node.get_chunk_at_line_break(*line_idx + 1);
-                        c + line_to_char_idx(chunk, *line_idx + 1 - l)
+                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx + 1);
+                        chunk_info.chars as usize
+                            + line_to_char_idx(
+                                chunk,
+                                *line_idx + 1 - chunk_info.line_breaks as usize,
+                            )
                     } else {
                         node.char_count()
                     }
@@ -850,7 +863,7 @@ impl<'a> Chunks<'a> {
         let at_byte = if at_char == char_idx_range.1 {
             byte_idx_range.1
         } else {
-            node.get_chunk_at_char(at_char).1.max(byte_idx_range.0)
+            (node.get_chunk_at_char(at_char).1.bytes as usize).max(byte_idx_range.0)
         };
 
         Chunks::new_with_range_at_byte(
@@ -873,9 +886,7 @@ impl<'a> Chunks<'a> {
         let at_byte = if at_line_break == line_break_idx_range.1 {
             byte_idx_range.1
         } else {
-            node.get_chunk_at_line_break(at_line_break)
-                .1
-                .max(byte_idx_range.0)
+            (node.get_chunk_at_line_break(at_line_break).1.bytes as usize).max(byte_idx_range.0)
         };
 
         Chunks::new_with_range_at_byte(
