@@ -625,7 +625,7 @@ impl Rope {
             let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
 
             if crlf_seam {
-                let seam_idx = root.char_to_byte_and_line(start).0;
+                let seam_idx = root.char_to_text_info(start).bytes;
                 root.fix_crlf_seam(seam_idx as Count, false);
             }
 
@@ -1014,7 +1014,13 @@ impl Rope {
             self.len_bytes()
         );
 
-        self.root.get_chunk_at_byte(byte_idx)
+        let (chunk, info) = self.root.get_chunk_at_byte(byte_idx);
+        (
+            chunk,
+            info.bytes as usize,
+            info.chars as usize,
+            info.line_breaks as usize,
+        )
     }
 
     /// Returns the chunk containing the given char index.
@@ -1043,7 +1049,13 @@ impl Rope {
             self.len_chars()
         );
 
-        self.root.get_chunk_at_char(char_idx)
+        let (chunk, info) = self.root.get_chunk_at_char(char_idx);
+        (
+            chunk,
+            info.bytes as usize,
+            info.chars as usize,
+            info.line_breaks as usize,
+        )
     }
 
     /// Returns the chunk containing the given line break.
@@ -1075,7 +1087,13 @@ impl Rope {
             self.len_lines()
         );
 
-        self.root.get_chunk_at_line_break(line_break_idx)
+        let (chunk, info) = self.root.get_chunk_at_line_break(line_break_idx);
+        (
+            chunk,
+            info.bytes as usize,
+            info.chars as usize,
+            info.line_breaks as usize,
+        )
     }
 
     //-----------------------------------------------------------------------
@@ -1454,29 +1472,28 @@ impl<'a> From<RopeSlice<'a>> for Rope {
         match s {
             RopeSlice(RSEnum::Full {
                 node,
-                start_char,
-                end_char,
-                ..
+                start_info,
+                end_info,
             }) => {
                 let mut rope = Rope {
                     root: Arc::clone(node),
                 };
 
                 // Chop off right end if needed
-                if end_char < node.text_info().chars {
+                if end_info.chars < node.text_info().chars {
                     {
                         let root = Arc::make_mut(&mut rope.root);
-                        root.split(end_char as usize);
+                        root.split(end_info.chars as usize);
                         root.zip_fix_right();
                     }
                     rope.pull_up_singular_nodes();
                 }
 
                 // Chop off left end if needed
-                if start_char > 0 {
+                if start_info.chars > 0 {
                     {
                         let root = Arc::make_mut(&mut rope.root);
-                        *root = root.split(start_char as usize);
+                        *root = root.split(start_info.chars as usize);
                         root.zip_fix_left();
                     }
                     rope.pull_up_singular_nodes();
