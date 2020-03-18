@@ -5,8 +5,9 @@ use std::sync::Arc;
 use iter::{Bytes, Chars, Chunks, Lines};
 use rope::Rope;
 use str_utils::{
-    byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx, count_chars,
-    count_line_breaks, count_utf16_surrogates, line_to_byte_idx, line_to_char_idx,
+    byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
+    char_to_line_idx, count_chars, count_line_breaks, count_utf16_surrogates, line_to_byte_idx,
+    line_to_char_idx, utf16_code_unit_to_char_idx,
 };
 use tree::{Count, Node, TextInfo};
 
@@ -167,6 +168,34 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    /// Total number of utf16 code units that would be in the `RopeSlice` if
+    /// it were encoded as utf16.
+    ///
+    /// Ropey stores text internally as utf8, but sometimes it is necessary
+    /// to interact with external APIs that still use utf16.  This function is
+    /// primarily intended for such situations, and is otherwise not very
+    /// useful.
+    ///
+    /// Runs in O(1) time.
+    #[inline]
+    pub fn len_utf16_code_units(&self) -> usize {
+        match *self {
+            RopeSlice(RSEnum::Full {
+                end_info,
+                start_info,
+                ..
+            }) => {
+                ((end_info.chars + end_info.utf16_surrogates)
+                    - (start_info.chars + start_info.utf16_surrogates)) as usize
+            }
+            RopeSlice(RSEnum::Light {
+                char_count,
+                utf16_surrogate_count,
+                ..
+            }) => (char_count + utf16_surrogate_count) as usize,
+        }
+    }
+
     //-----------------------------------------------------------------------
     // Index conversion methods
 
@@ -278,6 +307,104 @@ impl<'a> RopeSlice<'a> {
 
         let (chunk, _, c, l) = self.chunk_at_char(char_idx);
         l + char_to_line_idx(chunk, char_idx - c)
+    }
+
+    /// Returns the utf16 code unit index of the given char.
+    ///
+    /// Ropey stores text internally as utf8, but sometimes it is necessary
+    /// to interact with external APIs that still use utf16.  This function is
+    /// primarily intended for such situations, and is otherwise not very
+    /// useful.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
+    pub fn char_to_utf16_code_unit(&self, char_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            char_idx <= self.len_chars(),
+            "Attempt to index past end of slice: char index {}, slice char \
+             length {}",
+            char_idx,
+            self.len_chars()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                ref node,
+                start_info,
+                ..
+            }) => {
+                let char_idx = char_idx + start_info.chars as usize;
+
+                let (chunk, chunk_start_info) = node.get_chunk_at_char(char_idx);
+                let chunk_byte_idx =
+                    char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
+                let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
+
+                char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count
+                    - start_info.chars as usize
+                    - start_info.utf16_surrogates as usize
+            }
+
+            RopeSlice(RSEnum::Light { text, .. }) => {
+                let byte_idx = char_to_byte_idx(text, char_idx);
+                let surrogate_count = byte_to_utf16_surrogate_idx(text, byte_idx);
+                char_idx + surrogate_count
+            }
+        }
+    }
+
+    /// Returns the char index of the given utf16 code unit.
+    ///
+    /// Ropey stores text internally as utf8, but sometimes it is necessary
+    /// to interact with external APIs that still use utf16.  This function is
+    /// primarily intended for such situations, and is otherwise not very
+    /// useful.
+    ///
+    /// Note: since utf16 code units can be in the middle of a char, this
+    /// returns the char index of a the char that the utf16 code unit is a
+    /// part of.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `utf16_idx` is out of bounds
+    /// (i.e. `utf16_idx > len_utf16_code_units()`).
+    #[inline]
+    pub fn utf16_code_unit_to_char(&self, utf16_idx: usize) -> usize {
+        // Bounds check
+        assert!(
+            utf16_idx <= self.len_utf16_code_units(),
+            "Attempt to index past end of slice: utf16 code unit index {}, \
+             slice utf16 code unit length {}",
+            utf16_idx,
+            self.len_utf16_code_units()
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                ref node,
+                start_info,
+                ..
+            }) => {
+                let utf16_idx =
+                    utf16_idx + (start_info.chars + start_info.utf16_surrogates) as usize;
+
+                let (chunk, chunk_start_info) = node.get_chunk_at_utf16_code_unit(utf16_idx);
+                let chunk_utf16_idx = utf16_idx
+                    - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
+                let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_idx);
+
+                chunk_start_info.chars as usize + chunk_char_idx - start_info.chars as usize
+            }
+
+            RopeSlice(RSEnum::Light { text, .. }) => utf16_code_unit_to_char_idx(text, utf16_idx),
+        }
     }
 
     /// Returns the byte index of the start of the given line.
@@ -1458,6 +1585,10 @@ mod tests {
     const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
                               a fine day, isn't it?\nAren't you glad \
                               we're alive?\nこんにちは、みんなさん！";
+    // 127 bytes, 107 chars, 111 utf16 code units, 1 line
+    const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
+                              a fine day, isn't it?🐸  Aren't you glad \
+                              we're alive?🐸  こんにちは、みんなさん！";
 
     #[test]
     fn len_bytes_01() {
@@ -1499,6 +1630,41 @@ mod tests {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
         assert_eq!(s.len_lines(), 1);
+    }
+
+    #[test]
+    fn len_utf16_code_units_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(..);
+        assert_eq!(s.len_utf16_code_units(), 103);
+    }
+
+    #[test]
+    fn len_utf16_code_units_02() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(..);
+        assert_eq!(s.len_utf16_code_units(), 111);
+    }
+
+    #[test]
+    fn len_utf16_code_units_03() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(13..33);
+        assert_eq!(s.len_utf16_code_units(), 21);
+    }
+
+    #[test]
+    fn len_utf16_code_units_04() {
+        let r = Rope::from_str("🐸");
+        let s = r.slice(..);
+        assert_eq!(s.len_utf16_code_units(), 2);
+    }
+
+    #[test]
+    fn len_utf16_code_units_05() {
+        let r = Rope::from_str("");
+        let s = r.slice(..);
+        assert_eq!(s.len_utf16_code_units(), 0);
     }
 
     #[test]
@@ -1696,6 +1862,197 @@ mod tests {
         let s = r.slice(34..96);
 
         s.line_to_char(4);
+    }
+
+    #[test]
+    fn char_to_utf16_code_unit_01() {
+        let r = Rope::from_str("");
+        let s = r.slice(..);
+        assert_eq!(0, s.char_to_utf16_code_unit(0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_utf16_code_unit_02() {
+        let r = Rope::from_str("");
+        let s = r.slice(..);
+        s.char_to_utf16_code_unit(1);
+    }
+
+    #[test]
+    fn char_to_utf16_code_unit_03() {
+        let r = Rope::from_str("🐸");
+        let s = r.slice(..);
+        assert_eq!(0, s.char_to_utf16_code_unit(0));
+        assert_eq!(2, s.char_to_utf16_code_unit(1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_utf16_code_unit_04() {
+        let r = Rope::from_str("🐸");
+        let s = r.slice(..);
+        s.char_to_utf16_code_unit(2);
+    }
+
+    #[test]
+    fn char_to_utf16_code_unit_05() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(..);
+
+        assert_eq!(0, s.char_to_utf16_code_unit(0));
+
+        assert_eq!(12, s.char_to_utf16_code_unit(12));
+        assert_eq!(14, s.char_to_utf16_code_unit(13));
+
+        assert_eq!(33, s.char_to_utf16_code_unit(32));
+        assert_eq!(35, s.char_to_utf16_code_unit(33));
+
+        assert_eq!(63, s.char_to_utf16_code_unit(61));
+        assert_eq!(65, s.char_to_utf16_code_unit(62));
+
+        assert_eq!(95, s.char_to_utf16_code_unit(92));
+        assert_eq!(97, s.char_to_utf16_code_unit(93));
+
+        assert_eq!(111, s.char_to_utf16_code_unit(107));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_utf16_code_unit_06() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(..);
+        s.char_to_utf16_code_unit(108);
+    }
+
+    #[test]
+    fn char_to_utf16_code_unit_07() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(1..106);
+
+        assert_eq!(0, s.char_to_utf16_code_unit(0));
+
+        assert_eq!(11, s.char_to_utf16_code_unit(11));
+        assert_eq!(13, s.char_to_utf16_code_unit(12));
+
+        assert_eq!(32, s.char_to_utf16_code_unit(31));
+        assert_eq!(34, s.char_to_utf16_code_unit(32));
+
+        assert_eq!(62, s.char_to_utf16_code_unit(60));
+        assert_eq!(64, s.char_to_utf16_code_unit(61));
+
+        assert_eq!(94, s.char_to_utf16_code_unit(91));
+        assert_eq!(96, s.char_to_utf16_code_unit(92));
+
+        assert_eq!(109, s.char_to_utf16_code_unit(105));
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_utf16_code_unit_08() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(1..106);
+        s.char_to_utf16_code_unit(106);
+    }
+
+    #[test]
+    fn utf16_code_unit_to_char_01() {
+        let r = Rope::from_str("");
+        let s = r.slice(..);
+        assert_eq!(0, s.utf16_code_unit_to_char(0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn utf16_code_unit_to_char_02() {
+        let r = Rope::from_str("");
+        let s = r.slice(..);
+        s.utf16_code_unit_to_char(1);
+    }
+
+    #[test]
+    fn utf16_code_unit_to_char_03() {
+        let r = Rope::from_str("🐸");
+        let s = r.slice(..);
+        assert_eq!(0, s.utf16_code_unit_to_char(0));
+        assert_eq!(0, s.utf16_code_unit_to_char(1));
+        assert_eq!(1, s.utf16_code_unit_to_char(2));
+    }
+
+    #[test]
+    #[should_panic]
+    fn utf16_code_unit_to_char_04() {
+        let r = Rope::from_str("🐸");
+        let s = r.slice(..);
+        s.utf16_code_unit_to_char(3);
+    }
+
+    #[test]
+    fn utf16_code_unit_to_char_05() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(..);
+
+        assert_eq!(0, s.utf16_code_unit_to_char(0));
+
+        assert_eq!(12, s.utf16_code_unit_to_char(12));
+        assert_eq!(12, s.utf16_code_unit_to_char(13));
+        assert_eq!(13, s.utf16_code_unit_to_char(14));
+
+        assert_eq!(32, s.utf16_code_unit_to_char(33));
+        assert_eq!(32, s.utf16_code_unit_to_char(34));
+        assert_eq!(33, s.utf16_code_unit_to_char(35));
+
+        assert_eq!(61, s.utf16_code_unit_to_char(63));
+        assert_eq!(61, s.utf16_code_unit_to_char(64));
+        assert_eq!(62, s.utf16_code_unit_to_char(65));
+
+        assert_eq!(92, s.utf16_code_unit_to_char(95));
+        assert_eq!(92, s.utf16_code_unit_to_char(96));
+        assert_eq!(93, s.utf16_code_unit_to_char(97));
+
+        assert_eq!(107, s.utf16_code_unit_to_char(111));
+    }
+
+    #[test]
+    #[should_panic]
+    fn utf16_code_unit_to_char_06() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(..);
+        s.utf16_code_unit_to_char(112);
+    }
+
+    #[test]
+    fn utf16_code_unit_to_char_07() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(1..106);
+
+        assert_eq!(0, s.utf16_code_unit_to_char(0));
+
+        assert_eq!(11, s.utf16_code_unit_to_char(11));
+        assert_eq!(11, s.utf16_code_unit_to_char(12));
+        assert_eq!(12, s.utf16_code_unit_to_char(13));
+
+        assert_eq!(31, s.utf16_code_unit_to_char(32));
+        assert_eq!(31, s.utf16_code_unit_to_char(33));
+        assert_eq!(32, s.utf16_code_unit_to_char(34));
+
+        assert_eq!(60, s.utf16_code_unit_to_char(62));
+        assert_eq!(60, s.utf16_code_unit_to_char(63));
+        assert_eq!(61, s.utf16_code_unit_to_char(64));
+
+        assert_eq!(91, s.utf16_code_unit_to_char(94));
+        assert_eq!(91, s.utf16_code_unit_to_char(95));
+        assert_eq!(92, s.utf16_code_unit_to_char(96));
+
+        assert_eq!(105, s.utf16_code_unit_to_char(109));
+    }
+
+    #[test]
+    #[should_panic]
+    fn utf16_code_unit_to_char_08() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(1..106);
+        s.utf16_code_unit_to_char(110);
     }
 
     #[test]
