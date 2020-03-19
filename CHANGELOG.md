@@ -3,6 +3,12 @@
 
 ## [Unreleased]
 
+### New features
+- `Rope` and `RopeSlice` can now convert between char indices and utf16 code unit indices.  This useful when interacting with external APIs that use utf16 code units as their text indexing scheme.
+
+### Dependencies
+- Updated smallvec to minimum version 1.0.
+
 
 ## [1.1.0] - 2019-09-01
 
