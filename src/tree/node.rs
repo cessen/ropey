@@ -1045,18 +1045,17 @@ mod tests {
         use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
-        let nodel = Node::Leaf(NodeText::from_str(
+        let nodel = Node::Leaf(Arc::new(NodeText::from_str(
             &iter::repeat("\n").take(MAX_BYTES - 1).collect::<String>(),
-        ));
-        let noder = Node::Leaf(NodeText::from_str(
+        )));
+        let noder = Node::Leaf(Arc::new(NodeText::from_str(
             &iter::repeat("\n").take(MAX_BYTES).collect::<String>(),
-        ));
+        )));
         let mut children = NodeChildren::new();
-        children.push((nodel.text_info(), Arc::new(nodel)));
-        children.push((noder.text_info(), Arc::new(noder)));
-        let root = Node::Internal(children);
+        children.push((nodel.text_info(), nodel));
+        children.push((noder.text_info(), noder));
         let mut rope = Rope {
-            root: Arc::new(root),
+            root: Node::Internal(Arc::new(children)),
         };
         assert_eq!(rope.char(0), '\n');
         assert_eq!(rope.len_chars(), MAX_BYTES * 2 - 1);
@@ -1073,18 +1072,17 @@ mod tests {
         use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
-        let nodel = Node::Leaf(NodeText::from_str(
+        let nodel = Node::Leaf(Arc::new(NodeText::from_str(
             &iter::repeat("\r").take(MAX_BYTES).collect::<String>(),
-        ));
-        let noder = Node::Leaf(NodeText::from_str(
+        )));
+        let noder = Node::Leaf(Arc::new(NodeText::from_str(
             &iter::repeat("\r").take(MAX_BYTES - 1).collect::<String>(),
-        ));
+        )));
         let mut children = NodeChildren::new();
-        children.push((nodel.text_info(), Arc::new(nodel)));
-        children.push((noder.text_info(), Arc::new(noder)));
-        let root = Node::Internal(children);
+        children.push((nodel.text_info(), nodel));
+        children.push((noder.text_info(), noder));
         let mut rope = Rope {
-            root: Arc::new(root),
+            root: Node::Internal(Arc::new(children)),
         };
         assert_eq!(rope.char(0), '\r');
         assert_eq!(rope.len_chars(), MAX_BYTES * 2 - 1);

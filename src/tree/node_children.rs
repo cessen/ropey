@@ -762,15 +762,15 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+            Node::Leaf(Arc::new(NodeText::from_str("Hello "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+            Node::Leaf(Arc::new(NodeText::from_str("there "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+            Node::Leaf(Arc::new(NodeText::from_str("world!"))),
         ));
 
         children.update_child_info(0);
@@ -804,15 +804,15 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+            Node::Leaf(Arc::new(NodeText::from_str("Hello "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+            Node::Leaf(Arc::new(NodeText::from_str("there "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+            Node::Leaf(Arc::new(NodeText::from_str("world!"))),
         ));
 
         children.update_child_info(0);
@@ -827,15 +827,15 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+            Node::Leaf(Arc::new(NodeText::from_str("Hello "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+            Node::Leaf(Arc::new(NodeText::from_str("there "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+            Node::Leaf(Arc::new(NodeText::from_str("world!"))),
         ));
 
         children.update_child_info(0);
@@ -906,15 +906,15 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("Hello "))),
+            Node::Leaf(Arc::new(NodeText::from_str("Hello "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("there "))),
+            Node::Leaf(Arc::new(NodeText::from_str("there "))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+            Node::Leaf(Arc::new(NodeText::from_str("world!"))),
         ));
 
         children.update_child_info(0);
@@ -929,15 +929,15 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("Hello\n"))),
+            Node::Leaf(Arc::new(NodeText::from_str("Hello\n"))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("\nthere\n"))),
+            Node::Leaf(Arc::new(NodeText::from_str("\nthere\n"))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("world!\n"))),
+            Node::Leaf(Arc::new(NodeText::from_str("world!\n"))),
         ));
 
         children.update_child_info(0);
@@ -968,15 +968,15 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("Hello\n"))),
+            Node::Leaf(Arc::new(NodeText::from_str("Hello\n"))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("there"))),
+            Node::Leaf(Arc::new(NodeText::from_str("there"))),
         ));
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str("world!"))),
+            Node::Leaf(Arc::new(NodeText::from_str("world!"))),
         ));
 
         children.update_child_info(0);
@@ -998,7 +998,7 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str(""))),
+            Node::Leaf(Arc::new(NodeText::from_str(""))),
         ));
 
         children.update_child_info(0);
@@ -1016,7 +1016,7 @@ mod tests {
         let mut children = NodeChildren::new();
         children.push((
             TextInfo::new(),
-            Arc::new(Node::Leaf(NodeText::from_str(""))),
+            Node::Leaf(Arc::new(NodeText::from_str(""))),
         ));
 
         children.update_child_info(0);
