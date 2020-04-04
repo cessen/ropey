@@ -7,17 +7,29 @@ use tree::{
     Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) enum Node {
-    Leaf(NodeText),
-    Internal(NodeChildren),
+    Leaf(Arc<NodeText>),
+    Internal(Arc<NodeChildren>),
+}
+
+// We can just derive the clone trait if we want, but I feel more
+// comfortable making it explicit that we're cloning the `Arc`s and not
+// the data they point to.
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        match self {
+            &Node::Leaf(ref text) => Node::Leaf(Arc::clone(text)),
+            &Node::Internal(ref children) => Node::Internal(Arc::clone(children)),
+        }
+    }
 }
 
 impl Node {
     /// Creates an empty node.
     #[inline(always)]
     pub fn new() -> Self {
-        Node::Leaf(NodeText::from_str(""))
+        Node::Leaf(Arc::new(NodeText::from_str("")))
     }
 
     /// Total number of bytes in the Rope.
@@ -74,13 +86,15 @@ impl Node {
         char_idx: usize,
         node_info: TextInfo,
         mut edit: F,
-    ) -> (TextInfo, Option<(TextInfo, Arc<Node>)>)
+    ) -> (TextInfo, Option<(TextInfo, Node)>)
     where
-        F: FnMut(usize, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, Arc<Node>)>),
+        F: FnMut(usize, TextInfo, &mut NodeText) -> (TextInfo, Option<(TextInfo, Node)>),
     {
         match *self {
-            Node::Leaf(ref mut leaf_text) => edit(char_idx, node_info, leaf_text),
+            Node::Leaf(ref mut leaf_text) => edit(char_idx, node_info, Arc::make_mut(leaf_text)),
             Node::Internal(ref mut children) => {
+                let children = Arc::make_mut(children);
+
                 // Compact leaf children if we're very close to maximum leaf
                 // fragmentation.  This basically guards against excessive memory
                 // ballooning when repeatedly appending to the end of a rope.
@@ -99,8 +113,11 @@ impl Node {
                 let info = children.info()[child_i];
 
                 // Recurse into the child.
-                let (l_info, residual) = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                    .edit_chunk_at_char(char_idx - acc_char_idx, info, edit);
+                let (l_info, residual) = children.nodes_mut()[child_i].edit_chunk_at_char(
+                    char_idx - acc_char_idx,
+                    info,
+                    edit,
+                );
                 children.info_mut()[child_i] = l_info;
 
                 // Handle the residual node if there is one and return.
@@ -113,7 +130,7 @@ impl Node {
                         let r_info = r.combined_info();
                         (
                             children.combined_info(),
-                            Some((r_info, Arc::new(Node::Internal(r)))),
+                            Some((r_info, Node::Internal(Arc::new(r)))),
                         )
                     }
                 } else {
@@ -145,6 +162,8 @@ impl Node {
         match *self {
             // If it's a leaf
             Node::Leaf(ref mut leaf_text) => {
+                let leaf_text = Arc::make_mut(leaf_text);
+
                 let byte_start = char_to_byte_idx(leaf_text, start_idx);
                 let byte_end =
                     byte_start + char_to_byte_idx(&leaf_text[byte_start..], end_idx - start_idx);
@@ -199,6 +218,8 @@ impl Node {
 
             // If it's internal, it's much more complicated
             Node::Internal(ref mut children) => {
+                let children = Arc::make_mut(children);
+
                 // Shared code for handling children.
                 // Returns (in this order):
                 // - Whether there's a possible CRLF seam that needs fixing.
@@ -211,8 +232,8 @@ impl Node {
                     // Recurse into child
                     let tmp_info = children.info()[child_i];
                     let tmp_chars = children.info()[child_i].chars as usize;
-                    let (new_info, seam, needs_fix) =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i]).remove_char_range(
+                    let (new_info, seam, needs_fix) = children.nodes_mut()[child_i]
+                        .remove_char_range(
                             start_idx - c_char_acc.min(start_idx),
                             (end_idx - c_char_acc).min(tmp_chars),
                             tmp_info,
@@ -316,7 +337,7 @@ impl Node {
         }
     }
 
-    pub fn append_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+    pub fn append_at_depth(&mut self, other: Node, depth: usize) -> Option<Node> {
         if depth == 0 {
             match *self {
                 Node::Leaf(_) => {
@@ -327,8 +348,12 @@ impl Node {
                     }
                 }
                 Node::Internal(ref mut children_l) => {
+                    let children_l = Arc::make_mut(children_l);
+
                     let mut other = other;
-                    if let Node::Internal(ref mut children_r) = *Arc::make_mut(&mut other) {
+                    if let Node::Internal(ref mut children_r) = other {
+                        let children_r = Arc::make_mut(children_r);
+
                         if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
                             for _ in 0..children_r.len() {
                                 children_l.push(children_r.remove(0));
@@ -345,9 +370,10 @@ impl Node {
                 }
             }
         } else if let Node::Internal(ref mut children) = *self {
+            let children = Arc::make_mut(children);
+
             let last_i = children.len() - 1;
-            let residual =
-                Arc::make_mut(&mut children.nodes_mut()[last_i]).append_at_depth(other, depth - 1);
+            let residual = children.nodes_mut()[last_i].append_at_depth(other, depth - 1);
             children.update_child_info(last_i);
             if let Some(extra_node) = residual {
                 if children.len() < MAX_CHILDREN {
@@ -355,7 +381,7 @@ impl Node {
                     return None;
                 } else {
                     let r_children = children.push_split((extra_node.text_info(), extra_node));
-                    return Some(Arc::new(Node::Internal(r_children)));
+                    return Some(Node::Internal(Arc::new(r_children)));
                 }
             } else {
                 return None;
@@ -365,7 +391,7 @@ impl Node {
         }
     }
 
-    pub fn prepend_at_depth(&mut self, other: Arc<Node>, depth: usize) -> Option<Arc<Node>> {
+    pub fn prepend_at_depth(&mut self, other: Node, depth: usize) -> Option<Node> {
         if depth == 0 {
             match *self {
                 Node::Leaf(_) => {
@@ -376,8 +402,12 @@ impl Node {
                     }
                 }
                 Node::Internal(ref mut children_r) => {
+                    let children_r = Arc::make_mut(children_r);
+
                     let mut other = other;
-                    if let Node::Internal(ref mut children_l) = *Arc::make_mut(&mut other) {
+                    if let Node::Internal(ref mut children_l) = other {
+                        let children_l = Arc::make_mut(children_l);
+
                         if (children_l.len() + children_r.len()) <= MAX_CHILDREN {
                             for _ in 0..children_l.len() {
                                 children_r.insert(0, children_l.pop());
@@ -394,8 +424,9 @@ impl Node {
                 }
             }
         } else if let Node::Internal(ref mut children) = *self {
-            let residual =
-                Arc::make_mut(&mut children.nodes_mut()[0]).prepend_at_depth(other, depth - 1);
+            let children = Arc::make_mut(children);
+
+            let residual = children.nodes_mut()[0].prepend_at_depth(other, depth - 1);
             children.update_child_info(0);
             if let Some(extra_node) = residual {
                 if children.len() < MAX_CHILDREN {
@@ -405,7 +436,7 @@ impl Node {
                     let mut r_children =
                         children.insert_split(0, (extra_node.text_info(), extra_node));
                     std::mem::swap(children, &mut r_children);
-                    return Some(Arc::new(Node::Internal(r_children)));
+                    return Some(Node::Internal(Arc::new(r_children)));
                 }
             } else {
                 return None;
@@ -422,30 +453,33 @@ impl Node {
         debug_assert!(char_idx != (self.text_info().chars as usize));
         match *self {
             Node::Leaf(ref mut text) => {
+                let text = Arc::make_mut(text);
                 let byte_idx = char_to_byte_idx(text, char_idx);
-                Node::Leaf(text.split_off(byte_idx))
+                Node::Leaf(Arc::new(text.split_off(byte_idx)))
             }
             Node::Internal(ref mut children) => {
+                let children = Arc::make_mut(children);
+
                 let (child_i, acc_info) = children.search_char_idx(char_idx);
                 let child_info = children.info()[child_i];
 
                 if char_idx == acc_info.chars as usize {
-                    Node::Internal(children.split_off(child_i))
+                    Node::Internal(Arc::new(children.split_off(child_i)))
                 } else if char_idx == (acc_info.chars as usize + child_info.chars as usize) {
-                    Node::Internal(children.split_off(child_i + 1))
+                    Node::Internal(Arc::new(children.split_off(child_i + 1)))
                 } else {
                     let mut r_children = children.split_off(child_i + 1);
 
                     // Recurse
-                    let r_node = Arc::make_mut(&mut children.nodes_mut()[child_i])
-                        .split(char_idx - acc_info.chars as usize);
+                    let r_node =
+                        children.nodes_mut()[child_i].split(char_idx - acc_info.chars as usize);
 
-                    r_children.insert(0, (r_node.text_info(), Arc::new(r_node)));
+                    r_children.insert(0, (r_node.text_info(), r_node));
 
                     children.update_child_info(child_i);
                     r_children.update_child_info(0);
 
-                    Node::Internal(r_children)
+                    Node::Internal(Arc::new(r_children))
                 }
             }
         }
@@ -466,7 +500,7 @@ impl Node {
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_byte_idx(byte_idx);
                     info += acc_info;
-                    node = &*children.nodes()[child_i];
+                    node = &children.nodes()[child_i];
                     byte_idx -= acc_info.bytes as usize;
                 }
             }
@@ -488,7 +522,7 @@ impl Node {
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_char_idx(char_idx);
                     info += acc_info;
-                    node = &*children.nodes()[child_i];
+                    node = &children.nodes()[child_i];
                     char_idx -= acc_info.chars as usize;
                 }
             }
@@ -510,7 +544,7 @@ impl Node {
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_utf16_code_unit_idx(utf16_idx);
                     info += acc_info;
-                    node = &*children.nodes()[child_i];
+                    node = &children.nodes()[child_i];
                     utf16_idx -= (acc_info.chars + acc_info.utf16_surrogates) as usize;
                 }
             }
@@ -535,7 +569,7 @@ impl Node {
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = children.search_line_break_idx(line_break_idx);
                     info += acc_info;
-                    node = &*children.nodes()[child_i];
+                    node = &children.nodes()[child_i];
                     line_break_idx -= acc_info.line_breaks as usize;
                 }
             }
@@ -582,7 +616,7 @@ impl Node {
 
     pub fn children_mut(&mut self) -> &mut NodeChildren {
         match *self {
-            Node::Internal(ref mut children) => children,
+            Node::Internal(ref mut children) => Arc::make_mut(children),
             _ => panic!(),
         }
     }
@@ -597,7 +631,7 @@ impl Node {
 
     pub fn leaf_text_mut(&mut self) -> &mut NodeText {
         if let Node::Leaf(ref mut text) = *self {
-            text
+            Arc::make_mut(text)
         } else {
             panic!()
         }
@@ -630,7 +664,7 @@ impl Node {
                 Node::Leaf(_) => return depth,
                 Node::Internal(ref children) => {
                     depth += 1;
-                    node = &*children.nodes()[0];
+                    node = &children.nodes()[0];
                 }
             }
         }
@@ -707,14 +741,17 @@ impl Node {
     /// `fix_info_*` methods below, but I'm not totally sure.
     pub fn fix_crlf_seam(&mut self, byte_pos: Count, must_be_boundary: bool) {
         if let Node::Internal(ref mut children) = *self {
+            let children = Arc::make_mut(children);
+
             if byte_pos == 0 {
                 // Special-case 1
-                Arc::make_mut(&mut children.nodes_mut()[0])
-                    .fix_crlf_seam(byte_pos, must_be_boundary);
+                children.nodes_mut()[0].fix_crlf_seam(byte_pos, must_be_boundary);
             } else if byte_pos == children.combined_info().bytes {
                 // Special-case 2
                 let (info, nodes) = children.data_mut();
-                Arc::make_mut(nodes.last_mut().unwrap())
+                nodes
+                    .last_mut()
+                    .unwrap()
                     .fix_crlf_seam(info.last().unwrap().bytes, must_be_boundary);
             } else {
                 // Find the child to navigate into
@@ -737,11 +774,10 @@ impl Node {
                     // Scope for borrow
                     {
                         // Fetch the two children
-                        let (mut l_child, mut r_child) =
-                            children.get_two_mut(l_child_i, l_child_i + 1);
+                        let (l_child, r_child) = children.get_two_mut(l_child_i, l_child_i + 1);
                         let l_child_bytes = l_child.0.bytes;
-                        let l_child = Arc::make_mut(&mut l_child.1);
-                        let r_child = Arc::make_mut(&mut r_child.1);
+                        let l_child = l_child.1;
+                        let r_child = r_child.1;
 
                         // Get the text of the two children and fix
                         // the seam between them.
@@ -776,8 +812,7 @@ impl Node {
                     }
                 } else {
                     // Internal to child
-                    Arc::make_mut(&mut children.nodes_mut()[child_i])
-                        .fix_crlf_seam(pos_in_child, must_be_boundary);
+                    children.nodes_mut()[child_i].fix_crlf_seam(pos_in_child, must_be_boundary);
 
                     children.update_child_info(child_i);
 
@@ -793,10 +828,12 @@ impl Node {
     /// of that byte within the chunk.
     pub fn get_chunk_at_byte_mut(&mut self, byte_idx: usize) -> (&mut NodeText, usize) {
         match *self {
-            Node::Leaf(ref mut text) => return (text, byte_idx),
+            Node::Leaf(ref mut text) => return (Arc::make_mut(text), byte_idx),
             Node::Internal(ref mut children) => {
+                let children = Arc::make_mut(children);
+
                 let (child_i, acc_info) = children.search_byte_idx(byte_idx);
-                Arc::make_mut(&mut children.nodes_mut()[child_i])
+                children.nodes_mut()[child_i]
                     .get_chunk_at_byte_mut(byte_idx - acc_info.bytes as usize)
             }
         }
@@ -808,7 +845,8 @@ impl Node {
         match *self {
             Node::Leaf(_) => {}
             Node::Internal(ref mut children) => {
-                Arc::make_mut(&mut children.nodes_mut()[0]).fix_info_left();
+                let children = Arc::make_mut(children);
+                children.nodes_mut()[0].fix_info_left();
                 children.update_child_info(0);
                 if children.info()[0].bytes == 0 {
                     children.remove(0);
@@ -823,8 +861,9 @@ impl Node {
         match *self {
             Node::Leaf(_) => {}
             Node::Internal(ref mut children) => {
+                let children = Arc::make_mut(children);
                 let idx = children.len() - 1;
-                Arc::make_mut(&mut children.nodes_mut()[idx]).fix_info_right();
+                children.nodes_mut()[idx].fix_info_right();
                 children.update_child_info(idx);
                 if children.info()[idx].bytes == 0 {
                     children.remove(idx);
@@ -839,10 +878,12 @@ impl Node {
     /// parent.
     pub fn zip_fix_left(&mut self) -> bool {
         if let Node::Internal(ref mut children) = *self {
+            let children = Arc::make_mut(children);
+
             let mut did_stuff = false;
             loop {
                 let do_merge = (children.len() > 1)
-                    && match *children.nodes()[0] {
+                    && match children.nodes()[0] {
                         Node::Leaf(ref text) => text.len() < MIN_BYTES,
                         Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
                     };
@@ -851,7 +892,7 @@ impl Node {
                     did_stuff |= children.merge_distribute(0, 1);
                 }
 
-                if !Arc::make_mut(&mut children.nodes_mut()[0]).zip_fix_left() {
+                if !children.nodes_mut()[0].zip_fix_left() {
                     break;
                 }
             }
@@ -867,11 +908,13 @@ impl Node {
     /// parent. True: did stuff, false: didn't do stuff
     pub fn zip_fix_right(&mut self) -> bool {
         if let Node::Internal(ref mut children) = *self {
+            let children = Arc::make_mut(children);
+
             let mut did_stuff = false;
             loop {
                 let last_i = children.len() - 1;
                 let do_merge = (children.len() > 1)
-                    && match *children.nodes()[last_i] {
+                    && match children.nodes()[last_i] {
                         Node::Leaf(ref text) => text.len() < MIN_BYTES,
                         Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
                     };
@@ -880,7 +923,7 @@ impl Node {
                     did_stuff |= children.merge_distribute(last_i - 1, last_i);
                 }
 
-                if !Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap()).zip_fix_right() {
+                if !children.nodes_mut().last_mut().unwrap().zip_fix_right() {
                     break;
                 }
             }
@@ -898,6 +941,8 @@ impl Node {
     /// parent. True: did stuff, false: didn't do stuff
     pub fn fix_after_remove(&mut self, char_idx: usize) -> bool {
         if let Node::Internal(ref mut children) = *self {
+            let children = Arc::make_mut(children);
+
             let mut did_stuff = false;
             loop {
                 // Do merging
@@ -906,10 +951,10 @@ impl Node {
                     let end_info = start_info + children.info()[child_i];
 
                     if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
-                        let do_merge = match *children.nodes()[child_i] {
+                        let do_merge = match children.nodes()[child_i] {
                             Node::Leaf(ref text) => text.len() < MIN_BYTES,
                             Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                        } || match *children.nodes()[child_i + 1] {
+                        } || match children.nodes()[child_i + 1] {
                             Node::Leaf(ref text) => text.len() < MIN_BYTES,
                             Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
                         };
@@ -918,7 +963,7 @@ impl Node {
                             did_stuff |= children.merge_distribute(child_i, child_i + 1);
                         }
                     } else {
-                        let do_merge = match *children.nodes()[child_i] {
+                        let do_merge = match children.nodes()[child_i] {
                             Node::Leaf(ref text) => text.len() < MIN_BYTES,
                             Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
                         };
@@ -939,14 +984,12 @@ impl Node {
 
                 if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
                     let tmp = children.info()[child_i].chars as usize;
-                    let effect_1 =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i]).fix_after_remove(tmp);
-                    let effect_2 =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i + 1]).fix_after_remove(0);
+                    let effect_1 = children.nodes_mut()[child_i].fix_after_remove(tmp);
+                    let effect_2 = children.nodes_mut()[child_i + 1].fix_after_remove(0);
                     if (!effect_1) && (!effect_2) {
                         break;
                     }
-                } else if !Arc::make_mut(&mut children.nodes_mut()[child_i])
+                } else if !children.nodes_mut()[child_i]
                     .fix_after_remove(char_idx - start_info.chars as usize)
                 {
                     break;

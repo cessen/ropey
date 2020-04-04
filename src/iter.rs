@@ -48,7 +48,6 @@
 //! chars.
 
 use std::str;
-use std::sync::Arc;
 
 use slice::RopeSlice;
 use str_utils::{
@@ -70,7 +69,7 @@ pub struct Bytes<'a> {
 }
 
 impl<'a> Bytes<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Bytes {
+    pub(crate) fn new(node: &Node) -> Bytes {
         let mut chunk_iter = Chunks::new(node);
         let cur_chunk = if let Some(chunk) = chunk_iter.next() {
             chunk
@@ -88,7 +87,7 @@ impl<'a> Bytes<'a> {
 
     #[inline(always)]
     pub(crate) fn new_with_range(
-        node: &Arc<Node>,
+        node: &Node,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
         line_break_idx_range: (usize, usize),
@@ -103,7 +102,7 @@ impl<'a> Bytes<'a> {
     }
 
     pub(crate) fn new_with_range_at(
-        node: &Arc<Node>,
+        node: &Node,
         at_byte: usize,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
@@ -235,7 +234,7 @@ pub struct Chars<'a> {
 }
 
 impl<'a> Chars<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Chars {
+    pub(crate) fn new(node: &Node) -> Chars {
         let mut chunk_iter = Chunks::new(node);
         let cur_chunk = if let Some(chunk) = chunk_iter.next() {
             chunk
@@ -253,7 +252,7 @@ impl<'a> Chars<'a> {
 
     #[inline(always)]
     pub(crate) fn new_with_range(
-        node: &Arc<Node>,
+        node: &Node,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
         line_break_idx_range: (usize, usize),
@@ -268,7 +267,7 @@ impl<'a> Chars<'a> {
     }
 
     pub(crate) fn new_with_range_at(
-        node: &Arc<Node>,
+        node: &Node,
         at_char: usize,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
@@ -417,7 +416,7 @@ pub struct Lines<'a>(LinesEnum<'a>);
 #[derive(Debug, Clone)]
 enum LinesEnum<'a> {
     Full {
-        node: &'a Arc<Node>,
+        node: &'a Node,
         start_char: usize,
         end_char: usize,
         start_line: usize,
@@ -434,7 +433,7 @@ enum LinesEnum<'a> {
 }
 
 impl<'a> Lines<'a> {
-    pub(crate) fn new(node: &Arc<Node>) -> Lines {
+    pub(crate) fn new(node: &Node) -> Lines {
         Lines(LinesEnum::Full {
             node: node,
             start_char: 0,
@@ -446,7 +445,7 @@ impl<'a> Lines<'a> {
     }
 
     pub(crate) fn new_with_range(
-        node: &Arc<Node>,
+        node: &Node,
         char_idx_range: (usize, usize),
         line_break_idx_range: (usize, usize),
     ) -> Lines {
@@ -459,7 +458,7 @@ impl<'a> Lines<'a> {
     }
 
     pub(crate) fn new_with_range_at(
-        node: &Arc<Node>,
+        node: &Node,
         at_line: usize,
         char_idx_range: (usize, usize),
         line_break_idx_range: (usize, usize),
@@ -693,8 +692,8 @@ pub struct Chunks<'a>(ChunksEnum<'a>);
 #[derive(Debug, Clone)]
 enum ChunksEnum<'a> {
     Full {
-        node_stack: Vec<(&'a Arc<Node>, usize)>, // (node ref, index of current child)
-        total_bytes: usize,                      // Total bytes in the data range of the iterator.
+        node_stack: Vec<(&'a Node, usize)>, // (node ref, index of current child)
+        total_bytes: usize,                 // Total bytes in the data range of the iterator.
         byte_idx: isize, // The index of the current byte relative to the data range start.
     },
     Light {
@@ -705,7 +704,7 @@ enum ChunksEnum<'a> {
 
 impl<'a> Chunks<'a> {
     #[inline(always)]
-    pub(crate) fn new(node: &Arc<Node>) -> Chunks {
+    pub(crate) fn new(node: &Node) -> Chunks {
         let info = node.text_info();
         Chunks::new_with_range_at_byte(
             node,
@@ -719,7 +718,7 @@ impl<'a> Chunks<'a> {
 
     #[inline(always)]
     pub(crate) fn new_with_range(
-        node: &Arc<Node>,
+        node: &Node,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
         line_break_idx_range: (usize, usize),
@@ -750,7 +749,7 @@ impl<'a> Chunks<'a> {
     /// Returns the iterator and the byte/char/line index of its start relative
     /// to the start of the node.
     pub(crate) fn new_with_range_at_byte(
-        node: &Arc<Node>,
+        node: &Node,
         at_byte: usize,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
@@ -807,10 +806,10 @@ impl<'a> Chunks<'a> {
         let mut info = TextInfo::new();
         let mut byte_idx = at_byte as isize;
         let node_stack = {
-            let mut node_stack: Vec<(&Arc<Node>, usize)> = Vec::new();
+            let mut node_stack: Vec<(&Node, usize)> = Vec::new();
             let mut node_ref = node;
             loop {
-                match **node_ref {
+                match *node_ref {
                     Node::Leaf(ref text) => {
                         if at_byte < end_byte || byte_idx == 0 {
                             byte_idx = info.bytes as isize - start_byte as isize;
@@ -854,7 +853,7 @@ impl<'a> Chunks<'a> {
 
     #[inline(always)]
     pub(crate) fn new_with_range_at_char(
-        node: &Arc<Node>,
+        node: &Node,
         at_char: usize,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),
@@ -877,7 +876,7 @@ impl<'a> Chunks<'a> {
 
     #[inline(always)]
     pub(crate) fn new_with_range_at_line_break(
-        node: &Arc<Node>,
+        node: &Node,
         at_line_break: usize,
         byte_idx_range: (usize, usize),
         char_idx_range: (usize, usize),

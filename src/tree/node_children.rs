@@ -32,12 +32,12 @@ impl NodeChildren {
     }
 
     /// Access to the nodes array.
-    pub fn nodes(&self) -> &[Arc<Node>] {
+    pub fn nodes(&self) -> &[Node] {
         self.0.nodes()
     }
 
     /// Mutable access to the nodes array.
-    pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
+    pub fn nodes_mut(&mut self) -> &mut [Node] {
         self.0.nodes_mut()
     }
 
@@ -52,7 +52,7 @@ impl NodeChildren {
     }
 
     /// Mutable access to both the info and nodes arrays simultaneously.
-    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Node]) {
         self.0.data_mut()
     }
 
@@ -65,7 +65,7 @@ impl NodeChildren {
     /// Pushes an item into the end of the array.
     ///
     /// Increases length by one.  Panics if already full.
-    pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
+    pub fn push(&mut self, item: (TextInfo, Node)) {
         self.0.push(item)
     }
 
@@ -73,7 +73,7 @@ impl NodeChildren {
     /// returning the right half.
     ///
     /// This works even when the array is full.
-    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> Self {
+    pub fn push_split(&mut self, new_child: (TextInfo, Node)) -> Self {
         let r_count = (self.len() + 1) / 2;
         let l_count = (self.len() + 1) - r_count;
 
@@ -94,11 +94,12 @@ impl NodeChildren {
         assert!(idx2 < self.len());
         let remove_right = {
             let ((_, node1), (_, node2)) = self.get_two_mut(idx1, idx2);
-            let node1 = Arc::make_mut(node1);
-            let node2 = Arc::make_mut(node2);
             match *node1 {
                 Node::Leaf(ref mut text1) => {
                     if let Node::Leaf(ref mut text2) = *node2 {
+                        let text1 = Arc::make_mut(text1);
+                        let text2 = Arc::make_mut(text2);
+
                         if (text1.len() + text2.len()) <= tree::MAX_BYTES {
                             text1.push_str(text2);
                             true
@@ -114,6 +115,9 @@ impl NodeChildren {
 
                 Node::Internal(ref mut children1) => {
                     if let Node::Internal(ref mut children2) = *node2 {
+                        let children1 = Arc::make_mut(children1);
+                        let children2 = Arc::make_mut(children2);
+
                         if (children1.len() + children2.len()) <= MAX_LEN {
                             for _ in 0..children2.len() {
                                 children1.push(children2.remove(0));
@@ -168,7 +172,7 @@ impl NodeChildren {
                 // Scope to contain borrows
                 {
                     let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
-                    let text_l = Arc::make_mut(node_l).leaf_text_mut();
+                    let text_l = node_l.leaf_text_mut();
                     let text_r = node_r.leaf_text();
                     text_l.push_str(text_r);
                 }
@@ -177,8 +181,8 @@ impl NodeChildren {
                 // Scope to contain borrows
                 {
                     let ((_, node_l), (_, node_r)) = self.get_two_mut(i - 1, i);
-                    let text_l = Arc::make_mut(node_l).leaf_text_mut();
-                    let text_r = Arc::make_mut(node_r).leaf_text_mut();
+                    let text_l = node_l.leaf_text_mut();
+                    let text_r = node_r.leaf_text_mut();
                     let split_idx_r = crlf::prev_break(MAX_BYTES - text_l.len(), text_r.as_bytes());
                     text_l.push_str(&text_r[..split_idx_r]);
                     text_r.truncate_front(split_idx_r);
@@ -197,7 +201,7 @@ impl NodeChildren {
     /// Pops an item off the end of the array and returns it.
     ///
     /// Decreases length by one.  Panics if already empty.
-    pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
+    pub fn pop(&mut self) -> (TextInfo, Node) {
         self.0.pop()
     }
 
@@ -205,7 +209,7 @@ impl NodeChildren {
     ///
     /// Increases length by one.  Panics if already full.  Preserves ordering
     /// of the other items.
-    pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
+    pub fn insert(&mut self, idx: usize, item: (TextInfo, Node)) {
         self.0.insert(idx, item)
     }
 
@@ -213,7 +217,7 @@ impl NodeChildren {
     /// the right half.
     ///
     /// This works even when the array is full.
-    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> Self {
+    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Node)) -> Self {
         assert!(self.len() > 0);
         assert!(idx <= self.len());
         let extra = if idx < self.len() {
@@ -230,7 +234,7 @@ impl NodeChildren {
     /// Removes the item at the given index from the the array.
     ///
     /// Decreases length by one.  Preserves ordering of the other items.
-    pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
+    pub fn remove(&mut self, idx: usize) -> (TextInfo, Node) {
         self.0.remove(idx)
     }
 
@@ -257,10 +261,7 @@ impl NodeChildren {
         &mut self,
         idx1: usize,
         idx2: usize,
-    ) -> (
-        (&mut TextInfo, &mut Arc<Node>),
-        (&mut TextInfo, &mut Arc<Node>),
-    ) {
+    ) -> ((&mut TextInfo, &mut Node), (&mut TextInfo, &mut Node)) {
         assert!(idx1 < idx2);
         assert!(idx2 < self.len());
 
@@ -276,7 +277,7 @@ impl NodeChildren {
     }
 
     /// Creates an iterator over the array's items.
-    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
+    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Node>> {
         Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
@@ -529,13 +530,12 @@ mod inner {
     use std::mem;
     use std::mem::MaybeUninit;
     use std::ptr;
-    use std::sync::Arc;
 
     /// This is essentially a fixed-capacity, stack-allocated `Vec`.  However,
     /// it actually containts _two_ arrays rather than just one, but which
     /// share a length.
     pub(crate) struct NodeChildrenInternal {
-        nodes: [MaybeUninit<Arc<Node>>; MAX_LEN],
+        nodes: [MaybeUninit<Node>; MAX_LEN],
         info: [MaybeUninit<TextInfo>; MAX_LEN],
         len: u8,
     }
@@ -559,13 +559,13 @@ mod inner {
 
         /// Access to the nodes array.
         #[inline(always)]
-        pub fn nodes<'a>(&'a self) -> &'a [Arc<Node>] {
+        pub fn nodes<'a>(&'a self) -> &'a [Node] {
             unsafe { mem::transmute(&self.nodes[..(self.len())]) }
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
-        pub fn nodes_mut<'a>(&'a mut self) -> &'a mut [Arc<Node>] {
+        pub fn nodes_mut<'a>(&'a mut self) -> &'a mut [Node] {
             unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) }
         }
 
@@ -583,7 +583,7 @@ mod inner {
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
-        pub fn data_mut<'a>(&'a mut self) -> (&'a mut [TextInfo], &'a mut [Arc<Node>]) {
+        pub fn data_mut<'a>(&'a mut self) -> (&'a mut [TextInfo], &'a mut [Node]) {
             (
                 unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) },
                 unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) },
@@ -594,7 +594,7 @@ mod inner {
         ///
         /// Increases length by one.  Panics if already full.
         #[inline(always)]
-        pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
+        pub fn push(&mut self, item: (TextInfo, Node)) {
             assert!(self.len() < MAX_LEN);
             self.info[self.len()] = MaybeUninit::new(item.0);
             self.nodes[self.len as usize] = MaybeUninit::new(item.1);
@@ -605,7 +605,7 @@ mod inner {
         ///
         /// Decreases length by one.  Panics if already empty.
         #[inline(always)]
-        pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
+        pub fn pop(&mut self) -> (TextInfo, Node) {
             assert!(self.len() > 0);
             self.len -= 1;
             (unsafe { self.info[self.len()].assume_init() }, unsafe {
@@ -618,7 +618,7 @@ mod inner {
         /// Increases length by one.  Panics if already full.  Preserves ordering
         /// of the other items.
         #[inline(always)]
-        pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
+        pub fn insert(&mut self, idx: usize, item: (TextInfo, Node)) {
             assert!(idx <= self.len());
             assert!(self.len() < MAX_LEN);
 
@@ -652,7 +652,7 @@ mod inner {
         ///
         /// Decreases length by one.  Preserves ordering of the other items.
         #[inline(always)]
-        pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
+        pub fn remove(&mut self, idx: usize) -> (TextInfo, Node) {
             assert!(self.len() > 0);
             assert!(idx < self.len());
 
@@ -705,7 +705,7 @@ mod inner {
                 clone_array.nodes[..self.len()].iter_mut(),
                 self.nodes[..self.len()].iter(),
             ) {
-                *clone_arc = MaybeUninit::new(Arc::clone(unsafe { &*arc.as_ptr() }));
+                *clone_arc = MaybeUninit::new((unsafe { &*arc.as_ptr() }).clone());
             }
 
             // Copy TextInfo
@@ -733,9 +733,14 @@ mod inner {
                     (&clone_array.nodes[..clone_array.len()]).iter(),
                     (&self.nodes[..clone_array.len()]).iter(),
                 ) {
-                    assert!(Arc::ptr_eq(unsafe { &*a.as_ptr() }, unsafe {
-                        &*b.as_ptr()
-                    },));
+                    let a = unsafe { &*a.as_ptr() };
+                    let b = unsafe { &*b.as_ptr() };
+
+                    if a.is_leaf() {
+                        assert_eq!(a.leaf_text().as_ptr(), b.leaf_text().as_ptr());
+                    } else {
+                        assert_eq!(a.children() as *const _, b.children() as *const _);
+                    }
                 }
             }
 

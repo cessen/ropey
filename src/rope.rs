@@ -100,7 +100,7 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// separate thread while the user continues to perform edits.
 #[derive(Clone)]
 pub struct Rope {
-    pub(crate) root: Arc<Node>,
+    pub(crate) root: Node,
 }
 
 impl Rope {
@@ -110,9 +110,7 @@ impl Rope {
     /// Creates an empty `Rope`.
     #[inline]
     pub fn new() -> Self {
-        Rope {
-            root: Arc::new(Node::new()),
-        }
+        Rope { root: Node::new() }
     }
 
     /// Creates a `Rope` from a string slice.
@@ -338,9 +336,7 @@ impl Rope {
             } else if node_stack.last().unwrap().child_count() == 0 {
                 node_stack.pop();
             } else {
-                let (_, next_node) = Arc::make_mut(node_stack.last_mut().unwrap())
-                    .children_mut()
-                    .remove(0);
+                let (_, next_node) = node_stack.last_mut().unwrap().children_mut().remove(0);
                 node_stack.push(next_node);
             }
         }
@@ -450,84 +446,82 @@ impl Rope {
         let mut left_seam = false;
         let root_info = self.root.text_info();
 
-        let (l_info, residual) = Arc::make_mut(&mut self.root).edit_chunk_at_char(
-            char_idx,
-            root_info,
-            |idx, cur_info, leaf_text| {
-                // First check if we have a left seam.
-                if idx == 0 && char_idx > 0 && ins_text.as_bytes()[0] == 0x0A {
-                    left_seam = true;
-                    ins_text = &ins_text[1..];
-                    // Early out if it was only an LF.
-                    if ins_text.is_empty() {
-                        return (cur_info, None);
+        let (l_info, residual) =
+            self.root
+                .edit_chunk_at_char(char_idx, root_info, |idx, cur_info, leaf_text| {
+                    // First check if we have a left seam.
+                    if idx == 0 && char_idx > 0 && ins_text.as_bytes()[0] == 0x0A {
+                        left_seam = true;
+                        ins_text = &ins_text[1..];
+                        // Early out if it was only an LF.
+                        if ins_text.is_empty() {
+                            return (cur_info, None);
+                        }
                     }
-                }
 
-                // Find our byte index
-                let byte_idx = char_to_byte_idx(leaf_text, idx);
+                    // Find our byte index
+                    let byte_idx = char_to_byte_idx(leaf_text, idx);
 
-                // No node splitting
-                if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
-                    // Calculate new info without doing a full re-scan of cur_text
-                    let new_info = {
-                        // Get summed info of current text and to-be-inserted text
-                        let mut info = cur_info + TextInfo::from_str(ins_text);
-                        // Check for CRLF pairs on the insertion seams, and
-                        // adjust line break counts accordingly
-                        if byte_idx > 0 {
-                            if leaf_text.as_bytes()[byte_idx - 1] == 0x0D
-                                && ins_text.as_bytes()[0] == 0x0A
+                    // No node splitting
+                    if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
+                        // Calculate new info without doing a full re-scan of cur_text
+                        let new_info = {
+                            // Get summed info of current text and to-be-inserted text
+                            let mut info = cur_info + TextInfo::from_str(ins_text);
+                            // Check for CRLF pairs on the insertion seams, and
+                            // adjust line break counts accordingly
+                            if byte_idx > 0 {
+                                if leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    && ins_text.as_bytes()[0] == 0x0A
+                                {
+                                    info.line_breaks -= 1;
+                                }
+                                if byte_idx < leaf_text.len()
+                                    && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    && leaf_text.as_bytes()[byte_idx] == 0x0A
+                                {
+                                    info.line_breaks += 1;
+                                }
+                            }
+                            if byte_idx < leaf_text.len()
+                                && *ins_text.as_bytes().last().unwrap() == 0x0D
+                                && leaf_text.as_bytes()[byte_idx] == 0x0A
                             {
                                 info.line_breaks -= 1;
                             }
-                            if byte_idx < leaf_text.len()
-                                && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
-                                && leaf_text.as_bytes()[byte_idx] == 0x0A
-                            {
-                                info.line_breaks += 1;
-                            }
-                        }
-                        if byte_idx < leaf_text.len()
-                            && *ins_text.as_bytes().last().unwrap() == 0x0D
-                            && leaf_text.as_bytes()[byte_idx] == 0x0A
-                        {
-                            info.line_breaks -= 1;
-                        }
-                        info
-                    };
-                    // Insert the text and return the new info
-                    leaf_text.insert_str(byte_idx, ins_text);
-                    (new_info, None)
-                }
-                // We're splitting the node
-                else {
-                    let r_text = leaf_text.insert_str_split(byte_idx, ins_text);
-                    let l_text_info = TextInfo::from_str(&leaf_text);
-                    if r_text.len() > 0 {
-                        let r_text_info = TextInfo::from_str(&r_text);
-                        (
-                            l_text_info,
-                            Some((r_text_info, Arc::new(Node::Leaf(r_text)))),
-                        )
-                    } else {
-                        // Leaf couldn't be validly split, so leave it oversized
-                        (l_text_info, None)
+                            info
+                        };
+                        // Insert the text and return the new info
+                        leaf_text.insert_str(byte_idx, ins_text);
+                        (new_info, None)
                     }
-                }
-            },
-        );
+                    // We're splitting the node
+                    else {
+                        let r_text = leaf_text.insert_str_split(byte_idx, ins_text);
+                        let l_text_info = TextInfo::from_str(&leaf_text);
+                        if r_text.len() > 0 {
+                            let r_text_info = TextInfo::from_str(&r_text);
+                            (
+                                l_text_info,
+                                Some((r_text_info, Node::Leaf(Arc::new(r_text)))),
+                            )
+                        } else {
+                            // Leaf couldn't be validly split, so leave it oversized
+                            (l_text_info, None)
+                        }
+                    }
+                });
 
         // Handle root splitting, if any.
         if let Some((r_info, r_node)) = residual {
-            let mut l_node = Arc::new(Node::new());
+            let mut l_node = Node::new();
             std::mem::swap(&mut l_node, &mut self.root);
 
             let mut children = NodeChildren::new();
             children.push((l_info, l_node));
             children.push((r_info, r_node));
 
-            *Arc::make_mut(&mut self.root) = Node::Internal(children);
+            self.root = Node::Internal(Arc::new(children));
         }
 
         // Insert the LF to the left.
@@ -536,53 +530,51 @@ impl Rope {
         if left_seam {
             // Do the insertion
             let root_info = self.root.text_info();
-            let (l_info, residual) = Arc::make_mut(&mut self.root).edit_chunk_at_char(
-                char_idx - 1,
-                root_info,
-                |_, cur_info, leaf_text| {
-                    let byte_idx = leaf_text.len();
+            let (l_info, residual) =
+                self.root
+                    .edit_chunk_at_char(char_idx - 1, root_info, |_, cur_info, leaf_text| {
+                        let byte_idx = leaf_text.len();
 
-                    // No node splitting
-                    if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
-                        // Calculate new info without doing a full re-scan of cur_text
-                        let mut new_info = cur_info;
-                        new_info.bytes += 1;
-                        new_info.chars += 1;
-                        if *leaf_text.as_bytes().last().unwrap() != 0x0D {
-                            new_info.line_breaks += 1;
+                        // No node splitting
+                        if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
+                            // Calculate new info without doing a full re-scan of cur_text
+                            let mut new_info = cur_info;
+                            new_info.bytes += 1;
+                            new_info.chars += 1;
+                            if *leaf_text.as_bytes().last().unwrap() != 0x0D {
+                                new_info.line_breaks += 1;
+                            }
+                            // Insert the text and return the new info
+                            leaf_text.insert_str(byte_idx, "\n");
+                            (new_info, None)
                         }
-                        // Insert the text and return the new info
-                        leaf_text.insert_str(byte_idx, "\n");
-                        (new_info, None)
-                    }
-                    // We're splitting the node
-                    else {
-                        let r_text = leaf_text.insert_str_split(byte_idx, "\n");
-                        let l_text_info = TextInfo::from_str(&leaf_text);
-                        if r_text.len() > 0 {
-                            let r_text_info = TextInfo::from_str(&r_text);
-                            (
-                                l_text_info,
-                                Some((r_text_info, Arc::new(Node::Leaf(r_text)))),
-                            )
-                        } else {
-                            // Leaf couldn't be validly split, so leave it oversized
-                            (l_text_info, None)
+                        // We're splitting the node
+                        else {
+                            let r_text = leaf_text.insert_str_split(byte_idx, "\n");
+                            let l_text_info = TextInfo::from_str(&leaf_text);
+                            if r_text.len() > 0 {
+                                let r_text_info = TextInfo::from_str(&r_text);
+                                (
+                                    l_text_info,
+                                    Some((r_text_info, Node::Leaf(Arc::new(r_text)))),
+                                )
+                            } else {
+                                // Leaf couldn't be validly split, so leave it oversized
+                                (l_text_info, None)
+                            }
                         }
-                    }
-                },
-            );
+                    });
 
             // Handle root splitting, if any.
             if let Some((r_info, r_node)) = residual {
-                let mut l_node = Arc::new(Node::new());
+                let mut l_node = Node::new();
                 std::mem::swap(&mut l_node, &mut self.root);
 
                 let mut children = NodeChildren::new();
                 children.push((l_info, l_node));
                 children.push((r_info, r_node));
 
-                *Arc::make_mut(&mut self.root) = Node::Internal(children);
+                self.root = Node::Internal(Arc::new(children));
             }
         }
     }
@@ -628,25 +620,20 @@ impl Rope {
         // A special case that the rest of the logic doesn't handle
         // correctly.
         if start == 0 && end == self.len_chars() {
-            self.root = Arc::new(Node::new());
+            self.root = Node::new();
             return;
         }
 
-        // Scope to contain borrow of root
-        {
-            let root = Arc::make_mut(&mut self.root);
+        let root_info = self.root.text_info();
+        let (_, crlf_seam, needs_fix) = self.root.remove_char_range(start, end, root_info);
 
-            let root_info = root.text_info();
-            let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
+        if crlf_seam {
+            let seam_idx = self.root.char_to_text_info(start).bytes;
+            self.root.fix_crlf_seam(seam_idx as Count, false);
+        }
 
-            if crlf_seam {
-                let seam_idx = root.char_to_text_info(start).bytes;
-                root.fix_crlf_seam(seam_idx as Count, false);
-            }
-
-            if needs_fix {
-                root.fix_after_remove(start);
-            }
+        if needs_fix {
+            self.root.fix_after_remove(start);
         }
 
         self.pull_up_singular_nodes();
@@ -680,12 +667,12 @@ impl Rope {
         } else {
             // Do the split
             let mut new_rope = Rope {
-                root: Arc::new(Arc::make_mut(&mut self.root).split(char_idx)),
+                root: self.root.split(char_idx),
             };
 
             // Fix up the edges
-            Arc::make_mut(&mut self.root).zip_fix_right();
-            Arc::make_mut(&mut new_rope.root).zip_fix_left();
+            self.root.zip_fix_right();
+            new_rope.root.zip_fix_left();
             self.pull_up_singular_nodes();
             new_rope.pull_up_singular_nodes();
 
@@ -712,29 +699,29 @@ impl Rope {
             let r_depth = other.root.depth();
 
             if l_depth > r_depth {
-                let extra =
-                    Arc::make_mut(&mut self.root).append_at_depth(other.root, l_depth - r_depth);
+                let extra = self.root.append_at_depth(other.root, l_depth - r_depth);
                 if let Some(node) = extra {
                     let mut children = NodeChildren::new();
-                    children.push((self.root.text_info(), Arc::clone(&self.root)));
+                    children.push((self.root.text_info(), self.root.clone()));
                     children.push((node.text_info(), node));
-                    self.root = Arc::new(Node::Internal(children));
+                    self.root = Node::Internal(Arc::new(children));
                 }
             } else {
                 let mut other = other;
-                let extra = Arc::make_mut(&mut other.root)
-                    .prepend_at_depth(Arc::clone(&self.root), r_depth - l_depth);
+                let extra = other
+                    .root
+                    .prepend_at_depth(self.root.clone(), r_depth - l_depth);
                 if let Some(node) = extra {
                     let mut children = NodeChildren::new();
                     children.push((node.text_info(), node));
-                    children.push((other.root.text_info(), Arc::clone(&other.root)));
-                    other.root = Arc::new(Node::Internal(children));
+                    children.push((other.root.text_info(), other.root.clone()));
+                    other.root = Node::Internal(Arc::new(children));
                 }
                 *self = other;
             };
 
             if let Some(i) = seam_byte_i {
-                Arc::make_mut(&mut self.root).fix_crlf_seam(i, true);
+                self.root.fix_crlf_seam(i, true);
             }
         }
     }
@@ -1506,8 +1493,8 @@ impl Rope {
     /// one child.
     pub(crate) fn pull_up_singular_nodes(&mut self) {
         while (!self.root.is_leaf()) && self.root.child_count() == 1 {
-            let child = if let Node::Internal(ref children) = *self.root {
-                Arc::clone(&children.nodes()[0])
+            let child = if let Node::Internal(ref children) = self.root {
+                children.nodes()[0].clone()
             } else {
                 unreachable!()
             };
@@ -1553,27 +1540,19 @@ impl<'a> From<RopeSlice<'a>> for Rope {
                 start_info,
                 end_info,
             }) => {
-                let mut rope = Rope {
-                    root: Arc::clone(node),
-                };
+                let mut rope = Rope { root: node.clone() };
 
                 // Chop off right end if needed
                 if end_info.chars < node.text_info().chars {
-                    {
-                        let root = Arc::make_mut(&mut rope.root);
-                        root.split(end_info.chars as usize);
-                        root.zip_fix_right();
-                    }
+                    rope.root.split(end_info.chars as usize);
+                    rope.root.zip_fix_right();
                     rope.pull_up_singular_nodes();
                 }
 
                 // Chop off left end if needed
                 if start_info.chars > 0 {
-                    {
-                        let root = Arc::make_mut(&mut rope.root);
-                        *root = root.split(start_info.chars as usize);
-                        root.zip_fix_left();
-                    }
+                    rope.root = rope.root.split(start_info.chars as usize);
+                    rope.root.zip_fix_left();
                     rope.pull_up_singular_nodes();
                 }
 
@@ -1615,8 +1594,8 @@ impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
 impl<'a> From<&'a Rope> for std::borrow::Cow<'a, str> {
     #[inline]
     fn from(r: &'a Rope) -> Self {
-        if let Node::Leaf(ref text) = *r.root {
-            std::borrow::Cow::Borrowed(text)
+        if let Node::Leaf(ref text) = r.root {
+            std::borrow::Cow::Borrowed(&*text)
         } else {
             std::borrow::Cow::Owned(String::from(r))
         }

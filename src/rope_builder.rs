@@ -42,7 +42,7 @@ use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct RopeBuilder {
-    stack: SmallVec<[Arc<Node>; 4]>,
+    stack: SmallVec<[Node; 4]>,
     buffer: String,
 }
 
@@ -52,7 +52,7 @@ impl RopeBuilder {
         RopeBuilder {
             stack: {
                 let mut stack = SmallVec::new();
-                stack.push(Arc::new(Node::new()));
+                stack.push(Node::new());
                 stack
             },
             buffer: String::new(),
@@ -109,11 +109,11 @@ impl RopeBuilder {
                 NextText::None => break,
                 NextText::UseBuffer => {
                     let leaf_text = NodeText::from_str(&self.buffer);
-                    self.append_leaf_node(Arc::new(Node::Leaf(leaf_text)));
+                    self.append_leaf_node(Node::Leaf(Arc::new(leaf_text)));
                     self.buffer.clear();
                 }
                 NextText::String(s) => {
-                    self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(s))));
+                    self.append_leaf_node(Node::Leaf(Arc::new(NodeText::from_str(s))));
                 }
             }
         }
@@ -125,8 +125,8 @@ impl RopeBuilder {
         let mut stack_idx = self.stack.len() - 1;
         while stack_idx >= 1 {
             let node = self.stack.pop().unwrap();
-            if let Node::Internal(ref mut children) = *Arc::make_mut(&mut self.stack[stack_idx - 1])
-            {
+            if let Node::Internal(ref mut children) = self.stack[stack_idx - 1] {
+                let children = Arc::make_mut(children);
                 children.push((node.text_info(), node));
             } else {
                 unreachable!();
@@ -136,7 +136,7 @@ impl RopeBuilder {
 
         // Get root and fix any right-side nodes with too few children.
         let mut root = self.stack.pop().unwrap();
-        Arc::make_mut(&mut root).zip_fix_right();
+        root.zip_fix_right();
 
         // Create the rope, make sure it's well-formed, and return it.
         let mut rope = Rope { root: root };
@@ -202,9 +202,9 @@ impl RopeBuilder {
         }
     }
 
-    fn append_leaf_node(&mut self, leaf: Arc<Node>) {
+    fn append_leaf_node(&mut self, leaf: Node) {
         let last = self.stack.pop().unwrap();
-        match *last {
+        match last {
             Node::Leaf(_) => {
                 if last.leaf_text().is_empty() {
                     self.stack.push(leaf);
@@ -212,7 +212,7 @@ impl RopeBuilder {
                     let mut children = NodeChildren::new();
                     children.push((last.text_info(), last));
                     children.push((leaf.text_info(), leaf));
-                    self.stack.push(Arc::new(Node::Internal(children)));
+                    self.stack.push(Node::Internal(Arc::new(children)));
                 }
             }
 
@@ -225,18 +225,18 @@ impl RopeBuilder {
                         // We're above the root, so do a root split.
                         let mut children = NodeChildren::new();
                         children.push((left.text_info(), left));
-                        self.stack.insert(0, Arc::new(Node::Internal(children)));
+                        self.stack.insert(0, Node::Internal(Arc::new(children)));
                         break;
                     } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
                         // There's room to add a child, so do that.
-                        Arc::make_mut(&mut self.stack[stack_idx as usize])
+                        self.stack[stack_idx as usize]
                             .children_mut()
                             .push((left.text_info(), left));
                         break;
                     } else {
                         // Not enough room to fit a child, so split.
-                        left = Arc::new(Node::Internal(
-                            Arc::make_mut(&mut self.stack[stack_idx as usize])
+                        left = Node::Internal(Arc::new(
+                            self.stack[stack_idx as usize]
                                 .children_mut()
                                 .push_split((left.text_info(), left)),
                         ));

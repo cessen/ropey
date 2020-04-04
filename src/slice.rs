@@ -1,6 +1,5 @@
 use std;
 use std::ops::{Bound, RangeBounds};
-use std::sync::Arc;
 
 use iter::{Bytes, Chars, Chunks, Lines};
 use rope::Rope;
@@ -27,7 +26,7 @@ pub struct RopeSlice<'a>(pub(crate) RSEnum<'a>);
 #[derive(Copy, Clone)]
 pub(crate) enum RSEnum<'a> {
     Full {
-        node: &'a Arc<Node>,
+        node: &'a Node,
         start_info: TextInfo,
         end_info: TextInfo,
     },
@@ -40,7 +39,7 @@ pub(crate) enum RSEnum<'a> {
 }
 
 impl<'a> RopeSlice<'a> {
-    pub(crate) fn new_with_range(node: &'a Arc<Node>, start: usize, end: usize) -> Self {
+    pub(crate) fn new_with_range(node: &'a Node, start: usize, end: usize) -> Self {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
 
