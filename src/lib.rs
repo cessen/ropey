@@ -64,7 +64,7 @@
 //!
 //! More examples can be found in the `examples` directory of the git
 //! repository.  Many of those examples demonstrate doing non-trivial things
-//! with Ropey such grapheme handling, search-and-replace, and streaming
+//! with Ropey such as grapheme handling, search-and-replace, and streaming
 //! loading of non-utf8 text files.
 //!
 //!
