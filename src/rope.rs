@@ -37,25 +37,6 @@ use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 /// assert_eq!(rope, "Hello world!");
 /// ```
 ///
-/// You can also split off the end of a `Rope` or append one `Rope` to another:
-///
-/// ```
-/// # use ropey::Rope;
-/// #
-/// let mut rope = Rope::from_str("Hello みんなさん!");
-/// let right_side = rope.split_off(6);
-///
-/// assert_eq!(rope, "Hello ");
-/// assert_eq!(right_side, "みんなさん!");
-///
-/// rope.append(Rope::from_str("world!"));
-///
-/// assert_eq!(rope, "Hello world!");
-/// ```
-///
-/// Note that `insert()` and `remove()` are generally faster than `split_off()`
-/// and `append()`.
-///
 /// # Query Operations
 ///
 /// `Rope` provides a rich set of efficient query functions, including querying

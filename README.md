@@ -80,6 +80,8 @@ encoded as utf8.  All of Ropey's editing and slicing operations are done
 in terms of char indices, which prevents accidental creation of invalid
 utf8 data.
 
+Ropey also supports converting between scalar value indices and utf16 code unit indices, for interoperation with external APIs that may still use utf16.
+
 ### Line-aware
 
 Ropey knows about line breaks, allowing you to index into and iterate over
