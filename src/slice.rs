@@ -178,7 +178,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Runs in O(1) time.
     #[inline]
-    pub fn len_utf16_code_units(&self) -> usize {
+    pub fn len_utf16_cu(&self) -> usize {
         match *self {
             RopeSlice(RSEnum::Full {
                 end_info,
@@ -322,7 +322,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
-    pub fn char_to_utf16_code_unit(&self, char_idx: usize) -> usize {
+    pub fn char_to_utf16_cu(&self, char_idx: usize) -> usize {
         // Bounds check
         assert!(
             char_idx <= self.len_chars(),
@@ -372,17 +372,17 @@ impl<'a> RopeSlice<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if `utf16_idx` is out of bounds
-    /// (i.e. `utf16_idx > len_utf16_code_units()`).
+    /// Panics if `utf16_cu_idx` is out of bounds
+    /// (i.e. `utf16_cu_idx > len_utf16_cu()`).
     #[inline]
-    pub fn utf16_code_unit_to_char(&self, utf16_idx: usize) -> usize {
+    pub fn utf16_cu_to_char(&self, utf16_cu_idx: usize) -> usize {
         // Bounds check
         assert!(
-            utf16_idx <= self.len_utf16_code_units(),
+            utf16_cu_idx <= self.len_utf16_cu(),
             "Attempt to index past end of slice: utf16 code unit index {}, \
              slice utf16 code unit length {}",
-            utf16_idx,
-            self.len_utf16_code_units()
+            utf16_cu_idx,
+            self.len_utf16_cu()
         );
 
         match *self {
@@ -391,18 +391,20 @@ impl<'a> RopeSlice<'a> {
                 start_info,
                 ..
             }) => {
-                let utf16_idx =
-                    utf16_idx + (start_info.chars + start_info.utf16_surrogates) as usize;
+                let utf16_cu_idx =
+                    utf16_cu_idx + (start_info.chars + start_info.utf16_surrogates) as usize;
 
-                let (chunk, chunk_start_info) = node.get_chunk_at_utf16_code_unit(utf16_idx);
-                let chunk_utf16_idx = utf16_idx
+                let (chunk, chunk_start_info) = node.get_chunk_at_utf16_code_unit(utf16_cu_idx);
+                let chunk_utf16_cu_idx = utf16_cu_idx
                     - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
-                let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_idx);
+                let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_cu_idx);
 
                 chunk_start_info.chars as usize + chunk_char_idx - start_info.chars as usize
             }
 
-            RopeSlice(RSEnum::Light { text, .. }) => utf16_code_unit_to_char_idx(text, utf16_idx),
+            RopeSlice(RSEnum::Light { text, .. }) => {
+                utf16_code_unit_to_char_idx(text, utf16_cu_idx)
+            }
         }
     }
 
@@ -1632,38 +1634,38 @@ mod tests {
     }
 
     #[test]
-    fn len_utf16_code_units_01() {
+    fn len_utf16_cu_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(..);
-        assert_eq!(s.len_utf16_code_units(), 103);
+        assert_eq!(s.len_utf16_cu(), 103);
     }
 
     #[test]
-    fn len_utf16_code_units_02() {
+    fn len_utf16_cu_02() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
-        assert_eq!(s.len_utf16_code_units(), 111);
+        assert_eq!(s.len_utf16_cu(), 111);
     }
 
     #[test]
-    fn len_utf16_code_units_03() {
+    fn len_utf16_cu_03() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(13..33);
-        assert_eq!(s.len_utf16_code_units(), 21);
+        assert_eq!(s.len_utf16_cu(), 21);
     }
 
     #[test]
-    fn len_utf16_code_units_04() {
+    fn len_utf16_cu_04() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        assert_eq!(s.len_utf16_code_units(), 2);
+        assert_eq!(s.len_utf16_cu(), 2);
     }
 
     #[test]
-    fn len_utf16_code_units_05() {
+    fn len_utf16_cu_05() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        assert_eq!(s.len_utf16_code_units(), 0);
+        assert_eq!(s.len_utf16_cu(), 0);
     }
 
     #[test]
@@ -1864,194 +1866,194 @@ mod tests {
     }
 
     #[test]
-    fn char_to_utf16_code_unit_01() {
+    fn char_to_utf16_cu_01() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        assert_eq!(0, s.char_to_utf16_code_unit(0));
+        assert_eq!(0, s.char_to_utf16_cu(0));
     }
 
     #[test]
     #[should_panic]
-    fn char_to_utf16_code_unit_02() {
+    fn char_to_utf16_cu_02() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        s.char_to_utf16_code_unit(1);
+        s.char_to_utf16_cu(1);
     }
 
     #[test]
-    fn char_to_utf16_code_unit_03() {
+    fn char_to_utf16_cu_03() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        assert_eq!(0, s.char_to_utf16_code_unit(0));
-        assert_eq!(2, s.char_to_utf16_code_unit(1));
+        assert_eq!(0, s.char_to_utf16_cu(0));
+        assert_eq!(2, s.char_to_utf16_cu(1));
     }
 
     #[test]
     #[should_panic]
-    fn char_to_utf16_code_unit_04() {
+    fn char_to_utf16_cu_04() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        s.char_to_utf16_code_unit(2);
+        s.char_to_utf16_cu(2);
     }
 
     #[test]
-    fn char_to_utf16_code_unit_05() {
+    fn char_to_utf16_cu_05() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
 
-        assert_eq!(0, s.char_to_utf16_code_unit(0));
+        assert_eq!(0, s.char_to_utf16_cu(0));
 
-        assert_eq!(12, s.char_to_utf16_code_unit(12));
-        assert_eq!(14, s.char_to_utf16_code_unit(13));
+        assert_eq!(12, s.char_to_utf16_cu(12));
+        assert_eq!(14, s.char_to_utf16_cu(13));
 
-        assert_eq!(33, s.char_to_utf16_code_unit(32));
-        assert_eq!(35, s.char_to_utf16_code_unit(33));
+        assert_eq!(33, s.char_to_utf16_cu(32));
+        assert_eq!(35, s.char_to_utf16_cu(33));
 
-        assert_eq!(63, s.char_to_utf16_code_unit(61));
-        assert_eq!(65, s.char_to_utf16_code_unit(62));
+        assert_eq!(63, s.char_to_utf16_cu(61));
+        assert_eq!(65, s.char_to_utf16_cu(62));
 
-        assert_eq!(95, s.char_to_utf16_code_unit(92));
-        assert_eq!(97, s.char_to_utf16_code_unit(93));
+        assert_eq!(95, s.char_to_utf16_cu(92));
+        assert_eq!(97, s.char_to_utf16_cu(93));
 
-        assert_eq!(111, s.char_to_utf16_code_unit(107));
+        assert_eq!(111, s.char_to_utf16_cu(107));
     }
 
     #[test]
     #[should_panic]
-    fn char_to_utf16_code_unit_06() {
+    fn char_to_utf16_cu_06() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
-        s.char_to_utf16_code_unit(108);
+        s.char_to_utf16_cu(108);
     }
 
     #[test]
-    fn char_to_utf16_code_unit_07() {
+    fn char_to_utf16_cu_07() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..106);
 
-        assert_eq!(0, s.char_to_utf16_code_unit(0));
+        assert_eq!(0, s.char_to_utf16_cu(0));
 
-        assert_eq!(11, s.char_to_utf16_code_unit(11));
-        assert_eq!(13, s.char_to_utf16_code_unit(12));
+        assert_eq!(11, s.char_to_utf16_cu(11));
+        assert_eq!(13, s.char_to_utf16_cu(12));
 
-        assert_eq!(32, s.char_to_utf16_code_unit(31));
-        assert_eq!(34, s.char_to_utf16_code_unit(32));
+        assert_eq!(32, s.char_to_utf16_cu(31));
+        assert_eq!(34, s.char_to_utf16_cu(32));
 
-        assert_eq!(62, s.char_to_utf16_code_unit(60));
-        assert_eq!(64, s.char_to_utf16_code_unit(61));
+        assert_eq!(62, s.char_to_utf16_cu(60));
+        assert_eq!(64, s.char_to_utf16_cu(61));
 
-        assert_eq!(94, s.char_to_utf16_code_unit(91));
-        assert_eq!(96, s.char_to_utf16_code_unit(92));
+        assert_eq!(94, s.char_to_utf16_cu(91));
+        assert_eq!(96, s.char_to_utf16_cu(92));
 
-        assert_eq!(109, s.char_to_utf16_code_unit(105));
+        assert_eq!(109, s.char_to_utf16_cu(105));
     }
 
     #[test]
     #[should_panic]
-    fn char_to_utf16_code_unit_08() {
+    fn char_to_utf16_cu_08() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..106);
-        s.char_to_utf16_code_unit(106);
+        s.char_to_utf16_cu(106);
     }
 
     #[test]
-    fn utf16_code_unit_to_char_01() {
+    fn utf16_cu_to_char_01() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        assert_eq!(0, s.utf16_code_unit_to_char(0));
+        assert_eq!(0, s.utf16_cu_to_char(0));
     }
 
     #[test]
     #[should_panic]
-    fn utf16_code_unit_to_char_02() {
+    fn utf16_cu_to_char_02() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        s.utf16_code_unit_to_char(1);
+        s.utf16_cu_to_char(1);
     }
 
     #[test]
-    fn utf16_code_unit_to_char_03() {
+    fn utf16_cu_to_char_03() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        assert_eq!(0, s.utf16_code_unit_to_char(0));
-        assert_eq!(0, s.utf16_code_unit_to_char(1));
-        assert_eq!(1, s.utf16_code_unit_to_char(2));
+        assert_eq!(0, s.utf16_cu_to_char(0));
+        assert_eq!(0, s.utf16_cu_to_char(1));
+        assert_eq!(1, s.utf16_cu_to_char(2));
     }
 
     #[test]
     #[should_panic]
-    fn utf16_code_unit_to_char_04() {
+    fn utf16_cu_to_char_04() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        s.utf16_code_unit_to_char(3);
+        s.utf16_cu_to_char(3);
     }
 
     #[test]
-    fn utf16_code_unit_to_char_05() {
+    fn utf16_cu_to_char_05() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
 
-        assert_eq!(0, s.utf16_code_unit_to_char(0));
+        assert_eq!(0, s.utf16_cu_to_char(0));
 
-        assert_eq!(12, s.utf16_code_unit_to_char(12));
-        assert_eq!(12, s.utf16_code_unit_to_char(13));
-        assert_eq!(13, s.utf16_code_unit_to_char(14));
+        assert_eq!(12, s.utf16_cu_to_char(12));
+        assert_eq!(12, s.utf16_cu_to_char(13));
+        assert_eq!(13, s.utf16_cu_to_char(14));
 
-        assert_eq!(32, s.utf16_code_unit_to_char(33));
-        assert_eq!(32, s.utf16_code_unit_to_char(34));
-        assert_eq!(33, s.utf16_code_unit_to_char(35));
+        assert_eq!(32, s.utf16_cu_to_char(33));
+        assert_eq!(32, s.utf16_cu_to_char(34));
+        assert_eq!(33, s.utf16_cu_to_char(35));
 
-        assert_eq!(61, s.utf16_code_unit_to_char(63));
-        assert_eq!(61, s.utf16_code_unit_to_char(64));
-        assert_eq!(62, s.utf16_code_unit_to_char(65));
+        assert_eq!(61, s.utf16_cu_to_char(63));
+        assert_eq!(61, s.utf16_cu_to_char(64));
+        assert_eq!(62, s.utf16_cu_to_char(65));
 
-        assert_eq!(92, s.utf16_code_unit_to_char(95));
-        assert_eq!(92, s.utf16_code_unit_to_char(96));
-        assert_eq!(93, s.utf16_code_unit_to_char(97));
+        assert_eq!(92, s.utf16_cu_to_char(95));
+        assert_eq!(92, s.utf16_cu_to_char(96));
+        assert_eq!(93, s.utf16_cu_to_char(97));
 
-        assert_eq!(107, s.utf16_code_unit_to_char(111));
+        assert_eq!(107, s.utf16_cu_to_char(111));
     }
 
     #[test]
     #[should_panic]
-    fn utf16_code_unit_to_char_06() {
+    fn utf16_cu_to_char_06() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
-        s.utf16_code_unit_to_char(112);
+        s.utf16_cu_to_char(112);
     }
 
     #[test]
-    fn utf16_code_unit_to_char_07() {
+    fn utf16_cu_to_char_07() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..106);
 
-        assert_eq!(0, s.utf16_code_unit_to_char(0));
+        assert_eq!(0, s.utf16_cu_to_char(0));
 
-        assert_eq!(11, s.utf16_code_unit_to_char(11));
-        assert_eq!(11, s.utf16_code_unit_to_char(12));
-        assert_eq!(12, s.utf16_code_unit_to_char(13));
+        assert_eq!(11, s.utf16_cu_to_char(11));
+        assert_eq!(11, s.utf16_cu_to_char(12));
+        assert_eq!(12, s.utf16_cu_to_char(13));
 
-        assert_eq!(31, s.utf16_code_unit_to_char(32));
-        assert_eq!(31, s.utf16_code_unit_to_char(33));
-        assert_eq!(32, s.utf16_code_unit_to_char(34));
+        assert_eq!(31, s.utf16_cu_to_char(32));
+        assert_eq!(31, s.utf16_cu_to_char(33));
+        assert_eq!(32, s.utf16_cu_to_char(34));
 
-        assert_eq!(60, s.utf16_code_unit_to_char(62));
-        assert_eq!(60, s.utf16_code_unit_to_char(63));
-        assert_eq!(61, s.utf16_code_unit_to_char(64));
+        assert_eq!(60, s.utf16_cu_to_char(62));
+        assert_eq!(60, s.utf16_cu_to_char(63));
+        assert_eq!(61, s.utf16_cu_to_char(64));
 
-        assert_eq!(91, s.utf16_code_unit_to_char(94));
-        assert_eq!(91, s.utf16_code_unit_to_char(95));
-        assert_eq!(92, s.utf16_code_unit_to_char(96));
+        assert_eq!(91, s.utf16_cu_to_char(94));
+        assert_eq!(91, s.utf16_cu_to_char(95));
+        assert_eq!(92, s.utf16_cu_to_char(96));
 
-        assert_eq!(105, s.utf16_code_unit_to_char(109));
+        assert_eq!(105, s.utf16_cu_to_char(109));
     }
 
     #[test]
     #[should_panic]
-    fn utf16_code_unit_to_char_08() {
+    fn utf16_cu_to_char_08() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..106);
-        s.utf16_code_unit_to_char(110);
+        s.utf16_cu_to_char(110);
     }
 
     #[test]
