@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+
+## [1.2.0] - 2020-06-14
+
 ### New features
 - `Rope` and `RopeSlice` can now convert between char indices and utf16 code unit indices.  This useful when interacting with external APIs that use utf16 code units as their text indexing scheme.
 
@@ -244,7 +247,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/cessen/ropey/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cessen/ropey/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/cessen/ropey/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/cessen/ropey/compare/v0.9.2...v1.0.0
