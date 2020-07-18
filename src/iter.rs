@@ -50,12 +50,12 @@
 use std::str;
 use std::sync::Arc;
 
-use slice::RopeSlice;
-use str_utils::{
+use crate::slice::RopeSlice;
+use crate::str_utils::{
     byte_to_line_idx, char_to_byte_idx, count_chars, ends_with_line_break, line_to_byte_idx,
     line_to_char_idx, prev_line_end_char_idx,
 };
-use tree::{Node, TextInfo};
+use crate::tree::{Node, TextInfo};
 
 //==========================================================
 
@@ -1054,7 +1054,7 @@ impl<'a> Iterator for Chunks<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Rope;
+    use crate::Rope;
 
     const TEXT: &str = "\r\n\
                         Hello there!  How're you doing?  It's a fine day, \

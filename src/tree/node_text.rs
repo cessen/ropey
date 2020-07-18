@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 use std::ops::Deref;
 use std::str;
 
-use crlf;
+use crate::crlf;
 
 /// A custom small string.  The unsafe guts of this are in `NodeSmallString`
 /// further down in this file.
@@ -232,9 +232,9 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
 /// Try to keep this as small as possible, and implement functionality on
 /// NodeText via the safe APIs whenever possible.
 mod inner {
+    use crate::tree::MAX_BYTES;
     use smallvec::{Array, SmallVec};
     use std::{ptr, str};
-    use tree::MAX_BYTES;
 
     /// The backing internal buffer type for `NodeText`.
     #[derive(Copy, Clone)]

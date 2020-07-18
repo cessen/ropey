@@ -148,6 +148,6 @@ mod tree;
 pub mod iter;
 pub mod str_utils;
 
-pub use rope::Rope;
-pub use rope_builder::RopeBuilder;
-pub use slice::RopeSlice;
+pub use crate::rope::Rope;
+pub use crate::rope_builder::RopeBuilder;
+pub use crate::slice::RopeSlice;

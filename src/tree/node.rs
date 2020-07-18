@@ -1,9 +1,9 @@
 use std;
 use std::sync::Arc;
 
-use str_utils::{byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx};
-use tree::node_text::fix_segment_seam;
-use tree::{
+use crate::str_utils::{byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx};
+use crate::tree::node_text::fix_segment_seam;
+use crate::tree::{
     Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
 };
 
@@ -964,7 +964,7 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use Rope;
+    use crate::Rope;
 
     // 133 chars, 209 bytes
     const TEXT: &str = "\r\nHello there!  How're you doing?  It's a fine day, \
@@ -997,9 +997,9 @@ mod tests {
     #[test]
     fn crlf_corner_case_01() {
         use super::Node;
+        use crate::tree::{NodeChildren, NodeText, MAX_BYTES};
         use std::iter;
         use std::sync::Arc;
-        use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
         let nodel = Node::Leaf(NodeText::from_str(
@@ -1025,9 +1025,9 @@ mod tests {
     #[test]
     fn crlf_corner_case_02() {
         use super::Node;
+        use crate::tree::{NodeChildren, NodeText, MAX_BYTES};
         use std::iter;
         use std::sync::Arc;
-        use tree::{NodeChildren, NodeText, MAX_BYTES};
 
         // Construct the corner case
         let nodel = Node::Leaf(NodeText::from_str(

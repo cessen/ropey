@@ -5,15 +5,15 @@ use std::ops::RangeBounds;
 use std::ptr;
 use std::sync::Arc;
 
-use crlf;
-use iter::{Bytes, Chars, Chunks, Lines};
-use rope_builder::RopeBuilder;
-use slice::{end_bound_to_num, start_bound_to_num, RopeSlice};
-use str_utils::{
+use crate::crlf;
+use crate::iter::{Bytes, Chars, Chunks, Lines};
+use crate::rope_builder::RopeBuilder;
+use crate::slice::{end_bound_to_num, start_bound_to_num, RopeSlice};
+use crate::str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
     char_to_line_idx, line_to_byte_idx, line_to_char_idx, utf16_code_unit_to_char_idx,
 };
-use tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
+use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
 /// A utf8 text rope.
 ///
@@ -1016,8 +1016,8 @@ impl Rope {
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     #[inline]
     pub fn line(&self, line_idx: usize) -> RopeSlice {
-        use slice::RSEnum;
-        use str_utils::{count_chars, count_utf16_surrogates};
+        use crate::slice::RSEnum;
+        use crate::str_utils::{count_chars, count_utf16_surrogates};
 
         let len_lines = self.len_lines();
 
@@ -1527,7 +1527,7 @@ impl From<String> for Rope {
 /// Runs in O(log N) time.
 impl<'a> From<RopeSlice<'a>> for Rope {
     fn from(s: RopeSlice<'a>) -> Self {
-        use slice::RSEnum;
+        use crate::slice::RSEnum;
         match s {
             RopeSlice(RSEnum::Full {
                 node,
@@ -1753,7 +1753,7 @@ impl std::cmp::PartialOrd<Rope> for Rope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use str_utils::byte_to_char_idx;
+    use crate::str_utils::byte_to_char_idx;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \

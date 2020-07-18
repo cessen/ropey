@@ -2,14 +2,14 @@ use std;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
-use iter::{Bytes, Chars, Chunks, Lines};
-use rope::Rope;
-use str_utils::{
+use crate::iter::{Bytes, Chars, Chunks, Lines};
+use crate::rope::Rope;
+use crate::str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
     char_to_line_idx, count_chars, count_line_breaks, count_utf16_surrogates, line_to_byte_idx,
     line_to_char_idx, utf16_code_unit_to_char_idx,
 };
-use tree::{Count, Node, TextInfo};
+use crate::tree::{Count, Node, TextInfo};
 
 /// An immutable view into part of a `Rope`.
 ///
@@ -1575,8 +1575,10 @@ impl<'a, 'b> std::cmp::PartialOrd<RopeSlice<'b>> for RopeSlice<'a> {
 
 #[cfg(test)]
 mod tests {
-    use str_utils::{byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx};
-    use Rope;
+    use crate::str_utils::{
+        byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx,
+    };
+    use crate::Rope;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \

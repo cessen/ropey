@@ -2,6 +2,7 @@
 name = "ropey"
 version = "1.2.0"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+edition = "2018"
 description = "A fast and robust text rope for Rust"
 documentation = "https://docs.rs/ropey"
 repository = "https://github.com/cessen/ropey"

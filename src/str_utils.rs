@@ -36,7 +36,7 @@ pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
 /// Any past-the-end index will return the last line index.
 #[inline]
 pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
-    use crlf;
+    use crate::crlf;
     let mut byte_idx = byte_idx.min(text.len());
     while !text.is_char_boundary(byte_idx) {
         byte_idx -= 1;

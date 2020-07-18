@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use smallvec::SmallVec;
 
-use crlf;
-use rope::Rope;
-use tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
+use crate::crlf;
+use crate::rope::Rope;
+use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 
 /// An efficient incremental `Rope` builder.
 ///
