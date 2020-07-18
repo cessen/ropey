@@ -18,7 +18,7 @@ impl TextBuffer {
     fn from_path(path: &str) -> io::Result<TextBuffer> {
         let text = Rope::from_reader(&mut io::BufReader::new(File::open(&path)?))?;
         Ok(TextBuffer {
-            text,
+            text: text,
             path: path.to_string(),
             dirty: false,
         })
