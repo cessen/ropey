@@ -542,7 +542,7 @@ impl<'a> Lines<'a> {
                 ..
             }) => {
                 // Special cases.
-                if *at_end && (text.len() == 0 || ends_with_line_break(text)) {
+                if *at_end && (text.is_empty() || ends_with_line_break(text)) {
                     *line_idx -= 1;
                     *at_end = false;
                     return Some("".into());
@@ -1274,7 +1274,7 @@ mod tests {
 
         assert_eq!(byte_count, bytes.len());
 
-        while let Some(_) = bytes.prev() {
+        while bytes.prev().is_some() {
             byte_count += 1;
             assert_eq!(byte_count, bytes.len());
         }
@@ -1434,7 +1434,7 @@ mod tests {
 
         assert_eq!(char_count, chars.len());
 
-        while let Some(_) = chars.prev() {
+        while chars.prev().is_some() {
             char_count += 1;
             assert_eq!(char_count, chars.len());
         }
@@ -1888,7 +1888,7 @@ mod tests {
 
         assert_eq!(line_count, lines.len());
 
-        while let Some(_) = lines.prev() {
+        while lines.prev().is_some() {
             line_count += 1;
             assert_eq!(line_count, lines.len());
         }

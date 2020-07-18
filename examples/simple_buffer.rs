@@ -18,7 +18,7 @@ impl TextBuffer {
     fn from_path(path: &str) -> io::Result<TextBuffer> {
         let text = Rope::from_reader(&mut io::BufReader::new(File::open(&path)?))?;
         Ok(TextBuffer {
-            text: text,
+            text,
             path: path.to_string(),
             dirty: false,
         })
@@ -48,7 +48,7 @@ impl TextBuffer {
         if start != end {
             self.text.remove(start..end);
         }
-        if text.len() > 0 {
+        if !text.is_empty() {
             self.text.insert(start, text);
         }
         self.dirty = true;

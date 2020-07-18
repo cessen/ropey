@@ -28,7 +28,7 @@ impl<'a> RopeGraphemes<'a> {
         let first_chunk = chunks.next().unwrap_or("");
         RopeGraphemes {
             text: *slice,
-            chunks: chunks,
+            chunks,
             cur_chunk: first_chunk,
             cur_chunk_start: 0,
             cursor: GraphemeCursor::new(0, slice.len_bytes(), true),
@@ -76,7 +76,7 @@ impl<'a> Iterator for RopeGraphemes<'a> {
 }
 
 #[cfg(test)]
-#[cfg_attr(rustfmt, rustfmt_skip)] // Because of the crazy long graphemes
+#[rustfmt::skip] // Because of the crazy long graphemes
 mod tests {
     use super::*;
     use ropey::Rope;

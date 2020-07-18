@@ -129,7 +129,7 @@ fn bytes_iter_prev(bench: &mut Bencher) {
     let itr_src = r.bytes_at(r.len_bytes());
     let mut itr = itr_src.clone();
     bench.iter(|| {
-        if let None = itr.prev() {
+        if itr.prev().is_none() {
             itr = itr_src.clone();
         }
     });
@@ -148,7 +148,7 @@ fn chars_iter_prev(bench: &mut Bencher) {
     let itr_src = r.chars_at(r.len_chars());
     let mut itr = itr_src.clone();
     bench.iter(|| {
-        if let None = itr.prev() {
+        if itr.prev().is_none() {
             itr = itr_src.clone();
         }
     });
@@ -175,7 +175,7 @@ fn lines_iter_prev(bench: &mut Bencher) {
     let itr_src = r.lines_at(r.len_lines());
     let mut itr = itr_src.clone();
     bench.iter(|| {
-        if let None = itr.prev() {
+        if itr.prev().is_none() {
             itr = itr_src.clone();
         }
     });
@@ -186,7 +186,7 @@ fn lines_iter_prev_tiny(bench: &mut Bencher) {
     let itr_src = r.lines_at(r.len_lines());
     let mut itr = itr_src.clone();
     bench.iter(|| {
-        if let None = itr.prev() {
+        if itr.prev().is_none() {
             itr = itr_src.clone();
         }
     });
@@ -205,7 +205,7 @@ fn chunks_iter_prev(bench: &mut Bencher) {
     let itr_src = r.chunks_at_char(r.len_chars()).0;
     let mut itr = itr_src.clone();
     bench.iter(|| {
-        if let None = itr.prev() {
+        if itr.prev().is_none() {
             itr = itr_src.clone();
         }
     });

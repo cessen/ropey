@@ -596,10 +596,8 @@ proptest! {
         for i in directions {
             if *i == 0 {
                 assert_eq!(itr.prev(), bytes.pop());
-            } else {
-                if let Some(byte) = itr.next() {
-                    bytes.push(byte);
-                }
+            } else if let Some(byte) = itr.next() {
+                bytes.push(byte);
             }
         }
     }
@@ -644,10 +642,8 @@ proptest! {
         for i in directions {
             if *i == 0 {
                 assert_eq!(itr.prev(), chars.pop());
-            } else {
-                if let Some(c) = itr.next() {
-                    chars.push(c);
-                }
+            } else if let Some(c) = itr.next() {
+                chars.push(c);
             }
         }
     }
@@ -716,10 +712,8 @@ proptest! {
         for i in directions {
             if *i == 0 {
                 assert_eq!(itr.prev(), chunks.pop());
-            } else {
-                if let Some(chunk) = itr.next() {
-                    chunks.push(chunk);
-                }
+            } else if let Some(chunk) = itr.next() {
+                chunks.push(chunk);
             }
         }
     }
@@ -741,10 +735,8 @@ proptest! {
         for i in directions {
             if *i == 0 {
                 assert_eq!(itr.prev(), chunks.pop());
-            } else {
-                if let Some(chunk) = itr.next() {
-                    chunks.push(chunk);
-                }
+            } else if let Some(chunk) = itr.next() {
+                chunks.push(chunk);
             }
         }
     }
@@ -779,7 +771,7 @@ proptest! {
         let mut chars_r = r.chars_at(idx);
         let mut chars_t = (&TEXT[char_to_byte_idx(TEXT, idx)..]).chars();
 
-        while let Some(c) = chars_t.next() {
+        for c in chars_t {
             assert_eq!(chars_r.next(), Some(c));
         }
     }
@@ -823,7 +815,7 @@ proptest! {
 
             assert_eq!(byte_count, bytes.len());
 
-            while let Some(_) = bytes.prev() {
+            while bytes.prev().is_some() {
                 byte_count += 1;
                 assert_eq!(byte_count, bytes.len());
             }
@@ -860,7 +852,7 @@ proptest! {
 
         assert_eq!(char_count, chars.len());
 
-        while let Some(_) = chars.prev() {
+        while chars.prev().is_some() {
             char_count += 1;
             assert_eq!(char_count, chars.len());
         }
@@ -896,7 +888,7 @@ proptest! {
 
         assert_eq!(line_count, lines.len());
 
-        while let Some(_) = lines.prev() {
+        while lines.prev().is_some() {
             line_count += 1;
             assert_eq!(line_count, lines.len());
         }

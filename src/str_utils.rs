@@ -4,7 +4,7 @@
 //! slices in ways compatible with Ropey.  They may be useful when building
 //! additional functionality on top of Ropey.
 
-use std;
+
 
 // Get the appropriate module (if any) for sse2 types and intrinsics for the
 // platform we're compiling for.

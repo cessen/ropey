@@ -1,4 +1,4 @@
-use std;
+
 use std::sync::Arc;
 
 use crate::str_utils::{byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx};

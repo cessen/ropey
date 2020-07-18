@@ -1,4 +1,4 @@
-use std;
+
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
@@ -514,7 +514,7 @@ impl<'a> RopeSlice<'a> {
 
         let (chunk, _, chunk_char_idx, _) = self.chunk_at_char(char_idx);
         let byte_idx = char_to_byte_idx(chunk, char_idx - chunk_char_idx);
-        chunk[byte_idx..].chars().nth(0).unwrap()
+        chunk[byte_idx..].chars().next().unwrap()
     }
 
     /// Returns the line at `line_idx`.
