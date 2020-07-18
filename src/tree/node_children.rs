@@ -526,7 +526,6 @@ impl fmt::Debug for NodeChildren {
 /// and it was a pain to track down--as memory safety bugs often are.
 mod inner {
     use super::{Node, TextInfo, MAX_LEN};
-    use std::mem;
     use std::mem::MaybeUninit;
     use std::ptr;
     use std::sync::Arc;
@@ -560,33 +559,33 @@ mod inner {
         /// Access to the nodes array.
         #[inline(always)]
         pub fn nodes<'a>(&'a self) -> &'a [Arc<Node>] {
-            unsafe { mem::transmute(&self.nodes[..(self.len())]) }
+            unsafe { &*(&self.nodes[..(self.len())] as *const _ as *const _) }
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
         pub fn nodes_mut<'a>(&'a mut self) -> &'a mut [Arc<Node>] {
-            unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) }
+            unsafe { &mut *(&mut self.nodes[..(self.len as usize)] as *mut _ as *mut _) }
         }
 
         /// Access to the info array.
         #[inline(always)]
         pub fn info<'a>(&'a self) -> &'a [TextInfo] {
-            unsafe { mem::transmute(&self.info[..(self.len())]) }
+            unsafe { &*(&self.info[..(self.len())] as *const _ as *const _) }
         }
 
         /// Mutable access to the info array.
         #[inline(always)]
         pub fn info_mut<'a>(&'a mut self) -> &'a mut [TextInfo] {
-            unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) }
+            unsafe { &mut *(&mut self.info[..(self.len as usize)] as *mut _ as *mut _) }
         }
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
         pub fn data_mut<'a>(&'a mut self) -> (&'a mut [TextInfo], &'a mut [Arc<Node>]) {
             (
-                unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) },
-                unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) },
+                unsafe { &mut *(&mut self.info[..(self.len as usize)] as *mut _ as *mut _) },
+                unsafe { &mut *(&mut self.nodes[..(self.len as usize)] as *mut _ as *mut _) },
             )
         }
 
