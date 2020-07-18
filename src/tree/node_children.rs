@@ -564,19 +564,19 @@ mod inner {
 
         /// Mutable access to the nodes array.
         #[inline(always)]
-        pub fn nodes_mut<'a>(&'a mut self) -> &'a mut [Arc<Node>] {
+        pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
             unsafe { &mut *(&mut self.nodes[..(self.len as usize)] as *mut _ as *mut _) }
         }
 
         /// Access to the info array.
         #[inline(always)]
-        pub fn info<'a>(&'a self) -> &'a [TextInfo] {
+        pub fn info(& self) -> & [TextInfo] {
             unsafe { &*(&self.info[..(self.len())] as *const _ as *const _) }
         }
 
         /// Mutable access to the info array.
         #[inline(always)]
-        pub fn info_mut<'a>(&'a mut self) -> &'a mut [TextInfo] {
+        pub fn info_mut(&mut self) -> &mut [TextInfo] {
             unsafe { &mut *(&mut self.info[..(self.len as usize)] as *mut _ as *mut _) }
         }
 
