@@ -1519,19 +1519,19 @@ impl<'a> std::cmp::Ord for RopeSlice<'a> {
 
         loop {
             if chunk1.len() >= chunk2.len() {
-                if &chunk1[..chunk2.len()] < chunk2 {
-                    return std::cmp::Ordering::Less;
-                } else if &chunk1[..chunk2.len()] > chunk2 {
-                    return std::cmp::Ordering::Greater;
+                let compared = chunk1[..chunk2.len()].cmp(chunk2);
+                if compared != std::cmp::Ordering::Equal {
+                    return compared;
                 }
+
                 chunk1 = &chunk1[chunk2.len()..];
                 chunk2 = &[];
             } else {
-                if chunk1 < &chunk2[..chunk1.len()] {
-                    return std::cmp::Ordering::Less;
-                } else if chunk1 > &chunk2[..chunk1.len()] {
-                    return std::cmp::Ordering::Greater;
+                let compared = chunk1.cmp(&chunk2[..chunk1.len()]);
+                if compared != std::cmp::Ordering::Equal {
+                    return compared;
                 }
+
                 chunk1 = &[];
                 chunk2 = &chunk2[chunk1.len()..];
             }
@@ -1553,13 +1553,7 @@ impl<'a> std::cmp::Ord for RopeSlice<'a> {
             }
         }
 
-        if self.len_bytes() > other.len_bytes() {
-            return std::cmp::Ordering::Greater;
-        } else if self.len_bytes() < other.len_bytes() {
-            return std::cmp::Ordering::Less;
-        } else {
-            return std::cmp::Ordering::Equal;
-        }
+        self.len_bytes().cmp(&other.len_bytes())
     }
 }
 

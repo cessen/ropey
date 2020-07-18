@@ -570,7 +570,7 @@ mod inner {
 
         /// Access to the info array.
         #[inline(always)]
-        pub fn info(& self) -> & [TextInfo] {
+        pub fn info(&self) -> &[TextInfo] {
             unsafe { &*(&self.info[..(self.len())] as *const _ as *const _) }
         }
 
