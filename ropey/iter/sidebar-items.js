@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Bytes","An iterator over a `Rope`'s bytes."],["Chars","An iterator over a `Rope`'s chars."],["Chunks","An iterator over a `Rope`'s contiguous `str` chunks."],["Lines","An iterator over a `Rope`'s lines."]]});

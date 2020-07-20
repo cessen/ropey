@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `iter` mod in crate `ropey`."><meta name="keywords" content="rust, rustlang, rust-lang, iter"><title>ropey::iter - Rust</title><link rel="stylesheet" type="text/css" href="../../normalize.css"><link rel="stylesheet" type="text/css" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../dark.css"><link rel="stylesheet" type="text/css" href="../../light.css" id="themeStyle"><script src="../../storage.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="shortcut icon" href="../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../ropey/index.html'><div class='logo-container'><img src='../../rust-logo.png' alt='logo'></div></a><p class='location'>Module iter</p><div class="sidebar-elems"><div class="block items"><ul><li><a href="#structs">Structs</a></li></ul></div><p class='location'><a href='../index.html'>ropey</a></p><script>window.sidebarCurrent = {name: 'iter', ty: 'mod', relpath: '../'};</script><script defer src="../sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../settings.html"><img src="../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><h1 class='fqn'><span class='out-of-band'><span id='render-detail'><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class='inner'>&#x2212;</span>]</a></span><a class='srclink' href='../../src/ropey/iter.rs.html#1-2287' title='goto source code'>[src]</a></span><span class='in-band'>Module <a href='../index.html'>ropey</a>::<wbr><a class="mod" href=''>iter</a></span></h1><div class='docblock'><p>Iterators over a <code>Rope</code>'s data.</p>
+<p>The iterators in Ropey can be created from both <code>Rope</code>s and <code>RopeSlice</code>s.
+When created from a <code>RopeSlice</code>, they iterate over only the data that the
+<code>RopeSlice</code> refers to.  For the <code>Lines</code> and <code>Chunks</code> iterators, the data
+of the first and last yielded item will be correctly truncated to match
+the bounds of the <code>RopeSlice</code>.</p>
+<h1 id="reverse-iteration" class="section-header"><a href="#reverse-iteration">Reverse iteration</a></h1>
+<p>All iterators in Ropey operate as a cursor that can move both forwards
+and backwards over its contents.  Doing this is accomplished via the
+<code>next()</code> and <code>prev()</code> methods of each iterator.</p>
+<p>Conceptually, an iterator in Ropey is always positioned <em>between</em> the
+elements it iterates over, and returns an element when it jumps over it
+via the <code>next()</code> or <code>prev()</code> methods.</p>
+<p>For example, given the text <code>&quot;abc&quot;</code> and a <code>Chars</code> iterator starting at the
+beginning of the text, you would get the following sequence of states and
+return values by repeatedly calling <code>next()</code> (the vertical bar represents
+the position of the iterator):</p>
+<ol start="0">
+<li><code>|abc</code></li>
+<li><code>a|bc</code> -&gt; <code>Some('a')</code></li>
+<li><code>ab|c</code> -&gt; <code>Some('b')</code></li>
+<li><code>abc|</code> -&gt; <code>Some('c')</code></li>
+<li><code>abc|</code> -&gt; <code>None</code></li>
+</ol>
+<p>The <code>prev()</code> method operates identically, except moving in the opposite
+direction.</p>
+<h1 id="creating-iterators-at-any-position" class="section-header"><a href="#creating-iterators-at-any-position">Creating iterators at any position</a></h1>
+<p>Iterators in Ropey can be created starting at any position in the text.
+This is accomplished with the various <code>bytes_at()</code>, <code>chars_at()</code>, etc.
+methods of <code>Rope</code> and <code>RopeSlice</code>.</p>
+<p>When an iterator is created this way, it is positioned such that a call to
+<code>next()</code> will return the specified element, and a call to <code>prev()</code> will
+return the element just before the specified one.</p>
+<p>Importantly, iterators created this way still have access to the entire
+contents of the <code>Rope</code>/<code>RopeSlice</code> they were created from—the
+contents before the specified position is not truncated.  For example, you
+can create a <code>Chars</code> iterator starting at the end of a <code>Rope</code>, and then
+use the <code>prev()</code> method to iterate backwards over all of that <code>Rope</code>'s
+chars.</p>
+</div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
+<table><tr class='module-item'><td><a class="struct" href="struct.Bytes.html" title='ropey::iter::Bytes struct'>Bytes</a></td><td class='docblock-short'><p>An iterator over a <code>Rope</code>'s bytes.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Chars.html" title='ropey::iter::Chars struct'>Chars</a></td><td class='docblock-short'><p>An iterator over a <code>Rope</code>'s chars.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Chunks.html" title='ropey::iter::Chunks struct'>Chunks</a></td><td class='docblock-short'><p>An iterator over a <code>Rope</code>'s contiguous <code>str</code> chunks.</p>
+</td></tr><tr class='module-item'><td><a class="struct" href="struct.Lines.html" title='ropey::iter::Lines struct'>Lines</a></td><td class='docblock-short'><p>An iterator over a <code>Rope</code>'s lines.</p>
+</td></tr></table></section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "ropey";</script><script src="../../main.js"></script><script defer src="../../search-index.js"></script></body></html>

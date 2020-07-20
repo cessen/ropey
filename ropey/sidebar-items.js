@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["iter","Iterators over a `Rope`'s data."],["str_utils","Utility functions for utf8 string slices."]],"struct":[["Rope","A utf8 text rope."],["RopeBuilder","An efficient incremental `Rope` builder."],["RopeSlice","An immutable view into part of a `Rope`."]]});
