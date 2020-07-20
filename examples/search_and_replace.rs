@@ -140,7 +140,7 @@ impl<'a> SearchIter<'a> {
         );
         SearchIter {
             char_iter: slice.chars(),
-            search_pattern,
+            search_pattern: search_pattern,
             search_pattern_char_len: search_pattern.chars().count(),
             cur_index: 0,
             possible_matches: Vec::new(),
