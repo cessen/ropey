@@ -127,9 +127,9 @@ mod tests {
 
     #[test]
     fn crlf_segmenter_01() {
-        let text = "Hello world!\r\nHow's it going?".as_bytes();
+        let text = b"Hello world!\r\nHow's it going?";
 
-        assert!(is_break(0, "".as_bytes()));
+        assert!(is_break(0, b""));
         assert!(is_break(0, text));
         assert!(is_break(12, text));
         assert!(!is_break(13, text));
@@ -139,20 +139,20 @@ mod tests {
 
     #[test]
     fn crlf_segmenter_02() {
-        let l = "Hello world!\r".as_bytes();
-        let r = "\nHow's it going?".as_bytes();
+        let l = b"Hello world!\r";
+        let r = b"\nHow's it going?";
 
         assert!(!seam_is_break(l, r));
-        assert!(!seam_is_break(l, "\n".as_bytes()));
-        assert!(!seam_is_break("\r".as_bytes(), r));
-        assert!(!seam_is_break("\r".as_bytes(), "\n".as_bytes()));
+        assert!(!seam_is_break(l, b"\n"));
+        assert!(!seam_is_break(b"\r", r));
+        assert!(!seam_is_break(b"\r", b"\n"));
         assert!(seam_is_break(r, l));
-        assert!(seam_is_break("\n".as_bytes(), "\r".as_bytes()));
+        assert!(seam_is_break(b"\n", b"\r"));
     }
 
     #[test]
     fn nearest_internal_break_01() {
-        let text = "Hello world!".as_bytes();
+        let text = b"Hello world!";
         assert_eq!(1, nearest_internal_break(0, text));
         assert_eq!(6, nearest_internal_break(6, text));
         assert_eq!(11, nearest_internal_break(12, text));
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn nearest_internal_break_02() {
-        let text = "Hello\r\n world!".as_bytes();
+        let text = b"Hello\r\n world!";
         assert_eq!(5, nearest_internal_break(5, text));
         assert_eq!(7, nearest_internal_break(6, text));
         assert_eq!(7, nearest_internal_break(7, text));
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn nearest_internal_break_03() {
-        let text = "\r\nHello world!\r\n".as_bytes();
+        let text = b"\r\nHello world!\r\n";
         assert_eq!(2, nearest_internal_break(0, text));
         assert_eq!(2, nearest_internal_break(1, text));
         assert_eq!(2, nearest_internal_break(2, text));
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn nearest_internal_break_04() {
-        let text = "\r\n".as_bytes();
+        let text = b"\r\n";
         assert_eq!(2, nearest_internal_break(0, text));
         assert_eq!(2, nearest_internal_break(1, text));
         assert_eq!(2, nearest_internal_break(2, text));
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn is_break_01() {
-        let text = "\n\r\n\r\n\r\n\r\n\r\n\r".as_bytes();
+        let text = b"\n\r\n\r\n\r\n\r\n\r\n\r";
 
         assert!(is_break(0, text));
         assert!(is_break(12, text));
@@ -197,16 +197,16 @@ mod tests {
 
     #[test]
     fn seam_is_break_01() {
-        let text1 = "\r\n\r\n\r\n".as_bytes();
-        let text2 = "\r\n\r\n".as_bytes();
+        let text1 = b"\r\n\r\n\r\n";
+        let text2 = b"\r\n\r\n";
 
         assert!(seam_is_break(text1, text2));
     }
 
     #[test]
     fn seam_is_break_02() {
-        let text1 = "\r\n\r\n\r".as_bytes();
-        let text2 = "\n\r\n\r\n".as_bytes();
+        let text1 = b"\r\n\r\n\r";
+        let text2 = b"\n\r\n\r\n";
 
         assert!(!seam_is_break(text1, text2));
     }

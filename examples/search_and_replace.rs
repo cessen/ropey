@@ -89,7 +89,7 @@ fn search_and_replace(rope: &mut Rope, search_pattern: &str, replacement_text: &
         }
 
         // If there are no matches, we're done!
-        if matches.len() == 0 {
+        if matches.is_empty() {
             break;
         }
 
@@ -135,7 +135,7 @@ struct SearchIter<'a> {
 impl<'a> SearchIter<'a> {
     fn from_rope_slice<'b>(slice: &'b RopeSlice, search_pattern: &'b str) -> SearchIter<'b> {
         assert!(
-            search_pattern.len() > 0,
+            !search_pattern.is_empty(),
             "Can't search using an empty search pattern."
         );
         SearchIter {
@@ -188,6 +188,6 @@ impl<'a> Iterator for SearchIter<'a> {
             }
         }
 
-        return None;
+        None
     }
 }

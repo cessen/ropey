@@ -3,8 +3,8 @@ use std::iter::{Iterator, Zip};
 use std::slice;
 use std::sync::Arc;
 
-use crlf;
-use tree::{self, Node, TextInfo, MAX_BYTES};
+use crate::crlf;
+use crate::tree::{self, Node, TextInfo, MAX_BYTES};
 
 const MAX_LEN: usize = tree::MAX_CHILDREN;
 
@@ -749,8 +749,8 @@ mod inner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tree::{Node, NodeText, TextInfo};
     use std::sync::Arc;
-    use tree::{Node, NodeText, TextInfo};
 
     #[test]
     fn search_char_idx_01() {

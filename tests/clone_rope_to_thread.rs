@@ -50,7 +50,7 @@ fn clone_rope_to_thread() {
     let rope2 = rx2.recv().unwrap();
     let matches = Iterator::zip(rope1.chars(), rope2.chars())
         .map(|(a, b)| a == b)
-        .fold(true, |acc, n| acc && n);
+        .all(|n| n);
     assert_eq!(matches, true);
 
     // Send rope2 to the other thread again for more modifications.
@@ -60,6 +60,6 @@ fn clone_rope_to_thread() {
     let rope2 = rx2.recv().unwrap();
     let matches = Iterator::zip(rope1.chars(), rope2.chars())
         .map(|(a, b)| a == b)
-        .fold(true, |acc, n| acc && n);
+        .all(|n| n);
     assert_eq!(matches, false);
 }

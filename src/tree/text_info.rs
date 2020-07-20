@@ -1,7 +1,7 @@
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use str_utils::{count_chars, count_line_breaks, count_utf16_surrogates};
-use tree::Count;
+use crate::str_utils::{count_chars, count_line_breaks, count_utf16_surrogates};
+use crate::tree::Count;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TextInfo {

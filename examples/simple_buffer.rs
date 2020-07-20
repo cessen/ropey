@@ -48,7 +48,7 @@ impl TextBuffer {
         if start != end {
             self.text.remove(start..end);
         }
-        if text.len() > 0 {
+        if !text.is_empty() {
             self.text.insert(start, text);
         }
         self.dirty = true;

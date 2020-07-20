@@ -76,7 +76,7 @@ impl<'a> Iterator for RopeGraphemes<'a> {
 }
 
 #[cfg(test)]
-#[cfg_attr(rustfmt, rustfmt_skip)] // Because of the crazy long graphemes
+#[rustfmt::skip] // Because of the crazy long graphemes
 mod tests {
     use super::*;
     use ropey::Rope;

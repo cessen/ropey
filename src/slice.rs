@@ -1,15 +1,14 @@
-use std;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
-use iter::{Bytes, Chars, Chunks, Lines};
-use rope::Rope;
-use str_utils::{
+use crate::iter::{Bytes, Chars, Chunks, Lines};
+use crate::rope::Rope;
+use crate::str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
     char_to_line_idx, count_chars, count_line_breaks, count_utf16_surrogates, line_to_byte_idx,
     line_to_char_idx, utf16_code_unit_to_char_idx,
 };
-use tree::{Count, Node, TextInfo};
+use crate::tree::{Count, Node, TextInfo};
 
 /// An immutable view into part of a `Rope`.
 ///
@@ -514,7 +513,7 @@ impl<'a> RopeSlice<'a> {
 
         let (chunk, _, chunk_char_idx, _) = self.chunk_at_char(char_idx);
         let byte_idx = char_to_byte_idx(chunk, char_idx - chunk_char_idx);
-        chunk[byte_idx..].chars().nth(0).unwrap()
+        chunk[byte_idx..].chars().next().unwrap()
     }
 
     /// Returns the line at `line_idx`.
@@ -1520,19 +1519,19 @@ impl<'a> std::cmp::Ord for RopeSlice<'a> {
 
         loop {
             if chunk1.len() >= chunk2.len() {
-                if &chunk1[..chunk2.len()] < chunk2 {
-                    return std::cmp::Ordering::Less;
-                } else if &chunk1[..chunk2.len()] > chunk2 {
-                    return std::cmp::Ordering::Greater;
+                let compared = chunk1[..chunk2.len()].cmp(chunk2);
+                if compared != std::cmp::Ordering::Equal {
+                    return compared;
                 }
+
                 chunk1 = &chunk1[chunk2.len()..];
                 chunk2 = &[];
             } else {
-                if chunk1 < &chunk2[..chunk1.len()] {
-                    return std::cmp::Ordering::Less;
-                } else if chunk1 > &chunk2[..chunk1.len()] {
-                    return std::cmp::Ordering::Greater;
+                let compared = chunk1.cmp(&chunk2[..chunk1.len()]);
+                if compared != std::cmp::Ordering::Equal {
+                    return compared;
                 }
+
                 chunk1 = &[];
                 chunk2 = &chunk2[chunk1.len()..];
             }
@@ -1554,13 +1553,7 @@ impl<'a> std::cmp::Ord for RopeSlice<'a> {
             }
         }
 
-        if self.len_bytes() > other.len_bytes() {
-            return std::cmp::Ordering::Greater;
-        } else if self.len_bytes() < other.len_bytes() {
-            return std::cmp::Ordering::Less;
-        } else {
-            return std::cmp::Ordering::Equal;
-        }
+        self.len_bytes().cmp(&other.len_bytes())
     }
 }
 
@@ -1575,8 +1568,10 @@ impl<'a, 'b> std::cmp::PartialOrd<RopeSlice<'b>> for RopeSlice<'a> {
 
 #[cfg(test)]
 mod tests {
-    use str_utils::{byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx};
-    use Rope;
+    use crate::str_utils::{
+        byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx,
+    };
+    use crate::Rope;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \

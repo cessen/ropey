@@ -4,8 +4,6 @@
 //! slices in ways compatible with Ropey.  They may be useful when building
 //! additional functionality on top of Ropey.
 
-use std;
-
 // Get the appropriate module (if any) for sse2 types and intrinsics for the
 // platform we're compiling for.
 #[cfg(target_arch = "x86")]
@@ -36,7 +34,7 @@ pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
 /// Any past-the-end index will return the last line index.
 #[inline]
 pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
-    use crlf;
+    use crate::crlf;
     let mut byte_idx = byte_idx.min(text.len());
     while !text.is_char_boundary(byte_idx) {
         byte_idx -= 1;

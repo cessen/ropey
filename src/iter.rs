@@ -50,12 +50,12 @@
 use std::str;
 use std::sync::Arc;
 
-use slice::RopeSlice;
-use str_utils::{
+use crate::slice::RopeSlice;
+use crate::str_utils::{
     byte_to_line_idx, char_to_byte_idx, count_chars, ends_with_line_break, line_to_byte_idx,
     line_to_char_idx, prev_line_end_char_idx,
 };
-use tree::{Node, TextInfo};
+use crate::tree::{Node, TextInfo};
 
 //==========================================================
 
@@ -542,7 +542,7 @@ impl<'a> Lines<'a> {
                 ..
             }) => {
                 // Special cases.
-                if *at_end && (text.len() == 0 || ends_with_line_break(text)) {
+                if *at_end && (text.is_empty() || ends_with_line_break(text)) {
                     *line_idx -= 1;
                     *at_end = false;
                     return Some("".into());
@@ -1054,7 +1054,7 @@ impl<'a> Iterator for Chunks<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use Rope;
+    use crate::Rope;
 
     const TEXT: &str = "\r\n\
                         Hello there!  How're you doing?  It's a fine day, \
@@ -1274,7 +1274,7 @@ mod tests {
 
         assert_eq!(byte_count, bytes.len());
 
-        while let Some(_) = bytes.prev() {
+        while bytes.prev().is_some() {
             byte_count += 1;
             assert_eq!(byte_count, bytes.len());
         }
@@ -1434,7 +1434,7 @@ mod tests {
 
         assert_eq!(char_count, chars.len());
 
-        while let Some(_) = chars.prev() {
+        while chars.prev().is_some() {
             char_count += 1;
             assert_eq!(char_count, chars.len());
         }
@@ -1888,7 +1888,7 @@ mod tests {
 
         assert_eq!(line_count, lines.len());
 
-        while let Some(_) = lines.prev() {
+        while lines.prev().is_some() {
             line_count += 1;
             assert_eq!(line_count, lines.len());
         }
