@@ -29,7 +29,7 @@ jobs:
       # Build and test
       - run: cargo +stable build
       - run: cargo +stable test
-      - run: cargo +stable bench
+      - run: cargo +stable bench --no-run
 
   build-and-test-beta:
     name: Build and test, Rust-beta
@@ -46,4 +46,4 @@ jobs:
       # Build and test
       - run: cargo +beta build
       - run: cargo +beta test
-      - run: cargo +beta bench
+      - run: cargo +beta bench --no-run
