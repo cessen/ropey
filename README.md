@@ -1,6 +1,6 @@
 # Ropey
 
-[![Travis CI Build Status][trav-ci-img]][trav-ci]
+[![CI Build Status][github-ci-img]][github-ci]
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
@@ -158,7 +158,7 @@ submitted for inclusion in Ropey by you will be licensed as above, without any a
 
 [crates-io-badge]: https://img.shields.io/crates/v/ropey.svg
 [crates-io-url]: https://crates.io/crates/ropey
-[trav-ci-img]: https://travis-ci.org/cessen/ropey.svg?branch=master
-[trav-ci]: https://travis-ci.org/cessen/ropey
+[github-ci-img]: https://github.com/cessen/ropey/workflows/ci/badge.svg
+[github-ci]: https://github.com/cessen/ropey/actions?query=workflow%3Aci
 [docs-rs-img]: https://docs.rs/ropey/badge.svg
 [docs-rs-url]: https://docs.rs/ropey
