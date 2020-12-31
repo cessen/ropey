@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    # Every-other month, to make sure new Rust
+    # releases don't break things.
+    - cron: '15 12 5 1,3,5,7,9,11 *'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test-stable:
+    name: Build and test, Rust-stable
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      # Build and test
+      - run: cargo +stable build
+      - run: cargo +stable test
+
+  build-and-test-beta:
+    name: Build and test, Rust-beta
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: beta
+          override: true
+
+      # Build and test
+      - run: cargo +beta build
+      - run: cargo +beta test
