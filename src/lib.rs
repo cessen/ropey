@@ -136,8 +136,11 @@
 #![allow(clippy::needless_return)]
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::type_complexity)]
+#![no_std]
 
 extern crate smallvec;
+extern crate sp_std;
+extern crate cpufeatures;
 
 mod crlf;
 mod rope;

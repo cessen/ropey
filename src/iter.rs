@@ -47,8 +47,9 @@
 //! use the `prev()` method to iterate backwards over all of that `Rope`'s
 //! chars.
 
-use std::str;
-use std::sync::Arc;
+use sp_std::str;
+use sp_std::sync::Arc;
+use sp_std::vec::Vec;
 
 use crate::slice::RopeSlice;
 use crate::str_utils::{

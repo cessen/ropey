@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use sp_std::sync::Arc;
 
+use smallvec::alloc::string::String;
 use smallvec::SmallVec;
 
 use crate::crlf;
@@ -239,7 +240,7 @@ impl RopeBuilder {
                                 .children_mut()
                                 .push_split((left.text_info(), left)),
                         ));
-                        std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
+                        sp_std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
                         stack_idx -= 1;
                     }
                 }
