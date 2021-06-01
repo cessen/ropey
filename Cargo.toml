@@ -16,7 +16,6 @@ travis-ci = { repository = "cessen/ropey" }
 [dependencies]
 smallvec = "1"
 sp-std = {version = "3", default-features = false }
-cpufeatures = "*"
 
 [dev-dependencies]
 rand = "0.7"

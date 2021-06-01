@@ -4,18 +4,6 @@
 //! slices in ways compatible with Ropey.  They may be useful when building
 //! additional functionality on top of Ropey.
 
-// Get the appropriate module (if any) for sse2 types and intrinsics for the
-// platform we're compiling for.
-#[cfg(target_arch = "x86")]
-use core::arch::x86 as sse2;
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64 as sse2;
-
-fn sse2_exists() -> bool {
-    cpufeatures::new!(cpuid, "sse2");
-    cpuid::get()
-}
-
 /// Converts from byte-index to char-index in a string slice.
 ///
 /// If the byte is in the middle of a multi-byte char, returns the index of
@@ -57,13 +45,6 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline]
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if sse2_exists() {
-            return char_to_byte_idx_inner::<sse2::__m128i>(text, char_idx);
-        }
-    }
-
     // Fallback for non-sse2 platforms.
     char_to_byte_idx_inner::<usize>(text, char_idx)
 }
@@ -139,13 +120,6 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// Any past-the-end index will return the one-past-the-end byte index.
 #[inline]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if sse2_exists() {
-            return line_to_byte_idx_inner::<sse2::__m128i>(text, line_idx);
-        }
-    }
-
     // Fallback for non-sse2 platforms.
     line_to_byte_idx_inner::<usize>(text, line_idx)
 }
@@ -221,13 +195,6 @@ pub(crate) fn count_utf16_surrogates(text: &str) -> usize {
 
 #[inline]
 pub(crate) fn count_utf16_surrogates_in_bytes(text: &[u8]) -> usize {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if sse2_exists() {
-            return count_utf16_surrogates_internal::<sse2::__m128i>(text);
-        }
-    }
-
     // Fallback for non-sse2 platforms.
     count_utf16_surrogates_internal::<usize>(text)
 }
@@ -373,13 +340,6 @@ pub(crate) fn count_chars(text: &str) -> usize {
 
 #[inline]
 pub(crate) fn count_chars_in_bytes(text: &[u8]) -> usize {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if sse2_exists() {
-            return count_chars_internal::<sse2::__m128i>(text);
-        }
-    }
-
     // Fallback for non-sse2 platforms.
     count_chars_internal::<usize>(text)
 }
@@ -432,13 +392,6 @@ fn count_chars_internal<T: ByteChunk>(text: &[u8]) -> usize {
 /// - u{2029}        (Paragraph Separator)
 #[inline]
 pub(crate) fn count_line_breaks(text: &str) -> usize {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        if sse2_exists() {
-            return count_line_breaks_internal::<sse2::__m128i>(text);
-        }
-    }
-
     // Fallback for non-sse2 platforms.
     count_line_breaks_internal::<usize>(text)
 }
@@ -769,226 +722,6 @@ impl ByteChunk for usize {
         self.wrapping_mul(ONES) >> ((Self::size() - 1) * 8)
     }
 }
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-impl ByteChunk for sse2::__m128i {
-    #[inline(always)]
-    fn size() -> usize {
-        sp_std::mem::size_of::<sse2::__m128i>()
-    }
-
-    #[inline(always)]
-    fn max_acc() -> usize {
-        (256 / 8) - 1
-    }
-
-    #[inline(always)]
-    fn splat(n: u8) -> Self {
-        unsafe { sse2::_mm_set1_epi8(n as i8) }
-    }
-
-    #[inline(always)]
-    fn is_zero(&self) -> bool {
-        let tmp = unsafe { sp_std::mem::transmute::<Self, (u64, u64)>(*self) };
-        tmp.0 == 0 && tmp.1 == 0
-    }
-
-    #[inline(always)]
-    fn shift_back_lex(&self, n: usize) -> Self {
-        match n {
-            0 => *self,
-            1 => unsafe { sse2::_mm_srli_si128(*self, 1) },
-            2 => unsafe { sse2::_mm_srli_si128(*self, 2) },
-            3 => unsafe { sse2::_mm_srli_si128(*self, 3) },
-            4 => unsafe { sse2::_mm_srli_si128(*self, 4) },
-            _ => unreachable!(),
-        }
-    }
-
-    #[inline(always)]
-    fn shr(&self, n: usize) -> Self {
-        match n {
-            0 => *self,
-            1 => unsafe { sse2::_mm_srli_epi64(*self, 1) },
-            2 => unsafe { sse2::_mm_srli_epi64(*self, 2) },
-            3 => unsafe { sse2::_mm_srli_epi64(*self, 3) },
-            4 => unsafe { sse2::_mm_srli_epi64(*self, 4) },
-            _ => unreachable!(),
-        }
-    }
-
-    #[inline(always)]
-    fn cmp_eq_byte(&self, byte: u8) -> Self {
-        let tmp = unsafe { sse2::_mm_cmpeq_epi8(*self, Self::splat(byte)) };
-        unsafe { sse2::_mm_and_si128(tmp, Self::splat(1)) }
-    }
-
-    #[inline(always)]
-    fn bytes_between_127(&self, a: u8, b: u8) -> Self {
-        let tmp1 = unsafe { sse2::_mm_cmpgt_epi8(*self, Self::splat(a)) };
-        let tmp2 = unsafe { sse2::_mm_cmplt_epi8(*self, Self::splat(b)) };
-        let tmp3 = unsafe { sse2::_mm_and_si128(tmp1, tmp2) };
-        unsafe { sse2::_mm_and_si128(tmp3, Self::splat(1)) }
-    }
-
-    #[inline(always)]
-    fn bitand(&self, other: Self) -> Self {
-        unsafe { sse2::_mm_and_si128(*self, other) }
-    }
-
-    #[inline(always)]
-    fn add(&self, other: Self) -> Self {
-        unsafe { sse2::_mm_add_epi8(*self, other) }
-    }
-
-    #[inline(always)]
-    fn sub(&self, other: Self) -> Self {
-        unsafe { sse2::_mm_sub_epi8(*self, other) }
-    }
-
-    #[inline(always)]
-    fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self {
-        let mut tmp = unsafe { sp_std::mem::transmute::<Self, [u8; 16]>(*self) };
-        tmp[15 - n] += 1;
-        unsafe { sp_std::mem::transmute::<[u8; 16], Self>(tmp) }
-    }
-
-    #[inline(always)]
-    fn dec_last_lex_byte(&self) -> Self {
-        let mut tmp = unsafe { sp_std::mem::transmute::<Self, [u8; 16]>(*self) };
-        tmp[15] -= 1;
-        unsafe { sp_std::mem::transmute::<[u8; 16], Self>(tmp) }
-    }
-
-    #[inline(always)]
-    fn sum_bytes(&self) -> usize {
-        const ONES: u64 = core::u64::MAX / 0xFF;
-        let tmp = unsafe { sp_std::mem::transmute::<Self, (u64, u64)>(*self) };
-        let a = tmp.0.wrapping_mul(ONES) >> (7 * 8);
-        let b = tmp.1.wrapping_mul(ONES) >> (7 * 8);
-        (a + b) as usize
-    }
-}
-
-// AVX2, currently unused because it actually runs slower than SSE2 for most
-// of the things we're doing, oddly.
-// impl ByteChunk for x86_64::__m256i {
-//     #[inline(always)]
-//     fn size() -> usize {
-//         std::mem::size_of::<x86_64::__m256i>()
-//     }
-
-//     #[inline(always)]
-//     fn max_acc() -> usize {
-//         (256 / 8) - 1
-//     }
-
-//     #[inline(always)]
-//     fn splat(n: u8) -> Self {
-//         unsafe { x86_64::_mm256_set1_epi8(n as i8) }
-//     }
-
-//     #[inline(always)]
-//     fn is_zero(&self) -> bool {
-//         let tmp = unsafe { std::mem::transmute::<Self, (u64, u64, u64, u64)>(*self) };
-//         tmp.0 == 0 && tmp.1 == 0 && tmp.2 == 0 && tmp.3 == 0
-//     }
-
-//     #[inline(always)]
-//     fn shift_back_lex(&self, n: usize) -> Self {
-//         let mut tmp1;
-//         let tmp2 = unsafe { std::mem::transmute::<Self, [u8; 32]>(*self) };
-//         match n {
-//             0 => return *self,
-//             1 => {
-//                 tmp1 = unsafe {
-//                     std::mem::transmute::<Self, [u8; 32]>(x86_64::_mm256_srli_si256(*self, 1))
-//                 };
-//                 tmp1[15] = tmp2[16];
-//             }
-//             2 => {
-//                 tmp1 = unsafe {
-//                     std::mem::transmute::<Self, [u8; 32]>(x86_64::_mm256_srli_si256(*self, 2))
-//                 };
-//                 tmp1[15] = tmp2[17];
-//                 tmp1[14] = tmp2[16];
-//             }
-//             _ => unreachable!(),
-//         }
-//         unsafe { std::mem::transmute::<[u8; 32], Self>(tmp1) }
-//     }
-
-//     #[inline(always)]
-//     fn shr(&self, n: usize) -> Self {
-//         match n {
-//             0 => *self,
-//             1 => unsafe { x86_64::_mm256_srli_epi64(*self, 1) },
-//             2 => unsafe { x86_64::_mm256_srli_epi64(*self, 2) },
-//             3 => unsafe { x86_64::_mm256_srli_epi64(*self, 3) },
-//             4 => unsafe { x86_64::_mm256_srli_epi64(*self, 4) },
-//             _ => unreachable!(),
-//         }
-//     }
-
-//     #[inline(always)]
-//     fn cmp_eq_byte(&self, byte: u8) -> Self {
-//         let tmp = unsafe { x86_64::_mm256_cmpeq_epi8(*self, Self::splat(byte)) };
-//         unsafe { x86_64::_mm256_and_si256(tmp, Self::splat(1)) }
-//     }
-
-//     #[inline(always)]
-//     fn bytes_between_127(&self, a: u8, b: u8) -> Self {
-//         let tmp2 = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(a)) };
-//         let tmp1 = {
-//             let tmp = unsafe { x86_64::_mm256_cmpgt_epi8(*self, Self::splat(b + 1)) };
-//             unsafe { x86_64::_mm256_andnot_si256(tmp, Self::splat(0xff)) }
-//         };
-//         let tmp3 = unsafe { x86_64::_mm256_and_si256(tmp1, tmp2) };
-//         unsafe { x86_64::_mm256_and_si256(tmp3, Self::splat(1)) }
-//     }
-
-//     #[inline(always)]
-//     fn bitand(&self, other: Self) -> Self {
-//         unsafe { x86_64::_mm256_and_si256(*self, other) }
-//     }
-
-//     #[inline(always)]
-//     fn add(&self, other: Self) -> Self {
-//         unsafe { x86_64::_mm256_add_epi8(*self, other) }
-//     }
-
-//     #[inline(always)]
-//     fn sub(&self, other: Self) -> Self {
-//         unsafe { x86_64::_mm256_sub_epi8(*self, other) }
-//     }
-
-//     #[inline(always)]
-//     fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self {
-//         let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 32]>(*self) };
-//         tmp[31 - n] += 1;
-//         unsafe { std::mem::transmute::<[u8; 32], Self>(tmp) }
-//     }
-
-//     #[inline(always)]
-//     fn dec_last_lex_byte(&self) -> Self {
-//         let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 32]>(*self) };
-//         tmp[31] -= 1;
-//         unsafe { std::mem::transmute::<[u8; 32], Self>(tmp) }
-//     }
-
-//     #[inline(always)]
-//     fn sum_bytes(&self) -> usize {
-//         const ONES: u64 = std::u64::MAX / 0xFF;
-//         let tmp = unsafe { std::mem::transmute::<Self, (u64, u64, u64, u64)>(*self) };
-//         let a = tmp.0.wrapping_mul(ONES) >> (7 * 8);
-//         let b = tmp.1.wrapping_mul(ONES) >> (7 * 8);
-//         let c = tmp.2.wrapping_mul(ONES) >> (7 * 8);
-//         let d = tmp.3.wrapping_mul(ONES) >> (7 * 8);
-//         (a + b + c + d) as usize
-//     }
-// }
-
-//======================================================================
 
 /// An iterator that yields the byte indices of line breaks in a string.
 /// A line break in this case is the point immediately *after* a newline
