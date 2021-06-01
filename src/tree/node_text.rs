@@ -1,6 +1,6 @@
-use std::borrow::Borrow;
-use std::ops::Deref;
-use std::str;
+use sp_std::borrow::Borrow;
+use sp_std::ops::Deref;
+use sp_std::str;
 
 use crate::crlf;
 
@@ -130,7 +130,7 @@ impl NodeText {
     }
 }
 
-impl std::cmp::PartialEq for NodeText {
+impl sp_std::cmp::PartialEq for NodeText {
     fn eq(&self, other: &Self) -> bool {
         let (s1, s2): (&str, &str) = (self, other);
         s1 == s2
@@ -149,14 +149,14 @@ impl<'a> PartialEq<&'a str> for NodeText {
     }
 }
 
-impl std::fmt::Display for NodeText {
-    fn fmt(&self, fm: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+impl sp_std::fmt::Display for NodeText {
+    fn fmt(&self, fm: &mut sp_std::fmt::Formatter) -> Result<(), sp_std::fmt::Error> {
         NodeText::deref(self).fmt(fm)
     }
 }
 
-impl std::fmt::Debug for NodeText {
-    fn fmt(&self, fm: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl sp_std::fmt::Debug for NodeText {
+    fn fmt(&self, fm: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
         NodeText::deref(self).fmt(fm)
     }
 }
@@ -232,7 +232,7 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
 mod inner {
     use crate::tree::MAX_BYTES;
     use smallvec::{Array, SmallVec};
-    use std::{ptr, str};
+    use sp_std::{ptr, str};
 
     /// The backing internal buffer type for `NodeText`.
     #[derive(Copy, Clone)]

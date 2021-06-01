@@ -1,7 +1,7 @@
-use std::fmt;
-use std::iter::{Iterator, Zip};
-use std::slice;
-use std::sync::Arc;
+use sp_std::fmt;
+use sp_std::iter::{Iterator, Zip};
+use sp_std::slice;
+use sp_std::sync::Arc;
 
 use crate::crlf;
 use crate::tree::{self, Node, TextInfo, MAX_BYTES};
@@ -526,10 +526,10 @@ impl fmt::Debug for NodeChildren {
 /// and it was a pain to track down--as memory safety bugs often are.
 mod inner {
     use super::{Node, TextInfo, MAX_LEN};
-    use std::mem;
-    use std::mem::MaybeUninit;
-    use std::ptr;
-    use std::sync::Arc;
+    use sp_std::mem;
+    use sp_std::mem::MaybeUninit;
+    use sp_std::ptr;
+    use sp_std::sync::Arc;
 
     /// This is essentially a fixed-capacity, stack-allocated `Vec`.  However,
     /// it actually containts _two_ arrays rather than just one, but which
@@ -750,7 +750,7 @@ mod inner {
 mod tests {
     use super::*;
     use crate::tree::{Node, NodeText, TextInfo};
-    use std::sync::Arc;
+    use sp_std::sync::Arc;
 
     #[test]
     fn search_char_idx_01() {

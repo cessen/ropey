@@ -7,9 +7,14 @@
 // Get the appropriate module (if any) for sse2 types and intrinsics for the
 // platform we're compiling for.
 #[cfg(target_arch = "x86")]
-use std::arch::x86 as sse2;
+use core::arch::x86 as sse2;
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64 as sse2;
+use core::arch::x86_64 as sse2;
+
+fn sse2_exists() -> bool {
+    cpufeatures::new!(cpuid, "sse2");
+    cpuid::get()
+}
 
 /// Converts from byte-index to char-index in a string slice.
 ///
@@ -54,7 +59,7 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if is_x86_feature_detected!("sse2") {
+        if sse2_exists() {
             return char_to_byte_idx_inner::<sse2::__m128i>(text, char_idx);
         }
     }
@@ -136,7 +141,7 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if is_x86_feature_detected!("sse2") {
+        if sse2_exists() {
             return line_to_byte_idx_inner::<sse2::__m128i>(text, line_idx);
         }
     }
@@ -218,7 +223,7 @@ pub(crate) fn count_utf16_surrogates(text: &str) -> usize {
 pub(crate) fn count_utf16_surrogates_in_bytes(text: &[u8]) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if is_x86_feature_detected!("sse2") {
+        if sse2_exists() {
             return count_utf16_surrogates_internal::<sse2::__m128i>(text);
         }
     }
@@ -370,7 +375,7 @@ pub(crate) fn count_chars(text: &str) -> usize {
 pub(crate) fn count_chars_in_bytes(text: &[u8]) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if is_x86_feature_detected!("sse2") {
+        if sse2_exists() {
             return count_chars_internal::<sse2::__m128i>(text);
         }
     }
@@ -429,7 +434,7 @@ fn count_chars_internal<T: ByteChunk>(text: &[u8]) -> usize {
 pub(crate) fn count_line_breaks(text: &str) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
-        if is_x86_feature_detected!("sse2") {
+        if sse2_exists() {
             return count_line_breaks_internal::<sse2::__m128i>(text);
         }
     }
@@ -611,7 +616,7 @@ unsafe fn count_line_breaks_in_chunk_from_ptr<T: ByteChunk>(bytes: &[u8]) -> T {
 /// of `bytes` if alignment is beyond the end of `bytes`.
 #[inline(always)]
 fn alignment_diff<T>(bytes: &[u8]) -> usize {
-    let alignment = std::mem::align_of::<T>();
+    let alignment = sp_std::mem::align_of::<T>();
     let ptr = bytes.as_ptr() as usize;
     (alignment - ((ptr - 1) & (alignment - 1)) - 1).min(bytes.len())
 }
@@ -620,7 +625,7 @@ fn alignment_diff<T>(bytes: &[u8]) -> usize {
 
 /// Interface for working with chunks of bytes at a time, providing the
 /// operations needed for the functionality in str_utils.
-trait ByteChunk: Copy + Clone + std::fmt::Debug {
+trait ByteChunk: Copy + Clone + sp_std::fmt::Debug {
     /// Returns the size of the chunk in bytes.
     fn size() -> usize;
 
@@ -674,17 +679,17 @@ trait ByteChunk: Copy + Clone + std::fmt::Debug {
 impl ByteChunk for usize {
     #[inline(always)]
     fn size() -> usize {
-        std::mem::size_of::<usize>()
+        sp_std::mem::size_of::<usize>()
     }
 
     #[inline(always)]
     fn max_acc() -> usize {
-        (256 / std::mem::size_of::<usize>()) - 1
+        (256 / sp_std::mem::size_of::<usize>()) - 1
     }
 
     #[inline(always)]
     fn splat(n: u8) -> Self {
-        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES: usize = core::usize::MAX / 0xFF;
         ONES * n as usize
     }
 
@@ -709,7 +714,7 @@ impl ByteChunk for usize {
 
     #[inline(always)]
     fn cmp_eq_byte(&self, byte: u8) -> Self {
-        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES: usize = core::usize::MAX / 0xFF;
         const ONES_HIGH: usize = ONES << 7;
         let word = *self ^ (byte as usize * ONES);
         (!(((word & !ONES_HIGH) + !ONES_HIGH) | word) & ONES_HIGH) >> 7
@@ -717,7 +722,7 @@ impl ByteChunk for usize {
 
     #[inline(always)]
     fn bytes_between_127(&self, a: u8, b: u8) -> Self {
-        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES: usize = core::usize::MAX / 0xFF;
         const ONES_HIGH: usize = ONES << 7;
         let tmp = *self & (ONES * 127);
         (((ONES * (127 + b as usize) - tmp) & !*self & (tmp + (ONES * (127 - a as usize))))
@@ -760,7 +765,7 @@ impl ByteChunk for usize {
 
     #[inline(always)]
     fn sum_bytes(&self) -> usize {
-        const ONES: usize = std::usize::MAX / 0xFF;
+        const ONES: usize = core::usize::MAX / 0xFF;
         self.wrapping_mul(ONES) >> ((Self::size() - 1) * 8)
     }
 }
@@ -769,7 +774,7 @@ impl ByteChunk for usize {
 impl ByteChunk for sse2::__m128i {
     #[inline(always)]
     fn size() -> usize {
-        std::mem::size_of::<sse2::__m128i>()
+        sp_std::mem::size_of::<sse2::__m128i>()
     }
 
     #[inline(always)]
@@ -784,7 +789,7 @@ impl ByteChunk for sse2::__m128i {
 
     #[inline(always)]
     fn is_zero(&self) -> bool {
-        let tmp = unsafe { std::mem::transmute::<Self, (u64, u64)>(*self) };
+        let tmp = unsafe { sp_std::mem::transmute::<Self, (u64, u64)>(*self) };
         tmp.0 == 0 && tmp.1 == 0
     }
 
@@ -843,22 +848,22 @@ impl ByteChunk for sse2::__m128i {
 
     #[inline(always)]
     fn inc_nth_from_end_lex_byte(&self, n: usize) -> Self {
-        let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 16]>(*self) };
+        let mut tmp = unsafe { sp_std::mem::transmute::<Self, [u8; 16]>(*self) };
         tmp[15 - n] += 1;
-        unsafe { std::mem::transmute::<[u8; 16], Self>(tmp) }
+        unsafe { sp_std::mem::transmute::<[u8; 16], Self>(tmp) }
     }
 
     #[inline(always)]
     fn dec_last_lex_byte(&self) -> Self {
-        let mut tmp = unsafe { std::mem::transmute::<Self, [u8; 16]>(*self) };
+        let mut tmp = unsafe { sp_std::mem::transmute::<Self, [u8; 16]>(*self) };
         tmp[15] -= 1;
-        unsafe { std::mem::transmute::<[u8; 16], Self>(tmp) }
+        unsafe { sp_std::mem::transmute::<[u8; 16], Self>(tmp) }
     }
 
     #[inline(always)]
     fn sum_bytes(&self) -> usize {
-        const ONES: u64 = std::u64::MAX / 0xFF;
-        let tmp = unsafe { std::mem::transmute::<Self, (u64, u64)>(*self) };
+        const ONES: u64 = core::u64::MAX / 0xFF;
+        let tmp = unsafe { sp_std::mem::transmute::<Self, (u64, u64)>(*self) };
         let a = tmp.0.wrapping_mul(ONES) >> (7 * 8);
         let b = tmp.1.wrapping_mul(ONES) >> (7 * 8);
         (a + b) as usize
@@ -1000,7 +1005,7 @@ impl ByteChunk for sse2::__m128i {
 /// - u{2029}        (Paragraph Separator)
 #[allow(unused)] // Used in tests, as reference solution.
 struct LineBreakIter<'a> {
-    byte_itr: std::str::Bytes<'a>,
+    byte_itr: sp_std::str::Bytes<'a>,
     byte_idx: usize,
 }
 

@@ -1,8 +1,8 @@
-use std::io;
-use std::iter::FromIterator;
-use std::ops::RangeBounds;
-use std::ptr;
-use std::sync::Arc;
+use smallvec::alloc::string::String;
+use sp_std::iter::FromIterator;
+use sp_std::ops::RangeBounds;
+use sp_std::sync::Arc;
+use sp_std::vec::Vec;
 
 use crate::crlf;
 use crate::iter::{Bytes, Chars, Chunks, Lines};
@@ -102,123 +102,6 @@ impl Rope {
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
-    }
-
-    /// Creates a `Rope` from the output of a reader.
-    ///
-    /// This is a convenience function.  To do more sophisticated text loading,
-    /// see [`RopeBuilder`](struct.RopeBuilder.html).
-    ///
-    /// Runs in O(N) time.
-    ///
-    /// # Errors
-    ///
-    /// - If the reader returns an error, `from_reader` stops and returns
-    ///   that error.
-    /// - If non-utf8 data is encountered, an IO error with kind
-    ///   `InvalidData` is returned.
-    ///
-    /// Note: some data from the reader is likely consumed even if there is
-    /// an error.
-    #[allow(unused_mut)]
-    pub fn from_reader<T: io::Read>(mut reader: T) -> io::Result<Self> {
-        const BUFFER_SIZE: usize = MAX_BYTES * 2;
-        let mut builder = RopeBuilder::new();
-        let mut buffer = [0u8; BUFFER_SIZE];
-        let mut fill_idx = 0; // How much `buffer` is currently filled with valid data
-        loop {
-            match reader.read(&mut buffer[fill_idx..]) {
-                Ok(read_count) => {
-                    fill_idx += read_count;
-
-                    // Determine how much of the buffer is valid utf8.
-                    let valid_count = match std::str::from_utf8(&buffer[..fill_idx]) {
-                        Ok(_) => fill_idx,
-                        Err(e) => e.valid_up_to(),
-                    };
-
-                    // Append the valid part of the buffer to the rope.
-                    if valid_count > 0 {
-                        // The unsafe block here is reinterpreting the bytes as
-                        // utf8.  This is safe because the bytes being
-                        // reinterpreted have already been validated as utf8
-                        // just above.
-                        builder.append(unsafe {
-                            std::str::from_utf8_unchecked(&buffer[..valid_count])
-                        });
-                    }
-
-                    // Shift the un-read part of the buffer to the beginning.
-                    if valid_count < fill_idx {
-                        // The unsafe here is just used for efficiency.  This
-                        // can be replaced with a safe call to `copy_within()`
-                        // on the slice once that API is stabalized in the
-                        // standard library.
-                        unsafe {
-                            ptr::copy(
-                                buffer.as_ptr().add(valid_count),
-                                buffer.as_mut_ptr().offset(0),
-                                fill_idx - valid_count,
-                            );
-                        }
-                    }
-                    fill_idx -= valid_count;
-
-                    if fill_idx == BUFFER_SIZE {
-                        // Buffer is full and none of it could be consumed.  Utf8
-                        // codepoints don't get that large, so it's clearly not
-                        // valid text.
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "stream did not contain valid UTF-8",
-                        ));
-                    }
-
-                    // If we're done reading
-                    if read_count == 0 {
-                        if fill_idx > 0 {
-                            // We couldn't consume all data.
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "stream contained invalid UTF-8",
-                            ));
-                        } else {
-                            return Ok(builder.finish());
-                        }
-                    }
-                }
-
-                Err(e) => {
-                    // Read error
-                    return Err(e);
-                }
-            }
-        }
-    }
-
-    //-----------------------------------------------------------------------
-    // Convenience output methods
-
-    /// Writes the contents of the `Rope` to a writer.
-    ///
-    /// This is a convenience function.  To do more sophisticated text output,
-    /// see the [`Chunks`](iter/struct.Chunks.html) iterator.
-    ///
-    /// Runs in O(N) time.
-    ///
-    /// # Errors
-    ///
-    /// - If the writer returns an error, `write_to` stops and returns that
-    ///   error.
-    ///
-    /// Note: some data may have been written even if an error is returned.
-    #[allow(unused_mut)]
-    pub fn write_to<T: io::Write>(&self, mut writer: T) -> io::Result<()> {
-        for chunk in self.chunks() {
-            writer.write_all(chunk.as_bytes())?;
-        }
-
-        Ok(())
     }
 
     //-----------------------------------------------------------------------
@@ -501,7 +384,7 @@ impl Rope {
         // Handle root splitting, if any.
         if let Some((r_info, r_node)) = residual {
             let mut l_node = Arc::new(Node::new());
-            std::mem::swap(&mut l_node, &mut self.root);
+            sp_std::mem::swap(&mut l_node, &mut self.root);
 
             let mut children = NodeChildren::new();
             children.push((l_info, l_node));
@@ -556,7 +439,7 @@ impl Rope {
             // Handle root splitting, if any.
             if let Some((r_info, r_node)) = residual {
                 let mut l_node = Arc::new(Node::new());
-                std::mem::swap(&mut l_node, &mut self.root);
+                sp_std::mem::swap(&mut l_node, &mut self.root);
 
                 let mut children = NodeChildren::new();
                 children.push((l_info, l_node));
@@ -652,7 +535,7 @@ impl Rope {
         if char_idx == 0 {
             // Special case 1
             let mut new_rope = Rope::new();
-            std::mem::swap(self, &mut new_rope);
+            sp_std::mem::swap(self, &mut new_rope);
             new_rope
         } else if char_idx == self.len_chars() {
             // Special case 2
@@ -680,7 +563,7 @@ impl Rope {
         if self.len_chars() == 0 {
             // Special case
             let mut other = other;
-            std::mem::swap(self, &mut other);
+            sp_std::mem::swap(self, &mut other);
         } else if other.len_chars() > 0 {
             let seam_byte_i = if other.char(0) == '\n' {
                 Some(self.root.text_info().bytes)
@@ -1507,9 +1390,9 @@ impl<'a> From<&'a str> for Rope {
     }
 }
 
-impl<'a> From<std::borrow::Cow<'a, str>> for Rope {
+impl<'a> From<sp_std::borrow::Cow<'a, str>> for Rope {
     #[inline]
-    fn from(text: std::borrow::Cow<'a, str>) -> Self {
+    fn from(text: sp_std::borrow::Cow<'a, str>) -> Self {
         Rope::from_str(&text)
     }
 }
@@ -1581,10 +1464,10 @@ impl<'a> From<&'a Rope> for String {
     }
 }
 
-impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
+impl<'a> From<Rope> for sp_std::borrow::Cow<'a, str> {
     #[inline]
     fn from(r: Rope) -> Self {
-        std::borrow::Cow::Owned(String::from(r))
+        sp_std::borrow::Cow::Owned(String::from(r))
     }
 }
 
@@ -1592,13 +1475,13 @@ impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
 /// owned string if the contents is not contiguous in memory.
 ///
 /// Runs in best case O(1), worst case O(N).
-impl<'a> From<&'a Rope> for std::borrow::Cow<'a, str> {
+impl<'a> From<&'a Rope> for sp_std::borrow::Cow<'a, str> {
     #[inline]
     fn from(r: &'a Rope) -> Self {
         if let Node::Leaf(ref text) = *r.root {
-            std::borrow::Cow::Borrowed(text)
+            sp_std::borrow::Cow::Borrowed(text)
         } else {
-            std::borrow::Cow::Owned(String::from(r))
+            sp_std::borrow::Cow::Owned(String::from(r))
         }
     }
 }
@@ -1616,10 +1499,10 @@ impl<'a> FromIterator<&'a str> for Rope {
     }
 }
 
-impl<'a> FromIterator<std::borrow::Cow<'a, str>> for Rope {
+impl<'a> FromIterator<sp_std::borrow::Cow<'a, str>> for Rope {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = std::borrow::Cow<'a, str>>,
+        T: IntoIterator<Item = sp_std::borrow::Cow<'a, str>>,
     {
         let mut builder = RopeBuilder::new();
         for chunk in iter {
@@ -1645,15 +1528,15 @@ impl FromIterator<String> for Rope {
 //==============================================================
 // Other impls
 
-impl std::fmt::Debug for Rope {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl sp_std::fmt::Debug for Rope {
+    fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
         f.debug_list().entries(self.chunks()).finish()
     }
 }
 
-impl std::fmt::Display for Rope {
+impl sp_std::fmt::Display for Rope {
     #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
         for chunk in self.chunks() {
             write!(f, "{}", chunk)?
         }
@@ -1661,88 +1544,88 @@ impl std::fmt::Display for Rope {
     }
 }
 
-impl std::default::Default for Rope {
+impl sp_std::default::Default for Rope {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl std::cmp::Eq for Rope {}
+impl sp_std::cmp::Eq for Rope {}
 
-impl std::cmp::PartialEq<Rope> for Rope {
+impl sp_std::cmp::PartialEq<Rope> for Rope {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         self.slice(..) == other.slice(..)
     }
 }
 
-impl<'a> std::cmp::PartialEq<&'a str> for Rope {
+impl<'a> sp_std::cmp::PartialEq<&'a str> for Rope {
     #[inline]
     fn eq(&self, other: &&'a str) -> bool {
         self.slice(..) == *other
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for &'a str {
+impl<'a> sp_std::cmp::PartialEq<Rope> for &'a str {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         *self == other.slice(..)
     }
 }
 
-impl std::cmp::PartialEq<str> for Rope {
+impl sp_std::cmp::PartialEq<str> for Rope {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         self.slice(..) == other
     }
 }
 
-impl std::cmp::PartialEq<Rope> for str {
+impl sp_std::cmp::PartialEq<Rope> for str {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         self == other.slice(..)
     }
 }
 
-impl<'a> std::cmp::PartialEq<String> for Rope {
+impl<'a> sp_std::cmp::PartialEq<String> for Rope {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.slice(..) == other.as_str()
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for String {
+impl<'a> sp_std::cmp::PartialEq<Rope> for String {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         self.as_str() == other.slice(..)
     }
 }
 
-impl<'a> std::cmp::PartialEq<std::borrow::Cow<'a, str>> for Rope {
+impl<'a> sp_std::cmp::PartialEq<sp_std::borrow::Cow<'a, str>> for Rope {
     #[inline]
-    fn eq(&self, other: &std::borrow::Cow<'a, str>) -> bool {
+    fn eq(&self, other: &sp_std::borrow::Cow<'a, str>) -> bool {
         self.slice(..) == **other
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for std::borrow::Cow<'a, str> {
+impl<'a> sp_std::cmp::PartialEq<Rope> for sp_std::borrow::Cow<'a, str> {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         **self == other.slice(..)
     }
 }
 
-impl std::cmp::Ord for Rope {
+impl sp_std::cmp::Ord for Rope {
     #[inline]
-    fn cmp(&self, other: &Rope) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Rope) -> sp_std::cmp::Ordering {
         self.slice(..).cmp(&other.slice(..))
     }
 }
 
-impl std::cmp::PartialOrd<Rope> for Rope {
+impl sp_std::cmp::PartialOrd<Rope> for Rope {
     #[inline]
-    fn partial_cmp(&self, other: &Rope) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Rope) -> Option<sp_std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -2913,7 +2796,7 @@ mod tests {
 
     #[test]
     fn to_cow_01() {
-        use std::borrow::Cow;
+        use sp_std::borrow::Cow;
         let r = Rope::from_str(TEXT);
         let cow: Cow<str> = (&r).into();
 
@@ -2922,7 +2805,7 @@ mod tests {
 
     #[test]
     fn to_cow_02() {
-        use std::borrow::Cow;
+        use sp_std::borrow::Cow;
         let r = Rope::from_str(TEXT);
         let cow: Cow<str> = (r.clone()).into();
 
@@ -2931,7 +2814,7 @@ mod tests {
 
     #[test]
     fn to_cow_03() {
-        use std::borrow::Cow;
+        use sp_std::borrow::Cow;
         let r = Rope::from_str("a");
         let cow: Cow<str> = (&r).into();
 
