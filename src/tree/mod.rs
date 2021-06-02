@@ -21,24 +21,28 @@ mod constants {
         sync::Arc,
     };
 
-    const PTR_SIZE: usize = size_of::<&u8>();
-    const CHILD_INFO_SIZE: usize = size_of::<Arc<Node>>() + size_of::<TextInfo>();
-    const CHILD_INFO_MAX_ALIGN: usize = if align_of::<Arc<Node>>() > align_of::<Arc<TextInfo>>() {
-        align_of::<Arc<Node>>()
-    } else {
-        align_of::<Arc<TextInfo>>()
-    };
-
     // Aim for nodes to be 1024 bytes minus Arc counters.  Keeping the nodes
     // multiples of large powers of two makes it easier for the memory allocator
     // to avoid fragmentation.
-    const TARGET_NODE_SIZE: usize = 1024 - (PTR_SIZE * 2);
+    const TARGET_TOTAL_SIZE: usize = 1024;
+    const TARGET_NODE_SIZE: usize = TARGET_TOTAL_SIZE - ARC_COUNTERS_SIZE;
+
+    // Space that the strong and weak Arc counters take up in `ArcInner`.
+    const ARC_COUNTERS_SIZE: usize = size_of::<std::sync::atomic::AtomicUsize>() * 2;
+
+    // Misc useful info that we need below.
+    const CHILD_INFO_SIZE: usize = size_of::<Arc<Node>>() + size_of::<TextInfo>();
+    const CHILD_INFO_MAX_ALIGN: usize = if align_of::<Arc<Node>>() > align_of::<TextInfo>() {
+        align_of::<Arc<Node>>()
+    } else {
+        align_of::<TextInfo>()
+    };
 
     // Min/max number of children of an internal node.
     pub(crate) const MAX_CHILDREN: usize = (TARGET_NODE_SIZE
         // In principle we want to subtract NodeChildren's length counter
-        // here, which would be one byte.  However, due to that extra byte
-        // NodeChildren actually gets padded out to the alignment of
+        // here, which would just be one byte.  However, due to that extra
+        // byte NodeChildren actually gets padded out to the alignment of
         // Arc/TextInfo.  So we need to subtract that alignment padding
         // instead.
         - CHILD_INFO_MAX_ALIGN
@@ -61,21 +65,19 @@ mod constants {
         & !(align_of::<SmallVec<[u8; 32]>>() - 1);
     pub(crate) const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
 
-    // These weird expressions are essentially poor-man's compile-time
-    // assertions.  They result in a compile-time error if everything
-    // isn't the way it needs to be for the combined "Arc counters + Node"
-    // size we want.
-    // The resulting error messages are cryptic, but they're distinct enough
-    // that if people run into them and file an issue it should be obvious what
-    // they are.
+    // This weird expression is essentially a poor-man's compile-time
+    // assertion.  It results in a compile-time error if our actual
+    // total "Arc counters + Node" size isn't the size we want.
+    // The resulting error message is cryptic, but it's distinct enough
+    // that if people run into it and file an issue it should be obvious
+    // what it is.
     const _: [(); 0 - !{
         // Assert alignment.
-        const ASSERT: bool = align_of::<Node>() <= align_of::<&u8>();
-        ASSERT
-    } as usize] = [];
-    const _: [(); 0 - !{
-        // Assert size.
-        const ASSERT: bool = size_of::<Node>() == TARGET_NODE_SIZE;
+        const ASSERT: bool = if align_of::<Node>() > ARC_COUNTERS_SIZE {
+            align_of::<Node>() + size_of::<Node>()
+        } else {
+            ARC_COUNTERS_SIZE + size_of::<Node>()
+        } == TARGET_TOTAL_SIZE;
         ASSERT
     } as usize] = [];
 }
