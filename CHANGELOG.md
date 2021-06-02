@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+### Bug fixes
+- The in-memory node size wasn't being computed properly, potentially resulting in unecessary memory fragmentation.
+
 
 ## [1.2.0] - 2020-06-14
 
