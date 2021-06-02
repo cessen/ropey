@@ -14,6 +14,53 @@ use crate::str_utils::{
 };
 use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
 
+#[derive(Clone, Copy)]
+pub enum RopeyError {
+    InvalidRange(usize, usize),
+    Insert(usize, usize),
+    Remove(usize, usize),
+    RopeIndexByte(usize, usize),
+    RopeIndexChar(usize, usize),
+    RopeIndexLine(usize, usize),
+    SliceIndexByte(usize, usize),
+    SliceIndexChar(usize, usize),
+    SliceIndexLine(usize, usize),
+}
+
+impl std::fmt::Debug for RopeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RopeyError::InvalidRange(start, end) => {
+                write!(f, "invalid range {:?}: start must be <= end", start..end)
+            }
+            RopeyError::Insert(insert, len) => {
+                write!(f, "Attempt to insert past end of Rope: insertion point {}, Rope length {}", insert, len)
+            }
+            RopeyError::Remove(end, len) => {
+                write!(f, "Attempt to remove past end of Rope: removal end {}, Rope length {}", end, len)
+            },
+            RopeyError::RopeIndexByte(index, len) => {
+                write!(f, "Attempt to index past end of Rope: byte index {}, Rope byte length {}", index, len)
+            },
+            RopeyError::RopeIndexChar(index, len) => {
+                write!(f, "Attempt to index past end of Rope: char index {}, Rope char length {}", index, len)
+            },
+            RopeyError::RopeIndexLine(index, len) => {
+                write!(f, "Attempt to index past end of Rope: line index {}, Rope line length {}", index, len)
+            },
+            RopeyError::SliceIndexByte(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: byte index {}, RopeSlice byte length {}", index, len)
+            },
+            RopeyError::SliceIndexChar(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: char index {}, RopeSlice char length {}", index, len)
+            },
+            RopeyError::SliceIndexLine(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: line index {}, RopeSlice line length {}", index, len)
+            },
+        }
+    }
+}
+
 /// A utf8 text rope.
 ///
 /// The time complexity of nearly all edit and query operations on `Rope` are
@@ -342,58 +389,11 @@ impl Rope {
     #[inline]
     pub fn insert(&mut self, char_idx: usize, text: &str) {
         // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        // We have three cases here:
-        // 1. The insertion text is very large, in which case building a new
-        //    Rope out of it and splicing it into the existing Rope is most
-        //    efficient.
-        // 2. The insertion text is somewhat large, in which case splitting it
-        //    up into chunks and repeatedly inserting them is the most
-        //    efficient.  The splitting is necessary because the insertion code
-        //    only works correctly below a certain insertion size.
-        // 3. The insertion text is small, in which case we can simply insert
-        //    it.
-        //
-        // Cases #2 and #3 are rolled into one case here, where case #3 just
-        // results in the text being "split" into only one chunk.
-        //
-        // The boundary for what constitutes "very large" text was arrived at
-        // experimentally, by testing at what point Rope build + splice becomes
-        // faster than split + repeated insert.  This constant is likely worth
-        // revisiting from time to time as Ropey evolves.
-        if text.len() > MAX_BYTES * 6 {
-            // Case #1: very large text, build rope and splice it in.
-            let text_rope = Rope::from_str(text);
-            let right = self.split_off(char_idx);
-            self.append(text_rope);
-            self.append(right);
-        } else {
-            // Cases #2 and #3: split into chunks and repeatedly insert.
-            let mut text = text;
-            while !text.is_empty() {
-                // Split a chunk off from the end of the text.
-                // We do this from the end instead of the front so that
-                // the repeated insertions can keep re-using the same
-                // insertion point.
-                let split_idx = crlf::find_good_split(
-                    text.len() - (MAX_BYTES - 4).min(text.len()),
-                    text.as_bytes(),
-                    false,
-                );
-                let ins_text = &text[split_idx..];
-                text = &text[..split_idx];
-
-                // Do the insertion.
-                self.insert_internal(char_idx, ins_text);
-            }
-        }
+        self.try_insert(char_idx, text).unwrap()
     }
+
+
+
 
     /// Inserts a single char `ch` at char index `char_idx`.
     ///
@@ -593,44 +593,10 @@ impl Rope {
     where
         R: RangeBounds<usize>,
     {
-        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
-        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
-
-        // Bounds check
-        assert!(start <= end);
-        assert!(
-            end <= self.len_chars(),
-            "Attempt to remove past end of Rope: removal end {}, Rope length {}",
-            end,
-            self.len_chars()
-        );
-
-        // A special case that the rest of the logic doesn't handle
-        // correctly.
-        if start == 0 && end == self.len_chars() {
-            self.root = Arc::new(Node::new());
-            return;
-        }
-
-        // Scope to contain borrow of root
-        {
-            let root = Arc::make_mut(&mut self.root);
-
-            let root_info = root.text_info();
-            let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
-
-            if crlf_seam {
-                let seam_idx = root.char_to_text_info(start).bytes;
-                root.fix_crlf_seam(seam_idx as Count, false);
-            }
-
-            if needs_fix {
-                root.fix_after_remove(start);
-            }
-        }
-
-        self.pull_up_singular_nodes();
+        self.try_remove(char_range).unwrap()
     }
+
+
 
     /// Splits the `Rope` at `char_idx`, returning the right part of
     /// the split.
@@ -792,17 +758,9 @@ impl Rope {
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to index past end of Rope: char index {}, Rope char length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        let (chunk, b, c, _) = self.chunk_at_char(char_idx);
-        b + char_to_byte_idx(chunk, char_idx - c)
+        self.try_char_to_byte(char_idx).unwrap()
     }
+
 
     /// Returns the line index of the given char.
     ///
@@ -820,17 +778,10 @@ impl Rope {
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
     pub fn char_to_line(&self, char_idx: usize) -> usize {
-        // Bounds check
-        assert!(
-            char_idx <= self.len_chars(),
-            "Attempt to index past end of Rope: char index {}, Rope char length {}",
-            char_idx,
-            self.len_chars()
-        );
-
-        let (chunk, _, c, l) = self.chunk_at_char(char_idx);
-        l + char_to_line_idx(chunk, char_idx - c)
+        self.try_char_to_line(char_idx).unwrap()
     }
+
+
 
     /// Returns the utf16 code unit index of the given char.
     ///
@@ -1182,20 +1133,10 @@ impl Rope {
     where
         R: RangeBounds<usize>,
     {
-        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
-        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
-
-        // Bounds check
-        assert!(start <= end);
-        assert!(
-            end <= self.len_chars(),
-            "Attempt to slice past end of Rope: slice end {}, Rope length {}",
-            end,
-            self.len_chars()
-        );
-
-        RopeSlice::new_with_range(&self.root, start, end)
+        self.get_slice(char_range).unwrap()
     }
+
+
 
     //-----------------------------------------------------------------------
     // Iterator methods
@@ -1496,6 +1437,156 @@ impl Rope {
         }
     }
 }
+
+impl Rope {
+    /// a total version of [`insert`]; returns `true` on success.
+    ///
+    /// [`insert`]: Rope::insert
+    #[inline]
+    pub fn try_insert(&mut self, char_idx: usize, text: &str) -> Result<(), RopeyError> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            // We have three cases here:
+            // 1. The insertion text is very large, in which case building a new
+            //    Rope out of it and splicing it into the existing Rope is most
+            //    efficient.
+            // 2. The insertion text is somewhat large, in which case splitting it
+            //    up into chunks and repeatedly inserting them is the most
+            //    efficient.  The splitting is necessary because the insertion code
+            //    only works correctly below a certain insertion size.
+            // 3. The insertion text is small, in which case we can simply insert
+            //    it.
+            //
+            // Cases #2 and #3 are rolled into one case here, where case #3 just
+            // results in the text being "split" into only one chunk.
+            //
+            // The boundary for what constitutes "very large" text was arrived at
+            // experimentally, by testing at what point Rope build + splice becomes
+            // faster than split + repeated insert.  This constant is likely worth
+            // revisiting from time to time as Ropey evolves.
+            if text.len() > MAX_BYTES * 6 {
+                // Case #1: very large text, build rope and splice it in.
+                let text_rope = Rope::from_str(text);
+                let right = self.split_off(char_idx);
+                self.append(text_rope);
+                self.append(right);
+            } else {
+                // Cases #2 and #3: split into chunks and repeatedly insert.
+                let mut text = text;
+                while !text.is_empty() {
+                    // Split a chunk off from the end of the text.
+                    // We do this from the end instead of the front so that
+                    // the repeated insertions can keep re-using the same
+                    // insertion point.
+                    let split_idx = crlf::find_good_split(
+                        text.len() - (MAX_BYTES - 4).min(text.len()),
+                        text.as_bytes(),
+                        false,
+                    );
+                    let ins_text = &text[split_idx..];
+                    text = &text[..split_idx];
+
+                    // Do the insertion.
+                    self.insert_internal(char_idx, ins_text);
+                }
+            }
+            Ok(())
+        } else {
+            Err(RopeyError::Insert(char_idx, self.len_chars()))
+        }
+    }
+
+    /// a total version of [`remove`]; returns `true` on success.
+    ///
+    /// [`remove`]: Rope::remove
+    pub fn try_remove<R>(&mut self, char_range: R) -> Result<(), RopeyError>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
+        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
+        if !(start <= end) {
+            Err(RopeyError::InvalidRange(start, end))
+        } else if !(end <= self.len_chars()) {
+            Err(RopeyError::Remove(end, self.len_chars()))
+        } else {
+            // A special case that the rest of the logic doesn't handle
+            // correctly.
+            if start == 0 && end == self.len_chars() {
+                self.root = Arc::new(Node::new());
+                return Ok(());
+            }
+
+            // Scope to contain borrow of root
+            {
+                let root = Arc::make_mut(&mut self.root);
+
+                let root_info = root.text_info();
+                let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
+
+                if crlf_seam {
+                    let seam_idx = root.char_to_text_info(start).bytes;
+                    root.fix_crlf_seam(seam_idx as Count, false);
+                }
+
+                if needs_fix {
+                    root.fix_after_remove(start);
+                }
+            }
+
+            self.pull_up_singular_nodes();
+            Ok(())
+        }
+    }
+
+    /// a total version of [`char_to_byte`].
+    ///
+    /// [`char_to_byte`]: Rope::char_to_byte
+    #[inline]
+    pub fn try_char_to_byte(&self, char_idx: usize) -> Result<usize, RopeyError> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            let (chunk, b, c, _) = self.chunk_at_char(char_idx);
+            Ok(b + char_to_byte_idx(chunk, char_idx - c))
+        } else {
+            Err(RopeyError::RopeIndexChar(char_idx, self.len_chars()))
+        }
+    }
+
+    /// a total version of [`char_to_line`].
+    ///
+    /// [`char_to_line`]: Rope::char_to_line
+    #[inline]
+    pub fn try_char_to_line(&self, char_idx: usize) -> Result<usize, RopeyError> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            let (chunk, _, c, l) = self.chunk_at_char(char_idx);
+            Ok(l + char_to_line_idx(chunk, char_idx - c))
+        } else {
+            Err(RopeyError::RopeIndexChar(char_idx, self.len_chars()))
+        }
+    }
+
+    /// a total version of [`slice`]
+    ///
+    /// [`slice`]: Rope::slice
+    #[inline]
+    pub fn get_slice<R>(&self, char_range: R) -> Option<RopeSlice>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
+        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
+
+        // Bounds check
+        if start <= end && end <= self.len_chars() {
+            Some(RopeSlice::new_with_range(&self.root, start, end))
+        } else {
+            None
+        }
+    }
+}
+
 
 //==============================================================
 // Conversion impls
