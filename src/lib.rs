@@ -148,27 +148,38 @@ mod tree;
 pub mod iter;
 pub mod str_utils;
 
+use std::ops::Bound;
+
 pub use crate::rope::Rope;
 pub use crate::rope_builder::RopeBuilder;
 pub use crate::slice::RopeSlice;
+
+//==============================================================
+// Error reporting types.
 
 /// Ropey's result type.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Ropey's error type.
 #[derive(Clone, Copy)]
+#[non_exhaustive]
 pub enum Error {
-    InvalidRange(usize, usize),
-    Insert(usize, usize),
-    Remove(usize, usize),
-    RopeIndexByte(usize, usize),
-    RopeIndexChar(usize, usize),
-    RopeIndexLine(usize, usize),
-    RopeIndexUtf16(usize, usize),
-    SliceIndexByte(usize, usize),
-    SliceIndexChar(usize, usize),
-    SliceIndexLine(usize, usize),
-    SliceIndexUtf16(usize, usize),
+    ByteIndexOutOfBounds(usize, usize),  // (index, rope byte length)
+    CharIndexOutOfBounds(usize, usize),  // (index, rope char length)
+    LineIndexOutOfBounds(usize, usize),  // (index, rope line length)
+    Utf16IndexOutOfBounds(usize, usize), // (index, rope utf16 length)
+
+    // Unlike the range out-of-bounds error, this doesn't use Option.
+    // For this error to even be possible, it needs both a start and an end.
+    CharRangeInvalid(
+        usize, // Start.
+        usize, // End.
+    ),
+    CharRangeOutOfBounds(
+        Option<usize>, // Start.
+        Option<usize>, // End.
+        usize,         // Rope char length.
+    ),
 }
 
 impl std::error::Error for Error {
@@ -189,59 +200,43 @@ impl std::error::Error for Error {
 
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::InvalidRange(start, end) => {
-                write!(f, "invalid range {:?}: start must be <= end", start..end)
-            }
-            Error::Insert(insert, len) => {
+        match *self {
+            Error::ByteIndexOutOfBounds(index, len) => {
                 write!(
                     f,
-                    "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
-                    insert, len
-                )
-            }
-            Error::Remove(end, len) => {
-                write!(
-                    f,
-                    "Attempt to remove past end of Rope: removal end {}, Rope length {}",
-                    end, len
-                )
-            }
-            Error::RopeIndexByte(index, len) => {
-                write!(
-                    f,
-                    "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+                    "Byte index out of bounds: byte index {}, Rope/RopeSlice byte length {}",
                     index, len
                 )
             }
-            Error::RopeIndexChar(index, len) => {
+            Error::CharIndexOutOfBounds(index, len) => {
                 write!(
                     f,
-                    "Attempt to index past end of Rope: char index {}, Rope char length {}",
+                    "Char index out of bounds: char index {}, Rope/RopeSlice char length {}",
                     index, len
                 )
             }
-            Error::RopeIndexLine(index, len) => {
+            Error::LineIndexOutOfBounds(index, len) => {
                 write!(
                     f,
-                    "Attempt to index past end of Rope: line index {}, Rope line length {}",
+                    "Line index out of bounds: line index {}, Rope/RopeSlice line count {}",
                     index, len
                 )
             }
-            Error::RopeIndexUtf16(index, len) => {
-                write!(f, "Attempt to index past end of Rope: utf16 code unit index {}, Rope utf16 code unit length {}", index, len)
+            Error::Utf16IndexOutOfBounds(index, len) => {
+                write!(f, "Utf16 code-unit index out of bounds: utf16 index {}, Rope/RopeSlice utf16 length {}", index, len)
             }
-            Error::SliceIndexByte(index, len) => {
-                write!(f, "Attempt to index past end of RopeSlice: byte index {}, RopeSlice byte length {}", index, len)
+
+            Error::CharRangeInvalid(start_idx, end_idx) => {
+                write!(
+                    f,
+                    "Invalid char range {}..{}: start must be <= end",
+                    start_idx, end_idx
+                )
             }
-            Error::SliceIndexChar(index, len) => {
-                write!(f, "Attempt to index past end of RopeSlice: char index {}, RopeSlice char length {}", index, len)
-            }
-            Error::SliceIndexLine(index, len) => {
-                write!(f, "Attempt to index past end of RopeSlice: line index {}, RopeSlice line length {}", index, len)
-            }
-            Error::SliceIndexUtf16(index, len) => {
-                write!(f, "Attempt to index past end of RopeSlice: utf16 code unit index {}, RopeSlice utf16 code unit length {}", index, len)
+            Error::CharRangeOutOfBounds(start_idx_opt, end_idx_opt, len) => {
+                write!(f, "Char range out of bounds: char range ")?;
+                write_range(f, start_idx_opt, end_idx_opt)?;
+                write!(f, ", Rope/RopeSlice char length {}", len)
             }
         }
     }
@@ -251,5 +246,50 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Just re-use the debug impl.
         std::fmt::Debug::fmt(self, f)
+    }
+}
+
+fn write_range(
+    f: &mut std::fmt::Formatter<'_>,
+    start_idx: Option<usize>,
+    end_idx: Option<usize>,
+) -> std::fmt::Result {
+    match (start_idx, end_idx) {
+        (None, None) => {
+            write!(f, "..")
+        }
+
+        (Some(start), None) => {
+            write!(f, "{}..", start)
+        }
+
+        (None, Some(end)) => {
+            write!(f, "..{}", end)
+        }
+
+        (Some(start), Some(end)) => {
+            write!(f, "{}..{}", start, end)
+        }
+    }
+}
+
+//==============================================================
+// Range handling utilities.
+
+#[inline(always)]
+pub(crate) fn start_bound_to_num(b: Bound<&usize>) -> Option<usize> {
+    match b {
+        Bound::Included(n) => Some(*n),
+        Bound::Excluded(n) => Some(*n + 1),
+        Bound::Unbounded => None,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn end_bound_to_num(b: Bound<&usize>) -> Option<usize> {
+    match b {
+        Bound::Included(n) => Some(*n + 1),
+        Bound::Excluded(n) => Some(*n),
+        Bound::Unbounded => None,
     }
 }

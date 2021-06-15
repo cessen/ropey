@@ -7,13 +7,13 @@ use std::sync::Arc;
 use crate::crlf;
 use crate::iter::{Bytes, Chars, Chunks, Lines};
 use crate::rope_builder::RopeBuilder;
-use crate::slice::{end_bound_to_num, start_bound_to_num, RopeSlice};
+use crate::slice::RopeSlice;
 use crate::str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
     char_to_line_idx, line_to_byte_idx, line_to_char_idx, utf16_code_unit_to_char_idx,
 };
 use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
-use crate::{Error, Result};
+use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 
 /// A utf8 text rope.
 ///
@@ -1261,7 +1261,7 @@ impl Rope {
             }
             Ok(())
         } else {
-            Err(Error::Insert(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -1275,7 +1275,7 @@ impl Rope {
             let mut buf = [0u8; 4];
             Ok(self.insert_internal(char_idx, ch.encode_utf8(&mut buf)))
         } else {
-            Err(Error::Insert(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -1322,7 +1322,7 @@ impl Rope {
             let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
             Ok(c + byte_to_char_idx(chunk, byte_idx - b))
         } else {
-            Err(Error::RopeIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
         }
     }
 
@@ -1336,7 +1336,7 @@ impl Rope {
             let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
             Ok(l + byte_to_line_idx(chunk, byte_idx - b))
         } else {
-            Err(Error::RopeIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
         }
     }
 
@@ -1417,7 +1417,7 @@ impl Rope {
 
             Ok(char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count)
         } else {
-            Err(Error::RopeIndexChar(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -1435,7 +1435,10 @@ impl Rope {
 
             Ok(chunk_start_info.chars as usize + chunk_char_idx)
         } else {
-            Err(Error::RopeIndexUtf16(utf16_cu_idx, self.len_utf16_cu()))
+            Err(Error::Utf16IndexOutOfBounds(
+                utf16_cu_idx,
+                self.len_utf16_cu(),
+            ))
         }
     }
     /// a non-panicking version of [`line_to_byte`];
@@ -1452,7 +1455,7 @@ impl Rope {
                 Ok(b + line_to_byte_idx(chunk, line_idx - l))
             }
         } else {
-            Err(Error::RopeIndexLine(line_idx, self.len_lines()))
+            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
         }
     }
 
@@ -1470,7 +1473,7 @@ impl Rope {
                 Ok(c + line_to_char_idx(chunk, line_idx - l))
             }
         } else {
-            Err(Error::RopeIndexLine(line_idx, self.len_lines()))
+            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
         }
     }
 
@@ -1659,12 +1662,18 @@ impl Rope {
     where
         R: RangeBounds<usize>,
     {
-        let start = start_bound_to_num(char_range.start_bound()).unwrap_or(0);
-        let end = end_bound_to_num(char_range.end_bound()).unwrap_or_else(|| self.len_chars());
-        if !(start <= end) {
-            Err(Error::InvalidRange(start, end))
-        } else if !(end <= self.len_chars()) {
-            Err(Error::Remove(end, self.len_chars()))
+        let start_opt = start_bound_to_num(char_range.start_bound());
+        let end_opt = end_bound_to_num(char_range.end_bound());
+        let start = start_opt.unwrap_or(0);
+        let end = end_opt.unwrap_or_else(|| self.len_chars());
+        if !(end.max(start) <= self.len_chars()) {
+            Err(Error::CharRangeOutOfBounds(
+                start_opt,
+                end_opt,
+                self.len_chars(),
+            ))
+        } else if !(start <= end) {
+            Err(Error::CharRangeInvalid(start, end))
         } else {
             // A special case that the rest of the logic doesn't handle
             // correctly.
@@ -1705,7 +1714,7 @@ impl Rope {
             let (chunk, b, c, _) = self.chunk_at_char(char_idx);
             Ok(b + char_to_byte_idx(chunk, char_idx - c))
         } else {
-            Err(Error::RopeIndexChar(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -1719,7 +1728,7 @@ impl Rope {
             let (chunk, _, c, l) = self.chunk_at_char(char_idx);
             Ok(l + char_to_line_idx(chunk, char_idx - c))
         } else {
-            Err(Error::RopeIndexChar(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 

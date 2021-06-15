@@ -1,4 +1,4 @@
-use std::ops::{Bound, RangeBounds};
+use std::ops::RangeBounds;
 use std::sync::Arc;
 
 use crate::iter::{Bytes, Chars, Chunks, Lines};
@@ -9,7 +9,7 @@ use crate::str_utils::{
     line_to_char_idx, utf16_code_unit_to_char_idx,
 };
 use crate::tree::{Count, Node, TextInfo};
-use crate::{Error, Result};
+use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 
 /// An immutable view into part of a `Rope`.
 ///
@@ -848,7 +848,7 @@ impl<'a> RopeSlice<'a> {
             let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
             Ok(c + byte_to_char_idx(chunk, byte_idx - b))
         } else {
-            Err(Error::SliceIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
         }
     }
 
@@ -862,7 +862,7 @@ impl<'a> RopeSlice<'a> {
             let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
             Ok(l + byte_to_line_idx(chunk, byte_idx - b))
         } else {
-            Err(Error::SliceIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
         }
     }
 
@@ -876,7 +876,7 @@ impl<'a> RopeSlice<'a> {
             let (chunk, b, c, _) = self.chunk_at_char(char_idx);
             Ok(b + char_to_byte_idx(chunk, char_idx - c))
         } else {
-            Err(Error::SliceIndexChar(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -890,7 +890,7 @@ impl<'a> RopeSlice<'a> {
             let (chunk, _, c, l) = self.chunk_at_char(char_idx);
             Ok(l + char_to_line_idx(chunk, char_idx - c))
         } else {
-            Err(Error::SliceIndexChar(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -928,7 +928,7 @@ impl<'a> RopeSlice<'a> {
                 }
             }
         } else {
-            Err(Error::SliceIndexChar(char_idx, self.len_chars()))
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
@@ -964,7 +964,10 @@ impl<'a> RopeSlice<'a> {
                 }
             }
         } else {
-            Err(Error::SliceIndexUtf16(utf16_cu_idx, self.len_utf16_cu()))
+            Err(Error::Utf16IndexOutOfBounds(
+                utf16_cu_idx,
+                self.len_utf16_cu(),
+            ))
         }
     }
 
@@ -982,7 +985,7 @@ impl<'a> RopeSlice<'a> {
                 Ok(b + line_to_byte_idx(chunk, line_idx - l))
             }
         } else {
-            Err(Error::SliceIndexLine(line_idx, self.len_lines()))
+            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
         }
     }
 
@@ -1000,7 +1003,7 @@ impl<'a> RopeSlice<'a> {
                 Ok(c + line_to_char_idx(chunk, line_idx - l))
             }
         } else {
-            Err(Error::SliceIndexLine(line_idx, self.len_lines()))
+            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
         }
     }
 
@@ -1099,7 +1102,7 @@ impl<'a> RopeSlice<'a> {
                 RopeSlice(RSEnum::Light { text, .. }) => Ok((text, 0, 0, 0)),
             }
         } else {
-            Err(Error::SliceIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
         }
     }
 
@@ -1522,26 +1525,6 @@ impl<'a> RopeSlice<'a> {
         } else {
             None
         }
-    }
-}
-
-//==============================================================
-
-#[inline(always)]
-pub(crate) fn start_bound_to_num(b: Bound<&usize>) -> Option<usize> {
-    match b {
-        Bound::Included(n) => Some(*n),
-        Bound::Excluded(n) => Some(*n + 1),
-        Bound::Unbounded => None,
-    }
-}
-
-#[inline(always)]
-pub(crate) fn end_bound_to_num(b: Bound<&usize>) -> Option<usize> {
-    match b {
-        Bound::Included(n) => Some(*n + 1),
-        Bound::Excluded(n) => Some(*n),
-        Bound::Unbounded => None,
     }
 }
 
