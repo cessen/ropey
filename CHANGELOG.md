@@ -5,6 +5,7 @@
 
 ### New features
 - Added non-panicking versions of all methods on `Rope` and `RopeSlice`.
+- All iterators can now be reversed, swapping the beheavior of `prev()` and `next()`.
 
 ### Bug fixes
 - The in-memory node size wasn't being computed properly, potentially resulting in unecessary memory fragmentation.
