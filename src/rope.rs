@@ -26,7 +26,7 @@ pub enum RopeyError {
     SliceIndexByte(usize, usize),
     SliceIndexChar(usize, usize),
     SliceIndexLine(usize, usize),
-    SliceIndexUtf16(usize, usize)
+    SliceIndexUtf16(usize, usize),
 }
 
 impl std::fmt::Debug for RopeyError {
@@ -36,32 +36,52 @@ impl std::fmt::Debug for RopeyError {
                 write!(f, "invalid range {:?}: start must be <= end", start..end)
             }
             RopeyError::Insert(insert, len) => {
-                write!(f, "Attempt to insert past end of Rope: insertion point {}, Rope length {}", insert, len)
+                write!(
+                    f,
+                    "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
+                    insert, len
+                )
             }
             RopeyError::Remove(end, len) => {
-                write!(f, "Attempt to remove past end of Rope: removal end {}, Rope length {}", end, len)
-            },
+                write!(
+                    f,
+                    "Attempt to remove past end of Rope: removal end {}, Rope length {}",
+                    end, len
+                )
+            }
             RopeyError::RopeIndexByte(index, len) => {
-                write!(f, "Attempt to index past end of Rope: byte index {}, Rope byte length {}", index, len)
-            },
+                write!(
+                    f,
+                    "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+                    index, len
+                )
+            }
             RopeyError::RopeIndexChar(index, len) => {
-                write!(f, "Attempt to index past end of Rope: char index {}, Rope char length {}", index, len)
-            },
+                write!(
+                    f,
+                    "Attempt to index past end of Rope: char index {}, Rope char length {}",
+                    index, len
+                )
+            }
             RopeyError::RopeIndexLine(index, len) => {
-                write!(f, "Attempt to index past end of Rope: line index {}, Rope line length {}", index, len)
-            },
+                write!(
+                    f,
+                    "Attempt to index past end of Rope: line index {}, Rope line length {}",
+                    index, len
+                )
+            }
             RopeyError::RopeIndexUtf16(index, len) => {
                 write!(f, "Attempt to index past end of Rope: utf16 code unit index {}, Rope utf16 code unit length {}", index, len)
             }
             RopeyError::SliceIndexByte(index, len) => {
                 write!(f, "Attempt to index past end of RopeSlice: byte index {}, RopeSlice byte length {}", index, len)
-            },
+            }
             RopeyError::SliceIndexChar(index, len) => {
                 write!(f, "Attempt to index past end of RopeSlice: char index {}, RopeSlice char length {}", index, len)
-            },
+            }
             RopeyError::SliceIndexLine(index, len) => {
                 write!(f, "Attempt to index past end of RopeSlice: line index {}, RopeSlice line length {}", index, len)
-            },
+            }
             RopeyError::SliceIndexUtf16(index, len) => {
                 write!(f, "Attempt to index past end of RopeSlice: utf16 code unit index {}, RopeSlice utf16 code unit length {}", index, len)
             }
@@ -400,9 +420,6 @@ impl Rope {
         self.try_insert(char_idx, text).unwrap()
     }
 
-
-
-
     /// Inserts a single char `ch` at char index `char_idx`.
     ///
     /// Runs in O(log N) time.
@@ -595,8 +612,6 @@ impl Rope {
         self.try_remove(char_range).unwrap()
     }
 
-
-
     /// Splits the `Rope` at `char_idx`, returning the right part of
     /// the split.
     ///
@@ -741,8 +756,6 @@ impl Rope {
         self.try_char_to_line(char_idx).unwrap()
     }
 
-
-
     /// Returns the utf16 code unit index of the given char.
     ///
     /// Ropey stores text internally as utf8, but sometimes it is necessary
@@ -878,8 +891,7 @@ impl Rope {
             let len_lines = self.len_lines();
             panic!(
                 "Attempt to index past end of Rope: line index {}, Rope line length {}",
-                line_idx,
-                len_lines
+                line_idx, len_lines
             );
         }
     }
@@ -1005,8 +1017,6 @@ impl Rope {
     {
         self.get_slice(char_range).unwrap()
     }
-
-
 
     //-----------------------------------------------------------------------
     // Iterator methods
@@ -1399,7 +1409,6 @@ impl Rope {
         if byte_idx <= self.len_bytes() {
             let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
             Ok(l + byte_to_line_idx(chunk, byte_idx - b))
-
         } else {
             Err(RopeyError::RopeIndexByte(byte_idx, self.len_bytes()))
         }
@@ -1419,7 +1428,6 @@ impl Rope {
             None
         }
     }
-
 
     /// a non-panicking version of [`char`]
     ///
@@ -1467,8 +1475,7 @@ impl Rope {
         } else {
             None
         }
-
-   }
+    }
 
     /// a non-panicking version of [`char_to_utf16_cu`]
     ///
@@ -1478,7 +1485,8 @@ impl Rope {
         // Bounds check
         if char_idx <= self.len_chars() {
             let (chunk, chunk_start_info) = self.root.get_chunk_at_char(char_idx);
-            let chunk_byte_idx = char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
+            let chunk_byte_idx =
+                char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
             let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
 
             Ok(char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count)
@@ -1495,13 +1503,16 @@ impl Rope {
         // Bounds check
         if utf16_cu_idx <= self.len_utf16_cu() {
             let (chunk, chunk_start_info) = self.root.get_chunk_at_utf16_code_unit(utf16_cu_idx);
-            let chunk_utf16_cu_idx =
-                utf16_cu_idx - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
+            let chunk_utf16_cu_idx = utf16_cu_idx
+                - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
             let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_cu_idx);
 
             Ok(chunk_start_info.chars as usize + chunk_char_idx)
         } else {
-            Err(RopeyError::RopeIndexUtf16(utf16_cu_idx, self.len_utf16_cu()))
+            Err(RopeyError::RopeIndexUtf16(
+                utf16_cu_idx,
+                self.len_utf16_cu(),
+            ))
         }
     }
     /// a non-panicking version of [`line_to_byte`];
@@ -1557,7 +1568,6 @@ impl Rope {
         } else {
             None
         }
-
     }
 
     /// a non-panicking version of [`chunk_at_char`];
@@ -1583,7 +1593,10 @@ impl Rope {
     ///
     /// [`chunk_at_line_break`]: Rope::chunk_at_line_break
     #[inline]
-    pub fn get_chunk_at_line_break(&self, line_break_idx: usize) -> Option<(&str, usize, usize, usize)> {
+    pub fn get_chunk_at_line_break(
+        &self,
+        line_break_idx: usize,
+    ) -> Option<(&str, usize, usize, usize)> {
         // Bounds check
         if line_break_idx <= self.len_lines() {
             let (chunk, info) = self.root.get_chunk_at_line_break(line_break_idx);
@@ -1698,7 +1711,10 @@ impl Rope {
     ///
     /// [`chunks_at_line_break`]: Rope::chunks_at_line_break
     #[inline]
-    pub fn get_chunks_at_line_break(&self, line_break_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
+    pub fn get_chunks_at_line_break(
+        &self,
+        line_break_idx: usize,
+    ) -> Option<(Chunks, usize, usize, usize)> {
         // Bounds check
         if line_break_idx <= self.len_lines() {
             Some(Chunks::new_with_range_at_line_break(
@@ -1803,7 +1819,6 @@ impl Rope {
         }
     }
 }
-
 
 //==============================================================
 // Conversion impls
