@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+### New features
+- Added non-panicking versions of all methods on `Rope` and `RopeSlice`.
+
 ### Bug fixes
 - The in-memory node size wasn't being computed properly, potentially resulting in unecessary memory fragmentation.
 
