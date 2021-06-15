@@ -2,13 +2,14 @@ use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
 use crate::iter::{Bytes, Chars, Chunks, Lines};
-use crate::rope::{Rope, RopeyError};
+use crate::rope::Rope;
 use crate::str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
     char_to_line_idx, count_chars, count_line_breaks, count_utf16_surrogates, line_to_byte_idx,
     line_to_char_idx, utf16_code_unit_to_char_idx,
 };
 use crate::tree::{Count, Node, TextInfo};
+use crate::{Error, Result};
 
 /// An immutable view into part of a `Rope`.
 ///
@@ -841,13 +842,13 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`byte_to_char`]: RopeSlice::byte_to_char
     #[inline]
-    pub fn try_byte_to_char(&self, byte_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_byte_to_char(&self, byte_idx: usize) -> Result<usize> {
         // Bounds check
         if byte_idx <= self.len_bytes() {
             let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
             Ok(c + byte_to_char_idx(chunk, byte_idx - b))
         } else {
-            Err(RopeyError::SliceIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::SliceIndexByte(byte_idx, self.len_bytes()))
         }
     }
 
@@ -855,13 +856,13 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`byte_to_line`]: RopeSlice::byte_to_line
     #[inline]
-    pub fn try_byte_to_line(&self, byte_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_byte_to_line(&self, byte_idx: usize) -> Result<usize> {
         // Bounds check
         if byte_idx <= self.len_bytes() {
             let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
             Ok(l + byte_to_line_idx(chunk, byte_idx - b))
         } else {
-            Err(RopeyError::SliceIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::SliceIndexByte(byte_idx, self.len_bytes()))
         }
     }
 
@@ -869,13 +870,13 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`char_to_byte`]: RopeSlice::char_to_byte
     #[inline]
-    pub fn try_char_to_byte(&self, char_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_char_to_byte(&self, char_idx: usize) -> Result<usize> {
         // Bounds check
         if char_idx <= self.len_chars() {
             let (chunk, b, c, _) = self.chunk_at_char(char_idx);
             Ok(b + char_to_byte_idx(chunk, char_idx - c))
         } else {
-            Err(RopeyError::SliceIndexChar(char_idx, self.len_chars()))
+            Err(Error::SliceIndexChar(char_idx, self.len_chars()))
         }
     }
 
@@ -883,13 +884,13 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`char_to_line`]: RopeSlice::char_to_line
     #[inline]
-    pub fn try_char_to_line(&self, char_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_char_to_line(&self, char_idx: usize) -> Result<usize> {
         // Bounds check
         if char_idx <= self.len_chars() {
             let (chunk, _, c, l) = self.chunk_at_char(char_idx);
             Ok(l + char_to_line_idx(chunk, char_idx - c))
         } else {
-            Err(RopeyError::SliceIndexChar(char_idx, self.len_chars()))
+            Err(Error::SliceIndexChar(char_idx, self.len_chars()))
         }
     }
 
@@ -897,7 +898,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`char_to_utf16_cu`]: RopeSlice::char_to_utf16_cu
     #[inline]
-    pub fn try_char_to_utf16_cu(&self, char_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_char_to_utf16_cu(&self, char_idx: usize) -> Result<usize> {
         // Bounds check
         if char_idx <= self.len_chars() {
             match *self {
@@ -927,7 +928,7 @@ impl<'a> RopeSlice<'a> {
                 }
             }
         } else {
-            Err(RopeyError::SliceIndexChar(char_idx, self.len_chars()))
+            Err(Error::SliceIndexChar(char_idx, self.len_chars()))
         }
     }
 
@@ -935,7 +936,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`utf16_cu_to_char`]: RopeSlice::utf16_cu_to_char
     #[inline]
-    pub fn try_utf16_cu_to_char(&self, utf16_cu_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_utf16_cu_to_char(&self, utf16_cu_idx: usize) -> Result<usize> {
         // Bounds check
         if utf16_cu_idx <= self.len_utf16_cu() {
             match *self {
@@ -963,10 +964,7 @@ impl<'a> RopeSlice<'a> {
                 }
             }
         } else {
-            Err(RopeyError::SliceIndexUtf16(
-                utf16_cu_idx,
-                self.len_utf16_cu(),
-            ))
+            Err(Error::SliceIndexUtf16(utf16_cu_idx, self.len_utf16_cu()))
         }
     }
 
@@ -974,7 +972,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`line_to_byte`]: RopeSlice::line_to_byte
     #[inline]
-    pub fn try_line_to_byte(&self, line_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_line_to_byte(&self, line_idx: usize) -> Result<usize> {
         // Bounds check
         if line_idx <= self.len_lines() {
             if line_idx == self.len_lines() {
@@ -984,7 +982,7 @@ impl<'a> RopeSlice<'a> {
                 Ok(b + line_to_byte_idx(chunk, line_idx - l))
             }
         } else {
-            Err(RopeyError::SliceIndexLine(line_idx, self.len_lines()))
+            Err(Error::SliceIndexLine(line_idx, self.len_lines()))
         }
     }
 
@@ -992,7 +990,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// [`line_to_char`]: RopeSlice::line_to_char
     #[inline]
-    pub fn try_line_to_char(&self, line_idx: usize) -> Result<usize, RopeyError> {
+    pub fn try_line_to_char(&self, line_idx: usize) -> Result<usize> {
         // Bounds check
         if line_idx <= self.len_lines() {
             if line_idx == self.len_lines() {
@@ -1002,7 +1000,7 @@ impl<'a> RopeSlice<'a> {
                 Ok(c + line_to_char_idx(chunk, line_idx - l))
             }
         } else {
-            Err(RopeyError::SliceIndexLine(line_idx, self.len_lines()))
+            Err(Error::SliceIndexLine(line_idx, self.len_lines()))
         }
     }
 
@@ -1068,10 +1066,7 @@ impl<'a> RopeSlice<'a> {
     /// a non-panicking version of [`chunk_at_byte`]
     ///
     /// [`chunk_at_byte`]: RopeSlice::chunk_at_byte
-    pub fn try_chunk_at_byte(
-        &self,
-        byte_idx: usize,
-    ) -> Result<(&'a str, usize, usize, usize), RopeyError> {
+    pub fn try_chunk_at_byte(&self, byte_idx: usize) -> Result<(&'a str, usize, usize, usize)> {
         // Bounds check
         if byte_idx <= self.len_bytes() {
             match *self {
@@ -1104,7 +1099,7 @@ impl<'a> RopeSlice<'a> {
                 RopeSlice(RSEnum::Light { text, .. }) => Ok((text, 0, 0, 0)),
             }
         } else {
-            Err(RopeyError::SliceIndexByte(byte_idx, self.len_bytes()))
+            Err(Error::SliceIndexByte(byte_idx, self.len_bytes()))
         }
     }
 

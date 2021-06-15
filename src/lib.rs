@@ -151,3 +151,105 @@ pub mod str_utils;
 pub use crate::rope::Rope;
 pub use crate::rope_builder::RopeBuilder;
 pub use crate::slice::RopeSlice;
+
+/// Ropey's result type.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// Ropey's error type.
+#[derive(Clone, Copy)]
+pub enum Error {
+    InvalidRange(usize, usize),
+    Insert(usize, usize),
+    Remove(usize, usize),
+    RopeIndexByte(usize, usize),
+    RopeIndexChar(usize, usize),
+    RopeIndexLine(usize, usize),
+    RopeIndexUtf16(usize, usize),
+    SliceIndexByte(usize, usize),
+    SliceIndexChar(usize, usize),
+    SliceIndexLine(usize, usize),
+    SliceIndexUtf16(usize, usize),
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+
+    // Deprecated in std.
+    fn description(&self) -> &str {
+        ""
+    }
+
+    // Deprecated in std.
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        None
+    }
+}
+
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::InvalidRange(start, end) => {
+                write!(f, "invalid range {:?}: start must be <= end", start..end)
+            }
+            Error::Insert(insert, len) => {
+                write!(
+                    f,
+                    "Attempt to insert past end of Rope: insertion point {}, Rope length {}",
+                    insert, len
+                )
+            }
+            Error::Remove(end, len) => {
+                write!(
+                    f,
+                    "Attempt to remove past end of Rope: removal end {}, Rope length {}",
+                    end, len
+                )
+            }
+            Error::RopeIndexByte(index, len) => {
+                write!(
+                    f,
+                    "Attempt to index past end of Rope: byte index {}, Rope byte length {}",
+                    index, len
+                )
+            }
+            Error::RopeIndexChar(index, len) => {
+                write!(
+                    f,
+                    "Attempt to index past end of Rope: char index {}, Rope char length {}",
+                    index, len
+                )
+            }
+            Error::RopeIndexLine(index, len) => {
+                write!(
+                    f,
+                    "Attempt to index past end of Rope: line index {}, Rope line length {}",
+                    index, len
+                )
+            }
+            Error::RopeIndexUtf16(index, len) => {
+                write!(f, "Attempt to index past end of Rope: utf16 code unit index {}, Rope utf16 code unit length {}", index, len)
+            }
+            Error::SliceIndexByte(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: byte index {}, RopeSlice byte length {}", index, len)
+            }
+            Error::SliceIndexChar(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: char index {}, RopeSlice char length {}", index, len)
+            }
+            Error::SliceIndexLine(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: line index {}, RopeSlice line length {}", index, len)
+            }
+            Error::SliceIndexUtf16(index, len) => {
+                write!(f, "Attempt to index past end of RopeSlice: utf16 code unit index {}, RopeSlice utf16 code unit length {}", index, len)
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Just re-use the debug impl.
+        std::fmt::Debug::fmt(self, f)
+    }
+}
