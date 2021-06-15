@@ -164,17 +164,46 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Clone, Copy)]
 #[non_exhaustive]
 pub enum Error {
-    ByteIndexOutOfBounds(usize, usize),  // (index, rope byte length)
-    CharIndexOutOfBounds(usize, usize),  // (index, rope char length)
-    LineIndexOutOfBounds(usize, usize),  // (index, rope line length)
-    Utf16IndexOutOfBounds(usize, usize), // (index, rope utf16 length)
+    /// Indicates that the passed byte index was out of bounds.
+    ///
+    /// Contains the index attempted and the actual length of the
+    /// `Rope`/`RopeSlice` in bytes, in that order.
+    ByteIndexOutOfBounds(usize, usize),
 
-    // Unlike the range out-of-bounds error, this doesn't use Option.
-    // For this error to even be possible, it needs both a start and an end.
+    /// Indicates that the passed char index was out of bounds.
+    ///
+    /// Contains the index attempted and the actual length of the
+    /// `Rope`/`RopeSlice` in chars, in that order.
+    CharIndexOutOfBounds(usize, usize),
+
+    /// Indicates that the passed line index was out of bounds.
+    ///
+    /// Contains the index attempted and the actual length of the
+    /// `Rope`/`RopeSlice` in lines, in that order.
+    LineIndexOutOfBounds(usize, usize),
+
+    /// Indicates that the passed utf16 code-unit index was out of
+    /// bounds.
+    ///
+    /// Contains the index attempted and the actual length of the
+    /// `Rope`/`RopeSlice` in utf16 code units, in that order.
+    Utf16IndexOutOfBounds(usize, usize),
+
+    /// Indicates that a reversed char-index range (end < start) was
+    /// encountered.
+    ///
+    /// Contains the [start, end) char indices of the range, in that order.
     CharRangeInvalid(
         usize, // Start.
         usize, // End.
     ),
+
+    /// Indicates that the passed char-index range was partially or fully
+    /// out of bounds.
+    ///
+    /// Contains the [start, end) char indices of the range and the actual
+    /// length of the `Rope`/`RopeSlice` in chars, in that order.  When
+    /// either the start or end are `None`, that indicates a half-open range.
     CharRangeOutOfBounds(
         Option<usize>, // Start.
         Option<usize>, // End.
