@@ -1207,8 +1207,14 @@ impl Rope {
     }
 }
 
+/// # Non-Panicking
+///
+/// The methods in this impl block provide non-panicking versions of
+/// `Rope`'s panicking methods.  They return either an `Option`
+/// or a `Result`, and return `Option::None` or `Result::Err()` when their
+/// panicking counterparts would have panicked.
 impl Rope {
-    /// a non-panicking version of [`insert`];
+    /// Non-panicking version of [`insert`].
     ///
     /// [`insert`]: Rope::insert
     #[inline]
@@ -1265,7 +1271,7 @@ impl Rope {
         }
     }
 
-    /// a non-panicking version of [`insert_char`];
+    /// Non-panicking version of [`insert_char`].
     ///
     /// [`insert_char`]: Rope::insert_char
     #[inline]
@@ -1279,383 +1285,7 @@ impl Rope {
         }
     }
 
-    /// a non-panicking version of [`split_off`];
-    ///
-    /// [`split_off`]: Rope::split_off
-    pub fn get_split_off(&mut self, char_idx: usize) -> Option<Self> {
-        // Bounds check
-        if char_idx <= self.len_chars() {
-            if char_idx == 0 {
-                // Special case 1
-                let mut new_rope = Rope::new();
-                std::mem::swap(self, &mut new_rope);
-                Some(new_rope)
-            } else if char_idx == self.len_chars() {
-                // Special case 2
-                Some(Rope::new())
-            } else {
-                // Do the split
-                let mut new_rope = Rope {
-                    root: Arc::new(Arc::make_mut(&mut self.root).split(char_idx)),
-                };
-
-                // Fix up the edges
-                Arc::make_mut(&mut self.root).zip_fix_right();
-                Arc::make_mut(&mut new_rope.root).zip_fix_left();
-                self.pull_up_singular_nodes();
-                new_rope.pull_up_singular_nodes();
-
-                Some(new_rope)
-            }
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`byte_to_char`]
-    ///
-    /// [`byte_to_char`]: Rope::byte_to_char
-    #[inline]
-    pub fn try_byte_to_char(&self, byte_idx: usize) -> Result<usize> {
-        // Bounds check
-        if byte_idx <= self.len_bytes() {
-            let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
-            Ok(c + byte_to_char_idx(chunk, byte_idx - b))
-        } else {
-            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
-        }
-    }
-
-    /// a non-panicking version of [`byte_to_line`]
-    ///
-    /// [`byte_to_line`]: Rope::byte_to_line
-    #[inline]
-    pub fn try_byte_to_line(&self, byte_idx: usize) -> Result<usize> {
-        // Bounds check
-        if byte_idx <= self.len_bytes() {
-            let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
-            Ok(l + byte_to_line_idx(chunk, byte_idx - b))
-        } else {
-            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
-        }
-    }
-
-    /// a non-panicking version of [`byte`]
-    ///
-    /// [`byte`]: Rope::byte
-    #[inline]
-    pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
-        // Bounds check
-        if byte_idx < self.len_bytes() {
-            let (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(byte_idx);
-            let chunk_rel_byte_idx = byte_idx - chunk_byte_idx;
-            Some(chunk.as_bytes()[chunk_rel_byte_idx])
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`char`]
-    ///
-    /// [`char`]: Rope::char
-    #[inline]
-    pub fn get_char(&self, char_idx: usize) -> Option<char> {
-        // Bounds check
-        if char_idx < self.len_chars() {
-            let (chunk, _, chunk_char_idx, _) = self.chunk_at_char(char_idx);
-            let byte_idx = char_to_byte_idx(chunk, char_idx - chunk_char_idx);
-            Some(chunk[byte_idx..].chars().next().unwrap())
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`line`]
-    ///
-    /// [`line`]: Rope::line
-    #[inline]
-    pub fn get_line(&self, line_idx: usize) -> Option<RopeSlice> {
-        use crate::slice::RSEnum;
-        use crate::str_utils::{count_chars, count_utf16_surrogates};
-
-        let len_lines = self.len_lines();
-
-        // Bounds check
-        if line_idx < len_lines {
-            let (chunk_1, _, c1, l1) = self.chunk_at_line_break(line_idx);
-            let (chunk_2, _, c2, l2) = self.chunk_at_line_break(line_idx + 1);
-            if c1 == c2 {
-                let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
-                let text2 = &text1[..line_to_byte_idx(text1, 1)];
-                Some(RopeSlice(RSEnum::Light {
-                    text: text2,
-                    char_count: count_chars(text2) as Count,
-                    utf16_surrogate_count: count_utf16_surrogates(text2) as Count,
-                    line_break_count: if line_idx == (len_lines - 1) { 0 } else { 1 },
-                }))
-            } else {
-                let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
-                let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
-                Some(self.slice(start..end))
-            }
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`char_to_utf16_cu`]
-    ///
-    /// [`char_to_utf16_cu`]: Rope::char_to_utf16_cu
-    #[inline]
-    pub fn try_char_to_utf16_cu(&self, char_idx: usize) -> Result<usize> {
-        // Bounds check
-        if char_idx <= self.len_chars() {
-            let (chunk, chunk_start_info) = self.root.get_chunk_at_char(char_idx);
-            let chunk_byte_idx =
-                char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
-            let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
-
-            Ok(char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count)
-        } else {
-            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
-        }
-    }
-
-    /// a non-panicking version of [`utf16_cu_to_char`]
-    ///
-    /// [`utf16_cu_to_char`]: Rope::utf16_cu_to_char
-    #[inline]
-    pub fn try_utf16_cu_to_char(&self, utf16_cu_idx: usize) -> Result<usize> {
-        // Bounds check
-        if utf16_cu_idx <= self.len_utf16_cu() {
-            let (chunk, chunk_start_info) = self.root.get_chunk_at_utf16_code_unit(utf16_cu_idx);
-            let chunk_utf16_cu_idx = utf16_cu_idx
-                - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
-            let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_cu_idx);
-
-            Ok(chunk_start_info.chars as usize + chunk_char_idx)
-        } else {
-            Err(Error::Utf16IndexOutOfBounds(
-                utf16_cu_idx,
-                self.len_utf16_cu(),
-            ))
-        }
-    }
-    /// a non-panicking version of [`line_to_byte`];
-    ///
-    /// [`line_to_byte`]: Rope::line_to_byte
-    #[inline]
-    pub fn try_line_to_byte(&self, line_idx: usize) -> Result<usize> {
-        // Bounds check
-        if line_idx <= self.len_lines() {
-            if line_idx == self.len_lines() {
-                Ok(self.len_bytes())
-            } else {
-                let (chunk, b, _, l) = self.chunk_at_line_break(line_idx);
-                Ok(b + line_to_byte_idx(chunk, line_idx - l))
-            }
-        } else {
-            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
-        }
-    }
-
-    /// a non-panicking version of [`line_to_char`];
-    ///
-    /// [`line_to_char`]: Rope::line_to_char
-    #[inline]
-    pub fn try_line_to_char(&self, line_idx: usize) -> Result<usize> {
-        // Bounds check
-        if line_idx <= self.len_lines() {
-            if line_idx == self.len_lines() {
-                Ok(self.len_chars())
-            } else {
-                let (chunk, _, c, l) = self.chunk_at_line_break(line_idx);
-                Ok(c + line_to_char_idx(chunk, line_idx - l))
-            }
-        } else {
-            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
-        }
-    }
-
-    /// a non-panicking version of [`chunk_at_byte`];
-    ///
-    /// [`chunk_at_byte`]: Rope::chunk_at_byte
-    #[inline]
-    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> Option<(&str, usize, usize, usize)> {
-        // Bounds check
-        if byte_idx <= self.len_bytes() {
-            let (chunk, info) = self.root.get_chunk_at_byte(byte_idx);
-            Some((
-                chunk,
-                info.bytes as usize,
-                info.chars as usize,
-                info.line_breaks as usize,
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`chunk_at_char`];
-    ///
-    /// [`chunk_at_char`]: Rope::chunk_at_char
-    #[inline]
-    pub fn get_chunk_at_char(&self, char_idx: usize) -> Option<(&str, usize, usize, usize)> {
-        // Bounds check
-        if char_idx <= self.len_chars() {
-            let (chunk, info) = self.root.get_chunk_at_char(char_idx);
-            Some((
-                chunk,
-                info.bytes as usize,
-                info.chars as usize,
-                info.line_breaks as usize,
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`chunk_at_line_break`];
-    ///
-    /// [`chunk_at_line_break`]: Rope::chunk_at_line_break
-    #[inline]
-    pub fn get_chunk_at_line_break(
-        &self,
-        line_break_idx: usize,
-    ) -> Option<(&str, usize, usize, usize)> {
-        // Bounds check
-        if line_break_idx <= self.len_lines() {
-            let (chunk, info) = self.root.get_chunk_at_line_break(line_break_idx);
-            Some((
-                chunk,
-                info.bytes as usize,
-                info.chars as usize,
-                info.line_breaks as usize,
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`bytes_at`];
-    ///
-    /// [`bytes_at`]: Rope::bytes_at
-    #[inline]
-    pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes> {
-        // Bounds check
-        if byte_idx <= self.len_bytes() {
-            let info = self.root.text_info();
-            Some(Bytes::new_with_range_at(
-                &self.root,
-                byte_idx,
-                (0, info.bytes as usize),
-                (0, info.chars as usize),
-                (0, info.line_breaks as usize + 1),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`chars_at`];
-    ///
-    /// [`chars_at`]: Rope::chars_at
-    #[inline]
-    pub fn get_chars_at(&self, char_idx: usize) -> Option<Chars> {
-        // Bounds check
-        if char_idx <= self.len_chars() {
-            let info = self.root.text_info();
-            Some(Chars::new_with_range_at(
-                &self.root,
-                char_idx,
-                (0, info.bytes as usize),
-                (0, info.chars as usize),
-                (0, info.line_breaks as usize + 1),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`lines_at`];
-    ///
-    /// [`lines_at`]: Rope::lines_at
-    #[inline]
-    pub fn get_lines_at(&self, line_idx: usize) -> Option<Lines> {
-        // Bounds check
-        if line_idx <= self.len_lines() {
-            Some(Lines::new_with_range_at(
-                &self.root,
-                line_idx,
-                (0, self.len_bytes()),
-                (0, self.len_lines()),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`chunks_at_byte`];
-    ///
-    /// [`chunks_at_byte`]: Rope::chunks_at_byte
-    #[inline]
-    pub fn get_chunks_at_byte(&self, byte_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
-        // Bounds check
-        if byte_idx <= self.len_bytes() {
-            Some(Chunks::new_with_range_at_byte(
-                &self.root,
-                byte_idx,
-                (0, self.len_bytes()),
-                (0, self.len_chars()),
-                (0, self.len_lines()),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`chunks_at_char`];
-    ///
-    /// [`chunks_at_char`]: Rope::chunks_at_char
-    #[inline]
-    pub fn get_chunks_at_char(&self, char_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
-        // Bounds check
-        if char_idx <= self.len_chars() {
-            Some(Chunks::new_with_range_at_char(
-                &self.root,
-                char_idx,
-                (0, self.len_bytes()),
-                (0, self.len_chars()),
-                (0, self.len_lines()),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`chunks_at_line_break`];
-    ///
-    /// [`chunks_at_line_break`]: Rope::chunks_at_line_break
-    #[inline]
-    pub fn get_chunks_at_line_break(
-        &self,
-        line_break_idx: usize,
-    ) -> Option<(Chunks, usize, usize, usize)> {
-        // Bounds check
-        if line_break_idx <= self.len_lines() {
-            Some(Chunks::new_with_range_at_line_break(
-                &self.root,
-                line_break_idx,
-                (0, self.len_bytes()),
-                (0, self.len_chars()),
-                (0, self.len_lines()),
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`remove`];
+    /// Non-panicking version of [`remove`].
     ///
     /// [`remove`]: Rope::remove
     pub fn try_remove<R>(&mut self, char_range: R) -> Result<()>
@@ -1704,7 +1334,68 @@ impl Rope {
         }
     }
 
-    /// a non-panicking version of [`char_to_byte`].
+    /// Non-panicking version of [`split_off`].
+    ///
+    /// [`split_off`]: Rope::split_off
+    pub fn get_split_off(&mut self, char_idx: usize) -> Option<Self> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            if char_idx == 0 {
+                // Special case 1
+                let mut new_rope = Rope::new();
+                std::mem::swap(self, &mut new_rope);
+                Some(new_rope)
+            } else if char_idx == self.len_chars() {
+                // Special case 2
+                Some(Rope::new())
+            } else {
+                // Do the split
+                let mut new_rope = Rope {
+                    root: Arc::new(Arc::make_mut(&mut self.root).split(char_idx)),
+                };
+
+                // Fix up the edges
+                Arc::make_mut(&mut self.root).zip_fix_right();
+                Arc::make_mut(&mut new_rope.root).zip_fix_left();
+                self.pull_up_singular_nodes();
+                new_rope.pull_up_singular_nodes();
+
+                Some(new_rope)
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`byte_to_char`].
+    ///
+    /// [`byte_to_char`]: Rope::byte_to_char
+    #[inline]
+    pub fn try_byte_to_char(&self, byte_idx: usize) -> Result<usize> {
+        // Bounds check
+        if byte_idx <= self.len_bytes() {
+            let (chunk, b, c, _) = self.chunk_at_byte(byte_idx);
+            Ok(c + byte_to_char_idx(chunk, byte_idx - b))
+        } else {
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
+        }
+    }
+
+    /// Non-panicking version of [`byte_to_line`].
+    ///
+    /// [`byte_to_line`]: Rope::byte_to_line
+    #[inline]
+    pub fn try_byte_to_line(&self, byte_idx: usize) -> Result<usize> {
+        // Bounds check
+        if byte_idx <= self.len_bytes() {
+            let (chunk, b, _, l) = self.chunk_at_byte(byte_idx);
+            Ok(l + byte_to_line_idx(chunk, byte_idx - b))
+        } else {
+            Err(Error::ByteIndexOutOfBounds(byte_idx, self.len_bytes()))
+        }
+    }
+
+    /// Non-panicking version of [`char_to_byte`].
     ///
     /// [`char_to_byte`]: Rope::char_to_byte
     #[inline]
@@ -1718,7 +1409,7 @@ impl Rope {
         }
     }
 
-    /// a non-panicking version of [`char_to_line`].
+    /// Non-panicking version of [`char_to_line`].
     ///
     /// [`char_to_line`]: Rope::char_to_line
     #[inline]
@@ -1732,7 +1423,205 @@ impl Rope {
         }
     }
 
-    /// a non-panicking version of [`slice`]
+    /// Non-panicking version of [`char_to_utf16_cu`].
+    ///
+    /// [`char_to_utf16_cu`]: Rope::char_to_utf16_cu
+    #[inline]
+    pub fn try_char_to_utf16_cu(&self, char_idx: usize) -> Result<usize> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            let (chunk, chunk_start_info) = self.root.get_chunk_at_char(char_idx);
+            let chunk_byte_idx =
+                char_to_byte_idx(chunk, char_idx - chunk_start_info.chars as usize);
+            let surrogate_count = byte_to_utf16_surrogate_idx(chunk, chunk_byte_idx);
+
+            Ok(char_idx + chunk_start_info.utf16_surrogates as usize + surrogate_count)
+        } else {
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
+        }
+    }
+
+    /// Non-panicking version of [`utf16_cu_to_char`].
+    ///
+    /// [`utf16_cu_to_char`]: Rope::utf16_cu_to_char
+    #[inline]
+    pub fn try_utf16_cu_to_char(&self, utf16_cu_idx: usize) -> Result<usize> {
+        // Bounds check
+        if utf16_cu_idx <= self.len_utf16_cu() {
+            let (chunk, chunk_start_info) = self.root.get_chunk_at_utf16_code_unit(utf16_cu_idx);
+            let chunk_utf16_cu_idx = utf16_cu_idx
+                - (chunk_start_info.chars + chunk_start_info.utf16_surrogates) as usize;
+            let chunk_char_idx = utf16_code_unit_to_char_idx(chunk, chunk_utf16_cu_idx);
+
+            Ok(chunk_start_info.chars as usize + chunk_char_idx)
+        } else {
+            Err(Error::Utf16IndexOutOfBounds(
+                utf16_cu_idx,
+                self.len_utf16_cu(),
+            ))
+        }
+    }
+
+    /// Non-panicking version of [`line_to_byte`].
+    ///
+    /// [`line_to_byte`]: Rope::line_to_byte
+    #[inline]
+    pub fn try_line_to_byte(&self, line_idx: usize) -> Result<usize> {
+        // Bounds check
+        if line_idx <= self.len_lines() {
+            if line_idx == self.len_lines() {
+                Ok(self.len_bytes())
+            } else {
+                let (chunk, b, _, l) = self.chunk_at_line_break(line_idx);
+                Ok(b + line_to_byte_idx(chunk, line_idx - l))
+            }
+        } else {
+            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
+        }
+    }
+
+    /// Non-panicking version of [`line_to_char`].
+    ///
+    /// [`line_to_char`]: Rope::line_to_char
+    #[inline]
+    pub fn try_line_to_char(&self, line_idx: usize) -> Result<usize> {
+        // Bounds check
+        if line_idx <= self.len_lines() {
+            if line_idx == self.len_lines() {
+                Ok(self.len_chars())
+            } else {
+                let (chunk, _, c, l) = self.chunk_at_line_break(line_idx);
+                Ok(c + line_to_char_idx(chunk, line_idx - l))
+            }
+        } else {
+            Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
+        }
+    }
+
+    /// Non-panicking version of [`byte`].
+    ///
+    /// [`byte`]: Rope::byte
+    #[inline]
+    pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        // Bounds check
+        if byte_idx < self.len_bytes() {
+            let (chunk, chunk_byte_idx, _, _) = self.chunk_at_byte(byte_idx);
+            let chunk_rel_byte_idx = byte_idx - chunk_byte_idx;
+            Some(chunk.as_bytes()[chunk_rel_byte_idx])
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`char`].
+    ///
+    /// [`char`]: Rope::char
+    #[inline]
+    pub fn get_char(&self, char_idx: usize) -> Option<char> {
+        // Bounds check
+        if char_idx < self.len_chars() {
+            let (chunk, _, chunk_char_idx, _) = self.chunk_at_char(char_idx);
+            let byte_idx = char_to_byte_idx(chunk, char_idx - chunk_char_idx);
+            Some(chunk[byte_idx..].chars().next().unwrap())
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`line`].
+    ///
+    /// [`line`]: Rope::line
+    #[inline]
+    pub fn get_line(&self, line_idx: usize) -> Option<RopeSlice> {
+        use crate::slice::RSEnum;
+        use crate::str_utils::{count_chars, count_utf16_surrogates};
+
+        let len_lines = self.len_lines();
+
+        // Bounds check
+        if line_idx < len_lines {
+            let (chunk_1, _, c1, l1) = self.chunk_at_line_break(line_idx);
+            let (chunk_2, _, c2, l2) = self.chunk_at_line_break(line_idx + 1);
+            if c1 == c2 {
+                let text1 = &chunk_1[line_to_byte_idx(chunk_1, line_idx - l1)..];
+                let text2 = &text1[..line_to_byte_idx(text1, 1)];
+                Some(RopeSlice(RSEnum::Light {
+                    text: text2,
+                    char_count: count_chars(text2) as Count,
+                    utf16_surrogate_count: count_utf16_surrogates(text2) as Count,
+                    line_break_count: if line_idx == (len_lines - 1) { 0 } else { 1 },
+                }))
+            } else {
+                let start = c1 + line_to_char_idx(chunk_1, line_idx - l1);
+                let end = c2 + line_to_char_idx(chunk_2, line_idx + 1 - l2);
+                Some(self.slice(start..end))
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chunk_at_byte`].
+    ///
+    /// [`chunk_at_byte`]: Rope::chunk_at_byte
+    #[inline]
+    pub fn get_chunk_at_byte(&self, byte_idx: usize) -> Option<(&str, usize, usize, usize)> {
+        // Bounds check
+        if byte_idx <= self.len_bytes() {
+            let (chunk, info) = self.root.get_chunk_at_byte(byte_idx);
+            Some((
+                chunk,
+                info.bytes as usize,
+                info.chars as usize,
+                info.line_breaks as usize,
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chunk_at_char`].
+    ///
+    /// [`chunk_at_char`]: Rope::chunk_at_char
+    #[inline]
+    pub fn get_chunk_at_char(&self, char_idx: usize) -> Option<(&str, usize, usize, usize)> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            let (chunk, info) = self.root.get_chunk_at_char(char_idx);
+            Some((
+                chunk,
+                info.bytes as usize,
+                info.chars as usize,
+                info.line_breaks as usize,
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chunk_at_line_break`].
+    ///
+    /// [`chunk_at_line_break`]: Rope::chunk_at_line_break
+    #[inline]
+    pub fn get_chunk_at_line_break(
+        &self,
+        line_break_idx: usize,
+    ) -> Option<(&str, usize, usize, usize)> {
+        // Bounds check
+        if line_break_idx <= self.len_lines() {
+            let (chunk, info) = self.root.get_chunk_at_line_break(line_break_idx);
+            Some((
+                chunk,
+                info.bytes as usize,
+                info.chars as usize,
+                info.line_breaks as usize,
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`slice`].
     ///
     /// [`slice`]: Rope::slice
     #[inline]
@@ -1746,6 +1635,124 @@ impl Rope {
         // Bounds check
         if start <= end && end <= self.len_chars() {
             Some(RopeSlice::new_with_range(&self.root, start, end))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`bytes_at`].
+    ///
+    /// [`bytes_at`]: Rope::bytes_at
+    #[inline]
+    pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes> {
+        // Bounds check
+        if byte_idx <= self.len_bytes() {
+            let info = self.root.text_info();
+            Some(Bytes::new_with_range_at(
+                &self.root,
+                byte_idx,
+                (0, info.bytes as usize),
+                (0, info.chars as usize),
+                (0, info.line_breaks as usize + 1),
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chars_at`].
+    ///
+    /// [`chars_at`]: Rope::chars_at
+    #[inline]
+    pub fn get_chars_at(&self, char_idx: usize) -> Option<Chars> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            let info = self.root.text_info();
+            Some(Chars::new_with_range_at(
+                &self.root,
+                char_idx,
+                (0, info.bytes as usize),
+                (0, info.chars as usize),
+                (0, info.line_breaks as usize + 1),
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`lines_at`].
+    ///
+    /// [`lines_at`]: Rope::lines_at
+    #[inline]
+    pub fn get_lines_at(&self, line_idx: usize) -> Option<Lines> {
+        // Bounds check
+        if line_idx <= self.len_lines() {
+            Some(Lines::new_with_range_at(
+                &self.root,
+                line_idx,
+                (0, self.len_bytes()),
+                (0, self.len_lines()),
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chunks_at_byte`].
+    ///
+    /// [`chunks_at_byte`]: Rope::chunks_at_byte
+    #[inline]
+    pub fn get_chunks_at_byte(&self, byte_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
+        // Bounds check
+        if byte_idx <= self.len_bytes() {
+            Some(Chunks::new_with_range_at_byte(
+                &self.root,
+                byte_idx,
+                (0, self.len_bytes()),
+                (0, self.len_chars()),
+                (0, self.len_lines()),
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chunks_at_char`].
+    ///
+    /// [`chunks_at_char`]: Rope::chunks_at_char
+    #[inline]
+    pub fn get_chunks_at_char(&self, char_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
+        // Bounds check
+        if char_idx <= self.len_chars() {
+            Some(Chunks::new_with_range_at_char(
+                &self.root,
+                char_idx,
+                (0, self.len_bytes()),
+                (0, self.len_chars()),
+                (0, self.len_lines()),
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chunks_at_line_break`].
+    ///
+    /// [`chunks_at_line_break`]: Rope::chunks_at_line_break
+    #[inline]
+    pub fn get_chunks_at_line_break(
+        &self,
+        line_break_idx: usize,
+    ) -> Option<(Chunks, usize, usize, usize)> {
+        // Bounds check
+        if line_break_idx <= self.len_lines() {
+            Some(Chunks::new_with_range_at_line_break(
+                &self.root,
+                line_break_idx,
+                (0, self.len_bytes()),
+                (0, self.len_chars()),
+                (0, self.len_lines()),
+            ))
         } else {
             None
         }

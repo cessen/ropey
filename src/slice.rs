@@ -837,8 +837,14 @@ impl<'a> RopeSlice<'a> {
     }
 }
 
+/// # Non-Panicking
+///
+/// The methods in this impl block provide non-panicking versions of
+/// `RopeSlice`'s panicking methods.  They return either an `Option`
+/// or a `Result`, and return `Option::None` or `Result::Err()` when their
+/// panicking counterparts would have panicked.
 impl<'a> RopeSlice<'a> {
-    /// a non-panicking version of [`byte_to_char`]
+    /// Non-panicking version of [`byte_to_char`].
     ///
     /// [`byte_to_char`]: RopeSlice::byte_to_char
     #[inline]
@@ -852,7 +858,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`byte_to_line`]
+    /// Non-panicking version of [`byte_to_line`].
     ///
     /// [`byte_to_line`]: RopeSlice::byte_to_line
     #[inline]
@@ -866,7 +872,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`char_to_byte`]
+    /// Non-panicking version of [`char_to_byte`].
     ///
     /// [`char_to_byte`]: RopeSlice::char_to_byte
     #[inline]
@@ -880,7 +886,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`char_to_line`]
+    /// Non-panicking version of [`char_to_line`].
     ///
     /// [`char_to_line`]: RopeSlice::char_to_line
     #[inline]
@@ -894,7 +900,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`char_to_utf16_cu`]
+    /// Non-panicking version of [`char_to_utf16_cu`].
     ///
     /// [`char_to_utf16_cu`]: RopeSlice::char_to_utf16_cu
     #[inline]
@@ -932,7 +938,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`utf16_cu_to_char`]
+    /// Non-panicking version of [`utf16_cu_to_char`].
     ///
     /// [`utf16_cu_to_char`]: RopeSlice::utf16_cu_to_char
     #[inline]
@@ -971,7 +977,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`line_to_byte`]
+    /// Non-panicking version of [`line_to_byte`].
     ///
     /// [`line_to_byte`]: RopeSlice::line_to_byte
     #[inline]
@@ -989,7 +995,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`line_to_char`]
+    /// Non-panicking version of [`line_to_char`].
     ///
     /// [`line_to_char`]: RopeSlice::line_to_char
     #[inline]
@@ -1007,7 +1013,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`get_byte`]
+    /// Non-panicking version of [`get_byte`].
     ///
     /// [`get_byte`]: RopeSlice::get_byte
     #[inline]
@@ -1022,7 +1028,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`char`]
+    /// Non-panicking version of [`char`].
     ///
     /// [`char`]: RopeSlice::char
     #[inline]
@@ -1037,7 +1043,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`line`]
+    /// Non-panicking version of [`line`].
     ///
     /// [`line`]: RopeSlice::line
     #[inline]
@@ -1066,7 +1072,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chunk_at_byte`]
+    /// Non-panicking version of [`chunk_at_byte`].
     ///
     /// [`chunk_at_byte`]: RopeSlice::chunk_at_byte
     pub fn try_chunk_at_byte(&self, byte_idx: usize) -> Result<(&'a str, usize, usize, usize)> {
@@ -1106,7 +1112,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chunk_at_char`]
+    /// Non-panicking version of [`chunk_at_char`].
     ///
     /// [`chunk_at_char`]: RopeSlice::chunk_at_char
     pub fn get_chunk_at_char(&self, char_idx: usize) -> Option<(&'a str, usize, usize, usize)> {
@@ -1146,7 +1152,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chunk_at_line_break`]
+    /// Non-panicking version of [`chunk_at_line_break`].
     ///
     /// [`chunk_at_line_break`]: RopeSlice::chunk_at_line_break
     pub fn get_chunk_at_line_break(
@@ -1190,35 +1196,6 @@ impl<'a> RopeSlice<'a> {
                     ))
                 }
                 RopeSlice(RSEnum::Light { text, .. }) => Some((text, 0, 0, 0)),
-            }
-        } else {
-            None
-        }
-    }
-
-    /// a non-panicking version of [`bytes_at`]
-    ///
-    /// [`byte_at`]: RopeSlice::bytes_at
-    #[inline]
-    pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes> {
-        // Bounds check
-        if byte_idx <= self.len_bytes() {
-            match *self {
-                RopeSlice(RSEnum::Full {
-                    node,
-                    start_info,
-                    end_info,
-                }) => Some(Bytes::new_with_range_at(
-                    node,
-                    start_info.bytes as usize + byte_idx,
-                    (start_info.bytes as usize, end_info.bytes as usize),
-                    (start_info.chars as usize, end_info.chars as usize),
-                    (
-                        start_info.line_breaks as usize,
-                        end_info.line_breaks as usize + 1,
-                    ),
-                )),
-                RopeSlice(RSEnum::Light { text, .. }) => Some(Bytes::from_str_at(text, byte_idx)),
             }
         } else {
             None
@@ -1271,7 +1248,36 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chars_at`]
+    /// Non-panicking version of [`bytes_at`].
+    ///
+    /// [`bytes_at`]: RopeSlice::bytes_at
+    #[inline]
+    pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes> {
+        // Bounds check
+        if byte_idx <= self.len_bytes() {
+            match *self {
+                RopeSlice(RSEnum::Full {
+                    node,
+                    start_info,
+                    end_info,
+                }) => Some(Bytes::new_with_range_at(
+                    node,
+                    start_info.bytes as usize + byte_idx,
+                    (start_info.bytes as usize, end_info.bytes as usize),
+                    (start_info.chars as usize, end_info.chars as usize),
+                    (
+                        start_info.line_breaks as usize,
+                        end_info.line_breaks as usize + 1,
+                    ),
+                )),
+                RopeSlice(RSEnum::Light { text, .. }) => Some(Bytes::from_str_at(text, byte_idx)),
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Non-panicking version of [`chars_at`].
     ///
     /// [`chars_at`]: RopeSlice::chars_at
     #[inline]
@@ -1300,7 +1306,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`lines_at`]
+    /// Non-panicking version of [`lines_at`].
     ///
     /// [`lines_at`]: RopeSlice::lines_at
     #[inline]
@@ -1328,7 +1334,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chunks_at_byte`]
+    /// Non-panicking version of [`chunks_at_byte`].
     ///
     /// [`chunks_at_byte`]: RopeSlice::chunks_at_byte
     #[inline]
@@ -1385,7 +1391,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chunks_at_char`]
+    /// Non-panicking version of [`chunks_at_char`].
     ///
     /// [`chunks_at_char`]: RopeSlice::chunks_at_char
     #[inline]
@@ -1442,7 +1448,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// a non-panicking version of [`chunks_at_line_break`]
+    /// Non-panicking version of [`chunks_at_line_break`].
     ///
     /// [`chunks_at_line_break`]: RopeSlice::chunks_at_line_break
     #[inline]
