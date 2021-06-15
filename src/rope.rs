@@ -547,16 +547,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     pub fn split_off(&mut self, char_idx: usize) -> Self {
-        // Bounds check
-        if let Some(out) = self.get_split_off(char_idx) {
-            out
-        } else {
-            panic!(
-                "Attempt to split past end of Rope: split point {}, Rope length {}",
-                char_idx,
-                self.len_chars()
-            );
-        }
+        self.try_split_off(char_idx).unwrap()
     }
 
     /// Appends a `Rope` to the end of this one, consuming the other `Rope`.
@@ -1337,17 +1328,17 @@ impl Rope {
     /// Non-panicking version of [`split_off`].
     ///
     /// [`split_off`]: Rope::split_off
-    pub fn get_split_off(&mut self, char_idx: usize) -> Option<Self> {
+    pub fn try_split_off(&mut self, char_idx: usize) -> Result<Self> {
         // Bounds check
         if char_idx <= self.len_chars() {
             if char_idx == 0 {
                 // Special case 1
                 let mut new_rope = Rope::new();
                 std::mem::swap(self, &mut new_rope);
-                Some(new_rope)
+                Ok(new_rope)
             } else if char_idx == self.len_chars() {
                 // Special case 2
-                Some(Rope::new())
+                Ok(Rope::new())
             } else {
                 // Do the split
                 let mut new_rope = Rope {
@@ -1360,10 +1351,10 @@ impl Rope {
                 self.pull_up_singular_nodes();
                 new_rope.pull_up_singular_nodes();
 
-                Some(new_rope)
+                Ok(new_rope)
             }
         } else {
-            None
+            Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
     }
 
