@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+
+## [1.3.0] - 2021-06-16
+
 ### New features
 - Added non-panicking versions of all methods on `Rope` and `RopeSlice`.
 - All iterators can now be reversed, swapping the beheavior of `prev()` and `next()`.
@@ -254,7 +257,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/cessen/ropey/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/cessen/ropey/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cessen/ropey/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/cessen/ropey/compare/v1.0.0...v1.0.1
