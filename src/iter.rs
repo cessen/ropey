@@ -1510,6 +1510,90 @@ mod tests {
     }
 
     #[test]
+    fn bytes_reverse_01() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes();
+        let mut stack = Vec::new();
+
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    fn bytes_reverse_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes_at(r.len_bytes() / 3);
+        let mut stack = Vec::new();
+
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    fn bytes_reverse_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.bytes_at(r.len_bytes() / 3);
+        let mut stack = Vec::new();
+
+        itr.reverse();
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    fn bytes_reverse_04() {
+        let mut itr = Bytes::from_str("a");
+
+        assert_eq!(Some(0x61), itr.next());
+        assert_eq!(None, itr.next());
+        itr.reverse();
+        assert_eq!(Some(0x61), itr.next());
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn bytes_reverse_exact_size_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut bytes = s.bytes_at(42);
+        bytes.reverse();
+        let mut byte_count = 42;
+
+        assert_eq!(42, bytes.len());
+
+        while let Some(_) = bytes.next() {
+            byte_count -= 1;
+            assert_eq!(byte_count, bytes.len());
+        }
+
+        bytes.next();
+        bytes.next();
+        bytes.next();
+        bytes.next();
+        bytes.next();
+        bytes.next();
+        bytes.next();
+        assert_eq!(bytes.len(), 0);
+        assert_eq!(byte_count, 0);
+    }
+
+    #[test]
     fn chars_01() {
         let r = Rope::from_str(TEXT);
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
@@ -1661,6 +1745,90 @@ mod tests {
         assert_eq!(chars.len(), s.len_chars());
         chars.prev();
         assert_eq!(chars.len(), s.len_chars());
+    }
+
+    #[test]
+    fn chars_reverse_01() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars();
+        let mut stack = Vec::new();
+
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    fn chars_reverse_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars_at(r.len_chars() / 3);
+        let mut stack = Vec::new();
+
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    fn chars_reverse_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chars_at(r.len_chars() / 3);
+        let mut stack = Vec::new();
+
+        itr.reverse();
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    fn chars_reverse_04() {
+        let mut itr = Chars::from_str("a");
+
+        assert_eq!(Some('a'), itr.next());
+        assert_eq!(None, itr.next());
+        itr.reverse();
+        assert_eq!(Some('a'), itr.next());
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn chars_reverse_exact_size_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut chars = s.chars_at(42);
+        chars.reverse();
+        let mut char_count = 42;
+
+        assert_eq!(42, chars.len());
+
+        while let Some(_) = chars.next() {
+            char_count -= 1;
+            assert_eq!(char_count, chars.len());
+        }
+
+        chars.next();
+        chars.next();
+        chars.next();
+        chars.next();
+        chars.next();
+        chars.next();
+        chars.next();
+        assert_eq!(chars.len(), 0);
+        assert_eq!(char_count, 0);
     }
 
     #[test]
@@ -2124,6 +2292,92 @@ mod tests {
     }
 
     #[test]
+    fn lines_reverse_01() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.lines();
+        let mut stack = Vec::new();
+
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+        }
+    }
+
+    #[test]
+    fn lines_reverse_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.lines_at(r.len_lines() / 3);
+        let mut stack = Vec::new();
+
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+        }
+    }
+
+    #[test]
+    fn lines_reverse_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.lines_at(r.len_lines() / 3);
+        let mut stack = Vec::new();
+
+        itr.reverse();
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+        }
+    }
+
+    #[test]
+    fn lines_reverse_04() {
+        let mut itr = Lines::from_str("a\n");
+
+        assert_eq!(Some("a\n".into()), itr.next());
+        assert_eq!(Some("".into()), itr.next());
+        assert_eq!(None, itr.next());
+        itr.reverse();
+        assert_eq!(Some("".into()), itr.next());
+        assert_eq!(Some("a\n".into()), itr.next());
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
+    fn lines_reverse_exact_size_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..301);
+
+        let mut lines = s.lines_at(4);
+        lines.reverse();
+        let mut line_count = 4;
+
+        assert_eq!(4, lines.len());
+
+        while let Some(_) = lines.next() {
+            line_count -= 1;
+            assert_eq!(line_count, lines.len());
+        }
+
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        lines.next();
+        assert_eq!(lines.len(), 0);
+        assert_eq!(line_count, 0);
+    }
+
+    #[test]
     fn chunks_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2329,6 +2583,63 @@ mod tests {
     }
 
     #[test]
+    fn chunks_reverse_01() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chunks();
+        let mut stack = Vec::new();
+
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+        }
+    }
+
+    #[test]
+    fn chunks_reverse_02() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chunks_at_char(r.len_chars() / 3).0;
+        let mut stack = Vec::new();
+
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+        }
+    }
+
+    #[test]
+    fn chunks_reverse_03() {
+        let r = Rope::from_str(TEXT);
+        let mut itr = r.chunks_at_char(r.len_chars() / 3).0;
+        let mut stack = Vec::new();
+
+        itr.reverse();
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+        }
+    }
+
+    #[test]
+    fn chunks_reverse_04() {
+        let mut itr = Chunks::from_str("a\n", false);
+
+        assert_eq!(Some("a\n"), itr.next());
+        assert_eq!(None, itr.next());
+        itr.reverse();
+        assert_eq!(Some("a\n"), itr.next());
+        assert_eq!(None, itr.next());
+    }
+
+    #[test]
     fn bytes_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2354,6 +2665,25 @@ mod tests {
         }
 
         assert_eq!(s1_bytes.len(), 0);
+    }
+
+    #[test]
+    fn bytes_sliced_reverse_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 34;
+        let s_end = 301;
+        let s = r.slice(s_start..s_end);
+
+        let mut itr = s.bytes();
+        let mut stack = Vec::new();
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
     }
 
     #[test]
@@ -2403,6 +2733,25 @@ mod tests {
     }
 
     #[test]
+    fn bytes_at_sliced_reverse_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 34;
+        let s_end = 301;
+        let s = r.slice(s_start..s_end);
+
+        let mut itr = s.bytes_at(s.len_bytes() / 3);
+        let mut stack = Vec::new();
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
     fn chars_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2416,6 +2765,25 @@ mod tests {
 
         for (cr, ct) in s1.chars().zip(s2.chars()) {
             assert_eq!(cr, ct);
+        }
+    }
+
+    #[test]
+    fn chars_sliced_reverse_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 34;
+        let s_end = 301;
+        let s = r.slice(s_start..s_end);
+
+        let mut itr = s.chars();
+        let mut stack = Vec::new();
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
         }
     }
 
@@ -2466,6 +2834,25 @@ mod tests {
     }
 
     #[test]
+    fn chars_at_sliced_reverse_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 34;
+        let s_end = 301;
+        let s = r.slice(s_start..s_end);
+
+        let mut itr = s.chars_at(s.len_chars() / 3);
+        let mut stack = Vec::new();
+        for _ in 0..32 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..32 {
+            assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
     fn lines_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2479,6 +2866,25 @@ mod tests {
 
         for (liner, linet) in s1.lines().zip(s2.lines()) {
             assert_eq!(liner.to_string().trim_end(), linet);
+        }
+    }
+
+    #[test]
+    fn lines_sliced_reverse_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 34;
+        let s_end = 301;
+        let s = r.slice(s_start..s_end);
+
+        let mut itr = s.lines();
+        let mut stack = Vec::new();
+        for _ in 0..4 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..4 {
+            assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
         }
     }
 
@@ -2501,5 +2907,24 @@ mod tests {
         }
 
         assert_eq!(idx, s2.len());
+    }
+
+    #[test]
+    fn chunks_sliced_reverse_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s_start = 34;
+        let s_end = 301;
+        let s = r.slice(s_start..s_end);
+
+        let mut itr = s.chunks();
+        let mut stack = Vec::new();
+        for _ in 0..8 {
+            stack.push(itr.next().unwrap());
+        }
+        itr.reverse();
+        for _ in 0..8 {
+            assert_eq!(stack.pop(), itr.next());
+        }
     }
 }
