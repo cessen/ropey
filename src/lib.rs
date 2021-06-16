@@ -126,7 +126,9 @@
 //!
 //! Additionally, Ropey treats line breaks as being a part of the line that
 //! they mark the end of.  That is to say, lines begin immediately _after_ a
-//! line break.
+//! line break.  For example, the text `"Hello\nworld"` has two lines:
+//! `"Hello\n"` and `"world"`.  And the text `"Hello\nworld\n"` has three
+//! lines: `"Hello\n"`, `"world\n"`, and `""`.
 //!
 //! CRLF pairs are always treated as a single line break, and are never split
 //! across chunks.  Note, however, that slicing can still split them.
