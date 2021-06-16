@@ -849,8 +849,8 @@ impl<'a> ExactSizeIterator for Lines<'a> {}
 /// `&str` slice for each one.  It is useful for situations such as:
 ///
 /// - Writing a rope's utf8 text data to disk (but see
-///   [`Rope::write_to()`](../struct.Rope.html#method.write_to) for a
-///   convenience function that does this).
+///   [`write_to()`](Rope::write_to) for a convenience function that does this
+///   for casual use-cases).
 /// - Streaming a rope's text data somewhere.
 /// - Saving a rope to a non-utf8 encoding, doing the encoding conversion
 ///   incrementally as you go.

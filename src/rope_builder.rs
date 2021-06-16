@@ -12,9 +12,8 @@ use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 /// chunks.  It is useful for creating ropes from:
 ///
 /// - ...large text files, without pre-loading their entire contents into
-///   memory (but see
-///   [`from_reader()`](Rope::from_reader()) for a convenience function that
-/// does this for utf8 text).
+///   memory (but see [`from_reader()`](Rope::from_reader) for a convenience
+///   function that does this for casual use-cases).
 /// - ...streaming data sources.
 /// - ...non-utf8 text data, doing the encoding conversion incrementally
 ///   as you go.

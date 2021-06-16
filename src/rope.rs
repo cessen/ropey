@@ -107,8 +107,13 @@ impl Rope {
 
     /// Creates a `Rope` from the output of a reader.
     ///
-    /// This is a convenience function.  To do more sophisticated text loading,
-    /// see [`RopeBuilder`].
+    /// This is a convenience function, and provides *no specific guarantees*
+    /// about performance or internal implementation aside from the runtime
+    /// complexity listed below.
+    ///
+    /// When more precise control over IO behavior, buffering, etc. is desired,
+    /// you should handle IO yourself and use [`RopeBuilder`] to build the
+    /// `Rope`.
     ///
     /// Runs in O(N) time.
     ///
@@ -202,8 +207,13 @@ impl Rope {
 
     /// Writes the contents of the `Rope` to a writer.
     ///
-    /// This is a convenience function.  To do more sophisticated text output,
-    /// see the [`Chunks`] iterator.
+    /// This is a convenience function, and provides *no specific guarantees*
+    /// about performance or internal implementation aside from the runtime
+    /// complexity listed below.
+    ///
+    /// When more precise control over IO behavior, buffering, etc. is
+    /// desired, you should handle IO yourself and use the [`Chunks`]
+    /// iterator to iterate through the `Rope`'s contents.
     ///
     /// Runs in O(N) time.
     ///
