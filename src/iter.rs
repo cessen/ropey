@@ -9,8 +9,9 @@
 //! # Reverse iteration
 //!
 //! All iterators in Ropey operate as a cursor that can move both forwards
-//! and backwards over its contents.  Doing this is accomplished via the
-//! `next()` and `prev()` methods of each iterator.
+//! and backwards over its contents.  This can be accomplished via the
+//! `next()` and `prev()` methods on each iterator, or by using the `reverse()`
+//! method to change the iterator's direction.
 //!
 //! Conceptually, an iterator in Ropey is always positioned *between* the
 //! elements it iterates over, and returns an element when it jumps over it
@@ -28,7 +29,8 @@
 //! 4. `abc|` -> `None`
 //!
 //! The `prev()` method operates identically, except moving in the opposite
-//! direction.
+//! direction.  And `reverse()` simply swaps the behavior of `prev()` and
+//! `next()`.
 //!
 //! # Creating iterators at any position
 //!
@@ -46,6 +48,21 @@
 //! can create a `Chars` iterator starting at the end of a `Rope`, and then
 //! use the `prev()` method to iterate backwards over all of that `Rope`'s
 //! chars.
+//!
+//! # A possible point of confusion
+//!
+//! The Rust standard library has an iterator trait `DoubleEndedIterator` with
+//! a method `rev()`.  While this method's name is very similar to Ropey's
+//! `reverse()` method, its behavior is very different.
+//!
+//! `DoubleEndedIterator` actually provides two iterators: one starting at each
+//! end of the collection, moving in opposite directions towards each other.
+//! Calling `rev()` switches between those two iterators, changing not only the
+//! direction of iteration but also its current position in the collection.
+//!
+//! The `reverse()` method on Ropey's iterators, on the other hand, reverses
+//! the direction of the iterator in-place, without changing its position in
+//! the text.
 
 use std::str;
 use std::sync::Arc;
