@@ -1156,6 +1156,24 @@ mod tests {
 
     #[test]
     fn byte_to_char_idx_02() {
+        let text = "";
+        assert_eq!(0, byte_to_char_idx(text, 0));
+        assert_eq!(0, byte_to_char_idx(text, 1));
+
+        let text = "h";
+        assert_eq!(0, byte_to_char_idx(text, 0));
+        assert_eq!(1, byte_to_char_idx(text, 1));
+        assert_eq!(1, byte_to_char_idx(text, 2));
+
+        let text = "hi";
+        assert_eq!(0, byte_to_char_idx(text, 0));
+        assert_eq!(1, byte_to_char_idx(text, 1));
+        assert_eq!(2, byte_to_char_idx(text, 2));
+        assert_eq!(2, byte_to_char_idx(text, 3));
+    }
+
+    #[test]
+    fn byte_to_char_idx_03() {
         let text = "せかい";
         assert_eq!(0, byte_to_char_idx(text, 0));
         assert_eq!(0, byte_to_char_idx(text, 1));
@@ -1173,7 +1191,7 @@ mod tests {
     }
 
     #[test]
-    fn byte_to_char_idx_03() {
+    fn byte_to_char_idx_04() {
         // Ascii range
         for i in 0..88 {
             assert_eq!(i, byte_to_char_idx(TEXT_LINES, i));

@@ -185,7 +185,8 @@ impl<'a> Bytes<'a> {
 
     /// Reverses the direction of the iterator in-place.
     ///
-    /// In other words, causes `prev()` and `next()` swap directions.
+    /// In other words, swaps the behavior of [`prev()`](Bytes::prev())
+    /// and [`next()`](Bytes::next()).
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;
@@ -395,7 +396,8 @@ impl<'a> Chars<'a> {
 
     /// Reverses the direction of the iterator in-place.
     ///
-    /// In other words, causes `prev()` and `next()` swap directions.
+    /// In other words, swaps the behavior of [`prev()`](Chars::prev())
+    /// and [`next()`](Chars::next()).
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;
@@ -507,7 +509,7 @@ impl<'a> ExactSizeIterator for Chars<'a> {}
 
 /// An iterator over a `Rope`'s lines.
 ///
-/// The returned lines include the line-break at the end.
+/// The returned lines include the line break at the end.
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
@@ -606,7 +608,8 @@ impl<'a> Lines<'a> {
 
     /// Reverses the direction of the iterator in-place.
     ///
-    /// In other words, causes `prev()` and `next()` swap directions.
+    /// In other words, swaps the behavior of [`prev()`](Lines::prev())
+    /// and [`next()`](Lines::next()).
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;
@@ -859,9 +862,9 @@ impl<'a> ExactSizeIterator for Lines<'a> {}
 /// - CRLF pairs are never split across chunks.
 ///
 /// There are no guarantees about the size of yielded chunks, and except for
-/// CRLF pairs there are no guarantees about where the chunks are split.  For
-/// example, they may be zero-sized, they don't necessarily align with line
-/// breaks, etc.
+/// CRLF pairs and being valid `str` slices there are no guarantees about
+/// where the chunks are split.  For example, they may be zero-sized, they
+/// don't necessarily align with line breaks, etc.
 #[derive(Debug, Clone)]
 pub struct Chunks<'a> {
     iter: ChunksEnum<'a>,
@@ -1100,7 +1103,8 @@ impl<'a> Chunks<'a> {
 
     /// Reverses the direction of the iterator in-place.
     ///
-    /// In other words, causes `prev()` and `next()` swap directions.
+    /// In other words, swaps the behavior of [`prev()`](Chunks::prev())
+    /// and [`next()`](Chunks::next()).
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;

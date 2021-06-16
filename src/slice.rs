@@ -840,13 +840,10 @@ impl<'a> RopeSlice<'a> {
 /// # Non-Panicking
 ///
 /// The methods in this impl block provide non-panicking versions of
-/// `RopeSlice`'s panicking methods.  They return either an `Option`
-/// or a `Result`, and return `Option::None` or `Result::Err()` when their
-/// panicking counterparts would have panicked.
+/// `RopeSlice`'s panicking methods.  They return either `Option::None` or
+/// `Result::Err()` when their panicking counterparts would have panicked.
 impl<'a> RopeSlice<'a> {
-    /// Non-panicking version of [`byte_to_char`].
-    ///
-    /// [`byte_to_char`]: RopeSlice::byte_to_char
+    /// Non-panicking version of [`byte_to_char()`](RopeSlice::byte_to_char).
     #[inline]
     pub fn try_byte_to_char(&self, byte_idx: usize) -> Result<usize> {
         // Bounds check
@@ -858,9 +855,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`byte_to_line`].
-    ///
-    /// [`byte_to_line`]: RopeSlice::byte_to_line
+    /// Non-panicking version of [`byte_to_line()`](RopeSlice::byte_to_line).
     #[inline]
     pub fn try_byte_to_line(&self, byte_idx: usize) -> Result<usize> {
         // Bounds check
@@ -872,9 +867,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`char_to_byte`].
-    ///
-    /// [`char_to_byte`]: RopeSlice::char_to_byte
+    /// Non-panicking version of [`char_to_byte()`](RopeSlice::char_to_byte).
     #[inline]
     pub fn try_char_to_byte(&self, char_idx: usize) -> Result<usize> {
         // Bounds check
@@ -886,9 +879,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`char_to_line`].
-    ///
-    /// [`char_to_line`]: RopeSlice::char_to_line
+    /// Non-panicking version of [`char_to_line()`](RopeSlice::char_to_line).
     #[inline]
     pub fn try_char_to_line(&self, char_idx: usize) -> Result<usize> {
         // Bounds check
@@ -900,9 +891,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`char_to_utf16_cu`].
-    ///
-    /// [`char_to_utf16_cu`]: RopeSlice::char_to_utf16_cu
+    /// Non-panicking version of [`char_to_utf16_cu()`](RopeSlice::char_to_utf16_cu).
     #[inline]
     pub fn try_char_to_utf16_cu(&self, char_idx: usize) -> Result<usize> {
         // Bounds check
@@ -938,9 +927,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`utf16_cu_to_char`].
-    ///
-    /// [`utf16_cu_to_char`]: RopeSlice::utf16_cu_to_char
+    /// Non-panicking version of [`utf16_cu_to_char()`](RopeSlice::utf16_cu_to_char).
     #[inline]
     pub fn try_utf16_cu_to_char(&self, utf16_cu_idx: usize) -> Result<usize> {
         // Bounds check
@@ -977,9 +964,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`line_to_byte`].
-    ///
-    /// [`line_to_byte`]: RopeSlice::line_to_byte
+    /// Non-panicking version of [`line_to_byte()`](RopeSlice::line_to_byte).
     #[inline]
     pub fn try_line_to_byte(&self, line_idx: usize) -> Result<usize> {
         // Bounds check
@@ -995,9 +980,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`line_to_char`].
-    ///
-    /// [`line_to_char`]: RopeSlice::line_to_char
+    /// Non-panicking version of [`line_to_char()`](RopeSlice::line_to_char).
     #[inline]
     pub fn try_line_to_char(&self, line_idx: usize) -> Result<usize> {
         // Bounds check
@@ -1013,9 +996,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`get_byte`].
-    ///
-    /// [`get_byte`]: RopeSlice::get_byte
+    /// Non-panicking version of [`get_byte()`](RopeSlice::get_byte).
     #[inline]
     pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
         // Bounds check
@@ -1028,9 +1009,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`char`].
-    ///
-    /// [`char`]: RopeSlice::char
+    /// Non-panicking version of [`char()`](RopeSlice::char).
     #[inline]
     pub fn get_char(&self, char_idx: usize) -> Option<char> {
         // Bounds check
@@ -1043,9 +1022,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`line`].
-    ///
-    /// [`line`]: RopeSlice::line
+    /// Non-panicking version of [`line()`](RopeSlice::line).
     #[inline]
     pub fn get_line(&self, line_idx: usize) -> Option<RopeSlice<'a>> {
         let len_lines = self.len_lines();
@@ -1072,9 +1049,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chunk_at_byte`].
-    ///
-    /// [`chunk_at_byte`]: RopeSlice::chunk_at_byte
+    /// Non-panicking version of [`chunk_at_byte()`](RopeSlice::chunk_at_byte).
     pub fn try_chunk_at_byte(&self, byte_idx: usize) -> Result<(&'a str, usize, usize, usize)> {
         // Bounds check
         if byte_idx <= self.len_bytes() {
@@ -1112,9 +1087,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chunk_at_char`].
-    ///
-    /// [`chunk_at_char`]: RopeSlice::chunk_at_char
+    /// Non-panicking version of [`chunk_at_char()`](RopeSlice::chunk_at_char).
     pub fn get_chunk_at_char(&self, char_idx: usize) -> Option<(&'a str, usize, usize, usize)> {
         // Bounds check
         if char_idx <= self.len_chars() {
@@ -1152,9 +1125,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chunk_at_line_break`].
-    ///
-    /// [`chunk_at_line_break`]: RopeSlice::chunk_at_line_break
+    /// Non-panicking version of [`chunk_at_line_break()`](RopeSlice::chunk_at_line_break).
     pub fn get_chunk_at_line_break(
         &self,
         line_break_idx: usize,
@@ -1202,6 +1173,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    /// Non-panicking version of [`slice()`](RopeSlice::slice).
     pub fn get_slice<R>(&self, char_range: R) -> Option<Self>
     where
         R: RangeBounds<usize>,
@@ -1248,9 +1220,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`bytes_at`].
-    ///
-    /// [`bytes_at`]: RopeSlice::bytes_at
+    /// Non-panicking version of [`bytes_at()`](RopeSlice::bytes_at).
     #[inline]
     pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes> {
         // Bounds check
@@ -1277,9 +1247,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chars_at`].
-    ///
-    /// [`chars_at`]: RopeSlice::chars_at
+    /// Non-panicking version of [`chars_at()`](RopeSlice::chars_at).
     #[inline]
     pub fn get_chars_at(&self, char_idx: usize) -> Option<Chars> {
         // Bounds check
@@ -1306,9 +1274,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`lines_at`].
-    ///
-    /// [`lines_at`]: RopeSlice::lines_at
+    /// Non-panicking version of [`lines_at()`](RopeSlice::lines_at).
     #[inline]
     pub fn get_lines_at(&self, line_idx: usize) -> Option<Lines> {
         // Bounds check
@@ -1334,9 +1300,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chunks_at_byte`].
-    ///
-    /// [`chunks_at_byte`]: RopeSlice::chunks_at_byte
+    /// Non-panicking version of [`chunks_at_byte()`](RopeSlice::chunks_at_byte).
     #[inline]
     pub fn get_chunks_at_byte(&self, byte_idx: usize) -> Option<(Chunks<'a>, usize, usize, usize)> {
         // Bounds check
@@ -1391,9 +1355,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chunks_at_char`].
-    ///
-    /// [`chunks_at_char`]: RopeSlice::chunks_at_char
+    /// Non-panicking version of [`chunks_at_char()`](RopeSlice::chunks_at_char).
     #[inline]
     pub fn get_chunks_at_char(&self, char_idx: usize) -> Option<(Chunks<'a>, usize, usize, usize)> {
         // Bounds check
@@ -1448,9 +1410,7 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`chunks_at_line_break`].
-    ///
-    /// [`chunks_at_line_break`]: RopeSlice::chunks_at_line_break
+    /// Non-panicking version of [`chunks_at_line_break()`](RopeSlice::chunks_at_line_break).
     #[inline]
     pub fn get_chunks_at_line_break(
         &self,

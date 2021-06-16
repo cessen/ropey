@@ -8,11 +8,11 @@
 //!
 //! The library is made up of four main components:
 //!
-//! - [`Rope`](struct.Rope.html): the main rope type.
-//! - [`RopeSlice`](struct.RopeSlice.html): an immutable view into part of a
+//! - [`Rope`]: the main rope type.
+//! - [`RopeSlice`]: an immutable view into part of a
 //!   `Rope`.
-//! - [`iter`](iter/index.html): iterators over `Rope`/`RopeSlice` data.
-//! - [`RopeBuilder`](struct.RopeBuilder.html): an efficient incremental
+//! - [`iter`]: iterators over `Rope`/`RopeSlice` data.
+//! - [`RopeBuilder`]: an efficient incremental
 //!   `Rope` builder.
 //!
 //!
@@ -74,10 +74,10 @@
 //! code to efficiently work with a `Rope`'s data and implement new
 //! functionality.  The most important of those API's are:
 //!
-//! - The [`chunk_at_*()`](struct.Rope.html#method.chunk_at_byte)
+//! - The [`chunk_at_*()`](Rope::chunk_at_byte)
 //!   chunk-fetching methods of `Rope` and `RopeSlice`.
-//! - The [`Chunks`](iter/struct.Chunks.html) iterator.
-//! - The functions in [`str_utils`](str_utils/index.html) for operating on
+//! - The [`Chunks`](iter::Chunks) iterator.
+//! - The functions in [`str_utils`] for operating on
 //!   `&str` slices.
 //!
 //! Internally, each `Rope` stores text as a segemented collection of utf8
@@ -87,7 +87,7 @@
 //!
 //! The chunk-fetching methods and `str_utils` functions are the basic
 //! building blocks that Ropey itself uses to build much of its functionality.
-//! For example, the [`Rope::byte_to_char()`](struct.Rope.html#method.byte_to_char)
+//! For example, the [`Rope::byte_to_char()`]
 //! method can be reimplemented as a free function like this:
 //!
 //! ```no_run
