@@ -1,8 +1,7 @@
-#[macro_use]
-extern crate bencher;
+extern crate criterion;
 extern crate ropey;
 
-use bencher::Bencher;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use ropey::Rope;
 
 const TEXT_SMALL: &str = include_str!("small.txt");
@@ -12,55 +11,44 @@ const TEXT_LF: &str = include_str!("lf.txt");
 
 //----
 
-fn from_str_small(bench: &mut Bencher) {
-    bench.iter(|| {
-        Rope::from_str(TEXT_SMALL);
+fn from_str(c: &mut Criterion) {
+    let mut group = c.benchmark_group("from_str");
+
+    group.bench_function("small", |bench| {
+        bench.iter(|| {
+            Rope::from_str(black_box(TEXT_SMALL));
+        })
     });
 
-    bench.bytes = TEXT_SMALL.len() as u64;
-}
-
-fn from_str_medium(bench: &mut Bencher) {
-    bench.iter(|| {
-        Rope::from_str(TEXT_MEDIUM);
+    group.bench_function("medium", |bench| {
+        bench.iter(|| {
+            Rope::from_str(black_box(TEXT_MEDIUM));
+        })
     });
 
-    bench.bytes = TEXT_MEDIUM.len() as u64;
-}
-
-fn from_str_large(bench: &mut Bencher) {
-    bench.iter(|| {
-        Rope::from_str(TEXT_LARGE);
+    group.bench_function("large", |bench| {
+        bench.iter(|| {
+            Rope::from_str(black_box(TEXT_LARGE));
+        })
     });
 
-    bench.bytes = TEXT_LARGE.len() as u64;
-}
-
-fn from_str_linefeeds(bench: &mut Bencher) {
-    bench.iter(|| {
-        Rope::from_str(TEXT_LF);
+    group.bench_function("linefeeds", |bench| {
+        bench.iter(|| {
+            Rope::from_str(black_box(TEXT_LF));
+        })
     });
-
-    bench.bytes = TEXT_LF.len() as u64;
 }
 
-//----
-
-fn clone(bench: &mut Bencher) {
+fn rope_clone(c: &mut Criterion) {
     let rope = Rope::from_str(TEXT_LARGE);
-    bench.iter(|| {
-        let _ = rope.clone();
-    })
+    c.bench_function("rope_clone", |bench| {
+        bench.iter(|| {
+            let _ = black_box(&rope).clone();
+        })
+    });
 }
 
 //----
 
-benchmark_group!(
-    benches,
-    from_str_small,
-    from_str_medium,
-    from_str_large,
-    from_str_linefeeds,
-    clone,
-);
-benchmark_main!(benches);
+criterion_group!(benches, from_str, rope_clone,);
+criterion_main!(benches);
