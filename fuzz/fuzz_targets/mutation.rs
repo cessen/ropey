@@ -56,4 +56,7 @@ fuzz_target!(|data: (StartingText, Vec<Op>)| {
             }
         }
     }
+
+    r.assert_integrity();
+    r.assert_invariants();
 });
