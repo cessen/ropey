@@ -4,7 +4,7 @@ use smallvec::SmallVec;
 
 use crate::crlf;
 use crate::rope::Rope;
-use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
+use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN, MIN_BYTES};
 
 /// An efficient incremental `Rope` builder.
 ///
@@ -42,6 +42,7 @@ use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN};
 pub struct RopeBuilder {
     stack: SmallVec<[Arc<Node>; 4]>,
     buffer: String,
+    last_chunk_len_bytes: usize,
 }
 
 impl RopeBuilder {
@@ -54,6 +55,7 @@ impl RopeBuilder {
                 stack
             },
             buffer: String::new(),
+            last_chunk_len_bytes: 0,
         }
     }
 
@@ -102,6 +104,8 @@ impl RopeBuilder {
             let (leaf_text, remainder) = self.get_next_leaf_text(chunk, is_last_chunk);
             chunk = remainder;
 
+            self.last_chunk_len_bytes = chunk.len();
+
             // Append the leaf to the rope
             match leaf_text {
                 NextText::None => break,
@@ -132,12 +136,18 @@ impl RopeBuilder {
             stack_idx -= 1;
         }
 
-        // Get root and fix any right-side nodes with too few children.
+        // Get root and fix any right-side nodes with too few children or.
         let mut root = self.stack.pop().unwrap();
         Arc::make_mut(&mut root).zip_fix_right();
 
         // Create the rope, make sure it's well-formed, and return it.
         let mut rope = Rope { root: root };
+        if self.last_chunk_len_bytes < MIN_BYTES && self.last_chunk_len_bytes != rope.len_bytes() {
+            // Merge the last chunk if it was too small.
+            let idx =
+                rope.len_chars() - rope.byte_to_char(rope.len_bytes() - self.last_chunk_len_bytes);
+            Arc::make_mut(&mut rope.root).fix_tree_seam(idx);
+        }
         rope.pull_up_singular_nodes();
         return rope;
     }
