@@ -12,7 +12,7 @@ use crate::str_utils::{
     byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
     char_to_line_idx, line_to_byte_idx, line_to_char_idx, utf16_code_unit_to_char_idx,
 };
-use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES};
+use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES, MIN_BYTES};
 use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 
 /// A utf8 text rope.
@@ -569,9 +569,11 @@ impl Rope {
             let mut other = other;
             std::mem::swap(self, &mut other);
         } else if other.len_chars() > 0 {
-            let left_len = self.len_chars();
+            let left_info = self.root.text_info();
+            let right_info = other.root.text_info();
+
             let seam_byte_i = if other.char(0) == '\n' {
-                Some(self.root.text_info().bytes)
+                Some(left_info.bytes)
             } else {
                 None
             };
@@ -606,7 +608,9 @@ impl Rope {
             if let Some(i) = seam_byte_i {
                 root.fix_crlf_seam(i, true);
             }
-            root.fix_tree_seam(left_len);
+            if (left_info.bytes as usize) < MIN_BYTES || (right_info.bytes as usize) < MIN_BYTES {
+                root.fix_tree_seam(left_info.chars as usize);
+            }
             self.pull_up_singular_nodes();
         }
     }
