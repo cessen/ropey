@@ -127,7 +127,7 @@ impl Node {
     /// Returns (in this order):
     /// - The updated TextInfo for the node.
     /// - Whether there's a possible CRLF seam that needs fixing.
-    /// - Whether fix_after_remove() needs to be run after this.
+    /// - Whether fix_tree_seam() needs to be run after this.
     ///
     /// WARNING: does not correctly handle all text being removed.  That
     /// should be special-cased in calling code.
@@ -889,13 +889,13 @@ impl Node {
         }
     }
 
-    /// Fixes up the tree after remove_char_range().
+    /// Fixes up the tree after remove_char_range() or Rope::append().
     ///
     /// Takes the char index of the start of the removal range.
     ///
     /// Returns whether it did anything or not that would affect the
     /// parent. True: did stuff, false: didn't do stuff
-    pub fn fix_after_remove(&mut self, char_idx: usize) -> bool {
+    pub fn fix_tree_seam(&mut self, char_idx: usize) -> bool {
         if let Node::Internal(ref mut children) = *self {
             let mut did_stuff = false;
             loop {
@@ -939,14 +939,14 @@ impl Node {
                 if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
                     let tmp = children.info()[child_i].chars as usize;
                     let effect_1 =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i]).fix_after_remove(tmp);
+                        Arc::make_mut(&mut children.nodes_mut()[child_i]).fix_tree_seam(tmp);
                     let effect_2 =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i + 1]).fix_after_remove(0);
+                        Arc::make_mut(&mut children.nodes_mut()[child_i + 1]).fix_tree_seam(0);
                     if (!effect_1) && (!effect_2) {
                         break;
                     }
                 } else if !Arc::make_mut(&mut children.nodes_mut()[child_i])
-                    .fix_after_remove(char_idx - start_info.chars as usize)
+                    .fix_tree_seam(char_idx - start_info.chars as usize)
                 {
                     break;
                 }

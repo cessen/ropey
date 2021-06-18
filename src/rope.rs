@@ -569,6 +569,7 @@ impl Rope {
             let mut other = other;
             std::mem::swap(self, &mut other);
         } else if other.len_chars() > 0 {
+            let left_len = self.len_chars();
             let seam_byte_i = if other.char(0) == '\n' {
                 Some(self.root.text_info().bytes)
             } else {
@@ -600,9 +601,13 @@ impl Rope {
                 *self = other;
             };
 
+            // Fix up any mess left behind.
+            let root = Arc::make_mut(&mut self.root);
             if let Some(i) = seam_byte_i {
-                Arc::make_mut(&mut self.root).fix_crlf_seam(i, true);
+                root.fix_crlf_seam(i, true);
             }
+            root.fix_tree_seam(left_len);
+            self.pull_up_singular_nodes();
         }
     }
 
@@ -1306,21 +1311,18 @@ impl Rope {
                 return Ok(());
             }
 
-            // Scope to contain borrow of root
-            {
-                let root = Arc::make_mut(&mut self.root);
+            let root = Arc::make_mut(&mut self.root);
 
-                let root_info = root.text_info();
-                let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
+            let root_info = root.text_info();
+            let (_, crlf_seam, needs_fix) = root.remove_char_range(start, end, root_info);
 
-                if crlf_seam {
-                    let seam_idx = root.char_to_text_info(start).bytes;
-                    root.fix_crlf_seam(seam_idx as Count, false);
-                }
+            if crlf_seam {
+                let seam_idx = root.char_to_text_info(start).bytes;
+                root.fix_crlf_seam(seam_idx as Count, false);
+            }
 
-                if needs_fix {
-                    root.fix_after_remove(start);
-                }
+            if needs_fix {
+                root.fix_tree_seam(start);
             }
 
             self.pull_up_singular_nodes();
