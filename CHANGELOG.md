@@ -4,6 +4,13 @@
 ## [Unreleased]
 
 
+## [1.3.1] - 2021-06-22
+
+### Bug fixes
+- Fix unnecessary rope fragmentation when using `Rope::append()` to append many small ropes together.
+- Fix contiguous `RopeSlices` occasionally failing to convert to a `&str` with `RopeSlice::as_str()`.
+
+
 ## [1.3.0] - 2021-06-16
 
 ### New features
@@ -257,7 +264,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/cessen/ropey/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/cessen/ropey/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/cessen/ropey/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/cessen/ropey/compare/v1.0.1...v1.1.0
