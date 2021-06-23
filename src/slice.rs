@@ -24,7 +24,7 @@ use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a>(pub(crate) RSEnum<'a>);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum RSEnum<'a> {
     Full {
         node: &'a Arc<Node>,
@@ -40,6 +40,15 @@ pub(crate) enum RSEnum<'a> {
 }
 
 impl<'a> RopeSlice<'a> {
+    /// Used for tests and debugging purposes.
+    #[allow(dead_code)]
+    pub(crate) fn is_light(&self) -> bool {
+        match &self.0 {
+            &RSEnum::Light { .. } => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn new_with_range(node: &'a Arc<Node>, start: usize, end: usize) -> Self {
         assert!(start <= end);
         assert!(end <= node.text_info().chars as usize);
@@ -97,7 +106,7 @@ impl<'a> RopeSlice<'a> {
                 Node::Internal(ref children) => {
                     let mut start_char = 0;
                     for (i, inf) in children.info().iter().enumerate() {
-                        if n_start >= start_char && n_end < (start_char + inf.chars as usize) {
+                        if n_start >= start_char && n_end <= (start_char + inf.chars as usize) {
                             n_start -= start_char;
                             n_end -= start_char;
                             node = &children.nodes()[i];
@@ -2525,12 +2534,22 @@ mod tests {
 
         let s2 = s1.slice(21..21);
 
+        assert!(s2.is_light());
         assert_eq!("", s2);
     }
 
     #[test]
-    #[should_panic]
     fn slice_05() {
+        let r = Rope::from_str(TEXT);
+        for i in 0..(r.len_chars() - 1) {
+            let s = r.slice(i..(i + 1));
+            assert!(s.is_light());
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn slice_06() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..43);
 
@@ -2539,7 +2558,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn slice_06() {
+    fn slice_07() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..43);
 
