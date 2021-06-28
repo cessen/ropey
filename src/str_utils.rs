@@ -17,6 +17,8 @@ use std::arch::x86_64 as sse2;
 /// the char that the byte belongs to.
 ///
 /// Any past-the-end index will return the one-past-the-end char index.
+///
+/// Runs in O(N) time.
 #[inline]
 pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
     let count = count_chars_in_bytes(&text.as_bytes()[0..(byte_idx + 1).min(text.len())]);
@@ -32,6 +34,8 @@ pub fn byte_to_char_idx(text: &str, byte_idx: usize) -> usize {
 /// This is equivalent to counting the line endings before the given byte.
 ///
 /// Any past-the-end index will return the last line index.
+///
+/// Runs in O(N) time.
 #[inline]
 pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
     use crate::crlf;
@@ -50,6 +54,8 @@ pub fn byte_to_line_idx(text: &str, byte_idx: usize) -> usize {
 /// Converts from char-index to byte-index in a string slice.
 ///
 /// Any past-the-end index will return the one-past-the-end byte index.
+///
+/// Runs in O(N) time.
 #[inline]
 pub fn char_to_byte_idx(text: &str, char_idx: usize) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -121,6 +127,8 @@ fn char_to_byte_idx_inner<T: ByteChunk>(text: &str, char_idx: usize) -> usize {
 /// This is equivalent to counting the line endings before the given char.
 ///
 /// Any past-the-end index will return the last line index.
+///
+/// Runs in O(N) time.
 #[inline]
 pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
     byte_to_line_idx(text, char_to_byte_idx(text, char_idx))
@@ -132,6 +140,8 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// line.
 ///
 /// Any past-the-end index will return the one-past-the-end byte index.
+///
+/// Runs in O(N) time.
 #[inline]
 pub fn line_to_byte_idx(text: &str, line_idx: usize) -> usize {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -190,6 +200,8 @@ fn line_to_byte_idx_inner<T: ByteChunk>(text: &str, line_idx: usize) -> usize {
 /// line.
 ///
 /// Any past-the-end index will return the one-past-the-end char index.
+///
+/// Runs in O(N) time.
 #[inline]
 pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
     byte_to_char_idx(text, line_to_byte_idx(text, line_idx))
