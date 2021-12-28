@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+### Bug fixes
+- Relax the lifetime requirements of various `RopeSlice` methods.  They were unintentionally strict to begin with.
+
 
 ## [1.3.1] - 2021-06-22
 
