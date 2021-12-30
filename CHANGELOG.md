@@ -3,8 +3,11 @@
 
 ## [Unreleased]
 
+
+## [1.3.2] - 2021-12-30
+
 ### Bug fixes
-- Relax the lifetime requirements of various `RopeSlice` methods.  They were unintentionally strict to begin with.
+- Relax the lifetime requirements of various `RopeSlice` methods.  They were unintentionally strict.
 
 
 ## [1.3.1] - 2021-06-22
@@ -267,7 +270,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/cessen/ropey/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/cessen/ropey/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/cessen/ropey/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/cessen/ropey/compare/v1.1.0...v1.2.0
