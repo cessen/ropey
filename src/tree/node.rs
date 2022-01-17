@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::str_utils::{byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx};
+use crate::str_utils::{
+    byte_to_char_idx, byte_to_line_idx, byte_to_utf16_surrogate_idx, char_to_byte_idx,
+};
 use crate::tree::node_text::fix_segment_seam;
 use crate::tree::{
     Count, NodeChildren, NodeText, TextInfo, MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN,
@@ -549,6 +551,21 @@ impl Node {
         TextInfo {
             bytes: info.bytes + bi as Count,
             chars: char_idx as Count,
+            utf16_surrogates: info.utf16_surrogates
+                + byte_to_utf16_surrogate_idx(chunk, bi) as Count,
+            line_breaks: info.line_breaks + byte_to_line_idx(chunk, bi) as Count,
+        }
+    }
+
+    /// Returns the TextInfo at the given byte index.
+    #[inline(always)]
+    pub fn byte_to_text_info(&self, byte_idx: usize) -> TextInfo {
+        let (chunk, info) = self.get_chunk_at_byte(byte_idx);
+        let bi = byte_idx - info.bytes as usize;
+        let ci = byte_to_char_idx(chunk, byte_idx - info.bytes as usize);
+        TextInfo {
+            bytes: byte_idx as Count,
+            chars: info.chars + ci as Count,
             utf16_surrogates: info.utf16_surrogates
                 + byte_to_utf16_surrogate_idx(chunk, bi) as Count,
             line_breaks: info.line_breaks + byte_to_line_idx(chunk, bi) as Count,
