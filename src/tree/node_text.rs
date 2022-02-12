@@ -232,7 +232,7 @@ pub(crate) fn fix_segment_seam(l: &mut NodeText, r: &mut NodeText) {
 mod inner {
     use crate::tree::MAX_BYTES;
     use smallvec::{Array, SmallVec};
-    use std::{ptr, str};
+    use std::str;
 
     /// The backing internal buffer type for `NodeText`.
     #[derive(Copy, Clone)]
@@ -305,22 +305,11 @@ mod inner {
             // Enlarge buffer and shift bytes over to make room for the
             // insertion string.
             //
-            // There are two uses of unsafe here:
-            // - `set_len()`, which is used to avoid having to actually
-            //   initialize bytes that we know we're immediately going to
-            //   write to in the next step.
-            // - `ptr::copy()` to efficiently shift bytes over to make room
-            //   for the insertion data.  This can be replaced with a safe call
-            //   to `copy_within()` on the slice once that API is stabalized in
-            //   the standard library.
-            unsafe {
-                self.buffer.set_len(len + amt);
-                ptr::copy(
-                    self.buffer.as_ptr().add(byte_idx),
-                    self.buffer.as_mut_ptr().add(byte_idx + amt),
-                    len - byte_idx,
-                );
-            }
+            // We're using unsafe `set_len()` to avoid having to actually
+            // initialize bytes that we know we're immediately going to write
+            // to in the next step anyway.
+            unsafe { self.buffer.set_len(len + amt) };
+            self.buffer.copy_within(byte_idx..len, byte_idx + amt);
 
             // Copy bytes from `string` into the appropriate space in the
             // buffer.
@@ -339,16 +328,7 @@ mod inner {
             let len = self.len();
             let amt = end_byte_idx - start_byte_idx;
 
-            // The unsafe here is just used for efficiency.  This can be
-            // replaced with a safe call to `copy_within()` on the slice once
-            // that API is stabalized in the standard library.
-            unsafe {
-                ptr::copy(
-                    self.buffer.as_ptr().add(end_byte_idx),
-                    self.buffer.as_mut_ptr().add(start_byte_idx),
-                    len - end_byte_idx,
-                );
-            }
+            self.buffer.copy_within(end_byte_idx..len, start_byte_idx);
 
             self.buffer.truncate(len - amt);
         }
