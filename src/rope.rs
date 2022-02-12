@@ -1,7 +1,6 @@
 use std::io;
 use std::iter::FromIterator;
 use std::ops::RangeBounds;
-use std::ptr;
 use std::sync::Arc;
 
 use crate::crlf;
@@ -156,17 +155,7 @@ impl Rope {
 
                     // Shift the un-read part of the buffer to the beginning.
                     if valid_count < fill_idx {
-                        // The unsafe here is just used for efficiency.  This
-                        // can be replaced with a safe call to `copy_within()`
-                        // on the slice once that API is stabalized in the
-                        // standard library.
-                        unsafe {
-                            ptr::copy(
-                                buffer.as_ptr().add(valid_count),
-                                buffer.as_mut_ptr().offset(0),
-                                fill_idx - valid_count,
-                            );
-                        }
+                        buffer.copy_within(valid_count..fill_idx, 0);
                     }
                     fill_idx -= valid_count;
 

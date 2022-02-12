@@ -625,22 +625,17 @@ mod inner {
             let len = self.len();
             // This unsafe code simply shifts the elements of the arrays over
             // to make space for the new inserted value.  The `.info` array
-            // shifting can be replaced with a safe call to `copy_within()`
-            // once that API is stabalized in the standard library.  However,
-            // the `.nodes` array shift cannot, because of the specific drop
-            // semantics needed for safety.
+            // shifting can be done with a safe call to `copy_within()`.
+            // However, the `.nodes` array shift cannot, because of the
+            // specific drop semantics needed for safety.
             unsafe {
                 ptr::copy(
                     self.nodes.as_ptr().add(idx),
                     self.nodes.as_mut_ptr().add(idx + 1),
                     len - idx,
                 );
-                ptr::copy(
-                    self.info.as_ptr().add(idx),
-                    self.info.as_mut_ptr().add(idx + 1),
-                    len - idx,
-                );
             }
+            self.info.copy_within(idx..len, idx + 1);
 
             self.info[idx] = MaybeUninit::new(item.0);
             self.nodes[idx] = MaybeUninit::new(item.1);
@@ -663,22 +658,17 @@ mod inner {
             let len = self.len();
             // This unsafe code simply shifts the elements of the arrays over
             // to fill in the gap left by the removed element.  The `.info`
-            // array shifting can be replaced with a safe call to
-            // `copy_within()` once that API is stabalized in the standard
-            // library.  However, the `.nodes` array shift cannot, because of
-            // the specific drop semantics needed for safety.
+            // array shifting can be done with a safe call to `copy_within()`.
+            // However, the `.nodes` array shift cannot, because of the
+            // specific drop semantics needed for safety.
             unsafe {
                 ptr::copy(
                     self.nodes.as_ptr().add(idx + 1),
                     self.nodes.as_mut_ptr().add(idx),
                     len - idx - 1,
                 );
-                ptr::copy(
-                    self.info.as_ptr().add(idx + 1),
-                    self.info.as_mut_ptr().add(idx),
-                    len - idx - 1,
-                );
             }
+            self.info.copy_within((idx + 1)..len, idx);
 
             self.len -= 1;
             return item;
