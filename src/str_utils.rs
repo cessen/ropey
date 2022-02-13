@@ -361,11 +361,10 @@ pub(crate) fn ends_with_line_break(text: &str) -> bool {
     }
 
     // Check if the last codepoint is a line break.
-    match &text[i..] {
-        "\u{000A}" | "\u{000B}" | "\u{000C}" | "\u{000D}" | "\u{0085}" | "\u{2028}"
-        | "\u{2029}" => true,
-        _ => false,
-    }
+    matches!(
+        &text[i..],
+        "\u{000A}" | "\u{000B}" | "\u{000C}" | "\u{000D}" | "\u{0085}" | "\u{2028}" | "\u{2029}"
+    )
 }
 
 /// Uses bit-fiddling magic to count utf8 chars really quickly.
@@ -498,7 +497,7 @@ fn count_line_breaks_up_to(bytes: &[u8], max_bytes: usize, max_breaks: usize) ->
         let byte = bytes[ptr];
 
         // Handle u{000A}, u{000B}, u{000C}, and u{000D}
-        if (byte <= 0x0D) && (byte >= 0x0A) {
+        if (0x0A..=0x0D).contains(&byte) {
             count += 1;
 
             // Check for CRLF and and subtract 1 if it is,
@@ -1035,7 +1034,7 @@ impl<'a> Iterator for LineBreakIter<'a> {
         while let Some(byte) = self.byte_itr.next() {
             self.byte_idx += 1;
             // Handle u{000A}, u{000B}, u{000C}, and u{000D}
-            if (byte <= 0x0D) && (byte >= 0x0A) {
+            if (0x0A..=0x0D).contains(&byte) {
                 if byte == 0x0D {
                     // We're basically "peeking" here.
                     if let Some(0x0A) = self.byte_itr.clone().next() {

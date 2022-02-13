@@ -110,6 +110,7 @@ pub fn find_good_split(byte_idx: usize, text: &[u8], bias_left: bool) -> usize {
                 next
             }
         } else {
+            #[allow(clippy::collapsible_if)] // More readable this way
             if next < text.len() {
                 next
             } else {

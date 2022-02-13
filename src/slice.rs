@@ -43,10 +43,7 @@ impl<'a> RopeSlice<'a> {
     /// Used for tests and debugging purposes.
     #[allow(dead_code)]
     pub(crate) fn is_light(&self) -> bool {
-        match &self.0 {
-            &RSEnum::Light { .. } => true,
-            _ => false,
-        }
+        matches!(&self.0, RSEnum::Light { .. })
     }
 
     pub(crate) fn new_with_range(node: &'a Arc<Node>, start: usize, end: usize) -> RopeSlice<'a> {
@@ -91,7 +88,7 @@ impl<'a> RopeSlice<'a> {
                 // Early out if we reach a leaf, because we can do the
                 // simpler lightweight slice then.
                 Node::Leaf(ref text) => {
-                    let start_byte = char_to_byte_idx(&text, n_start);
+                    let start_byte = char_to_byte_idx(text, n_start);
                     let end_byte =
                         start_byte + char_to_byte_idx(&text[start_byte..], n_end - n_start);
                     return RopeSlice(RSEnum::Light {
@@ -907,9 +904,7 @@ impl<'a> RopeSlice<'a> {
         if char_idx <= self.len_chars() {
             match *self {
                 RopeSlice(RSEnum::Full {
-                    ref node,
-                    start_info,
-                    ..
+                    node, start_info, ..
                 }) => {
                     let char_idx = char_idx + start_info.chars as usize;
 
@@ -943,9 +938,7 @@ impl<'a> RopeSlice<'a> {
         if utf16_cu_idx <= self.len_utf16_cu() {
             match *self {
                 RopeSlice(RSEnum::Full {
-                    ref node,
-                    start_info,
-                    ..
+                    node, start_info, ..
                 }) => {
                     let utf16_cu_idx =
                         utf16_cu_idx + (start_info.chars + start_info.utf16_surrogates) as usize;

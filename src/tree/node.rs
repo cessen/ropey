@@ -186,7 +186,7 @@ impl Node {
                         // Remove the text
                         leaf_text.remove_range(byte_start, byte_end);
 
-                        (TextInfo::from_str(&leaf_text), seam, false)
+                        (TextInfo::from_str(leaf_text), seam, false)
                     }
                 } else {
                     // Remove all of the text
