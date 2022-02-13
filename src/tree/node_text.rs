@@ -295,25 +295,11 @@ mod inner {
         /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
         #[inline(always)]
         pub fn insert_str(&mut self, byte_idx: usize, string: &str) {
-            assert!(byte_idx <= self.len());
             assert!(self.as_str().is_char_boundary(byte_idx));
-
-            let len = self.len();
-            let amt = string.len();
-            self.buffer.reserve(amt);
-
-            // Enlarge buffer and shift bytes over to make room for the
-            // insertion string.
-            //
-            // We're using unsafe `set_len()` to avoid having to actually
-            // initialize bytes that we know we're immediately going to write
-            // to in the next step anyway.
-            unsafe { self.buffer.set_len(len + amt) };
-            self.buffer.copy_within(byte_idx..len, byte_idx + amt);
 
             // Copy bytes from `string` into the appropriate space in the
             // buffer.
-            (&mut self.buffer[byte_idx..(byte_idx + amt)]).copy_from_slice(string.as_bytes());
+            self.buffer.insert_from_slice(byte_idx, string.as_bytes());
         }
 
         /// Removes text in range `[start_byte_idx, end_byte_idx)`
@@ -351,12 +337,7 @@ mod inner {
             assert!(self.as_str().is_char_boundary(byte_idx));
             let len = self.len();
             let mut other = NodeSmallString::with_capacity(len - byte_idx);
-
-            // We're using unsafe `set_len()` to avoid having to actually
-            // initialize bytes that we know we're immediately going to write
-            // to in the next step anyway.
-            unsafe { other.buffer.set_len(len - byte_idx) };
-            (&mut other.buffer[..]).copy_from_slice(&self.buffer[byte_idx..]);
+            other.buffer.extend_from_slice(&self.buffer[byte_idx..]);
             self.buffer.truncate(byte_idx);
             other
         }
