@@ -103,7 +103,7 @@ impl NodeChildren {
                             text1.push_str(text2);
                             true
                         } else {
-                            let right = text1.push_str_split(&text2);
+                            let right = text1.push_str_split(text2);
                             *text2 = right;
                             false
                         }
@@ -559,31 +559,31 @@ mod inner {
 
         /// Access to the nodes array.
         #[inline(always)]
-        pub fn nodes<'a>(&'a self) -> &'a [Arc<Node>] {
+        pub fn nodes(&self) -> &[Arc<Node>] {
             unsafe { mem::transmute(&self.nodes[..(self.len())]) }
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
-        pub fn nodes_mut<'a>(&'a mut self) -> &'a mut [Arc<Node>] {
+        pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
             unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) }
         }
 
         /// Access to the info array.
         #[inline(always)]
-        pub fn info<'a>(&'a self) -> &'a [TextInfo] {
+        pub fn info(&self) -> &[TextInfo] {
             unsafe { mem::transmute(&self.info[..(self.len())]) }
         }
 
         /// Mutable access to the info array.
         #[inline(always)]
-        pub fn info_mut<'a>(&'a mut self) -> &'a mut [TextInfo] {
+        pub fn info_mut(&mut self) -> &mut [TextInfo] {
             unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) }
         }
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
-        pub fn data_mut<'a>(&'a mut self) -> (&'a mut [TextInfo], &'a mut [Arc<Node>]) {
+        pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
             (
                 unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) },
                 unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) },

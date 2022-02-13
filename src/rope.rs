@@ -424,7 +424,7 @@ impl Rope {
                 // We're splitting the node
                 else {
                     let r_text = leaf_text.insert_str_split(byte_idx, ins_text);
-                    let l_text_info = TextInfo::from_str(&leaf_text);
+                    let l_text_info = TextInfo::from_str(leaf_text);
                     if r_text.len() > 0 {
                         let r_text_info = TextInfo::from_str(&r_text);
                         (
@@ -479,7 +479,7 @@ impl Rope {
                     // We're splitting the node
                     else {
                         let r_text = leaf_text.insert_str_split(byte_idx, "\n");
-                        let l_text_info = TextInfo::from_str(&leaf_text);
+                        let l_text_info = TextInfo::from_str(leaf_text);
                         if r_text.len() > 0 {
                             let r_text_info = TextInfo::from_str(&r_text);
                             (
@@ -1273,7 +1273,8 @@ impl Rope {
         // Bounds check
         if char_idx <= self.len_chars() {
             let mut buf = [0u8; 4];
-            Ok(self.insert_internal(char_idx, ch.encode_utf8(&mut buf)))
+            self.insert_internal(char_idx, ch.encode_utf8(&mut buf));
+            Ok(())
         } else {
             Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
@@ -1288,13 +1289,13 @@ impl Rope {
         let end_opt = end_bound_to_num(char_range.end_bound());
         let start = start_opt.unwrap_or(0);
         let end = end_opt.unwrap_or_else(|| self.len_chars());
-        if !(end.max(start) <= self.len_chars()) {
+        if end.max(start) > self.len_chars() {
             Err(Error::CharRangeOutOfBounds(
                 start_opt,
                 end_opt,
                 self.len_chars(),
             ))
-        } else if !(start <= end) {
+        } else if start > end {
             Err(Error::CharRangeInvalid(start, end))
         } else {
             // A special case that the rest of the logic doesn't handle
