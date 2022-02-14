@@ -308,7 +308,8 @@ mod inner {
         #[inline(always)]
         pub fn remove_range(&mut self, start_byte_idx: usize, end_byte_idx: usize) {
             assert!(start_byte_idx <= end_byte_idx);
-            assert!(end_byte_idx <= self.len());
+            // Already checked by copy_within/is_char_boundary.
+            debug_assert!(end_byte_idx <= self.len());
             assert!(self.as_str().is_char_boundary(start_byte_idx));
             assert!(self.as_str().is_char_boundary(end_byte_idx));
             let len = self.len();
@@ -322,7 +323,8 @@ mod inner {
         /// Removes text after `byte_idx`.
         #[inline(always)]
         pub fn truncate(&mut self, byte_idx: usize) {
-            assert!(byte_idx <= self.len());
+            // Already checked by is_char_boundary.
+            debug_assert!(byte_idx <= self.len());
             assert!(self.as_str().is_char_boundary(byte_idx));
             self.buffer.truncate(byte_idx);
         }
@@ -333,7 +335,8 @@ mod inner {
         /// Panics on out-of-bounds or of `byte_idx` isn't a char boundary.
         #[inline(always)]
         pub fn split_off(&mut self, byte_idx: usize) -> Self {
-            assert!(byte_idx <= self.len());
+            // Already checked by is_char_boundary.
+            debug_assert!(byte_idx <= self.len());
             assert!(self.as_str().is_char_boundary(byte_idx));
             let len = self.len();
             let mut other = NodeSmallString::with_capacity(len - byte_idx);
