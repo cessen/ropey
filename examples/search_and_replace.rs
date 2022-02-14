@@ -183,7 +183,7 @@ impl<'a> Iterator for SearchIter<'a> {
                     }
                 } else {
                     // Doesn't match, remove it.
-                    self.possible_matches.swap_remove(i);
+                    let _ = self.possible_matches.swap_remove(i);
                 }
             }
         }
