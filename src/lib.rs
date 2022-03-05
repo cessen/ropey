@@ -191,6 +191,31 @@ pub enum Error {
     /// `Rope`/`RopeSlice` in utf16 code units, in that order.
     Utf16IndexOutOfBounds(usize, usize),
 
+    /// Indicates that the passed byte index was not a char boundary.
+    ///
+    /// Contains the passed byte index.
+    ByteIndexNotCharBoundary(usize),
+
+    /// Indicates that the passed byte range didn't line up with char
+    /// boundaries.
+    ///
+    /// Contains the [start, end) byte indices of the range, in that order.
+    /// When either the start or end are `None`, that indicates a half-open
+    /// range.
+    ByteRangeNotCharBoundary(
+        Option<usize>, // Start.
+        Option<usize>, // End.
+    ),
+
+    /// Indicates that a reversed byte-index range (end < start) was
+    /// encountered.
+    ///
+    /// Contains the [start, end) byte indices of the range, in that order.
+    ByteRangeInvalid(
+        usize, // Start.
+        usize, // End.
+    ),
+
     /// Indicates that a reversed char-index range (end < start) was
     /// encountered.
     ///
@@ -198,6 +223,18 @@ pub enum Error {
     CharRangeInvalid(
         usize, // Start.
         usize, // End.
+    ),
+
+    /// Indicates that the passed byte-index range was partially or fully
+    /// out of bounds.
+    ///
+    /// Contains the [start, end) byte indices of the range and the actual
+    /// length of the `Rope`/`RopeSlice` in bytes, in that order.  When
+    /// either the start or end are `None`, that indicates a half-open range.
+    ByteRangeOutOfBounds(
+        Option<usize>, // Start.
+        Option<usize>, // End.
+        usize,         // Rope char length.
     ),
 
     /// Indicates that the passed char-index range was partially or fully
@@ -256,13 +293,35 @@ impl std::fmt::Debug for Error {
             Error::Utf16IndexOutOfBounds(index, len) => {
                 write!(f, "Utf16 code-unit index out of bounds: utf16 index {}, Rope/RopeSlice utf16 length {}", index, len)
             }
-
+            Error::ByteIndexNotCharBoundary(index) => {
+                write!(
+                    f,
+                    "Byte index is not a valid char boundary: byte index {}",
+                    index
+                )
+            }
+            Error::ByteRangeNotCharBoundary(start_idx_opt, end_idx_opt) => {
+                write!(f, "Byte range doesn't align with char boundries: ")?;
+                write_range(f, start_idx_opt, end_idx_opt)
+            }
+            Error::ByteRangeInvalid(start_idx, end_idx) => {
+                write!(
+                    f,
+                    "Invalid byte range {}..{}: start must be <= end",
+                    start_idx, end_idx
+                )
+            }
             Error::CharRangeInvalid(start_idx, end_idx) => {
                 write!(
                     f,
                     "Invalid char range {}..{}: start must be <= end",
                     start_idx, end_idx
                 )
+            }
+            Error::ByteRangeOutOfBounds(start_idx_opt, end_idx_opt, len) => {
+                write!(f, "Byte range out of bounds: byte range ")?;
+                write_range(f, start_idx_opt, end_idx_opt)?;
+                write!(f, ", Rope/RopeSlice byte length {}", len)
             }
             Error::CharRangeOutOfBounds(start_idx_opt, end_idx_opt, len) => {
                 write!(f, "Char range out of bounds: char range ")?;
