@@ -3,6 +3,8 @@
 
 ## [Unreleased]
 
+- Added `byte_slice()` and `get_byte_slice()` methods to `Rope` and `RopeSlice` to slice by byte index instead of char index.  This can allow optimizations in client code in some cases.
+
 
 ## [1.3.2] - 2021-12-30
 
