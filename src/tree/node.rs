@@ -579,6 +579,11 @@ impl Node {
         }
     }
 
+    pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
+        let (chunk, info) = self.get_chunk_at_byte(byte_idx);
+        chunk.is_char_boundary(byte_idx - info.bytes as usize)
+    }
+
     //-----------------------------------------
 
     pub fn child_count(&self) -> usize {

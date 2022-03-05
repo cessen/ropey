@@ -234,7 +234,7 @@ pub enum Error {
     ByteRangeOutOfBounds(
         Option<usize>, // Start.
         Option<usize>, // End.
-        usize,         // Rope char length.
+        usize,         // Rope byte length.
     ),
 
     /// Indicates that the passed char-index range was partially or fully
@@ -301,7 +301,7 @@ impl std::fmt::Debug for Error {
                 )
             }
             Error::ByteRangeNotCharBoundary(start_idx_opt, end_idx_opt) => {
-                write!(f, "Byte range doesn't align with char boundries: ")?;
+                write!(f, "Byte range does not align with char boundaries: range ")?;
                 write_range(f, start_idx_opt, end_idx_opt)
             }
             Error::ByteRangeInvalid(start_idx, end_idx) => {

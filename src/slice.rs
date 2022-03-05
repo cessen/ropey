@@ -128,7 +128,7 @@ impl<'a> RopeSlice<'a> {
         node: &'a Arc<Node>,
         start: usize,
         end: usize,
-    ) -> RopeSlice<'a> {
+    ) -> Result<RopeSlice<'a>> {
         assert!(start <= end);
         assert!(end <= node.text_info().bytes as usize);
 
@@ -136,14 +136,14 @@ impl<'a> RopeSlice<'a> {
         if start == 0 && end == node.byte_count() {
             if node.is_leaf() {
                 let text = node.leaf_text();
-                return RopeSlice(RSEnum::Light {
+                return Ok(RopeSlice(RSEnum::Light {
                     text,
                     char_count: count_chars(text) as Count,
                     utf16_surrogate_count: count_utf16_surrogates(text) as Count,
                     line_break_count: count_line_breaks(text) as Count,
-                });
+                }));
             } else {
-                return RopeSlice(RSEnum::Full {
+                return Ok(RopeSlice(RSEnum::Full {
                     node,
                     start_info: TextInfo {
                         bytes: 0,
@@ -157,7 +157,7 @@ impl<'a> RopeSlice<'a> {
                         utf16_surrogates: node.utf16_surrogate_count() as Count,
                         line_breaks: node.line_break_count() as Count,
                     },
-                });
+                }));
             }
         }
 
@@ -172,13 +172,16 @@ impl<'a> RopeSlice<'a> {
                 Node::Leaf(ref text) => {
                     let start_byte = n_start;
                     let end_byte = n_end;
-                    return RopeSlice(RSEnum::Light {
+                    if !text.is_char_boundary(start_byte) || !text.is_char_boundary(end_byte) {
+                        return Err(Error::ByteRangeNotCharBoundary(Some(start), Some(end)));
+                    }
+                    return Ok(RopeSlice(RSEnum::Light {
                         text: &text[start_byte..end_byte],
                         char_count: count_chars(&text[start_byte..end_byte]) as Count,
                         utf16_surrogate_count: count_utf16_surrogates(&text[start_byte..end_byte])
                             as Count,
                         line_break_count: count_line_breaks(&text[start_byte..end_byte]) as Count,
-                    });
+                    }));
                 }
 
                 Node::Internal(ref children) => {
@@ -197,12 +200,17 @@ impl<'a> RopeSlice<'a> {
             }
         }
 
+        // Make sure the bytes indices are valid char boundaries.
+        if !node.is_char_boundary(n_start) || !node.is_char_boundary(n_end) {
+            return Err(Error::ByteRangeNotCharBoundary(Some(start), Some(end)));
+        }
+
         // Create the slice
-        RopeSlice(RSEnum::Full {
+        Ok(RopeSlice(RSEnum::Full {
             node,
             start_info: node.byte_to_text_info(n_start),
             end_info: node.byte_to_text_info(n_end),
-        })
+        }))
     }
 
     //-----------------------------------------------------------------------
@@ -671,55 +679,17 @@ impl<'a> RopeSlice<'a> {
     ///
     /// # Panics
     ///
-    /// Panics if the start of the range is greater than the end, or the end
-    /// is out of bounds (i.e. `end > len_bytes()`).
+    /// Panics if:
+    /// - The start of the range is greater than the end.
+    /// - The end is out of bounds (i.e. `end > len_bytes()`).
+    /// - The range doesn't align with char boundaries.
     pub fn byte_slice<R>(&self, byte_range: R) -> RopeSlice<'a>
     where
         R: RangeBounds<usize>,
     {
-        let (start, end) = {
-            let start_range = start_bound_to_num(byte_range.start_bound());
-            let end_range = end_bound_to_num(byte_range.end_bound());
-
-            // Early-out shortcut for taking a slice of the full thing.
-            if start_range == None && end_range == None {
-                return *self;
-            }
-
-            (
-                start_range.unwrap_or(0),
-                end_range.unwrap_or_else(|| self.len_bytes()),
-            )
-        };
-
-        // Bounds check
-        assert!(start <= end);
-        assert!(
-            end <= self.len_bytes(),
-            "Attempt to slice past end of RopeSlice: slice end {}, RopeSlice length {}",
-            end,
-            self.len_bytes()
-        );
-
-        match *self {
-            RopeSlice(RSEnum::Full {
-                node, start_info, ..
-            }) => RopeSlice::new_with_range(
-                node,
-                start_info.bytes as usize + start,
-                start_info.bytes as usize + end,
-            ),
-            RopeSlice(RSEnum::Light { text, .. }) => {
-                let start_byte = start;
-                let end_byte = end;
-                let new_text = &text[start_byte..end_byte];
-                RopeSlice(RSEnum::Light {
-                    text: new_text,
-                    char_count: count_chars(new_text) as Count,
-                    utf16_surrogate_count: count_utf16_surrogates(new_text) as Count,
-                    line_break_count: count_line_breaks(new_text) as Count,
-                })
-            }
+        match self.get_byte_slice_impl(byte_range) {
+            Ok(s) => return s,
+            Err(e) => panic!("byte_slice(): {}", e),
         }
     }
 
@@ -1363,50 +1333,84 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Non-panicking version of [`slice()`](RopeSlice::slice).
+    /// Non-panicking version of [`byte_slice()`](RopeSlice::byte_slice).
     pub fn get_byte_slice<R>(&self, byte_range: R) -> Option<RopeSlice<'a>>
     where
         R: RangeBounds<usize>,
     {
-        let (start, end) = {
-            let start_range = start_bound_to_num(byte_range.start_bound());
-            let end_range = end_bound_to_num(byte_range.end_bound());
+        self.get_byte_slice_impl(byte_range).ok()
+    }
 
-            // Early-out shortcut for taking a slice of the full thing.
-            if start_range == None && end_range == None {
-                return Some(*self);
+    pub(crate) fn get_byte_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice<'a>>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start_range = start_bound_to_num(byte_range.start_bound());
+        let end_range = end_bound_to_num(byte_range.end_bound());
+
+        // Bounds checks.
+        match (start_range, end_range) {
+            (None, None) => {
+                // Early-out shortcut for taking a slice of the full thing.
+                return Ok(*self);
             }
-
-            (
-                start_range.unwrap_or(0),
-                end_range.unwrap_or_else(|| self.len_bytes()),
-            )
-        };
-
-        // Bounds check
-        if start <= end && end <= self.len_bytes() {
-            match *self {
-                RopeSlice(RSEnum::Full {
-                    node, start_info, ..
-                }) => Some(RopeSlice::new_with_byte_range(
-                    node,
-                    start_info.bytes as usize + start,
-                    start_info.bytes as usize + end,
-                )),
-                RopeSlice(RSEnum::Light { text, .. }) => {
-                    let start_byte = start;
-                    let end_byte = end;
-                    let new_text = &text[start_byte..end_byte];
-                    Some(RopeSlice(RSEnum::Light {
-                        text: new_text,
-                        char_count: count_chars(new_text) as Count,
-                        utf16_surrogate_count: count_utf16_surrogates(new_text) as Count,
-                        line_break_count: count_line_breaks(new_text) as Count,
-                    }))
+            (Some(s), Some(e)) => {
+                if s > e {
+                    return Err(Error::ByteRangeInvalid(s, e));
                 }
             }
-        } else {
-            None
+            (Some(s), None) => {
+                if s > self.len_bytes() {
+                    return Err(Error::ByteRangeOutOfBounds(
+                        start_range,
+                        end_range,
+                        self.len_bytes(),
+                    ));
+                }
+            }
+            (None, Some(e)) => {
+                if e > self.len_bytes() {
+                    return Err(Error::ByteRangeOutOfBounds(
+                        start_range,
+                        end_range,
+                        self.len_bytes(),
+                    ));
+                }
+            }
+        }
+
+        let (start, end) = (
+            start_range.unwrap_or(0),
+            end_range.unwrap_or_else(|| self.len_bytes()),
+        );
+
+        match *self {
+            RopeSlice(RSEnum::Full {
+                node, start_info, ..
+            }) => RopeSlice::new_with_byte_range(
+                node,
+                start_info.bytes as usize + start,
+                start_info.bytes as usize + end,
+            )
+            .map_err(|e| {
+                if let Error::ByteRangeNotCharBoundary(_, _) = e {
+                    Error::ByteRangeNotCharBoundary(start_range, end_range)
+                } else {
+                    e
+                }
+            }),
+            RopeSlice(RSEnum::Light { text, .. }) => {
+                if !text.is_char_boundary(start) || !text.is_char_boundary(end) {
+                    return Err(Error::ByteRangeNotCharBoundary(start_range, end_range));
+                }
+                let new_text = &text[start..end];
+                Ok(RopeSlice(RSEnum::Light {
+                    text: new_text,
+                    char_count: count_chars(new_text) as Count,
+                    utf16_surrogate_count: count_utf16_surrogates(new_text) as Count,
+                    line_break_count: count_line_breaks(new_text) as Count,
+                }))
+            }
         }
     }
 

@@ -915,7 +915,7 @@ impl Rope {
     //-----------------------------------------------------------------------
     // Slicing
 
-    /// Gets an immutable slice of the `Rope`.
+    /// Gets an immutable slice of the `Rope`, using char indices.
     ///
     /// Uses range syntax, e.g. `2..7`, `2..`, etc.
     ///
@@ -941,6 +941,28 @@ impl Rope {
         R: RangeBounds<usize>,
     {
         self.get_slice(char_range).unwrap()
+    }
+
+    /// Gets and immutable slice of the `Rope`, using byte indices.
+    ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if:
+    /// - The start of the range is greater than the end.
+    /// - The end is out of bounds (i.e. `end > len_bytes()`).
+    /// - The range doesn't align with char boundaries.
+    pub fn byte_slice<R>(&self, byte_range: R) -> RopeSlice
+    where
+        R: RangeBounds<usize>,
+    {
+        match self.get_byte_slice_impl(byte_range) {
+            Ok(s) => return s,
+            Err(e) => panic!("byte_slice(): {}", e),
+        }
     }
 
     //-----------------------------------------------------------------------
@@ -1596,6 +1618,64 @@ impl Rope {
         } else {
             None
         }
+    }
+
+    /// Non-panicking version of [`byte_slice()`](Rope::byte_slice).
+    #[inline]
+    pub fn get_byte_slice<R>(&self, byte_range: R) -> Option<RopeSlice>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.get_byte_slice_impl(byte_range).ok()
+    }
+
+    pub(crate) fn get_byte_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start_range = start_bound_to_num(byte_range.start_bound());
+        let end_range = end_bound_to_num(byte_range.end_bound());
+
+        // Bounds checks.
+        match (start_range, end_range) {
+            (Some(s), Some(e)) => {
+                if s > e {
+                    return Err(Error::ByteRangeInvalid(s, e));
+                }
+            }
+            (Some(s), None) => {
+                if s > self.len_bytes() {
+                    return Err(Error::ByteRangeOutOfBounds(
+                        start_range,
+                        end_range,
+                        self.len_bytes(),
+                    ));
+                }
+            }
+            (None, Some(e)) => {
+                if e > self.len_bytes() {
+                    return Err(Error::ByteRangeOutOfBounds(
+                        start_range,
+                        end_range,
+                        self.len_bytes(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+
+        let (start, end) = (
+            start_range.unwrap_or(0),
+            end_range.unwrap_or_else(|| self.len_bytes()),
+        );
+
+        RopeSlice::new_with_byte_range(&self.root, start, end).map_err(|e| {
+            if let Error::ByteRangeNotCharBoundary(_, _) = e {
+                Error::ByteRangeNotCharBoundary(start_range, end_range)
+            } else {
+                e
+            }
+        })
     }
 
     /// Non-panicking version of [`bytes_at()`](Rope::bytes_at).
