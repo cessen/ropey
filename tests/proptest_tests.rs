@@ -497,6 +497,25 @@ proptest! {
     }
 
     #[test]
+    fn pt_get_byte_slice(ref text in "\\PC*", range in (0usize..1000000, 0usize..1000000)) {
+        let rope = Rope::from_str(&text);
+
+        let mut idx1 = range.0 % (rope.len_bytes() + 1);
+        let mut idx2 = range.1 % (rope.len_bytes() + 1);
+        if idx1 > idx2 {
+            std::mem::swap(&mut idx1, &mut idx2)
+        };
+
+        if let Some(slice) = rope.get_byte_slice(idx1..idx2) {
+            let text_slice = &text[idx1..idx2];
+
+            assert_eq!(slice, text_slice);
+            assert_eq!(slice.len_bytes(), text_slice.len());
+            assert_eq!(slice.len_chars(), text_slice.chars().count());
+        }
+    }
+
+    #[test]
     fn pt_byte_to_line_idx(ref text in "[\\u{000A}\\u{000B}\\u{000C}\\u{000D}\\u{0085}\\u{2028}\\u{2029}]*[\\u{000A}\\u{000B}\\u{000C}\\u{000D}\\u{0085}\\u{2028}\\u{2029}]*", idx in 0usize..200) {
         let idx = idx % (text.len() + 1);
         assert_eq!(

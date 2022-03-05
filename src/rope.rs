@@ -1641,6 +1641,12 @@ impl Rope {
             (Some(s), Some(e)) => {
                 if s > e {
                     return Err(Error::ByteRangeInvalid(s, e));
+                } else if e > self.len_bytes() {
+                    return Err(Error::ByteRangeOutOfBounds(
+                        start_range,
+                        end_range,
+                        self.len_bytes(),
+                    ));
                 }
             }
             (Some(s), None) => {
@@ -3130,6 +3136,72 @@ mod tests {
     fn slice_06() {
         let r = Rope::from_str(TEXT);
         r.slice(102..104);
+    }
+
+    #[test]
+    fn byte_slice_01() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.byte_slice(0..r.len_bytes());
+
+        assert_eq!(TEXT, s);
+    }
+
+    #[test]
+    fn byte_slice_02() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.byte_slice(5..21);
+
+        assert_eq!(&TEXT[5..21], s);
+    }
+
+    #[test]
+    fn byte_slice_03() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.byte_slice(31..97);
+
+        assert_eq!(&TEXT[31..97], s);
+    }
+
+    #[test]
+    fn byte_slice_04() {
+        let r = Rope::from_str(TEXT);
+
+        let s = r.byte_slice(53..53);
+
+        assert_eq!("", s);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_05() {
+        let r = Rope::from_str(TEXT);
+        r.byte_slice(53..52);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_06() {
+        let r = Rope::from_str(TEXT);
+        r.byte_slice(20..128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_07() {
+        let r = Rope::from_str(TEXT);
+        // Not a char boundary.
+        r.byte_slice(..96);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_08() {
+        let r = Rope::from_str(TEXT);
+        // Not a char boundary.
+        r.byte_slice(96..);
     }
 
     #[test]

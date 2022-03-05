@@ -1357,6 +1357,12 @@ impl<'a> RopeSlice<'a> {
             (Some(s), Some(e)) => {
                 if s > e {
                     return Err(Error::ByteRangeInvalid(s, e));
+                } else if e > self.len_bytes() {
+                    return Err(Error::ByteRangeOutOfBounds(
+                        start_range,
+                        end_range,
+                        self.len_bytes(),
+                    ));
                 }
             }
             (Some(s), None) => {
@@ -2726,9 +2732,10 @@ mod tests {
     #[test]
     fn slice_05() {
         let r = Rope::from_str(TEXT);
-        for i in 0..(r.len_chars() - 1) {
-            let s = r.slice(i..(i + 1));
-            assert!(s.is_light());
+        let s1 = r.slice(5..98);
+        for i in 0..(s1.len_chars() - 1) {
+            let s2 = s1.slice(i..(i + 1));
+            assert!(s2.is_light());
         }
     }
 
@@ -2748,6 +2755,95 @@ mod tests {
         let s = r.slice(5..43);
 
         s.slice(37..39);
+    }
+
+    #[test]
+    fn byte_slice_01() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.byte_slice(..);
+
+        let s2 = s1.byte_slice(..);
+
+        assert_eq!(TEXT, s2);
+    }
+
+    #[test]
+    fn byte_slice_02() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.byte_slice(50..118);
+
+        let s2 = s1.byte_slice(3..25);
+
+        assert_eq!(&TEXT[53..75], s2);
+    }
+
+    #[test]
+    fn byte_slice_03() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.byte_slice(50..118);
+
+        let s2 = s1.byte_slice(7..65);
+
+        assert_eq!(&TEXT[57..115], s2);
+    }
+
+    #[test]
+    fn byte_slice_04() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.byte_slice(50..118);
+
+        let s2 = s1.byte_slice(21..21);
+
+        assert!(s2.is_light());
+        assert_eq!("", s2);
+    }
+
+    #[test]
+    fn byte_slice_05() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.byte_slice(4..86);
+        for i in 0..(s1.len_bytes() - 1) {
+            let s2 = s1.byte_slice(i..(i + 1));
+            assert!(s2.is_light());
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_06() {
+        let r = Rope::from_str(TEXT);
+        let s = r.byte_slice(50..118);
+
+        s.byte_slice(21..20);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_07() {
+        let r = Rope::from_str(TEXT);
+        let s = r.byte_slice(50..85);
+
+        s.byte_slice(35..36);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_08() {
+        let r = Rope::from_str(TEXT);
+        let s = r.byte_slice(50..118);
+
+        // Not a char boundary.
+        s.byte_slice(..43);
+    }
+
+    #[test]
+    #[should_panic]
+    fn byte_slice_09() {
+        let r = Rope::from_str(TEXT);
+        let s = r.byte_slice(50..118);
+
+        // Not a char boundary.
+        s.byte_slice(43..);
     }
 
     #[test]
