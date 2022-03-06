@@ -416,7 +416,7 @@ impl<'a> Chars<'a> {
     }
 
     #[inline]
-    pub fn prev_impl(&mut self) -> Option<char> {
+    fn prev_impl(&mut self) -> Option<char> {
         // Put us back into a "prev" progression.
         if !self.last_call_was_prev_impl {
             self.chunk_iter.prev();
@@ -444,7 +444,7 @@ impl<'a> Chars<'a> {
     }
 
     #[inline]
-    pub fn next_impl(&mut self) -> Option<char> {
+    fn next_impl(&mut self) -> Option<char> {
         // Put us back into a "next" progression.
         if self.last_call_was_prev_impl {
             self.chunk_iter.next();
