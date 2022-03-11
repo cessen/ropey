@@ -140,6 +140,7 @@
 #![allow(clippy::type_complexity)]
 
 extern crate smallvec;
+extern crate str_indices;
 
 mod crlf;
 mod rope;
