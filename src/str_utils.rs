@@ -4,18 +4,51 @@
 //! slices in ways compatible with Ropey.  They may be useful when building
 //! additional functionality on top of Ropey.
 
-pub use str_indices::{
-    byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx, line_to_byte_idx,
-    line_to_char_idx,
-};
+pub use str_indices::chars::from_byte_idx as byte_to_char_idx;
+pub use str_indices::chars::to_byte_idx as char_to_byte_idx;
+pub use str_indices::lines::from_byte_idx as byte_to_line_idx;
+pub use str_indices::lines::to_byte_idx as line_to_byte_idx;
 
-pub(crate) use str_indices::{byte_to_utf16_surrogate_idx, utf16_code_unit_to_char_idx};
+/// Converts from char-index to line-index in a string slice.
+///
+/// This is equivalent to counting the line endings before the given char.
+///
+/// Any past-the-end index will return the last line index.
+///
+/// Runs in O(N) time.
+#[inline]
+pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
+    str_indices::lines::from_byte_idx(text, str_indices::chars::to_byte_idx(text, char_idx))
+}
+
+/// Converts from line-index to char-index in a string slice.
+///
+/// More specifically, this returns the index of the first char of the given line.
+///
+/// Any past-the-end index will return the one-past-the-end char index.
+///
+/// Runs in O(N) time.
+#[inline]
+pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
+    str_indices::chars::from_byte_idx(text, str_indices::lines::to_byte_idx(text, line_idx))
+}
+
+pub(crate) fn byte_to_utf16_surrogate_idx(text: &str, byte_idx: usize) -> usize {
+    let mut i = byte_idx;
+    while !text.is_char_boundary(i) {
+        i -= 1;
+    }
+    str_indices::utf16::count_surrogates(&text[..i])
+}
+
+pub(crate) fn utf16_code_unit_to_char_idx(text: &str, utf16_idx: usize) -> usize {
+    str_indices::chars::from_byte_idx(text, str_indices::utf16::to_byte_idx(text, utf16_idx))
+}
 
 /// Counts the utf16 surrogate pairs that would be in `text` if it were encoded
 /// as utf16.
-#[inline]
 pub(crate) fn count_utf16_surrogates(text: &str) -> usize {
-    byte_to_utf16_surrogate_idx(text, text.len())
+    str_indices::utf16::count_surrogates(text)
 }
 
 /// Returns the byte position just after the second-to-last line break
