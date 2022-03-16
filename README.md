@@ -80,17 +80,16 @@ encoded as utf8.  All of Ropey's editing and slicing operations are done
 in terms of char indices, which prevents accidental creation of invalid
 utf8 data.
 
-Ropey also supports converting between scalar value indices and utf16 code unit indices, for interoperation with external APIs that may still use utf16.
+Ropey also supports converting between scalar value indices and utf16 code unit
+indices, for interoperation with external APIs that may still use utf16.
 
 ### Line-aware
 
 Ropey knows about line breaks, allowing you to index into and iterate over
 lines of text.
 
-By default, Ropey also recognizes all eight Unicode-specified line
-breaks.  (But the recognized line breaks can be reduced to just
-line feed or just line feed and carriage return via feature flags,
-if needed or desired.)
+The line breaks Ropey recognizes are also configurable at build time via
+feature flags.  See Ropey's documentation for details.
 
 ### Rope slices
 
