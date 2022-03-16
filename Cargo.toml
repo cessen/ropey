@@ -11,8 +11,10 @@ keywords = ["rope", "text", "edit", "buffer"]
 categories = ["text-processing", "data-structures"]
 exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
 
-[badges]
-travis-ci = { repository = "cessen/ropey" }
+[features]
+default = ["unicode_lines"]
+cr_lines = [] # Enable recognizing carriage returns as line breaks.
+unicode_lines = ["cr_lines"] # Enable recognizing all Unicode line breaks.
 
 [dependencies]
 smallvec = "1.0.0"
