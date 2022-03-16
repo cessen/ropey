@@ -112,10 +112,15 @@
 //! # A Note About Line Endings
 //!
 //! Some of Ropey's APIs use the concept of line breaks or lines of text.
-//! Ropey can be configured at build time via feature flags to recognize
-//! different line breaks.
 //!
-//! Ropey always recognizes:
+//! Ropey treats line breaks as being a part of the line they mark the
+//! end of.  That is to say, lines begin immediately _after_ a line
+//! break.  For example, the text `"Hello\nworld"` has two lines:
+//! `"Hello\n"` and `"world"`.  And the text `"Hello\nworld\n"` has three
+//! lines: `"Hello\n"`, `"world\n"`, and `""`.
+//!
+//! Ropey can be configured at build time via feature flags to recognize
+//! different line breaks.  Ropey always recognizes:
 //!
 //! - `U+000A`          &mdash; LF (Line Feed)
 //! - `U+000D` `U+000A` &mdash; CRLF (Carriage Return + Line Feed)
@@ -125,7 +130,9 @@
 //! - `U+000D`          &mdash; CR (Carriage Return)
 //!
 //! With the `unicode_lines` feature, in addition to all of the
-//! above, the following are also recognized:
+//! above, the following are also recognized (bringing Ropey into
+//! conformance with
+//! [Unicode Annex #14](https://www.unicode.org/reports/tr14/#BK)):
 //!
 //! - `U+000B`          &mdash; VT (Vertical Tab)
 //! - `U+000C`          &mdash; FF (Form Feed)
@@ -133,15 +140,8 @@
 //! - `U+2028`          &mdash; Line Separator
 //! - `U+2029`          &mdash; Paragraph Separator
 //!
-//! (Note that `unicode_lines` implies `cr_lines`.  `unicode_lines` is
-//! also enabled by default, so by default Ropey recognizes all Unicode
-//! line breaks.)
-//!
-//! Ropey treats line breaks as being a part of the line that they mark
-//! the end of.  That is to say, lines begin immediately _after_ a line
-//! break.  For example, the text `"Hello\nworld"` has two lines:
-//! `"Hello\n"` and `"world"`.  And the text `"Hello\nworld\n"` has three
-//! lines: `"Hello\n"`, `"world\n"`, and `""`.
+//! (Note: `unicode_lines` is enabled by default, and always implies
+//! `cr_lines`.)
 //!
 //! CRLF pairs are always treated as a single line break, and are never split
 //! across chunks.  Note, however, that slicing can still split them.
