@@ -8,7 +8,6 @@ pub(crate) use str_indices::chars::count as count_chars;
 pub use str_indices::chars::from_byte_idx as byte_to_char_idx;
 pub use str_indices::chars::to_byte_idx as char_to_byte_idx;
 pub(crate) use str_indices::utf16::count_surrogates as count_utf16_surrogates;
-pub(crate) use str_indices::utf16::from_byte_idx as utf16_code_unit_to_char_idx;
 
 // Determine which line implementation to use.
 #[cfg(feature = "unicode_lines")]
@@ -54,6 +53,10 @@ pub(crate) fn byte_to_utf16_surrogate_idx(text: &str, byte_idx: usize) -> usize 
         i -= 1;
     }
     str_indices::utf16::count_surrogates(&text[..i])
+}
+
+pub(crate) fn utf16_code_unit_to_char_idx(text: &str, utf16_idx: usize) -> usize {
+    str_indices::chars::from_byte_idx(text, str_indices::utf16::to_byte_idx(text, utf16_idx))
 }
 
 /// Returns the byte position just after the second-to-last line break
