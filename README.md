@@ -87,9 +87,10 @@ Ropey also supports converting between scalar value indices and utf16 code unit 
 Ropey knows about line breaks, allowing you to index into and iterate over
 lines of text.
 
-Ropey also recognizes all eight Unicode-specified line breaks:
-line feed, carriage return, carriage return + line feed, vertical tab,
-form feed, next line, line separator, and paragraph separator.
+By default, Ropey also recognizes all eight Unicode-specified line
+breaks.  (But the recognized line breaks can be reduced to just
+line feed or just line feed and carriage return via feature flags,
+if needed or desired.)
 
 ### Rope slices
 

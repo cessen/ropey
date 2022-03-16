@@ -111,22 +111,35 @@
 //!
 //! # A Note About Line Endings
 //!
-//! Some of Ropey's APIs use the concept of line breaks or lines of text.  In
-//! all such APIs, Ropey treats the following unicode sequences as line
-//! breaks:
+//! Some of Ropey's APIs use the concept of line breaks or lines of text.
+//! Ropey can be configured at build time via feature flags to recognize
+//! different line breaks.
+//!
+//! Ropey always recognizes:
 //!
 //! - `U+000A`          &mdash; LF (Line Feed)
+//! - `U+000D` `U+000A` &mdash; CRLF (Carriage Return + Line Feed)
+//!
+//! With the `cr_lines` feature, the following are also recognized:
+//!
+//! - `U+000D`          &mdash; CR (Carriage Return)
+//!
+//! With the `unicode_lines` feature, in addition to all of the
+//! above, the following are also recognized:
+//!
 //! - `U+000B`          &mdash; VT (Vertical Tab)
 //! - `U+000C`          &mdash; FF (Form Feed)
-//! - `U+000D`          &mdash; CR (Carriage Return)
 //! - `U+0085`          &mdash; NEL (Next Line)
 //! - `U+2028`          &mdash; Line Separator
 //! - `U+2029`          &mdash; Paragraph Separator
-//! - `U+000D` `U+000A` &mdash; CRLF (Carriage Return + Line Feed)
 //!
-//! Additionally, Ropey treats line breaks as being a part of the line that
-//! they mark the end of.  That is to say, lines begin immediately _after_ a
-//! line break.  For example, the text `"Hello\nworld"` has two lines:
+//! (Note that `unicode_lines` implies `cr_lines`.  `unicode_lines` is
+//! also enabled by default, so by default Ropey recognizes all Unicode
+//! line breaks.)
+//!
+//! Ropey treats line breaks as being a part of the line that they mark
+//! the end of.  That is to say, lines begin immediately _after_ a line
+//! break.  For example, the text `"Hello\nworld"` has two lines:
 //! `"Hello\n"` and `"world"`.  And the text `"Hello\nworld\n"` has three
 //! lines: `"Hello\n"`, `"world\n"`, and `""`.
 //!
