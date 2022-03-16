@@ -390,30 +390,34 @@ impl Rope {
 
                 // No node splitting
                 if (leaf_text.len() + ins_text.len()) <= MAX_BYTES {
-                    // Calculate new info without doing a full re-scan of cur_text
+                    // Calculate new info without doing a full re-scan of cur_text.
                     let new_info = {
-                        // Get summed info of current text and to-be-inserted text
+                        // Get summed info of current text and to-be-inserted text.
+                        #[allow(unused_mut)]
                         let mut info = cur_info + TextInfo::from_str(ins_text);
                         // Check for CRLF pairs on the insertion seams, and
-                        // adjust line break counts accordingly
-                        if byte_idx > 0 {
-                            if leaf_text.as_bytes()[byte_idx - 1] == 0x0D
-                                && ins_text.as_bytes()[0] == 0x0A
+                        // adjust line break counts accordingly.
+                        #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
+                        {
+                            if byte_idx > 0 {
+                                if leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    && ins_text.as_bytes()[0] == 0x0A
+                                {
+                                    info.line_breaks -= 1;
+                                }
+                                if byte_idx < leaf_text.len()
+                                    && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
+                                    && leaf_text.as_bytes()[byte_idx] == 0x0A
+                                {
+                                    info.line_breaks += 1;
+                                }
+                            }
+                            if byte_idx < leaf_text.len()
+                                && *ins_text.as_bytes().last().unwrap() == 0x0D
+                                && leaf_text.as_bytes()[byte_idx] == 0x0A
                             {
                                 info.line_breaks -= 1;
                             }
-                            if byte_idx < leaf_text.len()
-                                && leaf_text.as_bytes()[byte_idx - 1] == 0x0D
-                                && leaf_text.as_bytes()[byte_idx] == 0x0A
-                            {
-                                info.line_breaks += 1;
-                            }
-                        }
-                        if byte_idx < leaf_text.len()
-                            && *ins_text.as_bytes().last().unwrap() == 0x0D
-                            && leaf_text.as_bytes()[byte_idx] == 0x0A
-                        {
-                            info.line_breaks -= 1;
                         }
                         info
                     };
@@ -469,6 +473,11 @@ impl Rope {
                         let mut new_info = cur_info;
                         new_info.bytes += 1;
                         new_info.chars += 1;
+                        #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+                        {
+                            new_info.line_breaks += 1;
+                        }
+                        #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
                         if *leaf_text.as_bytes().last().unwrap() != 0x0D {
                             new_info.line_breaks += 1;
                         }
@@ -2046,7 +2055,7 @@ impl std::cmp::PartialOrd<Rope> for Rope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::str_utils::byte_to_char_idx;
+    use crate::str_utils::*;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -2576,8 +2585,9 @@ mod tests {
         let r2 = Rope::from_str("\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
 
         r.append(r2);
+        let s2 = r.to_string();
         assert_eq!(r, "\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r");
-        assert_eq!(r.len_lines(), 24);
+        assert_eq!(r.len_lines(), byte_to_line_idx(&s2, s2.len()) + 1);
 
         r.assert_integrity();
         r.assert_invariants();
