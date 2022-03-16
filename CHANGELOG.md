@@ -4,6 +4,8 @@
 ## [Unreleased]
 
 - Added `byte_slice()` and `get_byte_slice()` methods to `Rope` and `RopeSlice` to slice by byte index instead of char index.  This can allow optimizations in client code in some cases.
+- Split `str_utils` module out into a separate crate, `str_indices`.  The `str_utils` module still exists, but is now mostly just a re-export of the new crate.
+- Add `cr_lines` and `unicode_lines` feature flags to the crate, to manage what line endings are recognized and tracked.  This allows, for example, building Ropey to only recognize line feed as a line break.  `unicode_lines` is on by default, and corresponds to the original behavior.
 
 
 ## [1.3.2] - 2021-12-30
