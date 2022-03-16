@@ -2050,12 +2050,26 @@ impl std::cmp::PartialOrd<Rope> for Rope {
     }
 }
 
+impl std::hash::Hash for Rope {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for chunk in self.chunks() {
+            state.write(chunk.as_bytes());
+        }
+
+        // Same strategy as `&str` in stdlib, so that e.g. two adjacent
+        // fields in a `#[derive(Hash)]` struct with "Hi " and "there"
+        // vs "Hi t" and "here" give the struct a different hash.
+        state.write_u8(0xff)
+    }
+}
+
 //==============================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::str_utils::*;
+    use std::hash::{Hash, Hasher};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -3356,6 +3370,51 @@ mod tests {
         let r2: Rope = Rope::from_iter(r1.chunks());
 
         assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn hash_01() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r1 = Rope::from_str("Hello there!");
+        let mut r2 = Rope::from_str("Hlotee");
+        r2.insert_char(3, ' ');
+        r2.insert_char(7, '!');
+        r2.insert_char(1, 'e');
+        r2.insert_char(3, 'l');
+        r2.insert_char(7, 'h');
+        r2.insert_char(9, 'r');
+
+        r1.hash(&mut h1);
+        r2.hash(&mut h2);
+
+        assert_eq!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn hash_02() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r1 = Rope::from_str("Hello there!");
+        let r2 = Rope::from_str("Hello there.");
+
+        r1.hash(&mut h1);
+        r2.hash(&mut h2);
+
+        assert_ne!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn hash_03() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r = Rope::from_str("Hello there!");
+        let s = [Rope::from_str("Hello "), Rope::from_str("there!")];
+
+        r.hash(&mut h1);
+        Rope::hash_slice(&s, &mut h2);
+
+        assert_ne!(h1.finish(), h2.finish());
     }
 
     // Iterator tests are in the iter module

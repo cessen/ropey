@@ -1959,6 +1959,19 @@ impl<'a, 'b> std::cmp::PartialOrd<RopeSlice<'b>> for RopeSlice<'a> {
     }
 }
 
+impl<'a> std::hash::Hash for RopeSlice<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for chunk in self.chunks() {
+            state.write(chunk.as_bytes());
+        }
+
+        // Same strategy as `&str` in stdlib, so that e.g. two adjacent
+        // fields in a `#[derive(Hash)]` struct with "Hi " and "there"
+        // vs "Hi t" and "here" give the struct a different hash.
+        state.write_u8(0xff)
+    }
+}
+
 //===========================================================
 
 #[cfg(test)]
@@ -1967,6 +1980,7 @@ mod tests {
         byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx,
     };
     use crate::Rope;
+    use std::hash::{Hash, Hasher};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -3011,6 +3025,19 @@ mod tests {
         }
 
         assert_eq!(s, cow);
+    }
+
+    #[test]
+    fn hash_01() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r = Rope::from_str("Hello there!");
+        let s = r.slice(..);
+
+        r.hash(&mut h1);
+        s.hash(&mut h2);
+
+        assert_eq!(h1.finish(), h2.finish());
     }
 
     // Iterator tests are in the iter module
