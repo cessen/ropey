@@ -30,7 +30,7 @@ pub use self::lines::to_byte_idx as line_to_byte_idx;
 /// Runs in O(N) time.
 #[inline]
 pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
-    str_indices::lines::from_byte_idx(text, str_indices::chars::to_byte_idx(text, char_idx))
+    lines::from_byte_idx(text, str_indices::chars::to_byte_idx(text, char_idx))
 }
 
 /// Converts from line-index to char-index in a string slice.
@@ -42,7 +42,7 @@ pub fn char_to_line_idx(text: &str, char_idx: usize) -> usize {
 /// Runs in O(N) time.
 #[inline]
 pub fn line_to_char_idx(text: &str, line_idx: usize) -> usize {
-    str_indices::chars::from_byte_idx(text, str_indices::lines::to_byte_idx(text, line_idx))
+    str_indices::chars::from_byte_idx(text, lines::to_byte_idx(text, line_idx))
 }
 
 //-------------------------------------------------------------
@@ -261,5 +261,79 @@ mod tests {
         assert_eq!(false, ends_with_line_break("\u{0085}a"));
         assert_eq!(false, ends_with_line_break("\u{2028}a"));
         assert_eq!(false, ends_with_line_break("\u{2029}a"));
+    }
+
+    #[test]
+    fn char_to_line_idx_01() {
+        let text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
+                    There\u{2028}is something.\u{2029}";
+
+        #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+        {
+            assert_eq!(0, char_to_line_idx(text, 0));
+            assert_eq!(1, char_to_line_idx(text, 1));
+            assert_eq!(2, char_to_line_idx(text, 8));
+            assert_eq!(2, char_to_line_idx(text, 38));
+        }
+
+        #[cfg(all(feature = "cr_lines", not(feature = "unicode_lines")))]
+        {
+            assert_eq!(0, char_to_line_idx(text, 0));
+            assert_eq!(1, char_to_line_idx(text, 1));
+            assert_eq!(2, char_to_line_idx(text, 8));
+            assert_eq!(3, char_to_line_idx(text, 9));
+            assert_eq!(3, char_to_line_idx(text, 38));
+        }
+
+        #[cfg(feature = "unicode_lines")]
+        {
+            assert_eq!(0, char_to_line_idx(text, 0));
+            assert_eq!(1, char_to_line_idx(text, 1));
+            assert_eq!(2, char_to_line_idx(text, 8));
+            assert_eq!(3, char_to_line_idx(text, 9));
+            assert_eq!(4, char_to_line_idx(text, 11));
+            assert_eq!(5, char_to_line_idx(text, 13));
+            assert_eq!(6, char_to_line_idx(text, 15));
+            assert_eq!(7, char_to_line_idx(text, 23));
+            assert_eq!(8, char_to_line_idx(text, 37));
+            assert_eq!(8, char_to_line_idx(text, 38));
+        }
+    }
+
+    #[test]
+    fn line_to_char_idx_01() {
+        let text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
+                    There\u{2028}is something.\u{2029}";
+
+        #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+        {
+            assert_eq!(0, line_to_char_idx(text, 0));
+            assert_eq!(1, line_to_char_idx(text, 1));
+            assert_eq!(8, line_to_char_idx(text, 2));
+            assert_eq!(37, line_to_char_idx(text, 3));
+        }
+
+        #[cfg(all(feature = "cr_lines", not(feature = "unicode_lines")))]
+        {
+            assert_eq!(0, line_to_char_idx(text, 0));
+            assert_eq!(1, line_to_char_idx(text, 1));
+            assert_eq!(8, line_to_char_idx(text, 2));
+            assert_eq!(9, line_to_char_idx(text, 3));
+            assert_eq!(37, line_to_char_idx(text, 4));
+        }
+
+        #[cfg(feature = "unicode_lines")]
+        {
+            assert_eq!(0, line_to_char_idx(text, 0));
+            assert_eq!(1, line_to_char_idx(text, 1));
+            assert_eq!(8, line_to_char_idx(text, 2));
+            assert_eq!(9, line_to_char_idx(text, 3));
+            assert_eq!(11, line_to_char_idx(text, 4));
+            assert_eq!(13, line_to_char_idx(text, 5));
+            assert_eq!(15, line_to_char_idx(text, 6));
+            assert_eq!(23, line_to_char_idx(text, 7));
+            assert_eq!(37, line_to_char_idx(text, 8));
+            assert_eq!(37, line_to_char_idx(text, 9));
+        }
     }
 }
