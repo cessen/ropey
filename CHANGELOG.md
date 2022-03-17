@@ -4,6 +4,12 @@
 ## [Unreleased]
 
 
+## [1.4.1] - 2022-03-16
+
+### Bug fixes
+- Fix a stupid copy/paste typo in the previous line break feature flag implementation that caused the wrong line break code to be used.
+
+
 ## [1.4.0] - 2022-03-16
 
 ### New features
