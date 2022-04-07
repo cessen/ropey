@@ -11,7 +11,7 @@
 //! All iterators in Ropey operate as a cursor that can move both forwards
 //! and backwards over its contents.  This can be accomplished via the
 //! `next()` and `prev()` methods on each iterator, or by using the `reverse()`
-//! method to change the iterator's direction.
+//! or `reversed()` methods to change the iterator's direction.
 //!
 //! Conceptually, an iterator in Ropey is always positioned *between* the
 //! elements it iterates over, and returns an element when it jumps over it
@@ -190,6 +190,25 @@ impl<'a> Bytes<'a> {
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;
+    }
+
+    /// Same as `reverse()`, but returns itself.
+    ///
+    /// This is useful when chaining iterator methods:
+    ///
+    /// ```rust
+    /// # use ropey::Rope;
+    /// # let rope = Rope::from_str("Hello there\n world!\n");
+    /// // Enumerate the rope's bytes in reverse, starting from the end.
+    /// for (i, b) in rope.bytes_at(rope.len_bytes()).reversed().enumerate() {
+    ///     println!("{} {}", i, b);
+    /// #   assert_eq!(b, rope.byte(rope.len_bytes() - i - 1));
+    /// }
+    #[inline]
+    #[must_use]
+    pub fn reversed(mut self) -> Bytes<'a> {
+        self.reverse();
+        self
     }
 
     /// Advances the iterator backwards and returns the previous value.
@@ -403,6 +422,25 @@ impl<'a> Chars<'a> {
         self.is_reversed = !self.is_reversed;
     }
 
+    /// Same as `reverse()`, but returns itself.
+    ///
+    /// This is useful when chaining iterator methods:
+    ///
+    /// ```rust
+    /// # use ropey::Rope;
+    /// # let rope = Rope::from_str("Hello there\n world!\n");
+    /// // Enumerate the rope's chars in reverse, starting from the end.
+    /// for (i, ch) in rope.chars_at(rope.len_chars()).reversed().enumerate() {
+    ///     println!("{} {}", i, ch);
+    /// #   assert_eq!(ch, rope.char(rope.len_chars() - i - 1));
+    /// }
+    #[inline]
+    #[must_use]
+    pub fn reversed(mut self) -> Chars<'a> {
+        self.reverse();
+        self
+    }
+
     /// Advances the iterator backwards and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
@@ -613,6 +651,25 @@ impl<'a> Lines<'a> {
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;
+    }
+
+    /// Same as `reverse()`, but returns itself.
+    ///
+    /// This is useful when chaining iterator methods:
+    ///
+    /// ```rust
+    /// # use ropey::Rope;
+    /// # let rope = Rope::from_str("Hello there\n world!\n");
+    /// // Enumerate the rope's lines in reverse, starting from the end.
+    /// for (i, line) in rope.lines_at(rope.len_lines()).reversed().enumerate() {
+    ///     println!("{} {}", i, line);
+    /// #   assert_eq!(line, rope.line(rope.len_lines() - i - 1));
+    /// }
+    #[inline]
+    #[must_use]
+    pub fn reversed(mut self) -> Lines<'a> {
+        self.reverse();
+        self
     }
 
     /// Advances the iterator backwards and returns the previous value.
@@ -1108,6 +1165,25 @@ impl<'a> Chunks<'a> {
     #[inline]
     pub fn reverse(&mut self) {
         self.is_reversed = !self.is_reversed;
+    }
+
+    /// Same as `reverse()`, but returns itself.
+    ///
+    /// This is useful when chaining iterator methods:
+    ///
+    /// ```rust
+    /// # use ropey::Rope;
+    /// # let rope = Rope::from_str("Hello there\n world!\n");
+    /// // Enumerate the rope's chunks in reverse, starting from the end.
+    /// for (i, chunk) in rope.chunks_at_byte(rope.len_bytes()).0.reversed().enumerate() {
+    ///     println!("{} {}", i, chunk);
+    /// #   assert_eq!(chunk, rope.chunks().nth(rope.chunks().count() - i - 1).unwrap());
+    /// }
+    #[inline]
+    #[must_use]
+    pub fn reversed(mut self) -> Chunks<'a> {
+        self.reverse();
+        self
     }
 
     /// Advances the iterator backwards and returns the previous value.
