@@ -7,6 +7,7 @@ use crate::crlf;
 /// A custom small string.  The unsafe guts of this are in `NodeSmallString`
 /// further down in this file.
 #[derive(Clone, Default)]
+#[repr(C)]
 pub(crate) struct NodeText(inner::NodeSmallString);
 
 impl NodeText {
@@ -252,6 +253,7 @@ mod inner {
 
     /// Internal small string for `NodeText`.
     #[derive(Clone, Default)]
+    #[repr(C)]
     pub struct NodeSmallString {
         buffer: SmallVec<BackingArray>,
     }

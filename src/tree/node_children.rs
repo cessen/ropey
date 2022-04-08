@@ -13,6 +13,7 @@ const MAX_LEN: usize = tree::MAX_CHILDREN;
 /// The unsafe guts of this are implemented in NodeChildrenInternal
 /// lower down in this file.
 #[derive(Clone)]
+#[repr(C)]
 pub(crate) struct NodeChildren(inner::NodeChildrenInternal);
 
 impl NodeChildren {
@@ -534,6 +535,7 @@ mod inner {
     /// This is essentially a fixed-capacity, stack-allocated `Vec`.  However,
     /// it actually containts _two_ arrays rather than just one, but which
     /// share a length.
+    #[repr(C)]
     pub(crate) struct NodeChildrenInternal {
         nodes: [MaybeUninit<Arc<Node>>; MAX_LEN],
         info: [MaybeUninit<TextInfo>; MAX_LEN],

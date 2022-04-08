@@ -21,65 +21,70 @@ mod constants {
         sync::Arc,
     };
 
-    // Aim for nodes to be 1024 bytes minus Arc counters.  Keeping the nodes
-    // multiples of large powers of two makes it easier for the memory allocator
-    // to avoid fragmentation.
+    // Because stdlib's max is not const for some reason.
+    // TODO: replace with stdlib max once it's const.
+    const fn cmax(a: usize, b: usize) -> usize {
+        if a > b {
+            a
+        } else {
+            b
+        }
+    }
+
+    // Aim for Node + Arc counters to be 1024 bytes.  Keeping the nodes
+    // multiples of large powers of two makes it easier for the memory
+    // allocator to avoid fragmentation.
     const TARGET_TOTAL_SIZE: usize = 1024;
-    const TARGET_NODE_SIZE: usize = TARGET_TOTAL_SIZE - ARC_COUNTERS_SIZE;
 
     // Space that the strong and weak Arc counters take up in `ArcInner`.
     const ARC_COUNTERS_SIZE: usize = size_of::<std::sync::atomic::AtomicUsize>() * 2;
 
     // Misc useful info that we need below.
-    const CHILD_INFO_SIZE: usize = size_of::<Arc<Node>>() + size_of::<TextInfo>();
-    const CHILD_INFO_MAX_ALIGN: usize = if align_of::<Arc<Node>>() > align_of::<TextInfo>() {
-        align_of::<Arc<Node>>()
-    } else {
-        align_of::<TextInfo>()
+    const NODE_CHILDREN_ALIGN: usize = cmax(align_of::<Arc<u8>>(), align_of::<TextInfo>());
+    const NODE_TEXT_ALIGN: usize = align_of::<SmallVec<[u8; 16]>>();
+    const START_OFFSET: usize = {
+        const NODE_INNER_ALIGN: usize = cmax(NODE_CHILDREN_ALIGN, NODE_TEXT_ALIGN);
+        // The +NODE_INNER_ALIGN is because of Node's enum discriminant.
+        ARC_COUNTERS_SIZE + NODE_INNER_ALIGN
     };
 
-    // Min/max number of children of an internal node.
-    pub(crate) const MAX_CHILDREN: usize = (TARGET_NODE_SIZE
-        // In principle we want to subtract NodeChildren's length counter
-        // here, which would just be one byte.  However, due to that extra
-        // byte NodeChildren actually gets padded out to the alignment of
-        // Arc/TextInfo.  So we need to subtract that alignment padding
-        // instead.
-        - CHILD_INFO_MAX_ALIGN
-        // Minus Node's enum discriminant.
-        - 1)
-        / CHILD_INFO_SIZE;
-    pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
+    // Node maximums.
+    pub(crate) const MAX_CHILDREN: usize = {
+        let node_list_align = align_of::<Arc<u8>>();
+        let info_list_align = align_of::<TextInfo>();
+        let field_gap = if node_list_align >= info_list_align {
+            0
+        } else {
+            // This is over-conservative, because in reality it depends
+            // on the number of elements.  But handling that is probably
+            // more complexity than it's worth.
+            info_list_align - node_list_align
+        };
 
-    // Soft min/max number of bytes of text in a leaf node.
-    // Note: MIN_BYTES is little smaller than half MAX_BYTES so that repeated
-    // splitting/merging doesn't happen on alternating small insertions and
-    // removals.
-    pub(crate) const MAX_BYTES: usize = (TARGET_NODE_SIZE
-            // Minus NodeText's SmallVec overhead:
-            - (size_of::<SmallVec<[u8; 32]>>() - 32)
-            // Minus Node's enum discriminant:
-            - 1)
-        // Round down to NodeText's SmallVec alignment, since NodeText will get
-        // padded out otherwise, pushing it over the target node size.
-        & !(align_of::<SmallVec<[u8; 32]>>() - 1);
+        // The -NODE_CHILDREN_ALIGN is for the `len` field in `NodeChildrenInternal`.
+        let target_size = TARGET_TOTAL_SIZE - START_OFFSET - NODE_CHILDREN_ALIGN - field_gap;
+
+        target_size / (size_of::<Arc<u8>>() + size_of::<TextInfo>())
+    };
+    pub(crate) const MAX_BYTES: usize = {
+        let smallvec_overhead = size_of::<SmallVec<[u8; 16]>>() - 16;
+        TARGET_TOTAL_SIZE - START_OFFSET - smallvec_overhead
+    };
+
+    // Node minimums.
+    // Note: MIN_BYTES is intentionally a little smaller than half
+    // MAX_BYTES, to give a little wiggle room when on the edge of
+    // merging/splitting.
+    pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
     pub(crate) const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
 
-    // This weird expression is essentially a poor-man's compile-time
-    // assertion.  It results in a compile-time error if our actual
-    // total "Arc counters + Node" size isn't the size we want.
-    // The resulting error message is cryptic, but it's distinct enough
-    // that if people run into it and file an issue it should be obvious
-    // what it is.
-    const _: [(); 0 - !{
-        // Assert alignment.
-        const ASSERT: bool = if align_of::<Node>() > ARC_COUNTERS_SIZE {
-            align_of::<Node>() + size_of::<Node>()
-        } else {
-            ARC_COUNTERS_SIZE + size_of::<Node>()
-        } == TARGET_TOTAL_SIZE;
-        ASSERT
-    } as usize] = [];
+    // Compile-time assertion.
+    const _: () = {
+        assert!(
+            (ARC_COUNTERS_SIZE + size_of::<Node>()) == TARGET_TOTAL_SIZE,
+            "`Node` is not the target size in memory.",
+        );
+    };
 }
 
 // Smaller constants used in debug builds.  These are different from release

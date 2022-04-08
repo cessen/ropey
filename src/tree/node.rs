@@ -9,6 +9,7 @@ use crate::tree::{
 };
 
 #[derive(Debug, Clone)]
+#[repr(u8, C)]
 pub(crate) enum Node {
     Leaf(NodeText),
     Internal(NodeChildren),
