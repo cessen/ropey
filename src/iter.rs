@@ -1450,7 +1450,7 @@ mod tests {
     fn bytes_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
-        while let Some(_) = itr.next() {}
+        for _ in itr.by_ref() {}
 
         let mut i = TEXT.len();
         while let Some(b) = itr.prev() {
@@ -1473,7 +1473,7 @@ mod tests {
     fn bytes_04() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
-        while let Some(_) = itr.next() {}
+        for _ in itr.by_ref() {}
 
         itr.prev();
         itr.next();
@@ -1495,7 +1495,7 @@ mod tests {
     fn bytes_06() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
-        while let Some(_) = itr.next() {}
+        for _ in itr.by_ref() {}
 
         assert_eq!(None, itr.next());
         itr.prev();
@@ -1703,7 +1703,7 @@ mod tests {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
         let mut text_itr = TEXT.chars();
-        while let Some(_) = itr.next() {}
+        for _ in itr.by_ref() {}
 
         while let Some(b) = itr.prev() {
             assert_eq!(b, text_itr.next_back().unwrap());
@@ -1724,7 +1724,7 @@ mod tests {
     fn chars_04() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
-        while let Some(_) = itr.next() {}
+        for _ in itr.by_ref() {}
 
         itr.prev();
         itr.next();
@@ -1746,7 +1746,7 @@ mod tests {
     fn chars_06() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
-        while let Some(_) = itr.next() {}
+        for _ in itr.by_ref() {}
 
         assert_eq!(None, itr.next());
         itr.prev();
@@ -2152,7 +2152,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = r.lines();
 
-        while let Some(line) = itr.next() {
+        for line in itr.by_ref() {
             lines.push(line);
         }
 
@@ -2171,7 +2171,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = s.lines();
 
-        while let Some(line) = itr.next() {
+        for line in itr.by_ref() {
             lines.push(line);
         }
 
@@ -2191,7 +2191,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = s.lines();
 
-        while let Some(text) = itr.next() {
+        for text in itr.by_ref() {
             lines.push(text);
         }
 
@@ -2211,7 +2211,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = s.lines();
 
-        while let Some(text) = itr.next() {
+        for text in itr.by_ref() {
             lines.push(text);
         }
 
@@ -2231,7 +2231,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = s.lines();
 
-        while let Some(text) = itr.next() {
+        for text in itr.by_ref() {
             lines.push(text);
         }
 
@@ -2251,7 +2251,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = s.lines();
 
-        while let Some(text) = itr.next() {
+        for text in itr.by_ref() {
             lines.push(text);
         }
 
@@ -2271,7 +2271,7 @@ mod tests {
         let mut lines = Vec::new();
         let mut itr = s.lines();
 
-        while let Some(text) = itr.next() {
+        for text in itr.by_ref() {
             lines.push(text);
         }
 
@@ -2509,7 +2509,7 @@ mod tests {
         let mut chunks = Vec::new();
         let mut itr = r.chunks();
 
-        while let Some(text) = itr.next() {
+        for text in itr.by_ref() {
             chunks.push(text);
         }
 
