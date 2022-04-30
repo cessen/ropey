@@ -763,11 +763,10 @@ impl Node {
                     // Scope for borrow
                     {
                         // Fetch the two children
-                        let (mut l_child, mut r_child) =
-                            children.get_two_mut(l_child_i, l_child_i + 1);
+                        let (l_child, r_child) = children.get_two_mut(l_child_i, l_child_i + 1);
                         let l_child_bytes = l_child.0.bytes;
-                        let l_child = Arc::make_mut(&mut l_child.1);
-                        let r_child = Arc::make_mut(&mut r_child.1);
+                        let l_child = Arc::make_mut(l_child.1);
+                        let r_child = Arc::make_mut(r_child.1);
 
                         // Get the text of the two children and fix
                         // the seam between them.
@@ -906,7 +905,7 @@ impl Node {
                     did_stuff |= children.merge_distribute(last_i - 1, last_i);
                 }
 
-                if !Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap()).zip_fix_right() {
+                if !Arc::make_mut(children.nodes_mut().last_mut().unwrap()).zip_fix_right() {
                     break;
                 }
             }
