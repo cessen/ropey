@@ -28,7 +28,7 @@ fn clone_rope() {
     let matches = Iterator::zip(rope1.chars(), rope2.chars())
         .map(|(a, b)| a == b)
         .all(|n| n);
-    assert_eq!(matches, true);
+    assert!(matches);
 
     // Insert something into the clone, and make sure they don't match
     // afterwards.
@@ -36,5 +36,5 @@ fn clone_rope() {
     let matches = Iterator::zip(rope1.chars(), rope2.chars())
         .map(|(a, b)| a == b)
         .all(|n| n);
-    assert_eq!(matches, false);
+    assert!(!matches);
 }

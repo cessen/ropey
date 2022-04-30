@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_field_names)]
 #![allow(dead_code)]
 
 extern crate ropey;
@@ -24,23 +25,23 @@ impl TextBuffer {
         })
     }
 
-    fn get_line<'a>(&'a self, idx: usize) -> RopeSlice<'a> {
+    fn get_line(&self, idx: usize) -> RopeSlice {
         self.text.line(idx)
     }
 
-    fn bytes<'a>(&'a self) -> Bytes<'a> {
+    fn bytes(&self) -> Bytes {
         self.text.bytes()
     }
 
-    fn chars<'a>(&'a self) -> Chars<'a> {
+    fn chars(&self) -> Chars {
         self.text.chars()
     }
 
-    fn lines<'a>(&'a self) -> Lines<'a> {
+    fn lines(&self) -> Lines {
         self.text.lines()
     }
 
-    fn chunks<'a>(&'a self) -> Chunks<'a> {
+    fn chunks(&self) -> Chunks {
         self.text.chunks()
     }
 

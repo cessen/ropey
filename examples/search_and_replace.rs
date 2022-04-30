@@ -7,6 +7,8 @@
 //! The file contents with the search-and-replace performed on it is sent to
 //! stdout.
 
+#![allow(clippy::redundant_field_names)]
+
 extern crate ropey;
 
 use std::fs::File;
@@ -83,8 +85,7 @@ fn search_and_replace(rope: &mut Rope, search_pattern: &str, replacement_text: &
         // `Iterator::collect()` to collect the batch because we want to
         // re-use the same Vec to avoid unnecessary allocations.
         matches.clear();
-        for m in SearchIter::from_rope_slice(&rope.slice(head..), &search_pattern).take(BATCH_SIZE)
-        {
+        for m in SearchIter::from_rope_slice(&rope.slice(head..), search_pattern).take(BATCH_SIZE) {
             matches.push(m);
         }
 
@@ -102,7 +103,7 @@ fn search_and_replace(rope: &mut Rope, search_pattern: &str, replacement_text: &
 
             // Do the replacement.
             rope.remove(start_d..end_d);
-            rope.insert(start_d, &replacement_text);
+            rope.insert(start_d, replacement_text);
 
             // Update the index offset.
             let match_len = (end - start) as isize;
@@ -153,6 +154,7 @@ impl<'a> Iterator for SearchIter<'a> {
 
     // Return the start/end char indices of the next match.
     fn next(&mut self) -> Option<(usize, usize)> {
+        #[allow(clippy::while_let_on_iterator)]
         while let Some(next_char) = self.char_iter.next() {
             self.cur_index += 1;
 

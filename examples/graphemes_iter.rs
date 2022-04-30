@@ -2,6 +2,7 @@
 //! of a `Rope` or `RopeSlice`.  This also serves as a good starting point for
 //! iterators for other kinds of segementation, such as word boundaries.
 
+#![allow(clippy::redundant_field_names)]
 #![allow(dead_code)]
 
 extern crate ropey;

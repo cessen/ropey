@@ -2367,7 +2367,8 @@ mod tests {
     #[should_panic]
     fn remove_06() {
         let mut r = Rope::from_str(TEXT);
-        r.remove(56..55); // Wrong ordering of start/end
+        #[allow(clippy::reversed_empty_ranges)]
+        r.remove(56..55); // Wrong ordering of start/end on purpose.
     }
 
     #[test]
@@ -3152,7 +3153,8 @@ mod tests {
     #[should_panic]
     fn slice_05() {
         let r = Rope::from_str(TEXT);
-        r.slice(53..52);
+        #[allow(clippy::reversed_empty_ranges)]
+        r.slice(53..52); // Wrong ordering on purpose.
     }
 
     #[test]
@@ -3202,7 +3204,8 @@ mod tests {
     #[should_panic]
     fn byte_slice_05() {
         let r = Rope::from_str(TEXT);
-        r.byte_slice(53..52);
+        #[allow(clippy::reversed_empty_ranges)]
+        r.byte_slice(53..52); // Wrong ordering on purpose.
     }
 
     #[test]

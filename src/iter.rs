@@ -1368,6 +1368,7 @@ impl<'a> Iterator for Chunks<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::while_let_on_iterator)]
     use super::*;
     use crate::Rope;
 
