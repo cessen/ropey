@@ -97,7 +97,7 @@ impl<'a> Bytes<'a> {
             ""
         };
         Bytes {
-            chunk_iter: chunk_iter,
+            chunk_iter,
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: 0,
             last_call_was_prev_impl: false,
