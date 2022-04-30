@@ -118,7 +118,7 @@ impl<'a> RopeSlice<'a> {
 
         // Create the slice
         RopeSlice(RSEnum::Full {
-            node: node,
+            node,
             start_info: node.char_to_text_info(n_start),
             end_info: node.char_to_text_info(n_end),
         })
