@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 #[macro_use]
 extern crate proptest;
 extern crate ropey;

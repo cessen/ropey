@@ -5,6 +5,7 @@ use ropey::Rope;
 const TEXT: &str = include_str!("test_text.txt");
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn from_str() {
     // Build rope from file contents
     let rope = Rope::from_str(TEXT);

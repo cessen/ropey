@@ -8,6 +8,7 @@ use ropey::Rope;
 const TEXT: &str = include_str!("test_text.txt");
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn from_reader_01() {
     // Make a reader from our in-memory text
     let text_reader = Cursor::new(TEXT);
@@ -22,6 +23,7 @@ fn from_reader_01() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn from_reader_02() {
     // Make a reader from blank text
     let text_reader = Cursor::new("");
@@ -36,6 +38,7 @@ fn from_reader_02() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn from_reader_03() {
     // Make text with a utf8-invalid byte sequence in it.
     let mut text = Vec::new();

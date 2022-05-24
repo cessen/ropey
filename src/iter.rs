@@ -1440,6 +1440,7 @@ mod tests {
                         ";
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_01() {
         let r = Rope::from_str(TEXT);
         for (br, bt) in r.bytes().zip(TEXT.bytes()) {
@@ -1448,6 +1449,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
@@ -1461,6 +1463,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_03() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
@@ -1471,6 +1474,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_04() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
@@ -1482,6 +1486,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_05() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
@@ -1493,6 +1498,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_06() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
@@ -1505,6 +1511,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_07() {
         let mut itr = Bytes::from_str("a");
 
@@ -1515,6 +1522,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1526,6 +1534,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_02() {
         let r = Rope::from_str(TEXT);
         let mut bytes = r.bytes_at(r.len_bytes());
@@ -1533,6 +1542,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_03() {
         let r = Rope::from_str(TEXT);
         let mut bytes_1 = r.bytes_at(r.len_bytes());
@@ -1544,6 +1554,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1570,6 +1581,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_exact_size_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1581,6 +1593,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_exact_size_iter_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1608,6 +1621,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_reverse_01() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes();
@@ -1623,6 +1637,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_reverse_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes_at(r.len_bytes() / 3);
@@ -1638,6 +1653,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_reverse_03() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.bytes_at(r.len_bytes() / 3);
@@ -1654,6 +1670,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_reverse_04() {
         let mut itr = Bytes::from_str("a");
 
@@ -1665,6 +1682,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_reverse_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1692,6 +1710,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_01() {
         let r = Rope::from_str(TEXT);
         for (cr, ct) in r.chars().zip(TEXT.chars()) {
@@ -1700,6 +1719,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
@@ -1712,6 +1732,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_03() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
@@ -1722,6 +1743,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_04() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
@@ -1733,6 +1755,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_05() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
@@ -1744,6 +1767,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_06() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
@@ -1756,6 +1780,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_07() {
         let mut itr = Chars::from_str("a");
 
@@ -1766,6 +1791,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1777,6 +1803,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_02() {
         let r = Rope::from_str(TEXT);
         let mut chars = r.chars_at(r.len_chars());
@@ -1784,6 +1811,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_03() {
         let r = Rope::from_str(TEXT);
         let mut chars_1 = r.chars_at(r.len_chars());
@@ -1795,6 +1823,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1814,6 +1843,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_exact_size_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1825,6 +1855,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_exact_size_iter_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1846,6 +1877,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_reverse_01() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars();
@@ -1861,6 +1893,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_reverse_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars_at(r.len_chars() / 3);
@@ -1876,6 +1909,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_reverse_03() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chars_at(r.len_chars() / 3);
@@ -1892,6 +1926,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_reverse_04() {
         let mut itr = Chars::from_str("a");
 
@@ -1903,6 +1938,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_reverse_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -1930,6 +1966,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(..);
@@ -1975,6 +2012,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_02() {
         let text = "Hello there!\nHow goes it?";
         let r = Rope::from_str(text);
@@ -1995,6 +2033,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_03() {
         let text = "Hello there!\nHow goes it?\n";
         let r = Rope::from_str(text);
@@ -2017,6 +2056,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_04() {
         let text = "Hello there!\nHow goes it?\nYeah!";
         let r = Rope::from_str(text);
@@ -2039,6 +2079,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_05() {
         let text = "";
         let r = Rope::from_str(text);
@@ -2057,6 +2098,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_06() {
         let text = "a";
         let r = Rope::from_str(text);
@@ -2075,6 +2117,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_07() {
         let text = "a\nb";
         let r = Rope::from_str(text);
@@ -2095,6 +2138,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_08() {
         let text = "\n";
         let r = Rope::from_str(text);
@@ -2115,6 +2159,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_09() {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
@@ -2137,6 +2182,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_10() {
         let r = Rope::from_str(TEXT);
 
@@ -2147,6 +2193,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_11() {
         let r = Rope::from_str(TEXT);
 
@@ -2165,6 +2212,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_12() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2184,6 +2232,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_13() {
         let text = "";
         let r = Rope::from_str(text);
@@ -2204,6 +2253,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_14() {
         let text = "a";
         let r = Rope::from_str(text);
@@ -2224,6 +2274,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_15() {
         let text = "a\nb";
         let r = Rope::from_str(text);
@@ -2244,6 +2295,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_16() {
         let text = "\n";
         let r = Rope::from_str(text);
@@ -2264,6 +2316,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_17() {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
@@ -2284,6 +2337,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_at_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2298,6 +2352,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_at_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2313,6 +2368,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_at_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..34);
@@ -2325,6 +2381,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2352,6 +2409,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_exact_size_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2363,6 +2421,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_exact_size_iter_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2390,6 +2449,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_reverse_01() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.lines();
@@ -2405,6 +2465,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_reverse_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.lines_at(r.len_lines() / 3);
@@ -2420,6 +2481,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_reverse_03() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.lines_at(r.len_lines() / 3);
@@ -2436,6 +2498,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_reverse_04() {
         let mut itr = Lines::from_str("a\n");
 
@@ -2449,6 +2512,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_reverse_exact_size_iter_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2476,6 +2540,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2487,6 +2552,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_02() {
         let r = Rope::from_str("");
         let mut itr = r.chunks();
@@ -2495,6 +2561,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_03() {
         let r = Rope::from_str(TEXT);
 
@@ -2504,6 +2571,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_04() {
         let r = Rope::from_str(TEXT);
 
@@ -2522,6 +2590,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_byte_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2537,6 +2606,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_byte_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2553,6 +2623,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_byte_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2565,6 +2636,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_byte_04() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..34);
@@ -2577,6 +2649,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_char_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2592,6 +2665,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_char_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2608,6 +2682,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_char_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2617,6 +2692,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_char_04() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..34);
@@ -2629,6 +2705,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_line_break_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2644,6 +2721,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_line_break_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2660,6 +2738,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_line_break_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2669,6 +2748,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_at_line_break_04() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..34);
@@ -2681,6 +2761,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_reverse_01() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chunks();
@@ -2696,6 +2777,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_reverse_02() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chunks_at_char(r.len_chars() / 3).0;
@@ -2711,6 +2793,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_reverse_03() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.chunks_at_char(r.len_chars() / 3).0;
@@ -2727,6 +2810,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_reverse_04() {
         let mut itr = Chunks::from_str("a\n", false);
 
@@ -2738,6 +2822,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2766,6 +2851,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_sliced_reverse_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2785,6 +2871,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2804,6 +2891,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_sliced_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2812,6 +2900,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_sliced_03() {
         let r = Rope::from_str(TEXT);
 
@@ -2831,6 +2920,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn bytes_at_sliced_reverse_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2850,6 +2940,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2867,6 +2958,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_sliced_reverse_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2886,6 +2978,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2905,6 +2998,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_sliced_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..301);
@@ -2913,6 +3007,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_sliced_03() {
         let r = Rope::from_str(TEXT);
 
@@ -2932,6 +3027,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chars_at_sliced_reverse_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2951,6 +3047,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2968,6 +3065,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_sliced_reverse_01() {
         let r = Rope::from_str(TEXT);
 
@@ -2987,6 +3085,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_sliced_01() {
         let r = Rope::from_str(TEXT);
 
@@ -3008,6 +3107,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn chunks_sliced_reverse_01() {
         let r = Rope::from_str(TEXT);
 
