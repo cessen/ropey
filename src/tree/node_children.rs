@@ -537,7 +537,11 @@ mod inner {
     /// share a length.
     #[repr(C)]
     pub(crate) struct NodeChildrenInternal {
+        /// An array of the child nodes.
+        /// INVARIANT: The nodes from 0..len must be initialized
         nodes: [MaybeUninit<Arc<Node>>; MAX_LEN],
+        /// An array of the child node text infos
+        /// INVARIANT: The nodes from 0..len must be initialized
         info: [MaybeUninit<TextInfo>; MAX_LEN],
         len: u8,
     }
@@ -546,6 +550,8 @@ mod inner {
         /// Creates a new empty array.
         #[inline(always)]
         pub fn new() -> NodeChildrenInternal {
+            // SAFETY: Uninit data is valid for arrays of MaybeUninit.
+            // len is zero, so it's ok for all of them to be uninit
             NodeChildrenInternal {
                 nodes: unsafe { MaybeUninit::uninit().assume_init() },
                 info: unsafe { MaybeUninit::uninit().assume_init() },
@@ -562,30 +568,40 @@ mod inner {
         /// Access to the nodes array.
         #[inline(always)]
         pub fn nodes(&self) -> &[Arc<Node>] {
+            // SAFETY: MaybeUninit<T> is layout compatible with T, and
+            // the nodes from 0..len are guaranteed to be initialized
             unsafe { mem::transmute(&self.nodes[..(self.len())]) }
         }
 
         /// Mutable access to the nodes array.
         #[inline(always)]
         pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
+            // SAFETY: MaybeUninit<T> is layout compatible with T, and
+            // the nodes from 0..len are guaranteed to be initialized
             unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) }
         }
 
         /// Access to the info array.
         #[inline(always)]
         pub fn info(&self) -> &[TextInfo] {
+            // SAFETY: MaybeUninit<T> is layout compatible with T, and
+            // the info from 0..len are guaranteed to be initialized
             unsafe { mem::transmute(&self.info[..(self.len())]) }
         }
 
         /// Mutable access to the info array.
         #[inline(always)]
         pub fn info_mut(&mut self) -> &mut [TextInfo] {
+            // SAFETY: MaybeUninit<T> is layout compatible with T, and
+            // the info from 0..len are guaranteed to be initialized
             unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) }
         }
 
         /// Mutable access to both the info and nodes arrays simultaneously.
         #[inline(always)]
         pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+            // SAFETY: MaybeUninit<T> is layout compatible with T, and
+            // the info from 0..len are guaranteed to be initialized
             (
                 unsafe { mem::transmute(&mut self.info[..(self.len as usize)]) },
                 unsafe { mem::transmute(&mut self.nodes[..(self.len as usize)]) },
@@ -600,6 +616,7 @@ mod inner {
             assert!(self.len() < MAX_LEN);
             self.info[self.len()] = MaybeUninit::new(item.0);
             self.nodes[self.len as usize] = MaybeUninit::new(item.1);
+            // We have just initialized both info and node and 0..=len, so we can increase it
             self.len += 1;
         }
 
@@ -610,6 +627,8 @@ mod inner {
         pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
             assert!(self.len() > 0);
             self.len -= 1;
+            // SAFETY: before this, len was long enough to guarantee that both must be init
+            // We just decreased the length, guaranteeing that the elements will never be read again
             (unsafe { self.info[self.len()].assume_init() }, unsafe {
                 ptr::read(&self.nodes[self.len()]).assume_init()
             })
@@ -631,17 +650,15 @@ mod inner {
             // However, the `.nodes` array shift cannot, because of the
             // specific drop semantics needed for safety.
             unsafe {
-                ptr::copy(
-                    self.nodes.as_ptr().add(idx),
-                    self.nodes.as_mut_ptr().add(idx + 1),
-                    len - idx,
-                );
+                let ptr = self.nodes.as_mut_ptr();
+                ptr::copy(ptr.add(idx), ptr.add(idx + 1), len - idx);
             }
             self.info.copy_within(idx..len, idx + 1);
 
+            // We have just made space for the two new elements, so insert them
             self.info[idx] = MaybeUninit::new(item.0);
             self.nodes[idx] = MaybeUninit::new(item.1);
-
+            // Now that all elements from 0..=len are initialized, we can increase the length
             self.len += 1;
         }
 
@@ -653,6 +670,8 @@ mod inner {
             assert!(self.len() > 0);
             assert!(idx < self.len());
 
+            // Read out the elements, they must not be touched again. We copy the elements
+            // after them into them, and decrease the length at the end
             let item = (unsafe { self.info[idx].assume_init() }, unsafe {
                 ptr::read(&self.nodes[idx]).assume_init()
             });
@@ -664,15 +683,14 @@ mod inner {
             // However, the `.nodes` array shift cannot, because of the
             // specific drop semantics needed for safety.
             unsafe {
-                ptr::copy(
-                    self.nodes.as_ptr().add(idx + 1),
-                    self.nodes.as_mut_ptr().add(idx),
-                    len - idx - 1,
-                );
+                let ptr = self.nodes.as_mut_ptr();
+                ptr::copy(ptr.add(idx + 1), ptr.add(idx), len - idx - 1);
             }
             self.info.copy_within((idx + 1)..len, idx);
 
+            // Now that the gap is filled, decrease the length
             self.len -= 1;
+
             return item;
         }
     }
@@ -690,6 +708,7 @@ mod inner {
 
     impl Clone for NodeChildrenInternal {
         fn clone(&self) -> NodeChildrenInternal {
+            // Create an empty NodeChildrenInternal first, then fill it
             let mut clone_array = NodeChildrenInternal::new();
 
             // Copy nodes... carefully.

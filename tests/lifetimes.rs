@@ -9,6 +9,10 @@ use ropey::{Rope, RopeSlice};
 const TEXT: &str = include_str!("test_text.txt");
 
 fn main() {
+    if cfg!(miri) {
+        return;
+    }
+
     let rope = Rope::from_str(TEXT);
 
     let (a, b, c, d, e, f, g, count, line, string) = {

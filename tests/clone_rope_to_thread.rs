@@ -10,6 +10,7 @@ use ropey::Rope;
 const TEXT: &str = include_str!("test_text.txt");
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn clone_rope_to_thread() {
     let mut rope1 = Rope::from_str(TEXT);
     let rope2 = rope1.clone();

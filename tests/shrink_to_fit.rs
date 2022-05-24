@@ -5,6 +5,7 @@ use rand::Rng;
 use ropey::Rope;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn shrink_to_fit() {
     let mut rng = rand::thread_rng();
     let mut rope = Rope::new();

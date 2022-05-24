@@ -5,6 +5,7 @@ use rand::Rng;
 use ropey::Rope;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn small_random_inserts() {
     let mut rng = rand::thread_rng();
     let mut tree = Rope::new();
