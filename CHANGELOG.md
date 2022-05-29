@@ -3,6 +3,14 @@
 
 ## [Unreleased]
 
+### New features
+- Added a `reversed()` method for Ropey's iterators.  This is the same as `reverse()` except instead of mutating in-place, it consumes the iterator and returns it reversed.  This is more convenient when chaining iterator method calls.
+- Added a `simd` cargo feature flag.  It's enabled by default, but can be disabled to use only scalar code (no simd intrinsics).
+
+### Bug fixes
+- Fix a theoretical memory safety issue found via running Ropey's tests through miri.  Thanks to @Nilstrieb!
+- Fix (unintentionally) depending on Rust memory layout to achieve precise node sizes in memory.  We now use `repr(C)`.
+
 
 ## [1.4.1] - 2022-03-16
 
