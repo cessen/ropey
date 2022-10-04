@@ -10,6 +10,7 @@ use ropey::Rope;
 const TEXT: &str = include_str!("test_text.txt");
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn clone_rope_to_thread() {
     let mut rope1 = Rope::from_str(TEXT);
     let rope2 = rope1.clone();
@@ -51,7 +52,7 @@ fn clone_rope_to_thread() {
     let matches = Iterator::zip(rope1.chars(), rope2.chars())
         .map(|(a, b)| a == b)
         .all(|n| n);
-    assert_eq!(matches, true);
+    assert!(matches);
 
     // Send rope2 to the other thread again for more modifications.
     tx1.send(rope2).unwrap();
@@ -61,5 +62,5 @@ fn clone_rope_to_thread() {
     let matches = Iterator::zip(rope1.chars(), rope2.chars())
         .map(|(a, b)| a == b)
         .all(|n| n);
-    assert_eq!(matches, false);
+    assert!(!matches);
 }

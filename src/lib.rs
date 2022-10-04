@@ -109,15 +109,18 @@
 //! range for medium-sized (~200kB) documents on recent-ish computer systems.
 //!
 //!
-//! # A Note About Line Endings
+//! # A Note About Line Breaks
 //!
 //! Some of Ropey's APIs use the concept of line breaks or lines of text.
 //!
-//! Ropey treats line breaks as being a part of the line they mark the
-//! end of.  That is to say, lines begin immediately _after_ a line
-//! break.  For example, the text `"Hello\nworld"` has two lines:
-//! `"Hello\n"` and `"world"`.  And the text `"Hello\nworld\n"` has three
-//! lines: `"Hello\n"`, `"world\n"`, and `""`.
+//! Ropey considers the start of the rope and positions immediately
+//! _after_ line breaks to be the start of new lines.  And it treats
+//! line breaks as being a part of the lines they mark the end of.
+//!
+//! For example, the rope `"Hello"` has a single line: `"Hello"`.  The
+//! rope `"Hello\nworld"` has two lines: `"Hello\n"` and `"world"`.  And
+//! the rope `"Hello\nworld\n"` has three lines: `"Hello\n"`,
+//! `"world\n"`, and `""`.
 //!
 //! Ropey can be configured at build time via feature flags to recognize
 //! different line breaks.  Ropey always recognizes:

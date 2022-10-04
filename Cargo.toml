@@ -1,6 +1,6 @@
 [package]
 name = "ropey"
-version = "1.4.1"
+version = "1.5.0"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 description = "A fast and robust text rope for Rust"
 documentation = "https://docs.rs/ropey"
@@ -12,13 +12,14 @@ categories = ["text-processing", "data-structures"]
 exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
 
 [features]
-default = ["unicode_lines"]
+default = ["unicode_lines", "simd"]
 cr_lines = [] # Enable recognizing carriage returns as line breaks.
 unicode_lines = ["cr_lines"] # Enable recognizing all Unicode line breaks.
+simd = ["str_indices/simd"]
 
 [dependencies]
 smallvec = "1.0.0"
-str_indices = "0.3.0"
+str_indices = { version = "0.4.0", default-features = false }
 
 [dev-dependencies]
 rand = "0.8"

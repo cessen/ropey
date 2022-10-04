@@ -47,3 +47,20 @@ jobs:
       - run: cargo +beta build
       - run: cargo +beta test
       - run: cargo +beta bench --no-run
+  run-miri:
+    name: Run Miri
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
+          components: miri
+
+      # Build and test
+      # --no-default-features to get rid of the simd feature
+      - run: cargo miri test --no-default-features
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"
+

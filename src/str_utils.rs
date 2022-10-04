@@ -207,60 +207,60 @@ mod tests {
 
     #[test]
     fn ends_with_line_break_01() {
-        assert_eq!(true, ends_with_line_break("\n"));
+        assert!(ends_with_line_break("\n"));
 
         #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
-        assert_eq!(true, ends_with_line_break("\r"));
+        assert!(ends_with_line_break("\r"));
 
         #[cfg(feature = "unicode_lines")]
         {
-            assert_eq!(true, ends_with_line_break("\u{000A}"));
-            assert_eq!(true, ends_with_line_break("\u{000B}"));
-            assert_eq!(true, ends_with_line_break("\u{000C}"));
-            assert_eq!(true, ends_with_line_break("\u{000D}"));
-            assert_eq!(true, ends_with_line_break("\u{0085}"));
-            assert_eq!(true, ends_with_line_break("\u{2028}"));
-            assert_eq!(true, ends_with_line_break("\u{2029}"));
+            assert!(ends_with_line_break("\u{000A}"));
+            assert!(ends_with_line_break("\u{000B}"));
+            assert!(ends_with_line_break("\u{000C}"));
+            assert!(ends_with_line_break("\u{000D}"));
+            assert!(ends_with_line_break("\u{0085}"));
+            assert!(ends_with_line_break("\u{2028}"));
+            assert!(ends_with_line_break("\u{2029}"));
         }
     }
 
     #[test]
     fn ends_with_line_break_02() {
-        assert_eq!(true, ends_with_line_break("Hi there!\n"));
+        assert!(ends_with_line_break("Hi there!\n"));
 
         #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
-        assert_eq!(true, ends_with_line_break("Hi there!\r"));
+        assert!(ends_with_line_break("Hi there!\r"));
 
         #[cfg(feature = "unicode_lines")]
         {
-            assert_eq!(true, ends_with_line_break("Hi there!\u{000A}"));
-            assert_eq!(true, ends_with_line_break("Hi there!\u{000B}"));
-            assert_eq!(true, ends_with_line_break("Hi there!\u{000C}"));
-            assert_eq!(true, ends_with_line_break("Hi there!\u{000D}"));
-            assert_eq!(true, ends_with_line_break("Hi there!\u{0085}"));
-            assert_eq!(true, ends_with_line_break("Hi there!\u{2028}"));
-            assert_eq!(true, ends_with_line_break("Hi there!\u{2029}"));
+            assert!(ends_with_line_break("Hi there!\u{000A}"));
+            assert!(ends_with_line_break("Hi there!\u{000B}"));
+            assert!(ends_with_line_break("Hi there!\u{000C}"));
+            assert!(ends_with_line_break("Hi there!\u{000D}"));
+            assert!(ends_with_line_break("Hi there!\u{0085}"));
+            assert!(ends_with_line_break("Hi there!\u{2028}"));
+            assert!(ends_with_line_break("Hi there!\u{2029}"));
         }
     }
 
     #[test]
     fn ends_with_line_break_03() {
-        assert_eq!(false, ends_with_line_break(""));
-        assert_eq!(false, ends_with_line_break("a"));
-        assert_eq!(false, ends_with_line_break("Hi there!"));
+        assert!(!ends_with_line_break(""));
+        assert!(!ends_with_line_break("a"));
+        assert!(!ends_with_line_break("Hi there!"));
     }
 
     #[test]
     fn ends_with_line_break_04() {
-        assert_eq!(false, ends_with_line_break("\na"));
-        assert_eq!(false, ends_with_line_break("\ra"));
-        assert_eq!(false, ends_with_line_break("\u{000A}a"));
-        assert_eq!(false, ends_with_line_break("\u{000B}a"));
-        assert_eq!(false, ends_with_line_break("\u{000C}a"));
-        assert_eq!(false, ends_with_line_break("\u{000D}a"));
-        assert_eq!(false, ends_with_line_break("\u{0085}a"));
-        assert_eq!(false, ends_with_line_break("\u{2028}a"));
-        assert_eq!(false, ends_with_line_break("\u{2029}a"));
+        assert!(!ends_with_line_break("\na"));
+        assert!(!ends_with_line_break("\ra"));
+        assert!(!ends_with_line_break("\u{000A}a"));
+        assert!(!ends_with_line_break("\u{000B}a"));
+        assert!(!ends_with_line_break("\u{000C}a"));
+        assert!(!ends_with_line_break("\u{000D}a"));
+        assert!(!ends_with_line_break("\u{0085}a"));
+        assert!(!ends_with_line_break("\u{2028}a"));
+        assert!(!ends_with_line_break("\u{2029}a"));
     }
 
     #[test]

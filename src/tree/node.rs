@@ -763,11 +763,10 @@ impl Node {
                     // Scope for borrow
                     {
                         // Fetch the two children
-                        let (mut l_child, mut r_child) =
-                            children.get_two_mut(l_child_i, l_child_i + 1);
+                        let (l_child, r_child) = children.get_two_mut(l_child_i, l_child_i + 1);
                         let l_child_bytes = l_child.0.bytes;
-                        let l_child = Arc::make_mut(&mut l_child.1);
-                        let r_child = Arc::make_mut(&mut r_child.1);
+                        let l_child = Arc::make_mut(l_child.1);
+                        let r_child = Arc::make_mut(r_child.1);
 
                         // Get the text of the two children and fix
                         // the seam between them.
@@ -906,7 +905,7 @@ impl Node {
                     did_stuff |= children.merge_distribute(last_i - 1, last_i);
                 }
 
-                if !Arc::make_mut(&mut children.nodes_mut().last_mut().unwrap()).zip_fix_right() {
+                if !Arc::make_mut(children.nodes_mut().last_mut().unwrap()).zip_fix_right() {
                     break;
                 }
             }
@@ -1024,16 +1023,11 @@ mod tests {
     fn crlf_corner_case_01() {
         use super::Node;
         use crate::tree::{NodeChildren, NodeText, MAX_BYTES};
-        use std::iter;
         use std::sync::Arc;
 
         // Construct the corner case
-        let nodel = Node::Leaf(NodeText::from_str(
-            &iter::repeat("\n").take(MAX_BYTES - 1).collect::<String>(),
-        ));
-        let noder = Node::Leaf(NodeText::from_str(
-            &iter::repeat("\n").take(MAX_BYTES).collect::<String>(),
-        ));
+        let nodel = Node::Leaf(NodeText::from_str(&"\n".repeat(MAX_BYTES - 1)));
+        let noder = Node::Leaf(NodeText::from_str(&"\n".repeat(MAX_BYTES)));
         let mut children = NodeChildren::new();
         children.push((nodel.text_info(), Arc::new(nodel)));
         children.push((noder.text_info(), Arc::new(noder)));
@@ -1052,16 +1046,11 @@ mod tests {
     fn crlf_corner_case_02() {
         use super::Node;
         use crate::tree::{NodeChildren, NodeText, MAX_BYTES};
-        use std::iter;
         use std::sync::Arc;
 
         // Construct the corner case
-        let nodel = Node::Leaf(NodeText::from_str(
-            &iter::repeat("\r").take(MAX_BYTES).collect::<String>(),
-        ));
-        let noder = Node::Leaf(NodeText::from_str(
-            &iter::repeat("\r").take(MAX_BYTES - 1).collect::<String>(),
-        ));
+        let nodel = Node::Leaf(NodeText::from_str(&"\r".repeat(MAX_BYTES)));
+        let noder = Node::Leaf(NodeText::from_str(&"\r".repeat(MAX_BYTES - 1)));
         let mut children = NodeChildren::new();
         children.push((nodel.text_info(), Arc::new(nodel)));
         children.push((noder.text_info(), Arc::new(noder)));

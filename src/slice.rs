@@ -2759,7 +2759,8 @@ mod tests {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..43);
 
-        s.slice(21..20);
+        #[allow(clippy::reversed_empty_ranges)]
+        s.slice(21..20); // Wrong ordering on purpose.
     }
 
     #[test]
@@ -2828,7 +2829,8 @@ mod tests {
         let r = Rope::from_str(TEXT);
         let s = r.byte_slice(50..118);
 
-        s.byte_slice(21..20);
+        #[allow(clippy::reversed_empty_ranges)]
+        s.byte_slice(21..20); // Wrong ordering on purpose.
     }
 
     #[test]

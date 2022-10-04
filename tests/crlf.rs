@@ -7,6 +7,7 @@ use rand::Rng;
 use ropey::Rope;
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn crlf_inserts() {
     let mut rng = rand::thread_rng();
     let mut tree = Rope::new();
@@ -34,6 +35,7 @@ fn crlf_inserts() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn crlf_removals() {
     let mut rng = rand::thread_rng();
     let mut tree = Rope::new();

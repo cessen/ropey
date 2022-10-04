@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 #[macro_use]
 extern crate proptest;
 extern crate ropey;
@@ -36,7 +38,7 @@ proptest! {
 
     #[test]
     fn pt_from_str(ref text in "\\PC*\\PC*\\PC*") {
-        let rope = Rope::from_str(&text);
+        let rope = Rope::from_str(text);
 
         rope.assert_integrity();
         rope.assert_invariants();
@@ -46,7 +48,7 @@ proptest! {
 
     #[test]
     fn pt_from_str_crlf(ref text in "[\\u{000A}\\u{000D}]*\\u{000A}\\u{000D}]*\\u{000A}\\u{000D}]*") {
-        let rope = Rope::from_str(&text);
+        let rope = Rope::from_str(text);
 
         rope.assert_integrity();
         rope.assert_invariants();
@@ -60,8 +62,8 @@ proptest! {
         let mut text = String::from(TEXT);
 
         let len = rope.len_chars();
-        rope.insert(char_idx % (len + 1), &ins_text);
-        string_insert(&mut text, char_idx % (len + 1), &ins_text);
+        rope.insert(char_idx % (len + 1), ins_text);
+        string_insert(&mut text, char_idx % (len + 1), ins_text);
 
         rope.assert_integrity();
         rope.assert_invariants();
@@ -215,7 +217,7 @@ proptest! {
 
     #[test]
     fn pt_chunk_at_line_break(ref text in "\\PC*\\n?\\PC*\\n?\\PC*") {
-        let r = Rope::from_str(&text);
+        let r = Rope::from_str(text);
 
         // First chunk
         {
@@ -230,10 +232,10 @@ proptest! {
         for i in 1..r.len_lines() {
             let (chunk, b, c, l) = r.chunk_at_line_break(i);
             assert_eq!(chunk, &text[b..(b + chunk.len())]);
-            assert_eq!(c, byte_to_char_idx(&text, b));
-            assert_eq!(l, byte_to_line_idx(&text, b));
+            assert_eq!(c, byte_to_char_idx(text, b));
+            assert_eq!(l, byte_to_line_idx(text, b));
             assert!(l < i);
-            assert!(i <= byte_to_line_idx(&text, b + chunk.len()));
+            assert!(i <= byte_to_line_idx(text, b + chunk.len()));
         }
 
         // Last chunk
@@ -241,21 +243,21 @@ proptest! {
             let (chunk, b, c, l) = r.chunk_at_line_break(r.len_lines());
             assert_eq!(chunk, &text[(text.len() - chunk.len())..]);
             assert_eq!(chunk, &text[b..]);
-            assert_eq!(c, byte_to_char_idx(&text, b));
-            assert_eq!(l, byte_to_line_idx(&text, b));
+            assert_eq!(c, byte_to_char_idx(text, b));
+            assert_eq!(l, byte_to_line_idx(text, b));
         }
     }
 
     #[test]
     fn pt_chunk_at_byte_slice(ref gen_text in "\\PC*\\n?\\PC*\\n?\\PC*", range in (0usize..1000000, 0usize..1000000)) {
-        let r = Rope::from_str(&gen_text);
+        let r = Rope::from_str(gen_text);
         let mut idx1 = range.0 % (r.len_chars() + 1);
         let mut idx2 = range.1 % (r.len_chars() + 1);
         if idx1 > idx2 {
             std::mem::swap(&mut idx1, &mut idx2)
         };
         let s = r.slice(idx1..idx2);
-        let text = string_slice(&gen_text, idx1, idx2);
+        let text = string_slice(gen_text, idx1, idx2);
 
         let mut t = text;
         let mut prev_chunk = "";
@@ -286,14 +288,14 @@ proptest! {
 
     #[test]
     fn pt_chunk_at_char_slice(ref gen_text in "\\PC*\\n?\\PC*\\n?\\PC*", range in (0usize..1000000, 0usize..1000000)) {
-        let r = Rope::from_str(&gen_text);
+        let r = Rope::from_str(gen_text);
         let mut idx1 = range.0 % (r.len_chars() + 1);
         let mut idx2 = range.1 % (r.len_chars() + 1);
         if idx1 > idx2 {
             std::mem::swap(&mut idx1, &mut idx2)
         };
         let s = r.slice(idx1..idx2);
-        let text = string_slice(&gen_text, idx1, idx2);
+        let text = string_slice(gen_text, idx1, idx2);
 
         let mut t = text;
         let mut prev_chunk = "";
@@ -319,14 +321,14 @@ proptest! {
 
     #[test]
     fn pt_chunk_at_line_break_slice(ref gen_text in "\\PC*\\n?\\PC*\\n?\\PC*", range in (0usize..1000000, 0usize..1000000)) {
-        let r = Rope::from_str(&gen_text);
+        let r = Rope::from_str(gen_text);
         let mut idx1 = range.0 % (r.len_chars() + 1);
         let mut idx2 = range.1 % (r.len_chars() + 1);
         if idx1 > idx2 {
             std::mem::swap(&mut idx1, &mut idx2)
         };
         let s = r.slice(idx1..idx2);
-        let text = string_slice(&gen_text, idx1, idx2);
+        let text = string_slice(gen_text, idx1, idx2);
 
         // First chunk
         {
@@ -359,7 +361,7 @@ proptest! {
 
     #[test]
     fn pt_slice(ref text in "\\PC*", range in (0usize..1000000, 0usize..1000000)) {
-        let rope = Rope::from_str(&text);
+        let rope = Rope::from_str(text);
 
         let mut idx1 = range.0 % (rope.len_chars() + 1);
         let mut idx2 = range.1 % (rope.len_chars() + 1);
@@ -368,7 +370,7 @@ proptest! {
         };
 
         let slice = rope.slice(idx1..idx2);
-        let text_slice = string_slice(&text, idx1, idx2);
+        let text_slice = string_slice(text, idx1, idx2);
 
         assert_eq!(slice, text_slice);
         assert_eq!(slice.len_bytes(), text_slice.len());
@@ -377,7 +379,7 @@ proptest! {
 
     #[test]
     fn pt_get_byte_slice(ref text in "\\PC*", range in (0usize..1000000, 0usize..1000000)) {
-        let rope = Rope::from_str(&text);
+        let rope = Rope::from_str(text);
 
         let mut idx1 = range.0 % (rope.len_bytes() + 1);
         let mut idx2 = range.1 % (rope.len_bytes() + 1);
@@ -421,10 +423,8 @@ proptest! {
         let text = string_slice(text, start, end);
         let s = r.slice(start..end);
 
-        let mut idx = 0;
-        for byte in s.bytes() {
+        for (idx, byte) in s.bytes().enumerate() {
             assert_eq!(byte, text.as_bytes()[idx]);
-            idx += 1;
         }
     }
 
@@ -596,6 +596,7 @@ proptest! {
         let mut bytes_r = r.bytes_at(idx);
         let text_bytes = TEXT.as_bytes();
 
+        #[allow(clippy::needless_range_loop)]
         for i in idx..r.len_bytes() {
             assert_eq!(bytes_r.next(), Some(text_bytes[i]));
         }
