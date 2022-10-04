@@ -937,7 +937,7 @@ enum ChunksEnum<'a> {
     },
     Light {
         text: &'a str,
-        is_end: bool,
+        cursor: i8,
     },
 }
 
@@ -1007,7 +1007,7 @@ impl<'a> Chunks<'a> {
                 Chunks {
                     iter: ChunksEnum::Light {
                         text: "",
-                        is_end: false,
+                        cursor: -1,
                     },
                     is_reversed: false,
                 },
@@ -1025,7 +1025,7 @@ impl<'a> Chunks<'a> {
                     Chunks {
                         iter: ChunksEnum::Light {
                             text: text,
-                            is_end: true,
+                            cursor: 1,
                         },
                         is_reversed: false,
                     },
@@ -1038,7 +1038,7 @@ impl<'a> Chunks<'a> {
                     Chunks {
                         iter: ChunksEnum::Light {
                             text: text,
-                            is_end: false,
+                            cursor: -1,
                         },
                         is_reversed: false,
                     },
@@ -1152,7 +1152,7 @@ impl<'a> Chunks<'a> {
         Chunks {
             iter: ChunksEnum::Light {
                 text: text,
-                is_end: at_end,
+                cursor: if at_end { 1 } else { 0 },
             },
             is_reversed: false,
         }
@@ -1258,14 +1258,15 @@ impl<'a> Chunks<'a> {
                 iter:
                     ChunksEnum::Light {
                         text,
-                        ref mut is_end,
+                        ref mut cursor,
                     },
                 ..
             } => {
-                if !*is_end || text.is_empty() {
+                *cursor = *cursor - 1;
+
+                if *cursor < 0 || text.is_empty() {
                     return None;
                 } else {
-                    *is_end = false;
                     return Some(text);
                 }
             }
@@ -1333,14 +1334,15 @@ impl<'a> Chunks<'a> {
                 iter:
                     ChunksEnum::Light {
                         text,
-                        ref mut is_end,
+                        ref mut cursor,
                     },
                 ..
             } => {
-                if *is_end || text.is_empty() {
+                *cursor = *cursor + 1;
+
+                if *cursor > 0 || text.is_empty() {
                     return None;
                 } else {
-                    *is_end = true;
                     return Some(text);
                 }
             }
