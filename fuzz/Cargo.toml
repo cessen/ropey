@@ -24,3 +24,9 @@ name = "mutation"
 path = "fuzz_targets/mutation.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "hash"
+path = "fuzz_targets/hash.rs"
+test = false
+doc = false

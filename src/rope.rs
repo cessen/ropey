@@ -2052,9 +2052,48 @@ impl std::cmp::PartialOrd<Rope> for Rope {
 
 impl std::hash::Hash for Rope {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // TODO[perf]: Benchmark different different buffer sizes to determine which performs the best
+        // As most hashers operate on u128, BUFFER_SIZE should be a multiple of 16.
+        const BUFFER_SIZE: usize = MIN_BYTES;
+
+        // We can not simply call state.write(chunk) for each chunk
+        // because Hasher.write only produces the same input if the
+        // calls match exactly. The documentation in the `hash` and `hast_02` in the
+        // `slice` module go into more detail why that is required.
+        // To achieve this the chunks are copied into a temporary buffer of constant size
+        // that is passed to the hasher when full.
+        // This ensures that the text is always hashed in idential size (of size `BUFFER_SIZE`)
+        // no matter the actual chunk layout inside the `Rope`.
+        // A simpler solution would have been to hash each byte individually.
+        // However that is much (16x) slower for many hasher.
+        let mut buffer = [0u8; BUFFER_SIZE];
+        let mut buf_pos = 0;
         for chunk in self.chunks() {
-            state.write(chunk.as_bytes());
+            let chunk = chunk.as_bytes();
+            let empty_buffer_capacity = BUFFER_SIZE - buf_pos;
+            if chunk.len() < empty_buffer_capacity {
+                let start = buf_pos;
+                buf_pos += chunk.len();
+                buffer[start..buf_pos].copy_from_slice(chunk);
+                continue;
+            }
+
+            let (mut head, mut chunk) = chunk.split_at(empty_buffer_capacity);
+            buffer[buf_pos..].copy_from_slice(head);
+            state.write(&buffer);
+
+            // TODO[PERF]: This loop basically has usually no more then 2 iterations
+            // consider unrolling the first two iterations for better branch prediction.
+
+            while chunk.len() >= BUFFER_SIZE {
+                (head, chunk) = chunk.split_at(BUFFER_SIZE);
+                state.write(head);
+            }
+
+            buf_pos = chunk.len();
+            buffer[..buf_pos].copy_from_slice(chunk);
         }
+        state.write(&buffer[..buf_pos]);
 
         // Same strategy as `&str` in stdlib, so that e.g. two adjacent
         // fields in a `#[derive(Hash)]` struct with "Hi " and "there"

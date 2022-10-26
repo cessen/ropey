@@ -8,7 +8,7 @@ use crate::str_utils::{
     char_to_line_idx, count_chars, count_line_breaks, count_utf16_surrogates, line_to_byte_idx,
     line_to_char_idx, utf16_code_unit_to_char_idx,
 };
-use crate::tree::{Count, Node, TextInfo};
+use crate::tree::{Count, Node, TextInfo, MIN_BYTES};
 use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 
 /// An immutable view into part of a `Rope`.
@@ -1963,9 +1963,48 @@ impl<'a, 'b> std::cmp::PartialOrd<RopeSlice<'b>> for RopeSlice<'a> {
 
 impl<'a> std::hash::Hash for RopeSlice<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // TODO[perf]: Benchmark different different buffer sizes to determine which performs the best
+        // As most hashers operate on u128, BUFFER_SIZE should be a multiple of 16.
+        const BUFFER_SIZE: usize = MIN_BYTES;
+
+        // We can not simply call state.write(chunk) for each chunk
+        // because Hasher.write only produces the same input if the
+        // calls match exactly. The documentation in the `hash` and `hast_02` in the
+        // `slice` module go into more detail why that is required.
+        // To achieve this the chunks are copied into a temporary buffer of constant size
+        // that is passed to the hasher when full.
+        // This ensures that the text is always hashed in idential size (of size `BUFFER_SIZE`)
+        // no matter the actual chunk layout inside the `Rope`.
+        // A simpler solution would have been to hash each byte individually.
+        // However that is much (16x) slower for many hasher.
+        let mut buffer = [0u8; BUFFER_SIZE];
+        let mut buf_pos = 0;
         for chunk in self.chunks() {
-            state.write(chunk.as_bytes());
+            let chunk = chunk.as_bytes();
+            let empty_buffer_capacity = BUFFER_SIZE - buf_pos;
+            if chunk.len() < empty_buffer_capacity {
+                let start = buf_pos;
+                buf_pos += chunk.len();
+                buffer[start..buf_pos].copy_from_slice(chunk);
+                continue;
+            }
+
+            let (mut head, mut chunk) = chunk.split_at(empty_buffer_capacity);
+            buffer[buf_pos..].copy_from_slice(head);
+            state.write(&buffer);
+
+            // TODO[PERF]: This loop basically has usually no more then 2 iterations
+            // consider unrolling the first two iterations for better branch prediction.
+
+            while chunk.len() >= BUFFER_SIZE {
+                (head, chunk) = chunk.split_at(BUFFER_SIZE);
+                state.write(head);
+            }
+
+            buf_pos = chunk.len();
+            buffer[..buf_pos].copy_from_slice(chunk);
         }
+        state.write(&buffer[..buf_pos]);
 
         // Same strategy as `&str` in stdlib, so that e.g. two adjacent
         // fields in a `#[derive(Hash)]` struct with "Hi " and "there"
@@ -3040,6 +3079,58 @@ mod tests {
 
         r.hash(&mut h1);
         s.hash(&mut h2);
+
+        assert_eq!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn hash_02() {
+        /// This is an example `Hasher` to demonstrate a property guaranteed by
+        /// the documentation that is not exploited by the default `Hasher` (SipHash)
+        /// Relevant excerpt from the `Hasher` documentation:
+        /// > Nor can you assume that adjacent
+        /// > `write` calls are merged, so it's possible, for example, that
+        /// > ```
+        /// > # fn foo(hasher: &mut impl std::hash::Hasher) {
+        /// > hasher.write(&[1, 2]);
+        /// > hasher.write(&[3, 4, 5, 6]);
+        /// > # }
+        /// > ```
+        /// > and
+        /// > ```
+        /// > # fn foo(hasher: &mut impl std::hash::Hasher) {
+        /// > hasher.write(&[1, 2, 3, 4]);
+        /// > hasher.write(&[5, 6]);
+        /// > # }
+        /// > ```
+        /// > end up producing different hashes.
+        ///
+        /// This dummy hasher simply hashes `42` as separator at the end of `write`.
+        /// While this hasher might seem a little silly, it is perfectly inline with the std documentation.
+        /// Many other common high performance `Hasher`s (fxhash, ahash, fnvhash) exploit the same property
+        /// to improve the performance of `write`, so violating this property will cause issues in practice.
+        #[derive(Default)]
+        struct TestHasher(std::collections::hash_map::DefaultHasher);
+        impl Hasher for TestHasher {
+            fn finish(&self) -> u64 {
+                self.0.finish()
+            }
+
+            fn write(&mut self, bytes: &[u8]) {
+                self.0.write(bytes);
+                self.0.write(&[42]);
+            }
+        }
+        let mut h1 = TestHasher::default();
+        let mut h2 = TestHasher::default();
+        let r1 = Rope::from_str("Hthere!");
+        let mut r2 = Rope::from_str("H");
+        r2.append(Rope::from_str("there!"));
+        let s1 = r1.slice(..);
+        let s2 = r2.slice(..);
+
+        s1.hash(&mut h1);
+        s2.hash(&mut h2);
 
         assert_eq!(h1.finish(), h2.finish());
     }

@@ -23,6 +23,7 @@ fn non_ascii_eq() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn non_ascii_ord() {
     // Build rope from file contents
     let rope1 = Rope::from_str(TEXT1);
