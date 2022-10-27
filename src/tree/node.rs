@@ -928,46 +928,38 @@ impl Node {
                 // Do merging
                 if children.len() > 1 {
                     let (child_i, start_info) = children.search_char_idx(char_idx);
-                    let end_info = start_info + children.info()[child_i];
+                    let mut do_merge = match *children.nodes()[child_i] {
+                        Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                        Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                    };
 
-                    if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
-                        let do_merge = match *children.nodes()[child_i] {
-                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                        } || match *children.nodes()[child_i + 1] {
-                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                        };
-
+                    if child_i == 0 {
                         if do_merge {
-                            did_stuff |= children.merge_distribute(child_i, child_i + 1);
+                            did_stuff |= children.merge_distribute(0, 1);
                         }
                     } else {
-                        let do_merge = match *children.nodes()[child_i] {
-                            Node::Leaf(ref text) => text.len() < MIN_BYTES,
-                            Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
-                        };
-
+                        do_merge = do_merge
+                            || (start_info.chars as usize == char_idx
+                                && match *children.nodes()[child_i - 1] {
+                                    Node::Leaf(ref text) => text.len() < MIN_BYTES,
+                                    Node::Internal(ref children2) => children2.len() < MIN_CHILDREN,
+                                });
                         if do_merge {
-                            if child_i == 0 {
-                                did_stuff |= children.merge_distribute(0, 1);
-                            } else {
-                                did_stuff |= children.merge_distribute(child_i - 1, child_i);
-                            }
+                            let res = children.merge_distribute(child_i - 1, child_i);
+                            did_stuff |= res
                         }
                     }
                 }
 
                 // Do recursion
                 let (child_i, start_info) = children.search_char_idx(char_idx);
-                let end_info = start_info + children.info()[child_i];
 
-                if end_info.chars as usize == char_idx && (child_i + 1) < children.len() {
-                    let tmp = children.info()[child_i].chars as usize;
+                if start_info.chars as usize == char_idx && child_i != 0 {
+                    let tmp = children.info()[child_i - 1].chars as usize;
                     let effect_1 =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i]).fix_tree_seam(tmp);
+                        Arc::make_mut(&mut children.nodes_mut()[child_i - 1]).fix_tree_seam(tmp);
                     let effect_2 =
-                        Arc::make_mut(&mut children.nodes_mut()[child_i + 1]).fix_tree_seam(0);
+                        Arc::make_mut(&mut children.nodes_mut()[child_i]).fix_tree_seam(0);
                     if (!effect_1) && (!effect_2) {
                         break;
                     }
