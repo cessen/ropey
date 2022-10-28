@@ -302,24 +302,34 @@ impl NodeChildren {
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
         debug_assert!(self.len() > 0);
 
-        let mut accum = TextInfo::new();
         let mut idx = 0;
-        for info in self.info()[0..(self.len() - 1)].iter() {
+        let accum = self.search_byte_idx_at(byte_idx, &mut idx);
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given byte. This function is internal because it assume
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub(crate) fn search_byte_idx_at(&self, byte_idx: usize, idx: &mut usize) -> TextInfo {
+        debug_assert!(self.len() > 0);
+        let mut accum = TextInfo::new();
+
+        for info in self.info()[*idx..(self.len() - 1)].iter() {
             let next_accum = accum + *info;
             if byte_idx < next_accum.bytes as usize {
                 break;
             }
             accum = next_accum;
-            idx += 1;
+            *idx += 1;
         }
 
         #[cfg(any(test, debug_assertions))]
         assert!(
-            byte_idx <= (accum.bytes + self.info()[idx].bytes) as usize,
+            byte_idx <= (accum.bytes + self.info()[*idx].bytes) as usize,
             "Index out of bounds."
         );
-
-        (idx, accum)
+        accum
     }
 
     /// Returns the child index and left-side-accumulated text info of the

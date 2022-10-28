@@ -64,15 +64,16 @@
 //! the direction of the iterator in-place, without changing its position in
 //! the text.
 
+use std::mem::take;
 use std::str;
 use std::sync::Arc;
 
-use crate::slice::RopeSlice;
+use crate::slice::{RSEnum, RopeSlice};
 use crate::str_utils::{
-    byte_to_line_idx, char_to_byte_idx, count_chars, ends_with_line_break, line_to_byte_idx,
-    line_to_char_idx, prev_line_end_char_idx,
+    byte_to_line_idx, char_to_byte_idx, count_chars, count_utf16_surrogates, ends_with_line_break,
+    line_to_byte_idx, prev_line_end_char_idx,
 };
-use crate::tree::{Node, TextInfo};
+use crate::tree::{Count, Node, TextInfo};
 
 //==========================================================
 
@@ -540,11 +541,6 @@ impl<'a> ExactSizeIterator for Chars<'a> {}
 
 //==========================================================
 
-// TODO: the lines iterator is currently O(log N) per iteration, and generally
-// is fairly slow.  It should be possible to make this linear, or close to
-// linear, and much faster.  The implementation will likely be complex / subtle,
-// but it should be worth it.
-
 /// An iterator over a `Rope`'s lines.
 ///
 /// The returned lines include the line break at the end.
@@ -555,95 +551,195 @@ impl<'a> ExactSizeIterator for Chars<'a> {}
 pub struct Lines<'a> {
     iter: LinesEnum<'a>,
     is_reversed: bool,
+    text: &'a str,
+    byte_idx: usize,
+    at_end: bool,
+    line_idx: usize,
+    total_lines: usize,
 }
 
 #[derive(Debug, Clone)]
 enum LinesEnum<'a> {
     Full {
-        node: &'a Arc<Node>,
-        start_char: usize,
-        end_char: usize,
-        start_line: usize,
-        total_line_breaks: usize,
-        line_idx: usize,
+        node_stack: Vec<(&'a Arc<Node>, usize)>, // (node ref, index of current child)
+        leaf_byte_idx: u32,
+        total_bytes: usize,
     },
-    Light {
-        text: &'a str,
-        total_line_breaks: usize,
-        line_idx: usize,
-        byte_idx: usize,
-        at_end: bool,
-    },
+    Light,
 }
 
 impl<'a> Lines<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Lines {
-        Lines {
-            iter: LinesEnum::Full {
-                node: node,
-                start_char: 0,
-                end_char: node.text_info().chars as usize,
-                start_line: 0,
-                total_line_breaks: node.line_break_count(),
-                line_idx: 0,
-            },
-            is_reversed: false,
-        }
+        let info = node.text_info();
+        Lines::new_with_range(
+            node,
+            (0, info.bytes as usize),
+            (0, info.line_breaks as usize + 1),
+        )
     }
 
     pub(crate) fn new_with_range(
         node: &Arc<Node>,
-        char_idx_range: (usize, usize),
-        line_break_idx_range: (usize, usize),
+        byte_idx_range: (usize, usize),
+        line_idx_range: (usize, usize),
     ) -> Lines {
-        Lines::new_with_range_at(
-            node,
-            line_break_idx_range.0,
-            char_idx_range,
-            line_break_idx_range,
-        )
+        Lines::new_with_range_at_impl::<false>(node, 0, byte_idx_range, line_idx_range)
     }
 
     pub(crate) fn new_with_range_at(
         node: &Arc<Node>,
         at_line: usize,
-        char_idx_range: (usize, usize),
-        line_break_idx_range: (usize, usize),
+        byte_idx_range: (usize, usize),
+        line_idx_range: (usize, usize),
     ) -> Lines {
-        Lines {
-            iter: LinesEnum::Full {
-                node: node,
-                start_char: char_idx_range.0,
-                end_char: char_idx_range.1,
-                start_line: line_break_idx_range.0,
-                total_line_breaks: line_break_idx_range.1 - line_break_idx_range.0 - 1,
-                line_idx: at_line,
-            },
-            is_reversed: false,
-        }
+        Lines::new_with_range_at_impl::<true>(node, at_line, byte_idx_range, line_idx_range)
     }
 
-    pub(crate) fn from_str(text: &str) -> Lines {
-        Lines {
-            iter: LinesEnum::Light {
-                text: text,
-                total_line_breaks: byte_to_line_idx(text, text.len()),
-                line_idx: 0,
-                byte_idx: 0,
+    fn new_with_range_at_impl<const AT_LINE: bool>(
+        node: &Arc<Node>,
+        line: usize,
+        byte_idx_range: (usize, usize),
+        line_idx_range: (usize, usize),
+    ) -> Lines {
+        let start_byte = byte_idx_range.0;
+        let end_byte = byte_idx_range.1;
+        debug_assert!(node.is_char_boundary(start_byte));
+        debug_assert!(node.is_char_boundary(end_byte));
+
+        // curretly cut off the first line by handeling the same as a full slice
+        if AT_LINE {
+            if line == line_idx_range.0 {
+                return Lines::new_with_range(node, byte_idx_range, line_idx_range);
+            } else if line >= line_idx_range.1 {
+                let mut res = Lines::new_with_range_at(
+                    node,
+                    line_idx_range.1 - 1,
+                    byte_idx_range,
+                    line_idx_range,
+                );
+                res.next();
+                return res;
+            }
+        }
+        // For convenience/readability.
+
+        // Special-case for empty text contents.
+        if start_byte == end_byte {
+            return Lines {
+                iter: LinesEnum::Light,
+                text: "",
                 at_end: false,
-            },
+                is_reversed: false,
+                byte_idx: 0,
+                line_idx: 0,
+                total_lines: 0,
+            };
+        }
+
+        let total_lines = line_idx_range.1 - line_idx_range.0;
+
+        // If root is a leaf, return light version of the iter.
+        if node.is_leaf() {
+            let text = &node.leaf_text()[start_byte..end_byte];
+            if AT_LINE {
+                return Lines::from_str_at(text, line, total_lines);
+            } else {
+                return Lines::from_str(text, total_lines);
+            }
+        }
+
+        // Create and populate the node stack, and determine the char index
+        // within the first chunk, and byte index of the start of that chunk.
+        let mut byte_idx = if AT_LINE { 0 } else { start_byte };
+        let mut line_idx = line;
+        let mut node_stack: Vec<(&Arc<Node>, usize)> = Vec::new();
+        let mut node_ref = node;
+        loop {
+            match **node_ref {
+                Node::Leaf(ref text) => {
+                    if !AT_LINE && text.len() - byte_idx >= end_byte - start_byte {
+                        return Lines::from_str(text, total_lines);
+                    }
+
+                    debug_assert!(!AT_LINE || byte_idx + text.len() > start_byte);
+
+                    let (leaf_byte_idx, byte_idx) = if AT_LINE {
+                        let line_start = byte_idx;
+                        let mut leaf_byte_idx = line_to_byte_idx(text, line_idx);
+                        let mut total_byte_pos = line_start + leaf_byte_idx;
+                        // required in case the slice ends with a split CRLF
+                        if total_byte_pos > end_byte {
+                            total_byte_pos = end_byte;
+                            leaf_byte_idx = end_byte - line_start;
+                        }
+                        (leaf_byte_idx as u32, total_byte_pos - start_byte)
+                    } else {
+                        (byte_idx as u32, 0)
+                    };
+
+                    let res = Lines {
+                        iter: LinesEnum::Full {
+                            node_stack,
+                            leaf_byte_idx,
+                            total_bytes: end_byte - start_byte,
+                        },
+                        is_reversed: false,
+                        text,
+                        byte_idx,
+                        at_end: false,
+                        line_idx: if AT_LINE { line - line_idx_range.0 } else { 0 },
+                        total_lines,
+                    };
+
+                    return res;
+                }
+                Node::Internal(ref children) => {
+                    let mut child_i;
+                    let mut acc;
+                    if AT_LINE {
+                        (child_i, acc) = children.search_line_break_idx(line_idx as usize);
+                        byte_idx += acc.bytes as usize;
+                        if acc.line_breaks == 0 && byte_idx < start_byte {
+                            acc = children.search_byte_idx_at(start_byte - byte_idx, &mut child_i);
+                            debug_assert_eq!(acc.line_breaks, 0);
+                            byte_idx += acc.bytes as usize;
+                        } else {
+                            line_idx -= acc.line_breaks as usize;
+                        }
+                    } else {
+                        (child_i, acc) = children.search_byte_idx(byte_idx as usize);
+                        byte_idx -= acc.bytes as usize;
+                    };
+                    node_stack.push((node_ref, child_i));
+                    node_ref = &children.nodes()[child_i];
+                }
+            }
+        }
+    }
+
+    pub(crate) fn from_str(text: &str, lines: usize) -> Lines {
+        Lines {
+            iter: LinesEnum::Light,
             is_reversed: false,
+            text: text,
+            byte_idx: 0,
+            at_end: false,
+            line_idx: 0,
+            total_lines: lines,
         }
     }
 
-    pub(crate) fn from_str_at(text: &str, line_idx: usize) -> Lines {
-        let mut lines_iter = Lines::from_str(text);
-        for _ in 0..line_idx {
-            lines_iter.next();
+    pub(crate) fn from_str_at(text: &str, line: usize, lines: usize) -> Lines {
+        Lines {
+            iter: LinesEnum::Light,
+            is_reversed: false,
+            text: text,
+            byte_idx: line_to_byte_idx(text, line),
+            at_end: line >= lines,
+            line_idx: line.min(lines),
+            total_lines: lines,
         }
-        lines_iter
     }
-
     /// Reverses the direction of the iterator in-place.
     ///
     /// In other words, swaps the behavior of [`prev()`](Lines::prev())
@@ -674,13 +770,13 @@ impl<'a> Lines<'a> {
 
     /// Advances the iterator backwards and returns the previous value.
     ///
-    /// Runs in O(log N) time.
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
-        if !self.is_reversed {
-            self.prev_impl()
-        } else {
+        if self.is_reversed {
             self.next_impl()
+        } else {
+            self.prev_impl()
         }
     }
 
@@ -689,70 +785,201 @@ impl<'a> Lines<'a> {
             Lines {
                 iter:
                     LinesEnum::Full {
-                        ref mut node,
-                        start_char,
-                        end_char,
-                        start_line,
-                        ref mut line_idx,
+                        ref mut node_stack,
+                        ref mut leaf_byte_idx,
                         ..
                     },
+                ref mut byte_idx,
+                ref mut text,
+                ref mut at_end,
+                ref mut line_idx,
                 ..
             } => {
-                if *line_idx == start_line {
+                let tail = &text[..*leaf_byte_idx as usize];
+                let ends_with_terminator = if take(at_end) {
+                    if ends_with_line_break(tail) {
+                        *line_idx -= 1;
+                        return Some(RopeSlice(RSEnum::Light {
+                            text: "",
+                            char_count: 0,
+                            utf16_surrogate_count: 0,
+                            line_break_count: 0,
+                        }));
+                    }
+                    false
+                } else if *byte_idx == 0 {
                     return None;
                 } else {
-                    *line_idx -= 1;
+                    true
+                };
 
-                    let a = {
-                        // Find the char that corresponds to the start of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx);
-                        (chunk_info.chars as usize
-                            + line_to_char_idx(chunk, *line_idx - chunk_info.line_breaks as usize))
-                        .max(start_char)
-                    };
+                let mut line_start = prev_line_end_char_idx::<true>(tail);
 
-                    let b = if *line_idx < node.line_break_count() {
-                        // Find the char that corresponds to the end of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx + 1);
-                        chunk_info.chars as usize
-                            + line_to_char_idx(
-                                chunk,
-                                *line_idx + 1 - chunk_info.line_breaks as usize,
-                            )
-                    } else {
-                        node.char_count()
-                    }
-                    .min(end_char);
+                *line_idx -= 1;
 
-                    return Some(RopeSlice::new_with_range(node, a, b));
+                // check if we reached the first byte
+                let available_bytes = *byte_idx;
+                let line_len = *leaf_byte_idx as usize - line_start;
+                let line_inside_chunk = if line_len >= available_bytes {
+                    line_start = *leaf_byte_idx as usize - *byte_idx;
+                    true
+                } else {
+                    line_start > 0
+                };
+                let line = &tail[line_start..];
+
+                // book keeping
+                *byte_idx -= line.len();
+
+                // fast path for lines inside a chunk
+                if line_inside_chunk {
+                    *leaf_byte_idx = line_start as u32;
+                    return Some(RopeSlice(RSEnum::Light {
+                        text: line,
+                        char_count: count_chars(line) as Count,
+                        utf16_surrogate_count: count_utf16_surrogates(line) as Count,
+                        line_break_count: ends_with_terminator as Count,
+                    }));
                 }
+
+                // track shared_parent and position in shared parent to make RopeSlice construction cheap
+                let mut shared_parent = node_stack.len() - 1;
+                let mut pos_in_shared_parent = {
+                    let (parent, child_i) = *node_stack.last().unwrap();
+                    parent.children().info()[..child_i]
+                        .iter()
+                        .fold(TextInfo::new(), |res, it| res + *it)
+                };
+                let mut len = TextInfo::from_str(tail);
+                pos_in_shared_parent += len;
+
+                let mut multi_chunk_slice = !tail.is_empty();
+                let head_start = loop {
+                    let mut stack_idx = node_stack.len() - 1;
+                    let (_, child_i) = node_stack.last_mut().unwrap();
+
+                    // if we are at the first child, advance to the previous sibiling
+                    if *child_i == 0 {
+                        while node_stack[stack_idx].1 == 0 {
+                            debug_assert_ne!(stack_idx, 0, "iterated past the first leaf");
+                            stack_idx -= 1;
+                        }
+
+                        if stack_idx < shared_parent {
+                            for (node, child_i) in &node_stack[stack_idx..shared_parent] {
+                                for &child_pos in &node.children().info()[..*child_i] {
+                                    pos_in_shared_parent += child_pos;
+                                }
+                            }
+                            shared_parent = stack_idx;
+                        }
+
+                        node_stack[stack_idx].1 -= 1;
+                        while stack_idx < (node_stack.len() - 1) {
+                            let child_i = node_stack[stack_idx].1;
+                            let node = &node_stack[stack_idx].0.children().nodes()[child_i];
+                            node_stack[stack_idx + 1] = (node, node.child_count() - 1);
+                            stack_idx += 1;
+                        }
+                    } else {
+                        // advance to the previous sibiling
+                        *child_i -= 1;
+                    }
+
+                    let (node, child_i) = *node_stack.last().unwrap();
+                    let info = node.children().info()[child_i];
+                    let available_bytes = *byte_idx;
+
+                    if info.line_breaks != 0 {
+                        *text = node.children().nodes()[child_i].leaf_text();
+                        let mut line_start = prev_line_end_char_idx::<false>(text);
+                        let line_len = text.len() - line_start;
+                        if line_len >= available_bytes {
+                            line_start = text.len() - available_bytes;
+                        }
+                        break line_start;
+                    }
+
+                    if info.bytes as usize >= available_bytes {
+                        *text = node.children().nodes()[child_i].leaf_text();
+                        break text.len() - *byte_idx;
+                    }
+
+                    len += info;
+                    *byte_idx -= info.bytes as usize;
+                    multi_chunk_slice = true;
+                };
+
+                let head = &text[head_start..];
+
+                // book keeping
+                *byte_idx -= head.len();
+                *leaf_byte_idx = head_start as u32;
+
+                let head_chars = count_chars(head) as Count;
+                let head_surrogates = count_utf16_surrogates(head) as Count;
+
+                let line = if multi_chunk_slice {
+                    RSEnum::Full {
+                        node: node_stack[shared_parent].0,
+                        start_info: pos_in_shared_parent
+                            - TextInfo {
+                                bytes: head.len() as Count,
+                                chars: head_chars,
+                                utf16_surrogates: head_surrogates,
+                                line_breaks: 0,
+                            }
+                            - len,
+
+                        end_info: pos_in_shared_parent,
+                    }
+                } else {
+                    RSEnum::Light {
+                        text: head,
+                        char_count: head_chars,
+                        utf16_surrogate_count: head_surrogates,
+                        line_break_count: 0,
+                    }
+                };
+                let line = RopeSlice(line);
+
+                Some(line)
             }
+
             Lines {
-                iter:
-                    LinesEnum::Light {
-                        ref mut text,
-                        ref mut line_idx,
-                        ref mut byte_idx,
-                        ref mut at_end,
-                        ..
-                    },
+                iter: LinesEnum::Light,
+                ref mut text,
+                ref mut byte_idx,
+                ref mut at_end,
+                ref mut line_idx,
                 ..
             } => {
-                // Special cases.
-                if *at_end && (text.is_empty() || ends_with_line_break(text)) {
-                    *line_idx -= 1;
-                    *at_end = false;
-                    return Some("".into());
+                if take(at_end) {
+                    if text.is_empty() || ends_with_line_break(text) {
+                        *line_idx -= 1;
+                        return Some(RopeSlice(RSEnum::Light {
+                            text: "",
+                            char_count: 0,
+                            utf16_surrogate_count: 0,
+                            line_break_count: 0,
+                        }));
+                    }
                 } else if *byte_idx == 0 {
                     return None;
                 }
 
                 let end_idx = *byte_idx;
-                let start_idx = prev_line_end_char_idx(&text[..end_idx]);
+                let start_idx = prev_line_end_char_idx::<true>(&text[..end_idx]);
                 *byte_idx = start_idx;
                 *line_idx -= 1;
+                let line = &text[start_idx..end_idx];
 
-                return Some((&text[start_idx..end_idx]).into());
+                return Some(RopeSlice(RSEnum::Light {
+                    text: line,
+                    char_count: count_chars(line) as Count,
+                    utf16_surrogate_count: count_utf16_surrogates(line) as Count,
+                    line_break_count: 1,
+                }));
             }
         }
     }
@@ -762,59 +989,174 @@ impl<'a> Lines<'a> {
             Lines {
                 iter:
                     LinesEnum::Full {
-                        ref mut node,
-                        start_char,
-                        end_char,
-                        ref mut line_idx,
-                        ..
+                        ref mut node_stack,
+                        ref mut leaf_byte_idx,
+                        total_bytes,
                     },
+                ref mut byte_idx,
+                ref mut text,
+                ref mut at_end,
+                ref mut line_idx,
                 ..
             } => {
-                if *line_idx > node.line_break_count() {
+                if *at_end {
                     return None;
-                } else {
-                    let a = {
-                        // Find the char that corresponds to the start of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx);
-                        let a = (chunk_info.chars as usize
-                            + line_to_char_idx(chunk, *line_idx - chunk_info.line_breaks as usize))
-                        .max(start_char);
+                } else if *byte_idx == total_bytes {
+                    *at_end = true;
+                    *line_idx += 1;
+                    return Some(RopeSlice(RSEnum::Light {
+                        text: "",
+                        char_count: 0,
+                        utf16_surrogate_count: 0,
+                        line_break_count: 0,
+                    }));
+                }
+                *line_idx += 1;
 
-                        // Early out if we're past the specified end char
-                        if a > end_char {
-                            return None;
+                let head = &text[*leaf_byte_idx as usize..];
+                let mut line_len = line_to_byte_idx(head, 1);
+
+                // check if we reached the last byte
+                let available_bytes = total_bytes - *byte_idx;
+                let (line_inside_chunk, line_break_count) = if line_len >= available_bytes {
+                    line_len = available_bytes;
+                    let ends_with_line_break = ends_with_line_break(&head[..line_len]);
+                    *at_end = !ends_with_line_break;
+                    // reached EOF no need to advance
+                    (true, ends_with_line_break as u64)
+                } else {
+                    (line_len != head.len() || ends_with_line_break(head), 1)
+                };
+
+                if line_inside_chunk {
+                    let line = &head[..line_len];
+
+                    // book keeping
+                    *byte_idx += line_len;
+                    *leaf_byte_idx += line_len as u32;
+
+                    return Some(RopeSlice(RSEnum::Light {
+                        text: line,
+                        char_count: count_chars(line) as Count,
+                        utf16_surrogate_count: count_utf16_surrogates(line) as Count,
+                        line_break_count,
+                    }));
+                }
+
+                *byte_idx += head.len();
+
+                // track shared_parent and position in shared parent to make RopeSlice construction cheap
+                let mut shared_parent = node_stack.len() - 1;
+                let mut pos_in_shared_parent = {
+                    let (parent, child_i) = *node_stack.last().unwrap();
+                    parent.children().info()[..=child_i]
+                        .iter()
+                        .fold(TextInfo::new(), |res, it| res + *it)
+                };
+                let mut len = TextInfo::from_str(head);
+                pos_in_shared_parent -= len;
+
+                let mut multi_chunk_slice = !head.is_empty();
+                let (tail_len, tail_ends_with_newline) = loop {
+                    let mut stack_idx = node_stack.len() - 1;
+                    let (_, child_i) = node_stack.last_mut().unwrap();
+                    // advance to the next sibiling
+                    *child_i += 1;
+
+                    // if we are at the last child, advance to the next sibiling
+                    if *child_i >= node_stack[stack_idx].0.child_count() {
+                        while node_stack[stack_idx].1 >= (node_stack[stack_idx].0.child_count() - 1)
+                        {
+                            debug_assert_ne!(stack_idx, 0, "iterated past the last leaf");
+                            stack_idx -= 1;
                         }
 
-                        a
-                    };
+                        if stack_idx < shared_parent {
+                            for (node, child_i) in &node_stack[stack_idx..shared_parent] {
+                                for &child_pos in &node.children().info()[..*child_i] {
+                                    pos_in_shared_parent += child_pos;
+                                }
+                            }
+                            shared_parent = stack_idx;
+                        }
 
-                    let b = if *line_idx < node.line_break_count() {
-                        // Find the char that corresponds to the end of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx + 1);
-                        chunk_info.chars as usize
-                            + line_to_char_idx(
-                                chunk,
-                                *line_idx + 1 - chunk_info.line_breaks as usize,
-                            )
-                    } else {
-                        node.char_count()
+                        node_stack[stack_idx].1 += 1;
+                        while stack_idx < (node_stack.len() - 1) {
+                            let child_i = node_stack[stack_idx].1;
+                            let node = &node_stack[stack_idx].0.children().nodes()[child_i];
+                            node_stack[stack_idx + 1] = (node, 0);
+                            stack_idx += 1;
+                        }
                     }
-                    .min(end_char);
 
-                    *line_idx += 1;
+                    let (node, child_i) = *node_stack.last().unwrap();
+                    let info = node.children().info()[child_i];
+                    let available_bytes = total_bytes - *byte_idx;
 
-                    return Some(RopeSlice::new_with_range(node, a, b));
-                }
+                    if info.line_breaks != 0 {
+                        *text = node.children().nodes()[child_i].leaf_text();
+                        let mut line_end = line_to_byte_idx(text, 1);
+                        let ends_with_newline = if line_end >= available_bytes {
+                            line_end = available_bytes;
+                            let ends_with_newline = ends_with_line_break(&text[..line_end]);
+                            *at_end = !ends_with_newline;
+                            ends_with_newline
+                        } else {
+                            true
+                        };
+                        break (line_end, ends_with_newline);
+                    }
+
+                    if info.bytes as usize >= available_bytes {
+                        *at_end = true;
+                        *text = node.children().nodes()[child_i].leaf_text();
+                        break (available_bytes, false);
+                    }
+
+                    len += info;
+                    *byte_idx += info.bytes as usize;
+                    multi_chunk_slice = true;
+                };
+
+                // book keeping
+                *byte_idx += tail_len;
+                *leaf_byte_idx = tail_len as u32;
+
+                let line_tail = &text[..tail_len];
+                let line_tail_chars = count_chars(line_tail) as Count;
+                let line_tail_surrogates = count_utf16_surrogates(line_tail) as Count;
+
+                let line = if multi_chunk_slice {
+                    RSEnum::Full {
+                        node: node_stack[shared_parent].0,
+                        start_info: pos_in_shared_parent,
+                        end_info: pos_in_shared_parent
+                            + len
+                            + TextInfo {
+                                bytes: tail_len as Count,
+                                chars: line_tail_chars,
+                                utf16_surrogates: line_tail_surrogates,
+                                line_breaks: tail_ends_with_newline as Count,
+                            },
+                    }
+                } else {
+                    RSEnum::Light {
+                        text: line_tail,
+                        char_count: line_tail_chars,
+                        utf16_surrogate_count: line_tail_surrogates,
+                        line_break_count: tail_ends_with_newline as Count,
+                    }
+                };
+
+                Some(RopeSlice(line))
             }
+
             Lines {
-                iter:
-                    LinesEnum::Light {
-                        ref mut text,
-                        ref mut line_idx,
-                        ref mut byte_idx,
-                        ref mut at_end,
-                        ..
-                    },
+                iter: LinesEnum::Light,
+                text,
+                ref mut byte_idx,
+                ref mut at_end,
+                ref mut line_idx,
                 ..
             } => {
                 if *at_end {
@@ -822,7 +1164,12 @@ impl<'a> Lines<'a> {
                 } else if *byte_idx == text.len() {
                     *at_end = true;
                     *line_idx += 1;
-                    return Some("".into());
+                    return Some(RopeSlice(RSEnum::Light {
+                        text: "",
+                        char_count: 0,
+                        utf16_surrogate_count: 0,
+                        line_break_count: 0,
+                    }));
                 }
 
                 let start_idx = *byte_idx;
@@ -845,57 +1192,29 @@ impl<'a> Iterator for Lines<'a> {
 
     /// Advances the iterator forward and returns the next value.
     ///
-    /// Runs in O(log N) time.
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     fn next(&mut self) -> Option<RopeSlice<'a>> {
-        if !self.is_reversed {
-            self.next_impl()
-        } else {
+        if self.is_reversed {
             self.prev_impl()
+        } else {
+            self.next_impl()
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let lines_remaining = match *self {
-            Lines {
-                iter:
-                    LinesEnum::Full {
-                        start_line,
-                        total_line_breaks,
-                        line_idx,
-                        ..
-                    },
-                is_reversed,
-            } => {
-                if !is_reversed {
-                    total_line_breaks + 1 - (line_idx - start_line)
-                } else {
-                    line_idx - start_line
-                }
-            }
-
-            Lines {
-                iter:
-                    LinesEnum::Light {
-                        total_line_breaks,
-                        line_idx,
-                        ..
-                    },
-                is_reversed,
-            } => {
-                if !is_reversed {
-                    total_line_breaks + 1 - line_idx
-                } else {
-                    line_idx
-                }
-            }
-        };
-
-        (lines_remaining, Some(lines_remaining))
+        if self.is_reversed {
+            (self.line_idx, Some(self.line_idx))
+        } else {
+            (
+                self.total_lines - self.line_idx,
+                Some(self.total_lines - self.line_idx),
+            )
+        }
     }
 }
 
-impl<'a> ExactSizeIterator for Lines<'a> {}
+impl ExactSizeIterator for Lines<'_> {}
 
 //==========================================================
 
@@ -1363,8 +1682,6 @@ impl<'a> Iterator for Chunks<'a> {
         }
     }
 }
-
-//===========================================================
 
 #[cfg(test)]
 mod tests {
@@ -1967,6 +2284,27 @@ mod tests {
 
     #[test]
     #[cfg_attr(miri, ignore)]
+    fn lines_21() {
+        let r = Rope::from_str("a\nb\nc\nd\ne\nf\ng\nh\n");
+        for (line, c) in r.lines().zip('a'..='h') {
+            assert_eq!(line, format!("{c}\n"))
+        }
+        for (line, c) in r
+            .lines_at(r.len_lines() - 1)
+            .reversed()
+            .zip(('a'..='h').rev())
+        {
+            assert_eq!(line, format!("{c}\n"))
+        }
+
+        let r = Rope::from_str("ab\nc\nd\ne\nf\ng\nh\n");
+        for (line, c) in r.slice(1..).lines().zip('b'..='h') {
+            assert_eq!(line, format!("{c}\n"))
+        }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(..);
@@ -2513,7 +2851,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_reverse_04() {
-        let mut itr = Lines::from_str("a\n");
+        let mut itr = Lines::from_str("a\n", 1);
 
         assert_eq!(Some("a\n".into()), itr.next());
         assert_eq!(Some("".into()), itr.next());
