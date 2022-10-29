@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 use crate::str_utils::{count_chars, count_line_breaks, count_utf16_surrogates};
 use crate::tree::Count;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct TextInfo {
     pub(crate) bytes: Count,
     pub(crate) chars: Count,

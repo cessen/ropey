@@ -2008,14 +2008,14 @@ impl std::cmp::PartialEq<Rope> for str {
     }
 }
 
-impl<'a> std::cmp::PartialEq<String> for Rope {
+impl std::cmp::PartialEq<String> for Rope {
     #[inline]
     fn eq(&self, other: &String) -> bool {
         self.slice(..) == other.as_str()
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for String {
+impl std::cmp::PartialEq<Rope> for String {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         self.as_str() == other.slice(..)

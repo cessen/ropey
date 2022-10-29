@@ -97,7 +97,7 @@ impl<'a> Bytes<'a> {
             ""
         };
         Bytes {
-            chunk_iter: chunk_iter,
+            chunk_iter,
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: 0,
             last_call_was_prev_impl: false,
@@ -150,7 +150,7 @@ impl<'a> Bytes<'a> {
         };
 
         Bytes {
-            chunk_iter: chunk_iter,
+            chunk_iter,
             cur_chunk: cur_chunk.as_bytes(),
             byte_idx: at_byte - chunk_byte_start,
             last_call_was_prev_impl: false,
@@ -173,9 +173,9 @@ impl<'a> Bytes<'a> {
             ""
         };
         Bytes {
-            chunk_iter: chunk_iter,
+            chunk_iter,
             cur_chunk: cur_chunk.as_bytes(),
-            byte_idx: byte_idx,
+            byte_idx,
             last_call_was_prev_impl: false,
             bytes_total: text.len(),
             bytes_remaining: text.len() - byte_idx,
@@ -323,8 +323,8 @@ impl<'a> Chars<'a> {
             ""
         };
         Chars {
-            chunk_iter: chunk_iter,
-            cur_chunk: cur_chunk,
+            chunk_iter,
+            cur_chunk,
             byte_idx: 0,
             last_call_was_prev_impl: false,
             chars_total: node.text_info().chars as usize,
@@ -377,8 +377,8 @@ impl<'a> Chars<'a> {
         };
 
         Chars {
-            chunk_iter: chunk_iter,
-            cur_chunk: cur_chunk,
+            chunk_iter,
+            cur_chunk,
             byte_idx: char_to_byte_idx(cur_chunk, at_char - chunk_char_start),
             last_call_was_prev_impl: false,
             chars_total: char_idx_range.1 - char_idx_range.0,
@@ -403,12 +403,12 @@ impl<'a> Chars<'a> {
         let chars_remaining = count_chars(&text[start_byte_idx..]);
 
         Chars {
-            chunk_iter: chunk_iter,
-            cur_chunk: cur_chunk,
+            chunk_iter,
+            cur_chunk,
             byte_idx: start_byte_idx,
             last_call_was_prev_impl: false,
             chars_total: chars_remaining + count_chars(&text[..start_byte_idx]),
-            chars_remaining: chars_remaining,
+            chars_remaining,
             is_reversed: false,
         }
     }
@@ -478,7 +478,7 @@ impl<'a> Chars<'a> {
             self.byte_idx -= 1;
         }
         self.chars_remaining += 1;
-        return (&self.cur_chunk[self.byte_idx..]).chars().next();
+        return self.cur_chunk[self.byte_idx..].chars().next();
     }
 
     #[inline]
@@ -507,7 +507,7 @@ impl<'a> Chars<'a> {
             self.byte_idx += 1;
         }
         self.chars_remaining -= 1;
-        return (&self.cur_chunk[start..]).chars().next();
+        return self.cur_chunk[start..].chars().next();
     }
 }
 
@@ -580,7 +580,7 @@ impl<'a> Lines<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Lines {
         Lines {
             iter: LinesEnum::Full {
-                node: node,
+                node,
                 start_char: 0,
                 end_char: node.text_info().chars as usize,
                 start_line: 0,
@@ -612,7 +612,7 @@ impl<'a> Lines<'a> {
     ) -> Lines {
         Lines {
             iter: LinesEnum::Full {
-                node: node,
+                node,
                 start_char: char_idx_range.0,
                 end_char: char_idx_range.1,
                 start_line: line_break_idx_range.0,
@@ -626,7 +626,7 @@ impl<'a> Lines<'a> {
     pub(crate) fn from_str(text: &str) -> Lines {
         Lines {
             iter: LinesEnum::Light {
-                text: text,
+                text,
                 total_line_breaks: byte_to_line_idx(text, text.len()),
                 line_idx: 0,
                 byte_idx: 0,
@@ -1023,10 +1023,7 @@ impl<'a> Chunks<'a> {
             if at_byte == end_byte {
                 return (
                     Chunks {
-                        iter: ChunksEnum::Light {
-                            text: text,
-                            is_end: true,
-                        },
+                        iter: ChunksEnum::Light { text, is_end: true },
                         is_reversed: false,
                     },
                     text.len(),
@@ -1037,7 +1034,7 @@ impl<'a> Chunks<'a> {
                 return (
                     Chunks {
                         iter: ChunksEnum::Light {
-                            text: text,
+                            text,
                             is_end: false,
                         },
                         is_reversed: false,
@@ -1090,9 +1087,9 @@ impl<'a> Chunks<'a> {
         (
             Chunks {
                 iter: ChunksEnum::Full {
-                    node_stack: node_stack,
+                    node_stack,
                     total_bytes: end_byte - start_byte,
-                    byte_idx: byte_idx,
+                    byte_idx,
                 },
                 is_reversed: false,
             },
@@ -1151,7 +1148,7 @@ impl<'a> Chunks<'a> {
     pub(crate) fn from_str(text: &str, at_end: bool) -> Chunks {
         Chunks {
             iter: ChunksEnum::Light {
-                text: text,
+                text,
                 is_end: at_end,
             },
             is_reversed: false,

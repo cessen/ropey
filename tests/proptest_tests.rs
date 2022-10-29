@@ -619,7 +619,7 @@ proptest! {
     fn pt_chars_at_01(idx in 0usize..CHAR_LEN) {
         let r = Rope::from_str(TEXT);
         let mut chars_r = r.chars_at(idx);
-        let chars_t = (&TEXT[char_to_byte_idx(TEXT, idx)..]).chars();
+        let chars_t = TEXT[char_to_byte_idx(TEXT, idx)..].chars();
 
         for c in chars_t {
             assert_eq!(chars_r.next(), Some(c));
@@ -630,7 +630,7 @@ proptest! {
     fn pt_chars_at_02(idx in 0usize..CHAR_LEN) {
         let r = Rope::from_str(TEXT);
         let mut chars_r = r.chars_at(idx);
-        let mut chars_t = (&TEXT[..char_to_byte_idx(TEXT, idx)]).chars();
+        let mut chars_t = TEXT[..char_to_byte_idx(TEXT, idx)].chars();
 
         while let Some(c) = chars_t.next_back() {
             assert_eq!(chars_r.prev(), Some(c));
