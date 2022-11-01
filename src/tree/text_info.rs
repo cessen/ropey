@@ -49,7 +49,16 @@ impl Add for TextInfo {
 impl AddAssign for TextInfo {
     #[inline]
     fn add_assign(&mut self, other: TextInfo) {
-        *self = *self + other;
+        let Self {
+            bytes,
+            chars,
+            utf16_surrogates,
+            line_breaks,
+        } = self;
+        *bytes += other.bytes;
+        *chars += other.chars;
+        *utf16_surrogates += other.utf16_surrogates;
+        *line_breaks += other.line_breaks;
     }
 }
 
@@ -69,6 +78,15 @@ impl Sub for TextInfo {
 impl SubAssign for TextInfo {
     #[inline]
     fn sub_assign(&mut self, other: TextInfo) {
-        *self = *self - other;
+        let Self {
+            bytes,
+            chars,
+            utf16_surrogates,
+            line_breaks,
+        } = self;
+        *bytes -= other.bytes;
+        *chars -= other.chars;
+        *utf16_surrogates -= other.utf16_surrogates;
+        *line_breaks -= other.line_breaks;
     }
 }
