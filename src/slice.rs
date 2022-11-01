@@ -1776,8 +1776,8 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
 
         let mut chunk_itr_1 = self.chunks();
         let mut chunk_itr_2 = other.chunks();
-        let mut chunk1 = chunk_itr_1.next().unwrap_or("");
-        let mut chunk2 = chunk_itr_2.next().unwrap_or("");
+        let mut chunk1 = chunk_itr_1.next().unwrap_or("").as_bytes();
+        let mut chunk2 = chunk_itr_2.next().unwrap_or("").as_bytes();
 
         loop {
             if chunk1.len() > chunk2.len() {
@@ -1785,18 +1785,18 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
                     return false;
                 } else {
                     chunk1 = &chunk1[chunk2.len()..];
-                    chunk2 = "";
+                    chunk2 = &[];
                 }
             } else if &chunk2[..chunk1.len()] != chunk1 {
                 return false;
             } else {
                 chunk2 = &chunk2[chunk1.len()..];
-                chunk1 = "";
+                chunk1 = &[];
             }
 
             if chunk1.is_empty() {
                 if let Some(chunk) = chunk_itr_1.next() {
-                    chunk1 = chunk;
+                    chunk1 = chunk.as_bytes();
                 } else {
                     break;
                 }
@@ -1804,7 +1804,7 @@ impl<'a, 'b> std::cmp::PartialEq<RopeSlice<'b>> for RopeSlice<'a> {
 
             if chunk2.is_empty() {
                 if let Some(chunk) = chunk_itr_2.next() {
-                    chunk2 = chunk;
+                    chunk2 = chunk.as_bytes();
                 } else {
                     break;
                 }
@@ -1823,9 +1823,11 @@ impl<'a, 'b> std::cmp::PartialEq<&'b str> for RopeSlice<'a> {
                 if self.len_bytes() != other.len() {
                     return false;
                 }
+                let other = other.as_bytes();
 
                 let mut idx = 0;
                 for chunk in self.chunks() {
+                    let chunk = chunk.as_bytes();
                     if chunk != &other[idx..(idx + chunk.len())] {
                         return false;
                     }
