@@ -566,6 +566,11 @@ enum LinesEnum<'a> {
         start_line: usize,
         total_line_breaks: usize,
         line_idx: usize,
+
+        // Cached informations for performances
+        text_info: TextInfo,
+        // `(line, start-or-end)`
+        cached_chunk: Option<(usize, usize)>,
     },
     Light {
         text: &'a str,
@@ -578,14 +583,19 @@ enum LinesEnum<'a> {
 
 impl<'a> Lines<'a> {
     pub(crate) fn new(node: &Arc<Node>) -> Lines {
+        let text_info = node.text_info();
+        let end_char = text_info.chars as usize;
+        let total_line_breaks = text_info.line_breaks as usize;
         Lines {
             iter: LinesEnum::Full {
                 node,
                 start_char: 0,
-                end_char: node.text_info().chars as usize,
+                end_char,
                 start_line: 0,
-                total_line_breaks: node.line_break_count(),
+                total_line_breaks,
                 line_idx: 0,
+                text_info,
+                cached_chunk: None,
             },
             is_reversed: false,
         }
@@ -618,6 +628,8 @@ impl<'a> Lines<'a> {
                 start_line: line_break_idx_range.0,
                 total_line_breaks: line_break_idx_range.1 - line_break_idx_range.0 - 1,
                 line_idx: at_line,
+                text_info: node.text_info(),
+                cached_chunk: None,
             },
             is_reversed: false,
         }
@@ -685,57 +697,56 @@ impl<'a> Lines<'a> {
     }
 
     fn prev_impl(&mut self) -> Option<RopeSlice<'a>> {
-        match *self {
-            Lines {
-                iter:
-                    LinesEnum::Full {
-                        ref mut node,
-                        start_char,
-                        end_char,
-                        start_line,
-                        ref mut line_idx,
-                        ..
-                    },
+        match self.iter {
+            LinesEnum::Full {
+                ref mut node,
+                ref text_info,
+                start_char,
+                end_char,
+                start_line,
+                ref mut line_idx,
+                ref mut cached_chunk,
                 ..
             } => {
                 if *line_idx == start_line {
                     return None;
-                } else {
-                    *line_idx -= 1;
+                }
+                *line_idx -= 1;
+                let curr_line = *line_idx;
 
-                    let a = {
-                        // Find the char that corresponds to the start of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx);
-                        (chunk_info.chars as usize
-                            + line_to_char_idx(chunk, *line_idx - chunk_info.line_breaks as usize))
-                        .max(start_char)
-                    };
+                let start = {
+                    // Find the char that corresponds to the start of the line.
+                    let (chunk, chunk_info) = node.get_chunk_at_line_break(curr_line);
+                    chunk_info.chars as usize
+                        + line_to_char_idx(chunk, curr_line - chunk_info.line_breaks as usize)
+                };
+                let new_cached_chunk = Some((curr_line, start));
+                let start = start.max(start_char);
 
-                    let b = if *line_idx < node.line_break_count() {
+                let end = match (curr_line < text_info.line_breaks as usize, *cached_chunk) {
+                    (true, Some((cached_line, end))) if cached_line == curr_line + 1 => end,
+                    (true, _) => {
                         // Find the char that corresponds to the end of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx + 1);
+                        let (chunk, chunk_info) = node.get_chunk_at_line_break(curr_line + 1);
                         chunk_info.chars as usize
                             + line_to_char_idx(
                                 chunk,
-                                *line_idx + 1 - chunk_info.line_breaks as usize,
+                                curr_line + 1 - chunk_info.line_breaks as usize,
                             )
-                    } else {
-                        node.char_count()
                     }
-                    .min(end_char);
-
-                    return Some(RopeSlice::new_with_range(node, a, b));
+                    (false, _) => node.char_count(),
                 }
+                .min(end_char);
+
+                *cached_chunk = new_cached_chunk;
+
+                Some(RopeSlice::new_with_range(node, start, end))
             }
-            Lines {
-                iter:
-                    LinesEnum::Light {
-                        ref mut text,
-                        ref mut line_idx,
-                        ref mut byte_idx,
-                        ref mut at_end,
-                        ..
-                    },
+            LinesEnum::Light {
+                ref mut text,
+                ref mut line_idx,
+                ref mut byte_idx,
+                ref mut at_end,
                 ..
             } => {
                 // Special cases.
@@ -758,63 +769,59 @@ impl<'a> Lines<'a> {
     }
 
     fn next_impl(&mut self) -> Option<RopeSlice<'a>> {
-        match *self {
-            Lines {
-                iter:
-                    LinesEnum::Full {
-                        ref mut node,
-                        start_char,
-                        end_char,
-                        ref mut line_idx,
-                        ..
-                    },
+        match self.iter {
+            LinesEnum::Full {
+                ref mut node,
+                start_char,
+                end_char,
+                ref mut line_idx,
+                ref text_info,
+                ref mut cached_chunk,
                 ..
             } => {
-                if *line_idx > node.line_break_count() {
+                let node_line_break_count = text_info.line_breaks as usize;
+                let curr_line = *line_idx;
+
+                if *line_idx > node_line_break_count {
                     return None;
-                } else {
-                    let a = {
-                        // Find the char that corresponds to the start of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx);
-                        let a = (chunk_info.chars as usize
-                            + line_to_char_idx(chunk, *line_idx - chunk_info.line_breaks as usize))
-                        .max(start_char);
-
-                        // Early out if we're past the specified end char
-                        if a > end_char {
-                            return None;
-                        }
-
-                        a
-                    };
-
-                    let b = if *line_idx < node.line_break_count() {
-                        // Find the char that corresponds to the end of the line.
-                        let (chunk, chunk_info) = node.get_chunk_at_line_break(*line_idx + 1);
-                        chunk_info.chars as usize
-                            + line_to_char_idx(
-                                chunk,
-                                *line_idx + 1 - chunk_info.line_breaks as usize,
-                            )
-                    } else {
-                        node.char_count()
-                    }
-                    .min(end_char);
-
-                    *line_idx += 1;
-
-                    return Some(RopeSlice::new_with_range(node, a, b));
                 }
+
+                let start = match cached_chunk {
+                    Some((cached_line, start)) if *cached_line + 1 == curr_line => *start,
+                    _ => {
+                        // Find the char that corresponds to the start of the line.
+                        let (chunk, chunk_info) = node.get_chunk_at_line_break(curr_line);
+                        chunk_info.chars as usize
+                            + line_to_char_idx(chunk, curr_line - chunk_info.line_breaks as usize)
+                    }
+                };
+
+                let start = start.max(start_char);
+                // Early out if we're past the specified end char
+                if start > end_char {
+                    return None;
+                }
+
+                let end = if curr_line < node_line_break_count {
+                    // Find the char that corresponds to the end of the line.
+                    let (chunk, chunk_info) = node.get_chunk_at_line_break(curr_line + 1);
+                    chunk_info.chars as usize
+                        + line_to_char_idx(chunk, curr_line + 1 - chunk_info.line_breaks as usize)
+                } else {
+                    text_info.chars as usize
+                };
+
+                *cached_chunk = Some((curr_line, end));
+
+                *line_idx += 1;
+
+                Some(RopeSlice::new_with_range(node, start, end.min(end_char)))
             }
-            Lines {
-                iter:
-                    LinesEnum::Light {
-                        ref mut text,
-                        ref mut line_idx,
-                        ref mut byte_idx,
-                        ref mut at_end,
-                        ..
-                    },
+            LinesEnum::Light {
+                ref mut text,
+                ref mut line_idx,
+                ref mut byte_idx,
+                ref mut at_end,
                 ..
             } => {
                 if *at_end {
@@ -3120,6 +3127,16 @@ mod tests {
         itr.reverse();
         for _ in 0..8 {
             assert_eq!(stack.pop(), itr.next());
+        }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_iter_is_correct() {
+        let r = Rope::from_str(TEXT);
+
+        for (i, line) in r.lines().enumerate() {
+            assert_eq!(line, r.line(i));
         }
     }
 }
