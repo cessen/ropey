@@ -589,6 +589,17 @@ impl Node {
         chunk.is_char_boundary(byte_idx - info.bytes as usize)
     }
 
+    pub fn is_crlf_split(&self, char_idx: usize) -> bool {
+        let (chunk, info) = self.get_chunk_at_char(char_idx);
+        let idx = char_to_byte_idx(chunk, char_idx - info.chars as usize);
+        if idx == 0 || idx == chunk.len() {
+            false
+        } else {
+            let chunk = chunk.as_bytes();
+            chunk[idx - 1] == 0x0D && chunk[idx] == 0x0A
+        }
+    }
+
     //-----------------------------------------
 
     pub fn child_count(&self) -> usize {

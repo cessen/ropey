@@ -120,7 +120,18 @@ impl<'a> RopeSlice<'a> {
         RopeSlice(RSEnum::Full {
             node: node,
             start_info: node.char_to_text_info(n_start),
-            end_info: node.char_to_text_info(n_end),
+            end_info: {
+                #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
+                {
+                    let mut info = node.char_to_text_info(n_end);
+                    if node.is_crlf_split(n_end) {
+                        info.line_breaks += 1;
+                    }
+                    info
+                }
+                #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+                node.char_to_text_info(n_end)
+            },
         })
     }
 
@@ -2040,6 +2051,24 @@ mod tests {
     }
 
     #[test]
+    fn len_lines_03() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_chars() {
+            assert_eq!(r.slice(..i).len_lines(), 1 + ((i + 1) / 2));
+        }
+    }
+
+    #[test]
+    fn len_lines_04() {
+        // Make sure splitting CRLF pairs at the start works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_chars() {
+            assert_eq!(r.slice(i..).len_lines(), 16 - (i / 2));
+        }
+    }
+
+    #[test]
     fn len_utf16_cu_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(..);
@@ -2146,6 +2175,15 @@ mod tests {
     }
 
     #[test]
+    fn byte_to_line_05() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_bytes() {
+            assert_eq!(r.byte_slice(..i).byte_to_line(i), (i + 1) / 2);
+        }
+    }
+
+    #[test]
     fn char_to_byte_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(88..102);
@@ -2211,6 +2249,15 @@ mod tests {
     }
 
     #[test]
+    fn char_to_line_05() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_chars() {
+            assert_eq!(r.slice(..i).char_to_line(i), (i + 1) / 2);
+        }
+    }
+
+    #[test]
     fn line_to_byte_01() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
@@ -2243,6 +2290,15 @@ mod tests {
     }
 
     #[test]
+    fn line_to_byte_04() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_bytes() {
+            assert_eq!(r.byte_slice(..i).line_to_byte((i + 1) / 2), i);
+        }
+    }
+
+    #[test]
     fn line_to_char_01() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
@@ -2269,6 +2325,15 @@ mod tests {
         let s = r.slice(34..96);
 
         s.line_to_char(4);
+    }
+
+    #[test]
+    fn line_to_char_04() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_chars() {
+            assert_eq!(r.slice(..i).line_to_char((i + 1) / 2), i);
+        }
     }
 
     #[test]

@@ -2450,6 +2450,19 @@ mod tests {
 
     #[test]
     #[cfg_attr(miri, ignore)]
+    fn lines_exact_size_iter_04() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_chars() {
+            let s = r.slice(..i);
+            let mut lines = s.lines();
+            assert_eq!(lines.len(), 1 + ((i + 1) / 2));
+            assert_eq!(lines.len(), lines.count());
+        }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_reverse_01() {
         let r = Rope::from_str(TEXT);
         let mut itr = r.lines();
@@ -2537,6 +2550,18 @@ mod tests {
         lines.next();
         assert_eq!(lines.len(), 0);
         assert_eq!(line_count, 0);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_reverse_exact_size_iter_02() {
+        // Make sure splitting CRLF pairs at the end works properly.
+        let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+        for i in 0..r.len_chars() {
+            let s = r.slice(..i);
+            let mut lines = s.lines_at(((i + 1) / 2)).reversed();
+            assert_eq!(lines.len(), lines.count());
+        }
     }
 
     #[test]
