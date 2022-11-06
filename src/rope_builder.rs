@@ -70,6 +70,20 @@ impl RopeBuilder {
         self.append_internal(chunk, false);
     }
 
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!).
+    ///
+    /// Appends `contents` to the in-progress rope as a single leaf
+    /// node (chunk).  This is useful for building ropes with specific
+    /// chunk configurations for testing purposes.  It will happily append
+    /// both empty and more-than-max-size chunks.
+    ///
+    /// This makes no attempt to be consistent with the standard `append()`
+    /// method, and should not be used in conjunction with it.
+    #[doc(hidden)]
+    pub fn _append_chunk(&mut self, contents: &str) {
+        self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(contents))));
+    }
+
     /// Finishes the build, and returns the `Rope`.
     ///
     /// Note: this method consumes the builder.  If you want to continue
