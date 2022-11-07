@@ -70,6 +70,27 @@ impl RopeBuilder {
         self.append_internal(chunk, false);
     }
 
+    /// Finishes the build, and returns the `Rope`.
+    ///
+    /// Note: this method consumes the builder.  If you want to continue
+    /// building other ropes with the same prefix, you can clone the builder
+    /// before calling `finish()`.
+    pub fn finish(mut self) -> Rope {
+        // Append the last leaf
+        self.append_internal("", true);
+        self.finish_internal(true)
+    }
+
+    /// Builds a rope all at once from a single string slice.
+    ///
+    /// This avoids the creation and use of the internal buffer.  This is
+    /// for internal use only, because the public-facing API has
+    /// Rope::from_str(), which actually uses this for its implementation.
+    pub(crate) fn build_at_once(mut self, chunk: &str) -> Rope {
+        self.append_internal(chunk, true);
+        self.finish_internal(true)
+    }
+
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!).
     ///
     /// Appends `contents` to the in-progress rope as a single leaf
@@ -84,25 +105,14 @@ impl RopeBuilder {
         self.append_leaf_node(Arc::new(Node::Leaf(NodeText::from_str(contents))));
     }
 
-    /// Finishes the build, and returns the `Rope`.
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!).
     ///
-    /// Note: this method consumes the builder.  If you want to continue
-    /// building other ropes with the same prefix, you can clone the builder
-    /// before calling `finish()`.
-    pub fn finish(mut self) -> Rope {
-        // Append the last leaf
-        self.append_internal("", true);
-        self.finish_internal()
-    }
-
-    /// Builds a rope all at once from a single string slice.
-    ///
-    /// This avoids the creation and use of the internal buffer.  This is
-    /// for internal use only, because the public-facing API has
-    /// Rope::from_str(), which actually uses this for its implementation.
-    pub(crate) fn build_at_once(mut self, chunk: &str) -> Rope {
-        self.append_internal(chunk, true);
-        self.finish_internal()
+    /// Finishes the build without doing any tree fixing to adhere
+    /// to the btree invariants. To be used with `_append_chunk()` to
+    /// construct ropes with specific chunk boundaries for testing.
+    #[doc(hidden)]
+    pub fn _finish_no_fix(self) -> Rope {
+        self.finish_internal(false)
     }
 
     //-----------------------------------------------------------------
@@ -136,7 +146,11 @@ impl RopeBuilder {
     }
 
     // Internal workings of `finish()`.
-    fn finish_internal(mut self) -> Rope {
+    //
+    // When `fix_tree` is false, the resulting node tree is NOT fixed up
+    // to adhere to the btree invariants.  This is useful for some testing
+    // code.  But generally, `fix_tree` should be set to true.
+    fn finish_internal(mut self, fix_tree: bool) -> Rope {
         // Zip up all the remaining nodes on the stack
         let mut stack_idx = self.stack.len() - 1;
         while stack_idx >= 1 {
@@ -150,19 +164,25 @@ impl RopeBuilder {
             stack_idx -= 1;
         }
 
-        // Get root and fix any right-side nodes with too few children or.
-        let mut root = self.stack.pop().unwrap();
-        Arc::make_mut(&mut root).zip_fix_right();
+        // Create the rope.
+        let mut rope = Rope {
+            root: self.stack.pop().unwrap(),
+        };
 
-        // Create the rope, make sure it's well-formed, and return it.
-        let mut rope = Rope { root: root };
-        if self.last_chunk_len_bytes < MIN_BYTES && self.last_chunk_len_bytes != rope.len_bytes() {
-            // Merge the last chunk if it was too small.
-            let idx =
-                rope.len_chars() - rope.byte_to_char(rope.len_bytes() - self.last_chunk_len_bytes);
-            Arc::make_mut(&mut rope.root).fix_tree_seam(idx);
+        // Fix up the tree to be well-formed.
+        if fix_tree {
+            Arc::make_mut(&mut rope.root).zip_fix_right();
+            if self.last_chunk_len_bytes < MIN_BYTES
+                && self.last_chunk_len_bytes != rope.len_bytes()
+            {
+                // Merge the last chunk if it was too small.
+                let idx = rope.len_chars()
+                    - rope.byte_to_char(rope.len_bytes() - self.last_chunk_len_bytes);
+                Arc::make_mut(&mut rope.root).fix_tree_seam(idx);
+            }
+            rope.pull_up_singular_nodes();
         }
-        rope.pull_up_singular_nodes();
+
         return rope;
     }
 
