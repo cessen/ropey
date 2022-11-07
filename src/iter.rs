@@ -2455,7 +2455,7 @@ mod tests {
         let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
         for i in 0..r.len_chars() {
             let s = r.slice(..i);
-            let mut lines = s.lines();
+            let lines = s.lines();
             assert_eq!(lines.len(), 1 + ((i + 1) / 2));
             assert_eq!(lines.len(), lines.count());
         }
@@ -2559,7 +2559,7 @@ mod tests {
         let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
         for i in 0..r.len_chars() {
             let s = r.slice(..i);
-            let mut lines = s.lines_at(((i + 1) / 2)).reversed();
+            let lines = s.lines_at((i + 1) / 2).reversed();
             assert_eq!(lines.len(), lines.count());
         }
     }

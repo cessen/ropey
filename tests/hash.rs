@@ -2,7 +2,7 @@ extern crate ropey;
 
 use std::hash::{Hash, Hasher};
 
-use ropey::{Rope, RopeBuilder};
+use ropey::RopeBuilder;
 
 const SMALL_TEXT: &str = include_str!("small_ascii.txt");
 
