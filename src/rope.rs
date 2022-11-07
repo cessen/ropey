@@ -2052,14 +2052,7 @@ impl std::cmp::PartialOrd<Rope> for Rope {
 
 impl std::hash::Hash for Rope {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        for chunk in self.chunks() {
-            state.write(chunk.as_bytes());
-        }
-
-        // Same strategy as `&str` in stdlib, so that e.g. two adjacent
-        // fields in a `#[derive(Hash)]` struct with "Hi " and "there"
-        // vs "Hi t" and "here" give the struct a different hash.
-        state.write_u8(0xff)
+        self.slice(..).hash(state)
     }
 }
 

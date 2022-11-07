@@ -1974,8 +1974,51 @@ impl<'a, 'b> std::cmp::PartialOrd<RopeSlice<'b>> for RopeSlice<'a> {
 
 impl<'a> std::hash::Hash for RopeSlice<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // `std::hash::Hasher` only guarantees the same hash output for
+        // exactly the same calls to `Hasher::write()`.  Just submitting
+        // the same data in the same order isn't enough--it also has to
+        // be split the same between calls.  So we go to some effort here
+        // to ensure that we always submit the text data in the same
+        // fixed-size blocks, even if those blocks don't align with chunk
+        // boundaries at all.
+        //
+        // The naive approach is to always copy to a fixed-size buffer
+        // and submit the buffer whenever it fills up.  We conceptually
+        // follow that approach here, but we do a little better by
+        // skipping the buffer and directly passing the data without
+        // copying when possible.
+        const BLOCK_SIZE: usize = 256;
+
+        let mut buffer = [0u8; BLOCK_SIZE];
+        let mut buffer_len = 0;
+
         for chunk in self.chunks() {
-            state.write(chunk.as_bytes());
+            let mut data = chunk.as_bytes();
+
+            while !data.is_empty() {
+                if buffer_len == 0 && data.len() >= BLOCK_SIZE {
+                    // Process data directly, skipping the buffer.
+                    let (head, tail) = data.split_at(BLOCK_SIZE);
+                    state.write(head);
+                    data = tail;
+                } else if buffer_len == BLOCK_SIZE {
+                    // Process the filled buffer.
+                    state.write(&buffer[..]);
+                    buffer_len = 0;
+                } else {
+                    // Append to the buffer.
+                    let n = (BLOCK_SIZE - buffer_len).min(data.len());
+                    let (head, tail) = data.split_at(n);
+                    (&mut buffer[buffer_len..(buffer_len + n)]).copy_from_slice(head);
+                    buffer_len += n;
+                    data = tail;
+                }
+            }
+        }
+
+        // Write any remaining unprocessed data in the buffer.
+        if buffer_len > 0 {
+            state.write(&buffer[..buffer_len]);
         }
 
         // Same strategy as `&str` in stdlib, so that e.g. two adjacent
