@@ -12,7 +12,7 @@ pub(crate) use self::text_info::TextInfo;
 pub(crate) type Count = u64;
 
 // Real constants used in release builds.
-#[cfg(not(test))]
+#[cfg(not(any(test, feature = "small_chunks")))]
 mod constants {
     use super::{Node, TextInfo};
     use smallvec::SmallVec;
@@ -90,7 +90,7 @@ mod constants {
 // Smaller constants used in debug builds.  These are different from release
 // in order to trigger deeper trees without having to use huge text data in
 // the tests.
-#[cfg(test)]
+#[cfg(any(test, feature = "small_chunks"))]
 mod test_constants {
     pub(crate) const MAX_CHILDREN: usize = 5;
     pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
@@ -100,8 +100,8 @@ mod test_constants {
     pub(crate) const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
 }
 
-#[cfg(not(test))]
+#[cfg(not(any(test, feature = "small_chunks")))]
 pub(crate) use self::constants::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};
 
-#[cfg(test)]
+#[cfg(any(test, feature = "small_chunks"))]
 pub(crate) use self::test_constants::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};
