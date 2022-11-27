@@ -2,7 +2,7 @@ extern crate ropey;
 
 use ropey::Rope;
 
-const MEDIUM_TEXT: &str = include_str!("medium.txt");
+const MEDIUM_TEXT: &str = include_str!("../benches/medium.txt");
 
 #[test]
 #[cfg_attr(miri, ignore)]
