@@ -543,7 +543,7 @@ impl<'a> ExactSizeIterator for Chars<'a> {}
 
 /// An iterator over a `Rope`'s lines.
 ///
-/// The returned lines include the line break at the end.
+/// The returned lines include the line break at the end, if any.
 ///
 /// The last line is returned even if blank, in which case it
 /// is returned as an empty slice.
@@ -564,15 +564,15 @@ pub struct Lines<'a> {
 enum LinesEnum<'a> {
     Full {
         /// A stack of nodes that represents the current tree position.
-        /// This stack contains only internal nodes, the leaf text is stored in the `Lines::text` field instead.
-        /// Because the tree depth is the same everywhere the size of this vector
-        /// does not change during iteration.
-        /// Each entry contains a tree node and the index of the current child
-        /// that is stored next on the stack (or the index of the leaf) for the last node.
+        /// This stack contains only internal nodes, the leaf text is
+        /// stored in the `Lines::text` field instead.
+        /// Each entry contains a tree node and the index of the current
+        /// child that is stored next on the stack (or the index of the
+        /// leaf) for the last node.
         node_stack: Vec<(&'a Arc<Node>, usize)>,
-        /// The position within the current leaf (`Lines::text`)
+        /// The position within the current leaf (`Lines::text`).
         leaf_byte_idx: u32,
-        /// The total number of bytes this iterator can transverse
+        /// The total number of bytes this iterator can traverse.
         total_bytes: usize,
     },
     Light,
@@ -617,7 +617,7 @@ impl<'a> Lines<'a> {
         debug_assert!(node.is_char_boundary(start_byte));
         debug_assert!(node.is_char_boundary(end_byte));
 
-        // Correctly cut off the first line and the last line
+        // Correctly cut off the first line and the last line.
         if AT_LINE {
             if line == line_idx_range.0 {
                 // Special case the first line to behave the same as the full slice.
@@ -666,8 +666,9 @@ impl<'a> Lines<'a> {
             }
         }
 
-        // Create and populate the node stack, and determine the char index
-        // within the first chunk, and byte index of the start of that chunk.
+        // Create and populate the node stack, and determine the char
+        // index within the first chunk, and byte index of the start of
+        // that chunk.
         let mut byte_idx = if AT_LINE { 0 } else { start_byte };
         let mut line_idx = line;
         let mut node_stack: Vec<(&Arc<Node>, usize)> = Vec::new();
@@ -681,9 +682,9 @@ impl<'a> Lines<'a> {
                         let line_start = byte_idx;
                         let mut leaf_byte_idx = line_to_byte_idx(text, line_idx);
                         let mut total_byte_pos = line_start + leaf_byte_idx;
-                        // In case the slice end splits a CRLF `line_to_byte_idx`
-                        // will return an index one past the end (so after `\r\n` instead of after `\r`).
-                        // check that case here
+                        // When the end of the slice splits a CRLF `line_to_byte_idx`
+                        // will return an index one past the end (so after `\r\n`
+                        // instead of after `\r`).  Check that case here.
                         if total_byte_pos > end_byte {
                             total_byte_pos = end_byte;
                             leaf_byte_idx = end_byte - line_start;
@@ -807,10 +808,10 @@ impl<'a> Lines<'a> {
             } => {
                 let tail = &text[..*leaf_byte_idx as usize];
                 // The only line yielded by this iterator that might not
-                // end with a line terminator is the very last line.
+                // end with a line break is the very last line.
                 // As the very last line requires a special conditon here anyway
                 // we can save the result so we don't have to count newlines later.
-                let ends_with_terminator = if take(at_end) {
+                let ends_with_line_break = if take(at_end) {
                     if ends_with_line_break(tail) {
                         *line_idx -= 1;
                         return Some(RopeSlice(RSEnum::Light {
@@ -844,21 +845,22 @@ impl<'a> Lines<'a> {
 
                 *byte_idx -= line.len();
 
-                // If the line is contained entirely within the current cound return it
+                // If the line is contained entirely within the current chunk, return it.
                 if line_inside_chunk {
                     *leaf_byte_idx = line_start as u32;
                     return Some(RopeSlice(RSEnum::Light {
                         text: line,
                         char_count: count_chars(line) as Count,
                         utf16_surrogate_count: count_utf16_surrogates(line) as Count,
-                        line_break_count: ends_with_terminator as Count,
+                        line_break_count: ends_with_line_break as Count,
                     }));
                 }
 
-                // We need to advance to the next preceding chunk that contains a line terminator.
-                // As the line might span across multiple chunks we track
-                // the small common parent node (and position within that node)
-                // during transversal to avoid expensive `RopeSlice` construction later.
+                // We need to advance to the next (preceding) chunk that contains
+                // a line break.  As the line might span across multiple chunks we
+                // track the smallest common parent node (and position within that
+                // node) during traversal to avoid expensive `RopeSlice` construction
+                // later.
                 let mut shared_parent = node_stack.len() - 1;
                 let mut pos_in_shared_parent = {
                     let (parent, child_i) = *node_stack.last().unwrap();
@@ -885,7 +887,8 @@ impl<'a> Lines<'a> {
 
                         if stack_idx < shared_parent {
                             // This is the deepest postion in the stack so far, so this
-                            // node is or new shared parent. Save it for `RopeSlice` construction later.
+                            // node is our new shared parent. Save it for `RopeSlice`
+                            // construction later.
                             for (node, child_i) in &node_stack[stack_idx..shared_parent] {
                                 for &child_pos in &node.children().info()[..*child_i] {
                                     pos_in_shared_parent += child_pos;
@@ -916,10 +919,11 @@ impl<'a> Lines<'a> {
                         // Find the start of the line within the chunk.
                         // The function used here is slightly different because it must
                         // not skip the first line break.
-                        // A linebreak at the end of the chunk is already the linebreak we are looking for.
-                        // The linebreak belonging to this line is always contained in the chunk we started this iteration at.
+                        // A line break at the end of the chunk is already the line break
+                        // we are looking for.  The line break belonging to this line is
+                        // always contained in the chunk we started this iteration at.
                         let mut line_start = prev_line_end_char_idx::<false>(text);
-                        // Cutoff the line at the start of the iterator.
+                        // Cut off the line at the start of the iterator.
                         let line_len = text.len() - line_start;
                         if line_len >= available_bytes {
                             line_start = text.len() - available_bytes;
@@ -928,16 +932,16 @@ impl<'a> Lines<'a> {
                     }
 
                     if info.bytes as usize >= available_bytes {
-                        // This chunk does not contain a like break but the current line still ends
-                        // here because the iterator is exhaused.
+                        // This chunk does not contain a line break but the current
+                        // line still ends here because the iterator is exhaused.
                         *text = node.children().nodes()[child_i].leaf_text();
                         break text.len() - *byte_idx;
                     }
 
                     len += info;
                     *byte_idx -= info.bytes as usize;
-                    // This line will end in the next chunk but already fully contains this chunk
-                    // so a full `RopeSlice` is definitly necessary.
+                    // This line will end in the next chunk but already fully contains
+                    // this chunk so a full `RopeSlice` is definitly necessary.
                     multi_chunk_slice = true;
                 };
 
@@ -947,8 +951,8 @@ impl<'a> Lines<'a> {
                 *leaf_byte_idx = head_start as u32;
 
                 // Construct the `RopeSlice` containing the line.
-                // Note that `head` never contains any linebreaks
-                // because the iterator stops at the first line break (see comment above).
+                // Note that `head` never contains any line breaks because the
+                // iterator stops at the first line break (see comment above).
                 let head_chars = count_chars(head) as Count;
                 let head_surrogates = count_utf16_surrogates(head) as Count;
                 let line = if multi_chunk_slice {
@@ -989,12 +993,7 @@ impl<'a> Lines<'a> {
                 if take(at_end) {
                     if text.is_empty() || ends_with_line_break(text) {
                         *line_idx -= 1;
-                        return Some(RopeSlice(RSEnum::Light {
-                            text: "",
-                            char_count: 0,
-                            utf16_surrogate_count: 0,
-                            line_break_count: 0,
-                        }));
+                        return Some("".into());
                     }
                 } else if *byte_idx == 0 {
                     return None;
@@ -1049,21 +1048,23 @@ impl<'a> Lines<'a> {
                 let mut line_len = line_to_byte_idx(head, 1);
 
                 // Check if the iterators needs to advance to the next chunk.
-                // During this check the number of newline (0 or 1) is yielded for free so save that aswell.
+                // During this check the number of newline (0 or 1) is yielded
+                // for free so save that aswell.
                 let available_bytes = total_bytes - *byte_idx;
                 let (line_inside_chunk, line_break_count) = if line_len >= available_bytes {
-                    // If the iterator is exhause we don't need to switch chunks.
-                    // Check if the last line has a line terminator
-                    // to decide whether we still need to yield an empty line later.
+                    // If the iterator is exhausted we don't need to switch chunks.
+                    // Check if the last line has a line break to decide whether
+                    // we still need to yield an empty line later.
                     line_len = available_bytes;
                     let ends_with_line_break = ends_with_line_break(&head[..line_len]);
                     *at_end = !ends_with_line_break;
-                    // reached EOF no need to advance
+                    // Reached end of the text, so no need to advance.
                     (true, ends_with_line_break as u64)
                 } else {
-                    // Iterator is not yet exhaused, advanmce to the next chunk
-                    // if we reached the chunk boundry and the last character is not a line break.
-                    // If the iterator is not exhaused a line always ends with a line terminator.
+                    // Iterator is not yet exhausted, so advance to the next chunk
+                    // if we've reached the chunk boundary and the last character
+                    // is not a line break.  If the iterator is not exhausted, a
+                    // line always ends with a line break.
                     (line_len != head.len() || ends_with_line_break(head), 1)
                 };
 
@@ -1083,10 +1084,12 @@ impl<'a> Lines<'a> {
 
                 *byte_idx += head.len();
 
-                // We need to advance to the next preceding chunk that contains a line terminator.
+                // We need to advance to the next chunk that contains a
+                // line break.
                 // As the line might span across multiple chunks we track
-                // the smallest common parent node (and position within that node)
-                // during transversal to avoid expensive `RopeSlice` construction later.
+                // the smallest common parent node (and position within
+                // that node) during traversal to avoid expensive
+                // `RopeSlice` construction later.
                 let mut shared_parent = node_stack.len() - 1;
                 let mut pos_in_shared_parent = {
                     let (parent, child_i) = *node_stack.last().unwrap();
@@ -1106,7 +1109,8 @@ impl<'a> Lines<'a> {
                     // Advance to the next sibling.
                     *child_i += 1;
 
-                    // If the iterator has reached the end of the node advance to the next sibiling.
+                    // If the iterator has reached the end of the node, advance
+                    // to the next sibiling.
                     if *child_i >= node_stack[stack_idx].0.child_count() {
                         while node_stack[stack_idx].1 >= (node_stack[stack_idx].0.child_count() - 1)
                         {
@@ -1115,7 +1119,8 @@ impl<'a> Lines<'a> {
                         }
                         if stack_idx < shared_parent {
                             // This is the deepest postion in the stack so far, so this
-                            // node is or new shared parent. Save it for `RopeSlice` construction later.
+                            // node is or new shared parent. Save it for `RopeSlice`
+                            // construction later.
                             for (node, child_i) in &node_stack[stack_idx..shared_parent] {
                                 for &child_pos in &node.children().info()[..*child_i] {
                                     pos_in_shared_parent += child_pos;
@@ -1142,9 +1147,9 @@ impl<'a> Lines<'a> {
                         *text = node.children().nodes()[child_i].leaf_text();
                         // Find the end of the line within the chunk.
                         let mut line_end = line_to_byte_idx(text, 1);
-                        // Check if the iterator was exhaused.
+                        // Check if the iterator was exhausted.
                         let ends_with_newline = if line_end >= available_bytes {
-                            // Handle terminating lines without newline terminator properly.
+                            // Handle terminating lines without a line break properly.
                             line_end = available_bytes;
                             let ends_with_newline = ends_with_line_break(&text[..line_end]);
                             *at_end = !ends_with_newline;
@@ -1156,8 +1161,8 @@ impl<'a> Lines<'a> {
                     }
 
                     if info.bytes as usize >= available_bytes {
-                        // This chunk does not contain a like break but the current line still ends
-                        // here because the iterator is exhaused.
+                        // This chunk does not contain a line break but the current
+                        // line still ends here because the iterator is exhausted.
                         *at_end = true;
                         *text = node.children().nodes()[child_i].leaf_text();
                         break (available_bytes, false);
@@ -1168,7 +1173,7 @@ impl<'a> Lines<'a> {
                     multi_chunk_slice = true;
                 };
 
-                // book keeping
+                // Book keeping.
                 *byte_idx += tail_len;
                 *leaf_byte_idx = tail_len as u32;
 
@@ -1215,12 +1220,7 @@ impl<'a> Lines<'a> {
                 } else if *byte_idx == text.len() {
                     *at_end = true;
                     *line_idx += 1;
-                    return Some(RopeSlice(RSEnum::Light {
-                        text: "",
-                        char_count: 0,
-                        utf16_surrogate_count: 0,
-                        line_break_count: 0,
-                    }));
+                    return Some("".into());
                 }
 
                 let start_idx = *byte_idx;
