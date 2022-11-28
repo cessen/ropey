@@ -2845,7 +2845,11 @@ mod tests {
         for i in 0..r.len_chars() {
             let s = r.slice(..i);
             let lines = s.lines();
-            assert_eq!(lines.len(), 1 + ((i + 1) / 2));
+            if cfg!(any(feature = "cr_lines", feature = "unicode_lines")) {
+                assert_eq!(lines.len(), 1 + ((i + 1) / 2));
+            } else {
+                assert_eq!(lines.len(), 1 + (i / 2));
+            }
             assert_eq!(lines.len(), lines.count());
         }
     }
