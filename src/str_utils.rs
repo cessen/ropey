@@ -64,16 +64,20 @@ pub(crate) fn utf16_code_unit_to_char_idx(text: &str, utf16_idx: usize) -> usize
 ///
 /// This function is narrow in scope, only being used for iterating
 /// backwards over the lines of a `str`.
-pub(crate) fn prev_line_end_char_idx(text: &str) -> usize {
+pub(crate) fn prev_line_end_char_idx<const SKIP_FIRST: bool>(text: &str) -> usize {
     let mut itr = text.bytes().enumerate().rev();
 
     // This code always needs to execute, but the variable is only needed
     // for certain feature sets, so silence the warning.
     #[allow(unused_variables)]
-    let first_byte = if let Some((_, byte)) = itr.next() {
-        byte
+    let first_byte = if SKIP_FIRST {
+        if let Some((_, byte)) = itr.next() {
+            byte
+        } else {
+            return 0;
+        }
     } else {
-        return 0;
+        0xff
     };
 
     while let Some((idx, byte)) = itr.next() {
@@ -84,7 +88,7 @@ pub(crate) fn prev_line_end_char_idx(text: &str) -> usize {
             0x0D =>
             {
                 #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
-                if first_byte != 0x0A {
+                if !SKIP_FIRST || first_byte != 0x0A {
                     return idx + 1;
                 }
             }
@@ -155,11 +159,11 @@ mod tests {
                         There\u{2028}is something.\u{2029}";
 
         assert_eq!(48, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(8, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(1, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(0, text.len());
     }
 
@@ -170,13 +174,13 @@ mod tests {
                         There\u{2028}is something.\u{2029}";
 
         assert_eq!(48, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(9, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(8, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(1, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(0, text.len());
     }
 
@@ -187,21 +191,21 @@ mod tests {
                         There\u{2028}is something.\u{2029}";
 
         assert_eq!(48, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(32, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(22, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(17, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(13, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(9, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(8, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(1, text.len());
-        text = &text[..prev_line_end_char_idx(text)];
+        text = &text[..prev_line_end_char_idx::<true>(text)];
         assert_eq!(0, text.len());
     }
 
