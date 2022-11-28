@@ -3,6 +3,20 @@
 
 ## [Unreleased]
 
+### Performance
+- A much faster `Lines` iterator, thanks to @pascalkuthe (PR #70).
+
+### Bug fixes
+- Ropey's `Hash` impl was incorrect, due to making incorrect assumptions about the guaranteed behavior of `Hasher`s.  This didn't cause any problems with Rust's default hasher, but was incorrect in the general case.
+- Comparing ropes for equality would panic when the two ropes had chunk boundaries that weren't mutually aligned at char boundaries.
+- `len_lines()` could give incorrect counts on `RopeSlice`s that split CRLF pairs.
+- Ropey's internal B-Tree representation could (rarely) end up in a state that violated some invariants.  This didn't affect anything in practice, because no code currently depends on the violated invariant.  But future code might.
+
+
+## 1.5.1-alpha - 2022-11-27
+
+- Special early release, mainly to accomodate the Helix project.  It is not recommended to use this release outside of Helix.
+
 
 ## [1.5.0] - 2022-05-29
 
