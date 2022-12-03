@@ -38,7 +38,7 @@ use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN, MIN_BYT
 ///
 /// assert_eq!(rope, "Hello world!\nHow's it going?");
 /// ```
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RopeBuilder {
     stack: SmallVec<[Arc<Node>; 4]>,
     buffer: String,
@@ -291,6 +291,12 @@ impl RopeBuilder {
     }
 }
 
+impl Default for RopeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 enum NextText<'a> {
     None,
     UseBuffer,
@@ -326,6 +332,22 @@ mod tests {
         b.append("こんにち");
         b.append("は、みんなさ");
         b.append("ん！");
+
+        let r = b.finish();
+
+        assert_eq!(r, TEXT);
+
+        r.assert_integrity();
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn rope_builder_default_01() {
+        let mut b = RopeBuilder::default();
+
+        b.append("Hello there!  How're you doing?\r");
+        b.append("\nIt's a fine day, isn't it?\r\nAren't you ");
+        b.append("glad we're alive?\r\nこんにちは、みんなさん！");
 
         let r = b.finish();
 
