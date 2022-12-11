@@ -593,7 +593,7 @@ impl<'a> Lines<'a> {
         byte_idx_range: (usize, usize),
         line_idx_range: (usize, usize),
     ) -> Lines {
-        Lines::new_with_range_at_impl::<false>(node, 0, byte_idx_range, line_idx_range)
+        Lines::new_with_range_at_impl(node, false, 0, byte_idx_range, line_idx_range)
     }
 
     pub(crate) fn new_with_range_at(
@@ -602,11 +602,12 @@ impl<'a> Lines<'a> {
         byte_idx_range: (usize, usize),
         line_idx_range: (usize, usize),
     ) -> Lines {
-        Lines::new_with_range_at_impl::<true>(node, at_line, byte_idx_range, line_idx_range)
+        Lines::new_with_range_at_impl(node, true, at_line, byte_idx_range, line_idx_range)
     }
 
-    fn new_with_range_at_impl<const AT_LINE: bool>(
+    fn new_with_range_at_impl(
         node: &Arc<Node>,
+        at_line: bool,
         line: usize,
         byte_idx_range: (usize, usize),
         line_idx_range: (usize, usize),
@@ -618,7 +619,7 @@ impl<'a> Lines<'a> {
         debug_assert!(node.is_char_boundary(end_byte));
 
         // Correctly cut off the first line and the last line.
-        if AT_LINE {
+        if at_line {
             if line == line_idx_range.0 {
                 // Special case the first line to behave the same as the full slice.
                 return Lines::new_with_range(node, byte_idx_range, line_idx_range);
@@ -659,7 +660,7 @@ impl<'a> Lines<'a> {
         // If root is a leaf, return light version of the iter.
         if node.is_leaf() {
             let text = &node.leaf_text()[start_byte..end_byte];
-            if AT_LINE {
+            if at_line {
                 return Lines::from_str_at(text, line, total_lines);
             } else {
                 return Lines::from_str(text, total_lines);
@@ -669,16 +670,16 @@ impl<'a> Lines<'a> {
         // Create and populate the node stack, and determine the char
         // index within the first chunk, and byte index of the start of
         // that chunk.
-        let mut byte_idx = if AT_LINE { 0 } else { start_byte };
+        let mut byte_idx = if at_line { 0 } else { start_byte };
         let mut line_idx = line;
         let mut node_stack: Vec<(&Arc<Node>, usize)> = Vec::new();
         let mut node_ref = node;
         loop {
             match **node_ref {
                 Node::Leaf(ref text) => {
-                    debug_assert!(!AT_LINE || byte_idx + text.len() > start_byte);
+                    debug_assert!(!at_line || byte_idx + text.len() > start_byte);
 
-                    let (leaf_byte_idx, byte_idx) = if AT_LINE {
+                    let (leaf_byte_idx, byte_idx) = if at_line {
                         let line_start = byte_idx;
                         let mut leaf_byte_idx = line_to_byte_idx(text, line_idx);
                         let mut total_byte_pos = line_start + leaf_byte_idx;
@@ -704,7 +705,7 @@ impl<'a> Lines<'a> {
                         text,
                         byte_idx,
                         at_end: false,
-                        line_idx: if AT_LINE { line - line_idx_range.0 } else { 0 },
+                        line_idx: if at_line { line - line_idx_range.0 } else { 0 },
                         total_lines,
                     };
 
@@ -713,7 +714,7 @@ impl<'a> Lines<'a> {
                 Node::Internal(ref children) => {
                     let child_i;
                     let acc;
-                    if AT_LINE {
+                    if at_line {
                         (child_i, acc) = children.search_line_break_idx(line_idx as usize);
                         byte_idx += acc.bytes as usize;
                         line_idx -= acc.line_breaks as usize;
@@ -828,7 +829,7 @@ impl<'a> Lines<'a> {
                     true
                 };
 
-                let mut line_start = prev_line_end_char_idx::<true>(tail);
+                let mut line_start = prev_line_end_char_idx(true, tail);
 
                 *line_idx -= 1;
 
@@ -922,7 +923,7 @@ impl<'a> Lines<'a> {
                         // A line break at the end of the chunk is already the line break
                         // we are looking for.  The line break belonging to this line is
                         // always contained in the chunk we started this iteration at.
-                        let mut line_start = prev_line_end_char_idx::<false>(text);
+                        let mut line_start = prev_line_end_char_idx(false, text);
                         // Cut off the line at the start of the iterator.
                         let line_len = text.len() - line_start;
                         if line_len >= available_bytes {
@@ -1000,7 +1001,7 @@ impl<'a> Lines<'a> {
                 }
 
                 let end_idx = *byte_idx;
-                let start_idx = prev_line_end_char_idx::<true>(&text[..end_idx]);
+                let start_idx = prev_line_end_char_idx(true, &text[..end_idx]);
                 *byte_idx = start_idx;
                 *line_idx -= 1;
                 let line = &text[start_idx..end_idx];
