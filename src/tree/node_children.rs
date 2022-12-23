@@ -296,25 +296,39 @@ impl NodeChildren {
     }
 
     /// Returns the child index and left-side-accumulated text info of the
-    /// child that contains the given byte.
+    /// first child that matches the given predicate.
     ///
-    /// One-past-the end is valid, and will return the last child.
-    pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
+    /// If no child matches the predicate, the last child is returned.
+    #[inline(always)]
+    pub fn search_by<F>(&self, pred: F) -> (usize, TextInfo)
+    where
+        // (left-accumulated start info, left-accumulated end info)
+        F: Fn(TextInfo, TextInfo) -> bool,
+    {
         debug_assert!(self.len() > 0);
 
         let mut accum = TextInfo::new();
         let mut idx = 0;
         for info in self.info()[0..(self.len() - 1)].iter() {
             let next_accum = accum + *info;
-            if byte_idx < next_accum.bytes as usize {
+            if pred(accum, next_accum) {
                 break;
             }
             accum = next_accum;
             idx += 1;
         }
 
-        #[cfg(any(test, debug_assertions))]
-        assert!(
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given byte.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) = self.search_by(|_, end| byte_idx < end.bytes as usize);
+
+        debug_assert!(
             byte_idx <= (accum.bytes + self.info()[idx].bytes) as usize,
             "Index out of bounds."
         );
@@ -327,21 +341,9 @@ impl NodeChildren {
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
-        debug_assert!(self.len() > 0);
+        let (idx, accum) = self.search_by(|_, end| char_idx < end.chars as usize);
 
-        let mut accum = TextInfo::new();
-        let mut idx = 0;
-        for info in self.info()[0..(self.len() - 1)].iter() {
-            let next_accum = accum + *info;
-            if char_idx < next_accum.chars as usize {
-                break;
-            }
-            accum = next_accum;
-            idx += 1;
-        }
-
-        #[cfg(any(test, debug_assertions))]
-        assert!(
+        debug_assert!(
             char_idx <= (accum.chars + self.info()[idx].chars) as usize,
             "Index out of bounds."
         );
@@ -354,21 +356,10 @@ impl NodeChildren {
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
-        debug_assert!(self.len() > 0);
+        let (idx, accum) =
+            self.search_by(|_, end| utf16_idx < (end.chars + end.utf16_surrogates) as usize);
 
-        let mut accum = TextInfo::new();
-        let mut idx = 0;
-        for info in self.info()[0..(self.len() - 1)].iter() {
-            let next_accum = accum + *info;
-            if utf16_idx < (next_accum.chars + next_accum.utf16_surrogates) as usize {
-                break;
-            }
-            accum = next_accum;
-            idx += 1;
-        }
-
-        #[cfg(any(test, debug_assertions))]
-        assert!(
+        debug_assert!(
             utf16_idx
                 <= (accum.chars
                     + accum.utf16_surrogates
@@ -418,21 +409,9 @@ impl NodeChildren {
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_line_break_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
-        debug_assert!(self.len() > 0);
+        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks as usize);
 
-        let mut accum = TextInfo::new();
-        let mut idx = 0;
-        for info in self.info()[0..(self.len() - 1)].iter() {
-            let next_accum = accum + *info;
-            if line_break_idx <= next_accum.line_breaks as usize {
-                break;
-            }
-            accum = next_accum;
-            idx += 1;
-        }
-
-        #[cfg(any(test, debug_assertions))]
-        assert!(
+        debug_assert!(
             line_break_idx <= (accum.line_breaks + self.info()[idx].line_breaks + 1) as usize,
             "Index out of bounds."
         );

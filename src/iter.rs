@@ -579,71 +579,41 @@ enum LinesEnum<'a> {
 }
 
 impl<'a> Lines<'a> {
+    #[inline(always)]
     pub(crate) fn new(node: &Arc<Node>) -> Lines {
         let info = node.text_info();
-        Lines::new_with_range(
+        Lines::new_with_range_at(
             node,
+            0,
             (0, info.bytes as usize),
             (0, info.line_breaks as usize + 1),
         )
     }
 
+    #[inline(always)]
     pub(crate) fn new_with_range(
         node: &Arc<Node>,
         byte_idx_range: (usize, usize),
         line_idx_range: (usize, usize),
     ) -> Lines {
-        Lines::new_with_range_at_impl(node, false, 0, byte_idx_range, line_idx_range)
+        Lines::new_with_range_at(node, line_idx_range.0, byte_idx_range, line_idx_range)
     }
 
     pub(crate) fn new_with_range_at(
         node: &Arc<Node>,
-        at_line: usize,
-        byte_idx_range: (usize, usize),
-        line_idx_range: (usize, usize),
-    ) -> Lines {
-        Lines::new_with_range_at_impl(node, true, at_line, byte_idx_range, line_idx_range)
-    }
-
-    fn new_with_range_at_impl(
-        node: &Arc<Node>,
-        at_line: bool,
         line: usize,
         byte_idx_range: (usize, usize),
         line_idx_range: (usize, usize),
     ) -> Lines {
+        debug_assert!(node.is_char_boundary(byte_idx_range.0));
+        debug_assert!(node.is_char_boundary(byte_idx_range.1));
+        debug_assert!(line >= line_idx_range.0);
+
         // For convenience/readability.
-        let start_byte = byte_idx_range.0;
-        let end_byte = byte_idx_range.1;
-        debug_assert!(node.is_char_boundary(start_byte));
-        debug_assert!(node.is_char_boundary(end_byte));
+        let total_lines = line_idx_range.1 - line_idx_range.0;
 
-        // Correctly cut off the first line and the last line.
-        if at_line {
-            if line == line_idx_range.0 {
-                // Special case the first line to behave the same as the full slice.
-                return Lines::new_with_range(node, byte_idx_range, line_idx_range);
-            } else if line >= line_idx_range.1 {
-                // The last line can be handeled by going to teh second to last line
-                // and then advancing the iterator by 1.
-                // This avoids implementing yet another special case and uses the
-                // special case build into the iterator instead.
-                // Note: You can not perform the same trick for the first line
-                // because for slices where line_idx_range.1 == line_idx_range.0 + 1
-                // these two cases recuse into each other.
-                let mut res = Lines::new_with_range_at(
-                    node,
-                    line_idx_range.1 - 1,
-                    byte_idx_range,
-                    line_idx_range,
-                );
-                res.next();
-                return res;
-            }
-        }
-
-        // Special-case for empty slices.
-        if start_byte == end_byte {
+        // Special-case: empty slice/rope.
+        if byte_idx_range.0 == byte_idx_range.1 {
             return Lines {
                 iter: LinesEnum::Light,
                 text: "",
@@ -655,75 +625,68 @@ impl<'a> Lines<'a> {
             };
         }
 
-        let total_lines = line_idx_range.1 - line_idx_range.0;
-
-        // If root is a leaf, return light version of the iter.
+        // Special-case: root is a leaf.  Return light version of the iterator.
         if node.is_leaf() {
-            let text = &node.leaf_text()[start_byte..end_byte];
-            if at_line {
-                return Lines::from_str_at(text, line, total_lines);
-            } else {
-                return Lines::from_str(text, total_lines);
-            }
+            let text = &node.leaf_text()[byte_idx_range.0..byte_idx_range.1];
+            return Lines::from_str_at(text, line - line_idx_range.0, total_lines);
         }
 
-        // Create and populate the node stack, and determine the char
-        // index within the first chunk, and byte index of the start of
-        // that chunk.
-        let mut byte_idx = if at_line { 0 } else { start_byte };
+        // Common case.  Traverse into the tree to build the iterator.
+        let mut start_byte_idx = byte_idx_range.0;
+        let mut end_byte_idx = byte_idx_range.1;
         let mut line_idx = line;
+        let mut chunk_byte_start = 0;
         let mut node_stack: Vec<(&Arc<Node>, usize)> = Vec::new();
         let mut node_ref = node;
         loop {
             match **node_ref {
-                Node::Leaf(ref text) => {
-                    debug_assert!(!at_line || byte_idx + text.len() > start_byte);
-
-                    let (leaf_byte_idx, byte_idx) = if at_line {
-                        let line_start = byte_idx;
-                        let mut leaf_byte_idx = line_to_byte_idx(text, line_idx);
-                        let mut total_byte_pos = line_start + leaf_byte_idx;
-                        // When the end of the slice splits a CRLF `line_to_byte_idx`
-                        // will return an index one past the end (so after `\r\n`
-                        // instead of after `\r`).  Check that case here.
-                        if total_byte_pos > end_byte {
-                            total_byte_pos = end_byte;
-                            leaf_byte_idx = end_byte - line_start;
+                // Recursively traverse into whichever child has the target line break,
+                // bounded by the start and end bytes of the slice/rope.
+                Node::Internal(ref children) => {
+                    // Find the appropriate child.
+                    let (child_i, acc) = children.search_by(|_, end_info| {
+                        if (end_info.bytes as usize) >= end_byte_idx {
+                            true
+                        } else if line_idx <= (end_info.line_breaks as usize) {
+                            (end_info.bytes as usize) > start_byte_idx
+                        } else {
+                            false
                         }
-                        (leaf_byte_idx as u32, total_byte_pos - start_byte)
-                    } else {
-                        (byte_idx as u32, 0)
-                    };
+                    });
+
+                    // Update tracking info.
+                    start_byte_idx = start_byte_idx.saturating_sub(acc.bytes as usize);
+                    end_byte_idx -= acc.bytes as usize;
+                    line_idx -= acc.line_breaks as usize;
+                    chunk_byte_start += acc.bytes as usize;
+
+                    // Add to the node stack.
+                    node_stack.push((node_ref, child_i));
+                    node_ref = &children.nodes()[child_i];
+                }
+
+                // Create the iterator.
+                Node::Leaf(ref text) => {
+                    let leaf_byte_idx = line_to_byte_idx(text, line_idx)
+                        .max(start_byte_idx)
+                        .min(end_byte_idx);
 
                     let res = Lines {
                         iter: LinesEnum::Full {
                             node_stack,
-                            leaf_byte_idx,
-                            total_bytes: end_byte - start_byte,
+                            leaf_byte_idx: leaf_byte_idx as u32,
+                            total_bytes: byte_idx_range.1 - byte_idx_range.0,
                         },
                         is_reversed: false,
                         text,
-                        byte_idx,
-                        at_end: false,
-                        line_idx: if at_line { line - line_idx_range.0 } else { 0 },
+                        byte_idx: chunk_byte_start + leaf_byte_idx - byte_idx_range.0,
+                        at_end: leaf_byte_idx == end_byte_idx
+                            && line_idx > byte_to_line_idx(&text[..end_byte_idx], end_byte_idx),
+                        line_idx: line - line_idx_range.0,
                         total_lines,
                     };
 
                     return res;
-                }
-                Node::Internal(ref children) => {
-                    let child_i;
-                    let acc;
-                    if at_line {
-                        (child_i, acc) = children.search_line_break_idx(line_idx as usize);
-                        byte_idx += acc.bytes as usize;
-                        line_idx -= acc.line_breaks as usize;
-                    } else {
-                        (child_i, acc) = children.search_byte_idx(byte_idx as usize);
-                        byte_idx -= acc.bytes as usize;
-                    };
-                    node_stack.push((node_ref, child_i));
-                    node_ref = &children.nodes()[child_i];
                 }
             }
         }
