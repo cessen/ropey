@@ -59,38 +59,21 @@ pub(crate) fn utf16_code_unit_to_char_idx(text: &str, utf16_idx: usize) -> usize
     str_indices::chars::from_byte_idx(text, str_indices::utf16::to_byte_idx(text, utf16_idx))
 }
 
-/// Returns the byte position just after the second-to-last line break
-/// in `text`, or zero of there is no second-to-last line break.
+/// Returns the byte index of the start of the last line of the passed text.
 ///
-/// This function is narrow in scope, only being used for iterating
-/// backwards over the lines of a `str`.
-pub(crate) fn prev_line_end_char_idx(skip_first: bool, text: &str) -> usize {
+/// Note: if the text ends in a line break, that means the last line is
+/// an empty line that starts at the end of the text.
+pub(crate) fn last_line_start_byte_idx(text: &str) -> usize {
     let mut itr = text.bytes().enumerate().rev();
-
-    // This code always needs to execute, but the variable is only needed
-    // for certain feature sets, so silence the warning.
-    #[allow(unused_variables)]
-    let first_byte = if skip_first {
-        if let Some((_, byte)) = itr.next() {
-            byte
-        } else {
-            return 0;
-        }
-    } else {
-        0xff
-    };
 
     while let Some((idx, byte)) = itr.next() {
         match byte {
             0x0A => {
                 return idx + 1;
             }
-            0x0D =>
-            {
+            0x0D => {
                 #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
-                if !skip_first || first_byte != 0x0A {
-                    return idx + 1;
-                }
+                return idx + 1;
             }
             0x0B | 0x0C => {
                 #[cfg(feature = "unicode_lines")]
@@ -119,12 +102,56 @@ pub(crate) fn prev_line_end_char_idx(skip_first: bool, text: &str) -> usize {
     return 0;
 }
 
+/// Trims a single trailing line break (if any) off the end of the passed string.
+///
+/// If the string doesn't end in a line break, returns the string unchanged.
+#[inline]
+pub(crate) fn trim_line_break(text: &str) -> &str {
+    if text.is_empty() {
+        return "";
+    }
+
+    // Find the starting boundary of the last codepoint.
+    let mut i = text.len() - 1;
+    while !text.is_char_boundary(i) {
+        i -= 1;
+    }
+
+    let tail = &text[i..];
+
+    // Check if it's one of the fancy unicode line breaks.
+    #[cfg(feature = "unicode_lines")]
+    if matches!(
+        tail,
+        "\u{000B}" | "\u{000C}" | "\u{0085}" | "\u{2028}" | "\u{2029}"
+    ) {
+        return &text[..i];
+    }
+
+    #[cfg(feature = "cr_lines")]
+    if tail == "\u{000D}" {
+        return &text[..i];
+    }
+
+    if tail == "\u{000A}" {
+        #[cfg(feature = "cr_lines")]
+        if i > 0 && text.as_bytes()[i - 1] == 0xd {
+            return &text[..(i - 1)];
+        }
+
+        return &text[..i];
+    }
+
+    return text;
+}
+
 /// Returns whether the given string ends in a line break or not.
 #[inline]
 pub(crate) fn ends_with_line_break(text: &str) -> bool {
     if text.is_empty() {
         return false;
     }
+
     // Find the starting boundary of the last codepoint.
     let mut i = text.len() - 1;
     while !text.is_char_boundary(i) {
@@ -132,7 +159,6 @@ pub(crate) fn ends_with_line_break(text: &str) -> bool {
     }
 
     // Check if the last codepoint is a line break.
-
     #[cfg(feature = "unicode_lines")]
     return matches!(
         &text[i..],
@@ -154,59 +180,158 @@ mod tests {
 
     #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
     #[test]
-    fn prev_line_end_char_idx_lf_01() {
+    fn last_line_start_byte_idx_lf_01() {
+        assert_eq!(0, last_line_start_byte_idx(""));
+        assert_eq!(0, last_line_start_byte_idx("Hi"));
+
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000A}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{000B}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{000C}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{000D}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{0085}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{2028}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{2029}there."));
+    }
+
+    #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+    #[test]
+    fn last_line_start_byte_idx_lf_02() {
         let mut text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
                         There\u{2028}is something.\u{2029}";
 
         assert_eq!(48, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(8, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(1, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(0, text.len());
     }
 
     #[cfg(all(feature = "cr_lines", not(feature = "unicode_lines")))]
     #[test]
-    fn prev_line_end_char_idx_crlf_01() {
+    fn last_line_start_byte_idx_crlf_01() {
+        assert_eq!(0, last_line_start_byte_idx(""));
+        assert_eq!(0, last_line_start_byte_idx("Hi"));
+
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000A}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{000B}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{000C}there."));
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000D}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{0085}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{2028}there."));
+        assert_eq!(0, last_line_start_byte_idx("Hi\u{2029}there."));
+    }
+
+    #[cfg(all(feature = "cr_lines", not(feature = "unicode_lines")))]
+    #[test]
+    fn last_line_start_byte_idx_crlf_02() {
         let mut text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
                         There\u{2028}is something.\u{2029}";
 
         assert_eq!(48, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(9, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(8, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(1, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(0, text.len());
     }
 
     #[cfg(feature = "unicode_lines")]
     #[test]
-    fn prev_line_end_char_idx_unicode_01() {
+    fn last_line_start_byte_idx_unicode_01() {
+        assert_eq!(0, last_line_start_byte_idx(""));
+        assert_eq!(0, last_line_start_byte_idx("Hi"));
+
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000A}there."));
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000B}there."));
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000C}there."));
+        assert_eq!(3, last_line_start_byte_idx("Hi\u{000D}there."));
+        assert_eq!(4, last_line_start_byte_idx("Hi\u{0085}there."));
+        assert_eq!(5, last_line_start_byte_idx("Hi\u{2028}there."));
+        assert_eq!(5, last_line_start_byte_idx("Hi\u{2029}there."));
+    }
+
+    #[cfg(feature = "unicode_lines")]
+    #[test]
+    fn last_line_start_byte_idx_unicode_02() {
         let mut text = "\u{000A}Hello\u{000D}\u{000A}\u{000D}せ\u{000B}か\u{000C}い\u{0085}. \
                         There\u{2028}is something.\u{2029}";
 
         assert_eq!(48, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(32, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(22, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(17, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(13, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(9, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(8, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(1, text.len());
-        text = &text[..prev_line_end_char_idx(true, text)];
+        text = &text[..last_line_start_byte_idx(trim_line_break(text))];
         assert_eq!(0, text.len());
+    }
+
+    #[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+    #[test]
+    fn trim_line_break_lf_01() {
+        assert_eq!("", trim_line_break(""));
+        assert_eq!("Hi", trim_line_break("Hi"));
+
+        assert_eq!("Hi", trim_line_break("Hi\u{000A}"));
+        assert_eq!("Hi\u{000B}", trim_line_break("Hi\u{000B}"));
+        assert_eq!("Hi\u{000C}", trim_line_break("Hi\u{000C}"));
+        assert_eq!("Hi\u{000D}", trim_line_break("Hi\u{000D}"));
+        assert_eq!("Hi\u{0085}", trim_line_break("Hi\u{0085}"));
+        assert_eq!("Hi\u{2028}", trim_line_break("Hi\u{2028}"));
+        assert_eq!("Hi\u{2029}", trim_line_break("Hi\u{2029}"));
+
+        assert_eq!("\r", trim_line_break("\r\n"));
+        assert_eq!("Hi\r", trim_line_break("Hi\r\n"));
+    }
+
+    #[cfg(all(feature = "cr_lines", not(feature = "unicode_lines")))]
+    #[test]
+    fn trim_line_break_crlf_01() {
+        assert_eq!("", trim_line_break(""));
+        assert_eq!("Hi", trim_line_break("Hi"));
+
+        assert_eq!("Hi", trim_line_break("Hi\u{000A}"));
+        assert_eq!("Hi\u{000B}", trim_line_break("Hi\u{000B}"));
+        assert_eq!("Hi\u{000C}", trim_line_break("Hi\u{000C}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{000D}"));
+        assert_eq!("Hi\u{0085}", trim_line_break("Hi\u{0085}"));
+        assert_eq!("Hi\u{2028}", trim_line_break("Hi\u{2028}"));
+        assert_eq!("Hi\u{2029}", trim_line_break("Hi\u{2029}"));
+
+        assert_eq!("", trim_line_break("\r\n"));
+        assert_eq!("Hi", trim_line_break("Hi\r\n"));
+    }
+
+    #[cfg(feature = "unicode_lines")]
+    #[test]
+    fn trim_line_break_unicode_01() {
+        assert_eq!("", trim_line_break(""));
+        assert_eq!("Hi", trim_line_break("Hi"));
+
+        assert_eq!("Hi", trim_line_break("Hi\u{000A}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{000B}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{000C}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{000D}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{0085}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{2028}"));
+        assert_eq!("Hi", trim_line_break("Hi\u{2029}"));
+
+        assert_eq!("", trim_line_break("\r\n"));
+        assert_eq!("Hi", trim_line_break("Hi\r\n"));
     }
 
     #[test]

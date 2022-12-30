@@ -71,7 +71,7 @@ use std::sync::Arc;
 use crate::slice::{RSEnum, RopeSlice};
 use crate::str_utils::{
     byte_to_line_idx, char_to_byte_idx, count_chars, count_utf16_surrogates, ends_with_line_break,
-    line_to_byte_idx, prev_line_end_char_idx,
+    last_line_start_byte_idx, line_to_byte_idx, trim_line_break,
 };
 use crate::tree::{Count, Node, TextInfo};
 
@@ -792,7 +792,7 @@ impl<'a> Lines<'a> {
                     true
                 };
 
-                let mut line_start = prev_line_end_char_idx(true, tail);
+                let mut line_start = last_line_start_byte_idx(trim_line_break(tail));
 
                 *line_idx -= 1;
 
@@ -886,7 +886,7 @@ impl<'a> Lines<'a> {
                         // A line break at the end of the chunk is already the line break
                         // we are looking for.  The line break belonging to this line is
                         // always contained in the chunk we started this iteration at.
-                        let mut line_start = prev_line_end_char_idx(false, text);
+                        let mut line_start = last_line_start_byte_idx(text);
                         // Cut off the line at the start of the iterator.
                         let line_len = text.len() - line_start;
                         if line_len >= available_bytes {
@@ -964,7 +964,7 @@ impl<'a> Lines<'a> {
                 }
 
                 let end_idx = *byte_idx;
-                let start_idx = prev_line_end_char_idx(true, &text[..end_idx]);
+                let start_idx = last_line_start_byte_idx(trim_line_break(&text[..end_idx]));
                 *byte_idx = start_idx;
                 *line_idx -= 1;
                 let line = &text[start_idx..end_idx];
