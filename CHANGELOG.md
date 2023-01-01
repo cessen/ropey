@@ -3,6 +3,9 @@
 
 ## [Unreleased]
 
+
+## [1.5.1] - 2023-01-01
+
 ### Performance
 - A much faster `Lines` iterator, thanks to @pascalkuthe (PR #70).
 
@@ -312,7 +315,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/cessen/ropey/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/cessen/ropey/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/cessen/ropey/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/cessen/ropey/compare/v1.3.2...v1.4.0
