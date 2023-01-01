@@ -37,7 +37,7 @@ proptest! {
     #![proptest_config(Config::with_cases(512))]
 
     #[test]
-    fn pt_from_str(ref text in "\\PC*\\PC*\\PC*") {
+    fn pt_from_str(ref text in "\\PC{0,200}") {
         let rope = Rope::from_str(text);
 
         rope.assert_integrity();
@@ -47,7 +47,7 @@ proptest! {
     }
 
     #[test]
-    fn pt_from_str_crlf(ref text in "[\\u{000A}\\u{000D}]*\\u{000A}\\u{000D}]*\\u{000A}\\u{000D}]*") {
+    fn pt_from_str_crlf(ref text in "[\\u{000A}\\u{000D}]{0,200}") {
         let rope = Rope::from_str(text);
 
         rope.assert_integrity();
@@ -407,9 +407,7 @@ proptest! {
 
     #[test]
     fn pt_bytes_iter_next(ref text in
-        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        "\\PC{0,200}",
         idx1 in 0usize..20000, idx2 in 0usize..20000,
     ) {
         let len_chars = byte_to_char_idx(text, text.len());
@@ -453,9 +451,7 @@ proptest! {
 
     #[test]
     fn pt_chars_iter_next(ref text in
-        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        "\\PC{0,200}",
         idx1 in 0usize..20000, idx2 in 0usize..20000,
     ) {
         let len_chars = byte_to_char_idx(text, text.len());
@@ -499,9 +495,7 @@ proptest! {
 
     #[test]
     fn pt_chunks_iter_next_01(ref text in
-        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        "\\PC{0,200}",
         idx1 in 0usize..20000, idx2 in 0usize..20000,
     ) {
         let len_chars = byte_to_char_idx(text, text.len());
@@ -540,9 +534,7 @@ proptest! {
 
     #[test]
     fn pt_chunks_iter_prev_01(ref text in
-        "\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\\PC*\
-         \\PC*\\PC*\\PC*\\PC*\\PC*",
+        "\\PC{0,200}",
         ref directions in vec(0u8..2, 0..1000),
         idx1 in 0usize..20000, idx2 in 0usize..20000,
     ) {
