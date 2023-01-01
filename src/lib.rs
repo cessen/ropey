@@ -148,6 +148,18 @@
 //!
 //! CRLF pairs are always treated as a single line break, and are never split
 //! across chunks.  Note, however, that slicing can still split them.
+//!
+//!
+//! # A Note About SIMD Acceleration
+//!
+//! Ropey has a `simd` feature flag (enabled by default) that enables
+//! explicit SIMD on supported platforms to improve performance.
+//!
+//! There is a bit of a footgun here: if you disable default features to
+//! configure line break behavior (as per the section above) then SIMD
+//! will also get disabled, and performance will suffer.  So be careful
+//! to explicitly re-enable the `simd` feature flag (if desired) when
+//! doing that.
 
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::inline_always)]
