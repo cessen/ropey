@@ -591,6 +591,35 @@ proptest! {
     }
 
     #[test]
+    fn pt_lines_iter_01(ref text in
+        "\n{0,2}\\PC{0,200}\n{0,2}\\PC{0,10}\n{0,2}\\PC{0,200}\n{0,2}",
+        idx1 in 0usize..CHAR_LEN,
+        idx2 in 0usize..CHAR_LEN,
+        ref directions in vec(0u8..2, 1..50),
+    ) {
+        let r = Rope::from_str(text);
+
+        let idx1 = if r.len_chars() == 0 { 0 } else { idx1 % r.len_chars() };
+        let idx2 = if r.len_chars() == 0 { 0 } else { idx2 % r.len_chars() };
+        let start = idx1.min(idx2);
+        let end = idx1.max(idx2);
+
+        let s = r.slice(start..end);
+        let text = string_slice(text, start, end);
+
+        let mut itr1 = ropey::iter::Lines::from_str_pt(text);
+        let mut itr2 = s.lines();
+
+        for &dir in directions {
+            if dir == 0 {
+                assert_eq!(itr1.next(), itr2.next());
+            } else {
+                assert_eq!(itr1.prev(), itr2.prev());
+            }
+        }
+    }
+
+    #[test]
     fn pt_bytes_at_01(idx in 0usize..TEXT.len()) {
         let r = Rope::from_str(TEXT);
         let mut bytes_r = r.bytes_at(idx);

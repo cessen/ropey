@@ -691,6 +691,15 @@ impl<'a> Lines<'a> {
         }
     }
 
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!).
+    ///
+    /// This is only exposed publicly for use in property testing.
+    #[doc(hidden)]
+    pub fn from_str_pt(text: &str) -> Lines {
+        let line_count = byte_to_line_idx(text, text.len()) + 1;
+        Lines::from_str(text, line_count)
+    }
+
     pub(crate) fn from_str(text: &str, lines: usize) -> Lines {
         Lines {
             iter: LinesEnum::Light,
@@ -744,7 +753,8 @@ impl<'a> Lines<'a> {
 
     /// Advances the iterator backwards and returns the previous value.
     ///
-    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    /// Runs in O(1) time with respect to rope length and O(N) time with
+    /// respect to line length.
     #[inline(always)]
     pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
         if self.is_reversed {
@@ -1211,7 +1221,8 @@ impl<'a> Iterator for Lines<'a> {
 
     /// Advances the iterator forward and returns the next value.
     ///
-    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    /// Runs in O(1) time with respect to rope length and O(N) time with
+    /// respect to line length.
     #[inline(always)]
     fn next(&mut self) -> Option<RopeSlice<'a>> {
         if self.is_reversed {
