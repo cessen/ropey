@@ -64,7 +64,6 @@
 //! the direction of the iterator in-place, without changing its position in
 //! the text.
 
-use std::mem::take;
 use std::str;
 use std::sync::Arc;
 
@@ -771,11 +770,13 @@ impl<'a> Lines<'a> {
                 ..
             } => {
                 let tail = &text[..*leaf_byte_idx as usize];
-                // The only line yielded by this iterator that might not
-                // end with a line break is the very last line.
-                // As the very last line requires a special conditon here anyway
-                // we can save the result so we don't have to count newlines later.
-                let ends_with_line_break = if take(at_end) {
+
+                // The only line yielded by this iterator that doesn't
+                // end with a line break is the very last line. As the
+                // very last line requires a special conditon here
+                // anyway we can save the result so we don't have to
+                // count newlines later.
+                let ends_with_line_break = if std::mem::take(at_end) {
                     if ends_with_line_break(tail) {
                         *line_idx -= 1;
                         return Some(RopeSlice(RSEnum::Light {
@@ -792,37 +793,38 @@ impl<'a> Lines<'a> {
                     true
                 };
 
-                let mut line_start = last_line_start_byte_idx(trim_line_break(tail));
-
                 *line_idx -= 1;
 
-                // Check if the start of the iterator (first byte) was reached.
-                let available_bytes = *byte_idx;
-                let line_len = *leaf_byte_idx as usize - line_start;
-                let line_inside_chunk = if line_len >= available_bytes {
-                    line_start = *leaf_byte_idx as usize - *byte_idx;
-                    true
-                } else {
-                    line_start > 0
+                // Get the byte index of the start of the line within the chunk,
+                // and whether we know if the line is contained entirely within
+                // the chunk or not.
+                let (line_start_idx, line_inside_chunk) = {
+                    let line_start = last_line_start_byte_idx(trim_line_break(tail));
+                    let line_len = *leaf_byte_idx as usize - line_start;
+                    if line_len >= *byte_idx {
+                        (*leaf_byte_idx as usize - *byte_idx, true)
+                    } else {
+                        (line_start, line_start > 0)
+                    }
                 };
-                let line = &tail[line_start..];
 
-                *byte_idx -= line.len();
+                let chunk_line = &tail[line_start_idx..];
+                *byte_idx -= chunk_line.len();
 
                 // If the line is contained entirely within the current chunk, return it.
                 if line_inside_chunk {
-                    *leaf_byte_idx = line_start as u32;
+                    *leaf_byte_idx = line_start_idx as u32;
                     return Some(RopeSlice(RSEnum::Light {
-                        text: line,
-                        char_count: count_chars(line) as Count,
-                        utf16_surrogate_count: count_utf16_surrogates(line) as Count,
+                        text: chunk_line,
+                        char_count: count_chars(chunk_line) as Count,
+                        utf16_surrogate_count: count_utf16_surrogates(chunk_line) as Count,
                         line_break_count: ends_with_line_break as Count,
                     }));
                 }
 
                 // We need to advance to the next (preceding) chunk that contains
                 // a line break.  As the line might span across multiple chunks we
-                // track the smallest common parent node (and position within that
+                // track the closest common parent node (and position within that
                 // node) during traversal to avoid expensive `RopeSlice` construction
                 // later.
                 let mut shared_parent = node_stack.len() - 1;
@@ -842,17 +844,19 @@ impl<'a> Lines<'a> {
                     let mut stack_idx = node_stack.len() - 1;
                     let (_, child_i) = node_stack.last_mut().unwrap();
 
-                    // If we are at the first child, advance to the previous sibiling.
+                    // If the iterator has reached the start of the parent node, advance
+                    // to the previous parent.
                     if *child_i == 0 {
+                        // Find how high up the stack we need to go to advance to
+                        // the previous chunk.
                         while node_stack[stack_idx].1 == 0 {
                             debug_assert_ne!(stack_idx, 0, "iterated past the first leaf");
                             stack_idx -= 1;
                         }
 
+                        // If we've reached a new high position in the stack, accumulate its
+                        // TextInfo for `RopeSlice` construction later.
                         if stack_idx < shared_parent {
-                            // This is the deepest postion in the stack so far, so this
-                            // node is our new shared parent. Save it for `RopeSlice`
-                            // construction later.
                             for (node, child_i) in &node_stack[stack_idx..shared_parent] {
                                 for &child_pos in &node.children().info()[..*child_i] {
                                     pos_in_shared_parent += child_pos;
@@ -861,6 +865,7 @@ impl<'a> Lines<'a> {
                             shared_parent = stack_idx;
                         }
 
+                        // Advance to the previous chunk.
                         node_stack[stack_idx].1 -= 1;
                         while stack_idx < (node_stack.len() - 1) {
                             let child_i = node_stack[stack_idx].1;
@@ -869,7 +874,7 @@ impl<'a> Lines<'a> {
                             stack_idx += 1;
                         }
                     } else {
-                        // Advance to the previous child.
+                        // Advance to the previous sibling chunk.
                         *child_i -= 1;
                     }
 
@@ -904,13 +909,11 @@ impl<'a> Lines<'a> {
 
                     len += info;
                     *byte_idx -= info.bytes as usize;
-                    // This line will end in the next chunk but already fully contains
-                    // this chunk so a full `RopeSlice` is definitly necessary.
                     multi_chunk_slice = true;
                 };
-
                 let head = &text[head_start..];
 
+                // Book keeping.
                 *byte_idx -= head.len();
                 *leaf_byte_idx = head_start as u32;
 
@@ -930,7 +933,6 @@ impl<'a> Lines<'a> {
                                 line_breaks: 0,
                             }
                             - len,
-
                         end_info: pos_in_shared_parent,
                     }
                 } else {
@@ -954,7 +956,7 @@ impl<'a> Lines<'a> {
                 ref mut line_idx,
                 ..
             } => {
-                if take(at_end) {
+                if std::mem::take(at_end) {
                     if text.is_empty() || ends_with_line_break(text) {
                         *line_idx -= 1;
                         return Some("".into());
@@ -1048,12 +1050,11 @@ impl<'a> Lines<'a> {
 
                 *byte_idx += head.len();
 
-                // We need to advance to the next chunk that contains a
-                // line break.
-                // As the line might span across multiple chunks we track
-                // the smallest common parent node (and position within
-                // that node) during traversal to avoid expensive
-                // `RopeSlice` construction later.
+                // We need to advance to the next chunk that contains
+                // a line break.  As the line might span across multiple chunks we
+                // track the closest common parent node (and position within that
+                // node) during traversal to avoid expensive `RopeSlice` construction
+                // later.
                 let mut shared_parent = node_stack.len() - 1;
                 let mut pos_in_shared_parent = {
                     let (parent, child_i) = *node_stack.last().unwrap();
@@ -1064,27 +1065,30 @@ impl<'a> Lines<'a> {
                 let mut len = TextInfo::from_str(head);
                 pos_in_shared_parent -= len;
 
-                // If the line starts exactly at the start of the chunk
+                // If the line starts exactly at the start of the next chunk
                 // then it might not actually span multiple chunks.
                 let mut multi_chunk_slice = !head.is_empty();
                 let (tail_len, tail_ends_with_newline) = loop {
                     let mut stack_idx = node_stack.len() - 1;
+
+                    // Advance to the next sibling chunk.
                     let (_, child_i) = node_stack.last_mut().unwrap();
-                    // Advance to the next sibling.
                     *child_i += 1;
 
-                    // If the iterator has reached the end of the node, advance
-                    // to the next sibiling.
+                    // If the iterator has reached the end of the parent node, advance
+                    // to the next parent.
                     if *child_i >= node_stack[stack_idx].0.child_count() {
+                        // Find how high up the stack we need to go to advance to
+                        // the next chunk.
                         while node_stack[stack_idx].1 >= (node_stack[stack_idx].0.child_count() - 1)
                         {
                             debug_assert_ne!(stack_idx, 0, "iterated past the last leaf");
                             stack_idx -= 1;
                         }
+
+                        // If we've reached a new high position in the stack, accumulate its
+                        // TextInfo for `RopeSlice` construction later.
                         if stack_idx < shared_parent {
-                            // This is the deepest postion in the stack so far, so this
-                            // node is or new shared parent. Save it for `RopeSlice`
-                            // construction later.
                             for (node, child_i) in &node_stack[stack_idx..shared_parent] {
                                 for &child_pos in &node.children().info()[..*child_i] {
                                     pos_in_shared_parent += child_pos;
@@ -1093,6 +1097,7 @@ impl<'a> Lines<'a> {
                             shared_parent = stack_idx;
                         }
 
+                        // Advance to the next chunk.
                         node_stack[stack_idx].1 += 1;
                         while stack_idx < (node_stack.len() - 1) {
                             let child_i = node_stack[stack_idx].1;
@@ -1141,11 +1146,10 @@ impl<'a> Lines<'a> {
                 *byte_idx += tail_len;
                 *leaf_byte_idx = tail_len as u32;
 
+                // Construct the `RopeSlice` containing the line.
                 let line_tail = &text[..tail_len];
                 let line_tail_chars = count_chars(line_tail) as Count;
                 let line_tail_surrogates = count_utf16_surrogates(line_tail) as Count;
-
-                // Construct the `RopeSlice` containing the line.
                 let line = if multi_chunk_slice {
                     RSEnum::Full {
                         node: node_stack[shared_parent].0,
