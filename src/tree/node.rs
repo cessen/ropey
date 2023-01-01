@@ -589,6 +589,7 @@ impl Node {
         chunk.is_char_boundary(byte_idx - info.bytes as usize)
     }
 
+    #[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
     pub fn is_crlf_split(&self, char_idx: usize) -> bool {
         let (chunk, info) = self.get_chunk_at_char(char_idx);
         let idx = char_to_byte_idx(chunk, char_idx - info.chars as usize);

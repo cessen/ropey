@@ -29,6 +29,8 @@ jobs:
       # Build and test
       - run: cargo +stable build
       - run: cargo +stable test
+      - run: cargo +stable test --no-default-features line
+      - run: cargo +stable test --no-default-features --features=cr_lines line
       - run: cargo +stable bench --no-run
 
   build-and-test-beta:
