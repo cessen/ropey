@@ -1798,6 +1798,15 @@ impl Rope {
             None
         }
     }
+
+    /// Returns whether `other` is an instance of this `Rope`
+    /// and therefore points at exactly the same data.
+    /// That measn that `other` is an unmodified clone of this
+    /// `Rope` (or vice versa).
+    #[inline]
+    pub fn is_instance(&self, other: &Rope) -> bool {
+        Arc::ptr_eq(&self.root, &other.root)
+    }
 }
 
 //==============================================================
