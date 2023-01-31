@@ -620,7 +620,7 @@ impl<'a> Lines<'a> {
                 is_reversed: false,
                 byte_idx: 0,
                 line_idx: 0,
-                total_lines: 0,
+                total_lines: 1,
             };
         }
 
@@ -3521,5 +3521,13 @@ mod tests {
         for _ in 0..8 {
             assert_eq!(stack.pop(), itr.next());
         }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn empty_iter() {
+        let rope = Rope::from_str("");
+        let r: Vec<_> = rope.lines().collect();
+        assert_eq!(&[""], &*r)
     }
 }
