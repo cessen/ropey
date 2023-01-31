@@ -1175,6 +1175,27 @@ impl Rope {
         }
     }
 
+    /// Returns true if this rope and `other` point to precisely the same
+    /// in-memory data.
+    ///
+    /// This happens when one of the ropes is a clone of the other and
+    /// neither have been modified since then.  Because clones initially
+    /// share all the same data, it can be useful to check if they still
+    /// point to precisely the same memory as a way of determining
+    /// whether they are both still unmodified.
+    ///
+    /// Note: this is distinct from checking for equality: two ropes can
+    /// have the same *contents* (equal) but be stored in different
+    /// memory locations (not instances).  Importantly, two clones that
+    /// post-cloning are modified identically will *not* be instances
+    /// anymore, even though they will have equal contents.
+    ///
+    /// Runs in O(1) time.
+    #[inline]
+    pub fn is_instance(&self, other: &Rope) -> bool {
+        Arc::ptr_eq(&self.root, &other.root)
+    }
+
     //-----------------------------------------------------------------------
     // Debugging
 
@@ -1797,15 +1818,6 @@ impl Rope {
         } else {
             None
         }
-    }
-
-    /// Returns whether `other` is an instance of this `Rope`
-    /// and therefore points at exactly the same data.
-    /// That measn that `other` is an unmodified clone of this
-    /// `Rope` (or vice versa).
-    #[inline]
-    pub fn is_instance(&self, other: &Rope) -> bool {
-        Arc::ptr_eq(&self.root, &other.root)
     }
 }
 
@@ -3420,6 +3432,23 @@ mod tests {
         Rope::hash_slice(&s, &mut h2);
 
         assert_ne!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn is_instance_01() {
+        let r = Rope::from_str("Hello there!");
+        let mut c1 = r.clone();
+        let c2 = c1.clone();
+
+        assert!(r.is_instance(&c1));
+        assert!(r.is_instance(&c2));
+        assert!(c1.is_instance(&c2));
+
+        c1.insert(0, "Oh! ");
+
+        assert!(!r.is_instance(&c1));
+        assert!(r.is_instance(&c2));
+        assert!(!c1.is_instance(&c2));
     }
 
     // Iterator tests are in the iter module
