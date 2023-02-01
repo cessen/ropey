@@ -4,6 +4,15 @@
 ## [Unreleased]
 
 
+## [1.6.0] - 2023-02-01
+
+### New features
+- Added `is_instance()` method, which checks if two ropes are same-memory instances of each other.
+
+### Bug fixes
+- Ropey would panic when trying to create a `Lines` iterator for an empty rope or rope slice.
+
+
 ## [1.5.1] - 2023-01-01
 
 ### Performance
@@ -315,7 +324,8 @@
 - Added a changelog file.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/cessen/ropey/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/cessen/ropey/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/cessen/ropey/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/cessen/ropey/compare/v1.4.0...v1.4.1
