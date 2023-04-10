@@ -178,6 +178,7 @@ mod tree;
 
 pub mod iter;
 pub mod str_utils;
+pub mod two_way_peekable;
 
 use std::ops::Bound;
 

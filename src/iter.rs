@@ -73,6 +73,7 @@ use crate::str_utils::{
     last_line_start_byte_idx, line_to_byte_idx, trim_line_break,
 };
 use crate::tree::{Count, Node, TextInfo};
+use crate::two_way_peekable::{TwoWayIterator, TwoWayPeekable};
 
 //==========================================================
 
@@ -211,16 +212,20 @@ impl<'a> Bytes<'a> {
         self
     }
 
+    /// Return peekable version of the iterator
+    #[inline(always)]
+    pub fn two_way_peekable(self) -> TwoWayPeekable<Self> {
+        // this is needed, so that users can call `.two_way_peekable()` without importing TwoWayIterator
+        TwoWayIterator::two_way_peekable(self)
+    }
+
     /// Advances the iterator backwards and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     pub fn prev(&mut self) -> Option<u8> {
-        if !self.is_reversed {
-            self.prev_impl()
-        } else {
-            self.next_impl()
-        }
+        // this is needed, so that users can call `.prev()` without importing TwoWayIterator
+        TwoWayIterator::prev(self)
     }
 
     #[inline]
@@ -295,6 +300,16 @@ impl<'a> Iterator for Bytes<'a> {
             self.bytes_total - self.bytes_remaining
         };
         (remaining, Some(remaining))
+    }
+}
+
+impl<'a> TwoWayIterator for Bytes<'a> {
+    fn prev(&mut self) -> Option<Self::Item> {
+        if !self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
     }
 }
 
@@ -441,16 +456,20 @@ impl<'a> Chars<'a> {
         self
     }
 
+    /// Return peekable version of the iterator
+    #[inline(always)]
+    pub fn two_way_peekable(self) -> TwoWayPeekable<Self> {
+        // this is needed, so that users can call `.two_way_peekable()` without importing TwoWayIterator
+        TwoWayIterator::two_way_peekable(self)
+    }
+
     /// Advances the iterator backwards and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     pub fn prev(&mut self) -> Option<char> {
-        if !self.is_reversed {
-            self.prev_impl()
-        } else {
-            self.next_impl()
-        }
+        // this is needed, so that users can call `.prev()` without importing TwoWayIterator
+        TwoWayIterator::prev(self)
     }
 
     #[inline]
@@ -533,6 +552,20 @@ impl<'a> Iterator for Chars<'a> {
             self.chars_total - self.chars_remaining
         };
         (remaining, Some(remaining))
+    }
+}
+
+impl<'a> TwoWayIterator for Chars<'a> {
+    /// Advances the iterator backwards and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
+    fn prev(&mut self) -> Option<Self::Item> {
+        if !self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
     }
 }
 
@@ -751,17 +784,20 @@ impl<'a> Lines<'a> {
         self
     }
 
+    /// Return peekable version of the iterator
+    #[inline(always)]
+    pub fn two_way_peekable(self) -> TwoWayPeekable<Self> {
+        // this is needed, so that users can call `.two_way_peekable()` without importing TwoWayIterator
+        TwoWayIterator::two_way_peekable(self)
+    }
+
     /// Advances the iterator backwards and returns the previous value.
     ///
-    /// Runs in O(1) time with respect to rope length and O(N) time with
-    /// respect to line length.
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
-        if self.is_reversed {
-            self.next_impl()
-        } else {
-            self.prev_impl()
-        }
+        // this is needed, so that users can call `.prev()` without importing TwoWayIterator
+        TwoWayIterator::prev(self)
     }
 
     fn prev_impl(&mut self) -> Option<RopeSlice<'a>> {
@@ -1244,6 +1280,16 @@ impl<'a> Iterator for Lines<'a> {
     }
 }
 
+impl<'a> TwoWayIterator for Lines<'a> {
+    fn prev(&mut self) -> Option<Self::Item> {
+        if !self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
+    }
+}
+
 impl ExactSizeIterator for Lines<'_> {}
 
 //==========================================================
@@ -1535,16 +1581,20 @@ impl<'a> Chunks<'a> {
         self
     }
 
+    /// Return peekable version of the iterator
+    #[inline(always)]
+    pub fn two_way_peekable(self) -> TwoWayPeekable<Self> {
+        // this is needed, so that users can call `.two_way_peekable()` without importing TwoWayIterator
+        TwoWayIterator::two_way_peekable(self)
+    }
+
     /// Advances the iterator backwards and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     pub fn prev(&mut self) -> Option<&'a str> {
-        if !self.is_reversed {
-            self.prev_impl()
-        } else {
-            self.next_impl()
-        }
+        // this is needed, so that users can call `.prev()` without importing TwoWayIterator
+        TwoWayIterator::prev(self)
     }
 
     fn prev_impl(&mut self) -> Option<&'a str> {
@@ -1709,6 +1759,16 @@ impl<'a> Iterator for Chunks<'a> {
             self.next_impl()
         } else {
             self.prev_impl()
+        }
+    }
+}
+
+impl<'a> TwoWayIterator for Chunks<'a> {
+    fn prev(&mut self) -> Option<Self::Item> {
+        if !self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
         }
     }
 }
