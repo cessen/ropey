@@ -3,7 +3,6 @@ use std::iter::FromIterator;
 use std::ops::RangeBounds;
 use std::sync::Arc;
 
-use crate::crlf;
 use crate::iter::{Bytes, Chars, Chunks, Lines};
 use crate::rope_builder::RopeBuilder;
 use crate::slice::RopeSlice;
@@ -12,6 +11,7 @@ use crate::str_utils::{
     char_to_line_idx, line_to_byte_idx, line_to_char_idx, utf16_code_unit_to_char_idx,
 };
 use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES, MIN_BYTES};
+use crate::{crlf, LineColumn};
 use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 
 /// A utf8 text rope.
@@ -688,6 +688,26 @@ impl Rope {
     #[inline]
     pub fn char_to_line(&self, char_idx: usize) -> usize {
         self.try_char_to_line(char_idx).unwrap()
+    }
+
+    /// Returns the line and colum indexes of the given char.
+    ///
+    /// Notes:
+    ///
+    /// - Lines are zero-indexed.  This is functionally equivalent to
+    ///   counting the line endings before the specified char.
+    /// - Columns are zero-indexed.
+    /// - `char_idx` can be one-past-the-end, which will return the
+    ///   last line index.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[inline]
+    pub fn char_to_line_column(&self, char_idx: usize) -> LineColumn {
+        self.try_char_to_line_column(char_idx).unwrap()
     }
 
     /// Returns the utf16 code unit index of the given char.
@@ -1453,6 +1473,14 @@ impl Rope {
         } else {
             Err(Error::CharIndexOutOfBounds(char_idx, self.len_chars()))
         }
+    }
+
+    /// Non-panicking version of [`char_to_line_column()`](Rope::char_to_line_column).
+    #[inline]
+    pub fn try_char_to_line_column(&self, char_idx: usize) -> Result<LineColumn> {
+        let line = self.try_char_to_line(char_idx)?;
+        let column = char_idx - self.try_line_to_char(line)?;
+        Ok(LineColumn { line, column })
     }
 
     /// Non-panicking version of [`char_to_utf16_cu()`](Rope::char_to_utf16_cu).
@@ -2772,6 +2800,48 @@ mod tests {
     fn char_to_line_04() {
         let r = Rope::from_str(TEXT_LINES);
         r.char_to_line(101);
+    }
+
+    #[test]
+    fn char_to_line_column_01() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        assert_eq!(r.char_to_line_column(0), (0, 0).into());
+        assert_eq!(r.char_to_line_column(1), (0, 1).into());
+
+        assert_eq!(r.char_to_line_column(31), (0, 31).into());
+        assert_eq!(r.char_to_line_column(32), (1, 0).into());
+        assert_eq!(r.char_to_line_column(33), (1, 1).into());
+
+        assert_eq!(r.char_to_line_column(58), (1, 26).into());
+        assert_eq!(r.char_to_line_column(59), (2, 0).into());
+        assert_eq!(r.char_to_line_column(60), (2, 1).into());
+
+        assert_eq!(r.char_to_line_column(87), (2, 28).into());
+        assert_eq!(r.char_to_line_column(88), (3, 0).into());
+        assert_eq!(r.char_to_line_column(89), (3, 1).into());
+        assert_eq!(r.char_to_line_column(100), (3, 12).into());
+    }
+
+    #[test]
+    fn char_to_line_column_02() {
+        let r = Rope::from_str("");
+        assert_eq!(r.char_to_line_column(0), (0, 0).into());
+    }
+
+    #[test]
+    fn char_to_line_column_03() {
+        let r = Rope::from_str("Hi there\n");
+        assert_eq!(r.char_to_line_column(0), (0, 0).into());
+        assert_eq!(r.char_to_line_column(8), (0, 8).into());
+        assert_eq!(r.char_to_line_column(9), (1, 0).into());
+    }
+
+    #[test]
+    #[should_panic]
+    fn char_to_line_column_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.char_to_line_column(101);
     }
 
     #[test]

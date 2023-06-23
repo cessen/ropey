@@ -171,6 +171,7 @@ extern crate smallvec;
 extern crate str_indices;
 
 mod crlf;
+mod line_column;
 mod rope;
 mod rope_builder;
 mod slice;
@@ -181,6 +182,7 @@ pub mod str_utils;
 
 use std::ops::Bound;
 
+pub use crate::line_column::LineColumn;
 pub use crate::rope::Rope;
 pub use crate::rope_builder::RopeBuilder;
 pub use crate::slice::RopeSlice;
