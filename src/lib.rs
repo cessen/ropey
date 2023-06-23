@@ -215,6 +215,12 @@ pub enum Error {
     /// `Rope`/`RopeSlice` in lines, in that order.
     LineIndexOutOfBounds(usize, usize),
 
+    /// Indicates that the passed column index was out of line's bounds.
+    ///
+    /// Contains the index attempted and the actual length of the line
+    /// in characters, in that order.
+    ColumnIndexOutOfBounds(usize, usize),
+
     /// Indicates that the passed utf16 code-unit index was out of
     /// bounds.
     ///
@@ -318,6 +324,13 @@ impl std::fmt::Debug for Error {
                 write!(
                     f,
                     "Line index out of bounds: line index {}, Rope/RopeSlice line count {}",
+                    index, len
+                )
+            }
+            Error::ColumnIndexOutOfBounds(index, len) => {
+                write!(
+                    f,
+                    "Column index out of bounds: column index {}, line's length {}",
                     index, len
                 )
             }

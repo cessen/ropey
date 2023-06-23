@@ -784,6 +784,25 @@ impl Rope {
         self.try_line_to_char(line_idx).unwrap()
     }
 
+    /// Returns the char index at specified line and column
+    ///
+    /// Notes:
+    ///
+    /// - Lines and columns are zero-indexed.
+    /// - `line` can be one-past-the-end, which will return
+    ///   one-past-the-end char index.
+    /// - `colum <= line(line).len()`
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `line` or `column` is out of bounds (i.e. `line > len_lines()` or `column > line(line).len()`).
+    #[inline]
+    pub fn line_column_to_char(&self, line_column: impl Into<LineColumn>) -> usize {
+        self.try_line_column_to_char(line_column).unwrap()
+    }
+
     //-----------------------------------------------------------------------
     // Fetch methods
 
@@ -1547,6 +1566,19 @@ impl Rope {
             }
         } else {
             Err(Error::LineIndexOutOfBounds(line_idx, self.len_lines()))
+        }
+    }
+
+    /// Non-panicking version of [`line_column_to_char()`](Rope::line_column_to_char).
+    #[inline]
+    pub fn try_line_column_to_char(&self, line_column: impl Into<LineColumn>) -> Result<usize> {
+        let LineColumn { line, column } = line_column.into();
+        let start = self.try_line_to_char(line)?;
+        let line_len = self.get_line(line).map(|l| l.len_chars()).unwrap_or(0);
+        if column <= line_len {
+            Ok(start + column)
+        } else {
+            Err(Error::ColumnIndexOutOfBounds(column, line_len))
         }
     }
 
@@ -2892,6 +2924,49 @@ mod tests {
     fn line_to_char_03() {
         let r = Rope::from_str(TEXT_LINES);
         r.line_to_char(5);
+    }
+
+    #[test]
+    fn line_column_to_char_01() {
+        let r = Rope::from_str(TEXT_LINES);
+
+        assert_eq!(0, r.line_column_to_char((0, 0)));
+        assert_eq!(1, r.line_column_to_char((0, 1)));
+        assert_eq!(31, r.line_column_to_char((0, 31)));
+        assert_eq!(32, r.line_column_to_char((0, 32)));
+        assert_eq!(32, r.line_column_to_char((1, 0)));
+        assert_eq!(59, r.line_column_to_char((2, 0)));
+        assert_eq!(88, r.line_column_to_char((3, 0)));
+        assert_eq!(100, r.line_column_to_char((3, 12)));
+        assert_eq!(100, r.line_column_to_char((4, 0)));
+    }
+
+    #[test]
+    fn line_column_to_char_02() {
+        let r = Rope::from_str("");
+        assert_eq!(0, r.line_column_to_char((0, 0)));
+        assert_eq!(0, r.line_column_to_char((1, 0)));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_column_to_char_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_column_to_char((3, 13));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_column_to_char_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_column_to_char((4, 1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn line_column_to_char_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_column_to_char((5, 0));
     }
 
     #[test]
