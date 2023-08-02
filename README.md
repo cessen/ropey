@@ -66,7 +66,7 @@ On the other hand, Ropey is _not_ good at:
   performance overhead you may not need depending on your use-case.
 
 Keep this in mind when selecting Ropey for your project.  Ropey is very good
-at what it does, but like all software, it is designed with certain
+at what it does, but like all software it is designed with certain
 applications in mind.
 
 
