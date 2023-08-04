@@ -3,7 +3,7 @@
 //!
 //! Ropey's atomic unit of text is Unicode scalar values (or `char`s in Rust)
 //! encoded as utf8.  All of Ropey's editing and slicing operations are done
-//! in terms of char indices which prevents accidental creation of invalid
+//! in terms of char indices, which prevents accidental creation of invalid
 //! utf8 data.
 //!
 //! The library is made up of four main components:
