@@ -1,10 +1,10 @@
-//! Ropey is a utf8 text rope for Rust.  It is fast, robust, and can handle
+//! Ropey is a UTF-8 text rope for Rust. It is fast, robust, and can handle
 //! huge texts and memory-incoherent edits with ease.
 //!
 //! Ropey's atomic unit of text is Unicode scalar values (or `char`s in Rust)
-//! encoded as utf8.  All of Ropey's editing and slicing operations are done
+//! encoded as UTF-8. All of Ropey's editing and slicing operations are done
 //! in terms of char indices, which prevents accidental creation of invalid
-//! utf8 data.
+//! UTF-8 data.
 //!
 //! The library is made up of four main components:
 //!
@@ -19,7 +19,7 @@
 //! # A Basic Example
 //!
 //! Let's say we want to open up a text file, replace the 516th line (the
-//! writing was terrible!), and save it back to disk.  It's contrived, but will
+//! writing was terrible!), and save it back to disk. It's contrived, but will
 //! give a good sampling of the APIs and how they work together.
 //!
 //! ```no_run
@@ -63,16 +63,16 @@
 //! ```
 //!
 //! More examples can be found in the `examples` directory of the git
-//! repository.  Many of those examples demonstrate doing non-trivial things
+//! repository. Many of those examples demonstrate doing non-trivial things
 //! with Ropey such as grapheme handling, search-and-replace, and streaming
-//! loading of non-utf8 text files.
+//! loading of non-UTF-8 text files.
 //!
 //!
-//! # Low-level APIs
+//! # Low-Level APIs
 //!
 //! Ropey also provides access to some of its low-level APIs, enabling client
 //! code to efficiently work with a `Rope`'s data and implement new
-//! functionality.  The most important of those API's are:
+//! functionality. The most important of those APIs are:
 //!
 //! - The [`chunk_at_*()`](Rope::chunk_at_byte)
 //!   chunk-fetching methods of `Rope` and `RopeSlice`.
@@ -80,10 +80,10 @@
 //! - The functions in [`str_utils`] for operating on
 //!   `&str` slices.
 //!
-//! Internally, each `Rope` stores text as a segemented collection of utf8
-//! strings.  The chunk-fetching methods and `Chunks` iterator provide direct
+//! Internally, each `Rope` stores text as a segemented collection of UTF-8
+//! strings. The chunk-fetching methods and `Chunks` iterator provide direct
 //! access to those strings (or "chunks") as `&str` slices, allowing client
-//! code to work directly with the underlying utf8 data.
+//! code to work directly with the underlying UTF-8 data.
 //!
 //! The chunk-fetching methods and `str_utils` functions are the basic
 //! building blocks that Ropey itself uses to build much of its functionality.
@@ -114,16 +114,16 @@
 //! Some of Ropey's APIs use the concept of line breaks or lines of text.
 //!
 //! Ropey considers the start of the rope and positions immediately
-//! _after_ line breaks to be the start of new lines.  And it treats
+//! _after_ line breaks to be the start of new lines. And it treats
 //! line breaks as being a part of the lines they mark the end of.
 //!
-//! For example, the rope `"Hello"` has a single line: `"Hello"`.  The
-//! rope `"Hello\nworld"` has two lines: `"Hello\n"` and `"world"`.  And
+//! For example, the rope `"Hello"` has a single line: `"Hello"`. The
+//! rope `"Hello\nworld"` has two lines: `"Hello\n"` and `"world"`. And
 //! the rope `"Hello\nworld\n"` has three lines: `"Hello\n"`,
 //! `"world\n"`, and `""`.
 //!
 //! Ropey can be configured at build time via feature flags to recognize
-//! different line breaks.  Ropey always recognizes:
+//! different line breaks. Ropey always recognizes:
 //!
 //! - `U+000A`          &mdash; LF (Line Feed)
 //! - `U+000D` `U+000A` &mdash; CRLF (Carriage Return + Line Feed)
@@ -147,7 +147,7 @@
 //! `cr_lines`.)
 //!
 //! CRLF pairs are always treated as a single line break, and are never split
-//! across chunks.  Note, however, that slicing can still split them.
+//! across chunks. Note, however, that slicing can still split them.
 //!
 //!
 //! # A Note About SIMD Acceleration
@@ -156,8 +156,8 @@
 //! explicit SIMD on supported platforms to improve performance.
 //!
 //! There is a bit of a footgun here: if you disable default features to
-//! configure line break behavior (as per the section above) then SIMD
-//! will also get disabled, and performance will suffer.  So be careful
+//! configure line break behavior (as per the section above), then SIMD
+//! will also get disabled, and performance will suffer. So be careful
 //! to explicitly re-enable the `simd` feature flag (if desired) when
 //! doing that.
 

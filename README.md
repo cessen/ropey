@@ -4,12 +4,11 @@
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
-Ropey is a utf8 text rope for Rust, designed to be the backing text-buffer for
-applications such as text editors.  Ropey is fast, robust, and can handle huge
-texts and memory-incoherent edits with ease.
+Ropey is a UTF-8 text rope for Rust, designed for programs like text editors, handling large
+texts and memory-incoherent edits efficiently.
 
 
-## Example Usage
+## Example usage
 
 ```rust
 // Load a text file.
@@ -41,31 +40,31 @@ text.write_to(
 )?;
 ```
 
-## When Should I Use Ropey?
+## When should I use Ropey?
 
 Ropey is designed and built to be the backing text buffer for applications
-such as text editors, and its design trade-offs reflect that.  Ropey is good
+such as text editors, and its design trade-offs reflect that. Ropey is good
 at:
 
-- Handling frequent edits to medium-to-large texts.  Even on texts that are
+- Handling frequent edits to medium-to-large texts. Even on texts that are
   multiple gigabytes large, edits are measured in single-digit microseconds.
-- Handling Unicode correctly.  It is impossible to create invalid utf8 through
+- Handling Unicode correctly. It is impossible to create invalid UTF-8 through
   Ropey, and all Unicode line endings are correctly tracked including CRLF.
-- Having flat, predictable performance characteristics.  Ropey will never be
+- Having flat, predictable performance characteristics. Ropey will never be
   the source of hiccups or stutters in your software.
 
 On the other hand, Ropey is _not_ good at:
 
-- Handling texts smaller than a couple of kilobytes or so.  That is to say,
+- Handling texts smaller than a couple of kilobytes or so. That is to say,
   Ropey will handle them fine, but Ropey allocates space in kilobyte chunks,
   which introduces unnecessary bloat if your texts are almost always small.
-- Handling texts that are larger than available memory.  Ropey is an in-memory
+- Handling texts that are larger than available memory. Ropey is an in-memory
   data structure.
-- Getting the best performance for every possible use-case.  Ropey puts work
+- Getting the best performance for every possible use-case. Ropey puts work
   into tracking both line endings and unicode scalar values, which is
   performance overhead you may not need depending on your use-case.
 
-Keep this in mind when selecting Ropey for your project.  Ropey is very good
+Keep this in mind when considering Ropey for your project. Ropey is very good
 at what it does, but like all software it is designed with certain
 applications in mind.
 
@@ -76,12 +75,12 @@ applications in mind.
 Ropey's atomic unit of text is
 [Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
 (or [`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
-encoded as utf8.  All of Ropey's editing and slicing operations are done
+encoded as UTF-8. All of Ropey's editing and slicing operations are done
 in terms of char indices, which prevents accidental creation of invalid
-utf8 data.
+UTF-8 data.
 
-Ropey also supports converting between scalar value indices and utf16 code unit
-indices, for interoperation with external APIs that may still use utf16.
+Ropey also supports converting between scalar value indices and UTF-16 code unit
+indices, for interoperation with external APIs that may still use UTF-16.
 
 ### Line-aware
 
@@ -89,7 +88,7 @@ Ropey knows about line breaks, allowing you to index into and iterate over
 lines of text.
 
 The line breaks Ropey recognizes are also configurable at build time via
-feature flags.  See Ropey's documentation for details.
+feature flags. See Ropey's documentation for details.
 
 ### Rope slices
 
@@ -110,14 +109,14 @@ Ropey is fast and minimizes memory usage:
 
 - On a recent mobile i7 Intel CPU, Ropey performed over 1.8 million small
   incoherent insertions per second while building up a text roughly 100 MB
-  large.  Coherent insertions (i.e. all near the same place in the text) are
+  large. Coherent insertions (i.e. all near the same place in the text) are
   even faster, doing the same task at over 3.3 million insertions per
   second.
-- Freshly loading a file from disk only incurs about 10% memory overhead.  For
+- Freshly loading a file from disk only incurs about 10% memory overhead. For
   example, a 100 MB text file will occupy about 110 MB of memory when loaded
   by Ropey.
-- Cloning ropes is _extremely_ cheap.  Rope clones share data, so an initial
-  clone only takes 8 bytes of memory.  After that, memory usage will grow
+- Cloning ropes is _extremely_ cheap. Rope clones share data, so an initial
+  clone only takes 8 bytes of memory. After that, memory usage will grow
   incrementally as the clones diverge due to edits.
 
 ### Thread safe
@@ -129,12 +128,12 @@ Clones can be sent to other threads for both reading and writing.
 ## Unsafe code
 
 Ropey uses unsafe code to help achieve some of its space and performance
-characteristics.  Although effort has been put into keeping the unsafe code
-compartmentalized and making it correct, please be cautious about using Ropey
+characteristics. Although effort has been put into keeping the unsafe code
+compartmentalized and correct, please be cautious about using Ropey
 in software that may face adversarial conditions.
 
-Auditing, fuzzing, etc. of the unsafe code in Ropey is extremely welcome.
-If you find any unsoundness, _please_ file an issue!  Also welcome are
+Auditing, fuzzing, etc., of the unsafe code in Ropey is extremely welcome.
+If you find any unsoundness, _please_ file an issue! Also welcome are
 recommendations for how to remove any of the unsafe code without introducing
 significant space or performance regressions, or how to compartmentalize the
 unsafe code even better.
@@ -142,12 +141,12 @@ unsafe code even better.
 
 ## License
 
-Ropey is licensed under the MIT license (LICENSE.md or http://opensource.org/licenses/MIT)
+Ropey is licensed under the MIT license (LICENSE.md or https://opensource.org/licenses/MIT)
 
 
 ## Contributing
 
-Contributions are absolutely welcome!  However, please open an issue or email
+Contributions are absolutely welcome! However, please open an issue or email
 me to discuss larger changes, to avoid doing a lot of work that may get
 rejected.
 
