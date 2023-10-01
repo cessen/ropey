@@ -4,11 +4,11 @@
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
-Ropey is a UTF-8 text rope for Rust, designed for programs like text editors, handling large
-texts and memory-incoherent edits efficiently.
+Ropey is a UTF-8 [rope](https://en.wikipedia.org/wiki/Rope_(data_structure)) text buffer for Rust, designed for programs like text editors, handling large armounts of texts and memory-incoherent edits efficiently.
 
 
 ## Example usage
+_See the [examples directory](examples/) for more examples._
 
 ```rust
 // Load a text file.
@@ -42,37 +42,35 @@ text.write_to(
 
 ## When should I use Ropey?
 
-Ropey is designed and built to be the backing text buffer for applications
-such as text editors, and its design trade-offs reflect that. Ropey is good
-at:
+Ropey is designed and built to be the backing text buffer for programs like text editors, and its design trade-offs reflect that. Ropey is good at:
 
-- Handling frequent edits to medium-to-large texts. Even on texts that are
+- **Handling frequent edits to medium-to-large texts.** Even on texts that are
   multiple gigabytes large, edits are measured in single-digit microseconds.
-- Handling Unicode correctly. It is impossible to create invalid UTF-8 through
+- **Handling Unicode correctly.** It is impossible to create invalid UTF-8 through
   Ropey, and all Unicode line endings are correctly tracked including CRLF.
-- Having flat, predictable performance characteristics. Ropey will never be
+- **Having flat, predictable performance characteristics.** Ropey will never be
   the source of hiccups or stutters in your software.
 
 On the other hand, Ropey is _not_ good at:
 
-- Handling texts smaller than a couple of kilobytes or so. That is to say,
-  Ropey will handle them fine, but Ropey allocates space in kilobyte chunks,
-  which introduces unnecessary bloat if your texts are almost always small.
-- Handling texts that are larger than available memory. Ropey is an in-memory
+- **Handling texts smaller than a few kilobytes.** Ropey will handle them fine, but 
+  allocates space in kilobyte chunks, which introduces unnecessary bloat if your text 
+  is almost always small.
+- **Handling texts that are larger than available memory.** Ropey is an in-memory
   data structure.
-- Getting the best performance for every possible use-case. Ropey puts work
-  into tracking both line endings and unicode scalar values, which is
+- **Getting the best performance for every possible use-case.** Ropey puts work
+  into tracking both line endings and Unicode scalar values, which is
   performance overhead you may not need depending on your use-case.
 
-Keep this in mind when considering Ropey for your project. Ropey is very good
-at what it does, but like all software it is designed with certain
-applications in mind.
+Keep this in mind when considering Ropey for your project. Ropey is great
+at what it does, but like all libraries, it is designed with specific
+use cases in mind.
 
 
 ## Features
 
 ### Strong Unicode support
-Ropey's atomic unit of text is
+Ropey's atomic units of text are
 [Unicode scalar values](https://www.unicode.org/glossary/#unicode_scalar_value)
 (or [`char`](https://doc.rust-lang.org/std/primitive.char.html)s in Rust)
 encoded as UTF-8. All of Ropey's editing and slicing operations are done
@@ -107,8 +105,8 @@ implemented by client code with minimal overhead.
 
 Ropey is fast and minimizes memory usage:
 
-- On a recent mobile i7 Intel CPU, Ropey performed over 1.8 million small
-  incoherent insertions per second while building up a text roughly 100 MB
+- On a recent Intel i7 mobile CPU, Ropey performed over 1.8 million small
+  incoherent insertions per second while building up text roughly 100 MB
   large. Coherent insertions (i.e. all near the same place in the text) are
   even faster, doing the same task at over 3.3 million insertions per
   second.
@@ -137,6 +135,15 @@ If you find any unsoundness, _please_ file an issue! Also welcome are
 recommendations for how to remove any of the unsafe code without introducing
 significant space or performance regressions, or how to compartmentalize the
 unsafe code even better.
+
+
+## Used by
+
+- [Helix](https://helix-editor.com/)
+- [rspack](https://github.com/web-infra-dev/rspack)
+- [postgres_lsp](https://github.com/supabase/postgres_lsp)
+- [oxc](https://github.com/web-infra-dev/oxc)
+- [zee](https://github.com/zee-editor/zee)
 
 
 ## License

@@ -352,7 +352,7 @@ impl NodeChildren {
     }
 
     /// Returns the child index and left-side-accumulated text info of the
-    /// child that contains the given utf16 code unit offset.
+    /// child that contains the given UTF-16 code unit offset.
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {

@@ -1250,15 +1250,15 @@ impl ExactSizeIterator for Lines<'_> {}
 
 /// An iterator over a `Rope`'s contiguous `str` chunks.
 ///
-/// Internally, each `Rope` stores text as a segemented collection of utf8
+/// Internally, each `Rope` stores text as a segemented collection of UTF-8
 /// strings. This iterator iterates over those segments, returning a
 /// `&str` slice for each one.  It is useful for situations such as:
 ///
-/// - Writing a rope's utf8 text data to disk (but see
+/// - Writing a rope's UTF-8 text data to disk (but see
 ///   [`write_to()`](crate::rope::Rope::write_to) for a convenience function that does this
 ///   for casual use-cases).
 /// - Streaming a rope's text data somewhere.
-/// - Saving a rope to a non-utf8 encoding, doing the encoding conversion
+/// - Saving a rope to a non-UTF-8 encoding, doing the encoding conversion
 ///   incrementally as you go.
 /// - Writing custom iterators over a rope's text data.
 ///

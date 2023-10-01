@@ -213,11 +213,11 @@ pub enum Error {
     /// `Rope`/`RopeSlice` in lines, in that order.
     LineIndexOutOfBounds(usize, usize),
 
-    /// Indicates that the passed utf16 code-unit index was out of
+    /// Indicates that the passed UTF-16 code-unit index was out of
     /// bounds.
     ///
     /// Contains the index attempted and the actual length of the
-    /// `Rope`/`RopeSlice` in utf16 code units, in that order.
+    /// `Rope`/`RopeSlice` in UTF-16 code units, in that order.
     Utf16IndexOutOfBounds(usize, usize),
 
     /// Indicates that the passed byte index was not a char boundary.
@@ -320,7 +320,7 @@ impl std::fmt::Debug for Error {
                 )
             }
             Error::Utf16IndexOutOfBounds(index, len) => {
-                write!(f, "Utf16 code-unit index out of bounds: utf16 index {}, Rope/RopeSlice utf16 length {}", index, len)
+                write!(f, "UTF-16 code-unit index out of bounds: UTF-16 index {}, Rope/RopeSlice UTF-16 length {}", index, len)
             }
             Error::ByteIndexNotCharBoundary(index) => {
                 write!(

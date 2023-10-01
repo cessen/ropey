@@ -14,7 +14,7 @@ use crate::str_utils::{
 use crate::tree::{Count, Node, NodeChildren, TextInfo, MAX_BYTES, MIN_BYTES};
 use crate::{end_bound_to_num, start_bound_to_num, Error, Result};
 
-/// A utf8 text rope.
+/// A UTF-8 text rope.
 ///
 /// The time complexity of nearly all edit and query operations on `Rope` are
 /// worst-case `O(log N)` in the length of the rope.  `Rope` is designed to
@@ -120,7 +120,7 @@ impl Rope {
     ///
     /// - If the reader returns an error, `from_reader` stops and returns
     ///   that error.
-    /// - If non-utf8 data is encountered, an IO error with kind
+    /// - If non-UTF-8 data is encountered, an IO error with kind
     ///   `InvalidData` is returned.
     ///
     /// Note: some data from the reader is likely consumed even if there is
@@ -248,11 +248,11 @@ impl Rope {
         self.root.line_break_count() + 1
     }
 
-    /// Total number of utf16 code units that would be in `Rope` if it were
-    /// encoded as utf16.
+    /// Total number of UTF-16 code units that would be in `Rope` if it were
+    /// encoded as UTF-16.
     ///
-    /// Ropey stores text internally as utf8, but sometimes it is necessary
-    /// to interact with external APIs that still use utf16.  This function is
+    /// Ropey stores text internally as UTF-8, but sometimes it is necessary
+    /// to interact with external APIs that still use UTF-16. This function is
     /// primarily intended for such situations, and is otherwise not very
     /// useful.
     ///
@@ -690,10 +690,10 @@ impl Rope {
         self.try_char_to_line(char_idx).unwrap()
     }
 
-    /// Returns the utf16 code unit index of the given char.
+    /// Returns the UTF-16 code unit index of the given char.
     ///
-    /// Ropey stores text internally as utf8, but sometimes it is necessary
-    /// to interact with external APIs that still use utf16.  This function is
+    /// Ropey stores text internally as UTF-8, but sometimes it is necessary
+    /// to interact with external APIs that still use UTF-16.  This function is
     /// primarily intended for such situations, and is otherwise not very
     /// useful.
     ///
@@ -707,14 +707,14 @@ impl Rope {
         self.try_char_to_utf16_cu(char_idx).unwrap()
     }
 
-    /// Returns the char index of the given utf16 code unit.
+    /// Returns the char index of the given UTF-16 code unit.
     ///
-    /// Ropey stores text internally as utf8, but sometimes it is necessary
-    /// to interact with external APIs that still use utf16.  This function is
+    /// Ropey stores text internally as UTF-8, but sometimes it is necessary
+    /// to interact with external APIs that still use UTF-16.  This function is
     /// primarily intended for such situations, and is otherwise not very
     /// useful.
     ///
-    /// Note: if the utf16 code unit is in the middle of a char, returns the
+    /// Note: if the UTF-16 code unit is in the middle of a char, returns the
     /// index of the char that it belongs to.
     ///
     /// Runs in O(log N) time.

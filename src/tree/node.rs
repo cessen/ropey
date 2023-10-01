@@ -501,7 +501,7 @@ impl Node {
         }
     }
 
-    /// Returns the chunk that contains the given utf16 code unit, and the
+    /// Returns the chunk that contains the given UTF-16 code unit, and the
     /// TextInfo corresponding to the start of the chunk.
     pub fn get_chunk_at_utf16_code_unit(&self, utf16_idx: usize) -> (&str, TextInfo) {
         let mut node = self;

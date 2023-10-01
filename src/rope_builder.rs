@@ -15,7 +15,7 @@ use crate::tree::{Node, NodeChildren, NodeText, MAX_BYTES, MAX_CHILDREN, MIN_BYT
 ///   memory (but see [`from_reader()`](Rope::from_reader) for a convenience
 ///   function that does this for casual use-cases).
 /// - ...streaming data sources.
-/// - ...non-utf8 text data, doing the encoding conversion incrementally
+/// - ...non-UTF-8 text data, doing the encoding conversion incrementally
 ///   as you go.
 ///
 /// Unlike repeatedly calling `Rope::insert()` on the end of a rope,
@@ -65,7 +65,7 @@ impl RopeBuilder {
     /// `Rope`.  The passed text chunk can be as large or small as
     /// desired, but larger chunks are more efficient.
     ///
-    /// `chunk` must be valid utf8 text.
+    /// `chunk` must be valid UTF-8 text.
     pub fn append(&mut self, chunk: &str) {
         self.append_internal(chunk, false);
     }
