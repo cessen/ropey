@@ -78,7 +78,7 @@ in terms of char indices, which prevents accidental creation of invalid
 UTF-8 data.
 
 Ropey also supports converting between scalar value indices and UTF-16 code unit
-indices, for interoperation with external APIs that may still use UTF-16.
+indices, for interoperability with external APIs that may still use UTF-16.
 
 ### Line-aware
 
@@ -140,7 +140,7 @@ unsafe code even better.
 ## Used by
 
 - [Helix](https://helix-editor.com/)
-- [rspack](https://github.com/web-infra-dev/rspack)
+- [rspack](https://www.rspack.dev/)
 - [postgres_lsp](https://github.com/supabase/postgres_lsp)
 - [oxc](https://github.com/web-infra-dev/oxc)
 - [zee](https://github.com/zee-editor/zee)
@@ -148,7 +148,7 @@ unsafe code even better.
 
 ## License
 
-Ropey is licensed under the MIT license (LICENSE.md or https://opensource.org/licenses/MIT)
+Ropey is licensed under the MIT license ([LICENSE.md](/LICENSE.md) or https://opensource.org/licenses/MIT)
 
 
 ## Contributing
