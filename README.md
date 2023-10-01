@@ -4,7 +4,7 @@
 [![Latest Release][crates-io-badge]][crates-io-url]
 [![Documentation][docs-rs-img]][docs-rs-url]
 
-Ropey is a Rust UTF-8 [rope](https://en.wikipedia.org/wiki/Rope_(data_structure)) text buffer, designed for programs like text editors, handling large armounts of texts and memory-incoherent edits efficiently.
+Ropey is a Rust UTF-8 text [rope](https://en.wikipedia.org/wiki/Rope_(data_structure)) designed for programs such as text editors, that can efficiently handle large amounts of text and memory-incoherent edits.
 
 
 ## Example usage
@@ -42,7 +42,7 @@ text.write_to(
 
 ## When should I use Ropey?
 
-Ropey is designed and built to be the backing text buffer for programs like text editors, and its design trade-offs reflect that. Ropey is good at:
+Ropey is designed to be the backing text buffer for programs like text editors, and its design trade-offs reflect that. Ropey is good at:
 
 - **Handling frequent edits to medium-to-large texts.** Even on texts that are
   multiple gigabytes large, edits are measured in single-digit microseconds.
