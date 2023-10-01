@@ -68,7 +68,7 @@
 //! loading of non-UTF-8 text files.
 //!
 //!
-//! # Low-Level APIs
+//! # Low-level APIs
 //!
 //! Ropey also provides access to some of its low-level APIs, enabling client
 //! code to efficiently work with a `Rope`'s data and implement new
