@@ -140,9 +140,9 @@ unsafe code even better.
 ## Used by
 
 - [Helix](https://helix-editor.com/)
-- [rspack](https://www.rspack.dev/)
+- [Rspack](https://www.rspack.dev/)
 - [postgres_lsp](https://github.com/supabase/postgres_lsp)
-- [oxc](https://github.com/web-infra-dev/oxc)
+- [Oxc](https://github.com/web-infra-dev/oxc)
 - [zee](https://github.com/zee-editor/zee)
 
 
