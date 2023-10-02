@@ -53,7 +53,7 @@ Ropey is designed to be the backing text buffer for programs like text editors, 
 
 On the other hand, Ropey is _not_ good at:
 
-- **Handling texts smaller than a few kilobytes.** Ropey will handle them fine, but 
+- **Handling texts smaller than a few kilobytes.** Ropey will handle them fine, but it
   allocates space in kilobyte chunks, which introduces unnecessary bloat if your text 
   is almost always small.
 - **Handling texts that are larger than available memory.** Ropey is an in-memory
