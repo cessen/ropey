@@ -1,0 +1,20 @@
+[package]
+name = "ropey"
+version = "2.0.0-alpha"
+edition = "2021"
+authors = ["Nathan Vegdahl <cessen@cessen.com>"]
+description = "A fast and robust text rope for Rust"
+documentation = "https://docs.rs/ropey"
+repository = "https://github.com/cessen/ropey"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["rope", "text", "edit", "buffer"]
+categories = ["text-processing", "data-structures"]
+exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
+
+[features]
+default = ["simd"]
+simd = ["str_indices/simd"]
+
+[dependencies]
+str_indices = { version = "0.4", default-features = false }
