@@ -785,6 +785,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[cfg(debug_assertions)]
     fn search_char_idx_02() {
         let mut children = NodeChildren::new();
         children.push((
@@ -997,6 +998,7 @@ mod tests {
 
     #[test]
     #[should_panic]
+    #[cfg(debug_assertions)]
     fn search_line_break_idx_04() {
         let mut children = NodeChildren::new();
         children.push((
