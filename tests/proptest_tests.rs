@@ -8,7 +8,7 @@ use proptest::collection::vec;
 use proptest::test_runner::Config;
 use ropey::{
     str_utils::{byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx},
-    Rope,
+    Rope, MAX_BYTES,
 };
 
 fn string_insert(text: &mut String, char_idx: usize, text_ins: &str) {
@@ -130,8 +130,7 @@ proptest! {
         rope.assert_invariants();
         assert_eq!(rope, rope_clone);
 
-        let max_leaf_bytes = 1024 - 33;
-        assert!((rope.capacity() - rope.len_bytes()) <= max_leaf_bytes);
+        assert!((rope.capacity() - rope.len_bytes()) <= MAX_BYTES);
         assert!(rope.capacity() <= capacity_before);
     }
 
@@ -153,8 +152,7 @@ proptest! {
         rope.assert_invariants();
         assert_eq!(rope, rope_clone);
 
-        let max_leaf_bytes = 1024 - 33;
-        let max_diff = max_leaf_bytes + ((rope.len_bytes() / max_leaf_bytes) * ins_text.len());
+        let max_diff = MAX_BYTES + ((rope.len_bytes() / MAX_BYTES) * ins_text.len());
 
         assert!((rope.capacity() - rope.len_bytes()) <= max_diff);
     }

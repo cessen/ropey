@@ -49,7 +49,8 @@ mod constants {
     };
 
     // Node maximums.
-    pub(crate) const MAX_CHILDREN: usize = {
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MAX_CHILDREN: usize = {
         let node_list_align = align_of::<Arc<u8>>();
         let info_list_align = align_of::<TextInfo>();
         let field_gap = if node_list_align >= info_list_align {
@@ -66,7 +67,8 @@ mod constants {
 
         target_size / (size_of::<Arc<u8>>() + size_of::<TextInfo>())
     };
-    pub(crate) const MAX_BYTES: usize = {
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MAX_BYTES: usize = {
         let smallvec_overhead = size_of::<SmallVec<[u8; 16]>>() - 16;
         TARGET_TOTAL_SIZE - START_OFFSET - smallvec_overhead
     };
@@ -75,8 +77,10 @@ mod constants {
     // Note: MIN_BYTES is intentionally a little smaller than half
     // MAX_BYTES, to give a little wiggle room when on the edge of
     // merging/splitting.
-    pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
-    pub(crate) const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
 
     // Compile-time assertion.
     const _: () = {
@@ -92,16 +96,20 @@ mod constants {
 // the tests.
 #[cfg(any(test, feature = "small_chunks"))]
 mod test_constants {
-    pub(crate) const MAX_CHILDREN: usize = 5;
-    pub(crate) const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MAX_CHILDREN: usize = 5;
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MIN_CHILDREN: usize = MAX_CHILDREN / 2;
 
     // MAX_BYTES must be >= 4 to allow for 4-byte utf8 characters.
-    pub(crate) const MAX_BYTES: usize = 9; // Note: can't be 8, because 3-byte characters.
-    pub(crate) const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MAX_BYTES: usize = 9; // Note: can't be 8, because 3-byte characters.
+    #[doc(hidden)] // NOT PART OF THE PUBLIC API!
+    pub const MIN_BYTES: usize = (MAX_BYTES / 2) - (MAX_BYTES / 32);
 }
 
 #[cfg(not(any(test, feature = "small_chunks")))]
-pub(crate) use self::constants::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};
+pub use self::constants::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};
 
 #[cfg(any(test, feature = "small_chunks"))]
-pub(crate) use self::test_constants::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};
+pub use self::test_constants::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};

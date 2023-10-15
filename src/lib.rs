@@ -185,6 +185,11 @@ pub use crate::rope::Rope;
 pub use crate::rope_builder::RopeBuilder;
 pub use crate::slice::RopeSlice;
 
+/// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+/// These are only exposed for tests that live in the `tests` directory.
+#[doc(hidden)]
+pub use crate::tree::{MAX_BYTES, MAX_CHILDREN, MIN_BYTES, MIN_CHILDREN};
+
 //==============================================================
 // Error reporting types.
 
