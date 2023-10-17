@@ -83,24 +83,18 @@ impl Leaf {
         self.gap_size += (byte_idx_range[1] - byte_idx_range[0]) as u16;
     }
 
-    /// Returns the chunk of text on the left of the gap.
+    /// Returns the two chunk of the gap buffer, in order.
     ///
-    /// If there is no text, an empty string is returned.
+    /// Note: one or both chunks can be the empty string.
     #[inline(always)]
-    pub fn left_chunk(&self) -> &str {
-        let chunk = &self.buffer[..self.gap_start as usize];
-        debug_assert!(std::str::from_utf8(chunk).is_ok());
-        unsafe { std::str::from_utf8_unchecked(chunk) }
-    }
-
-    /// Returns the chunk of text on the right of the gap.
-    ///
-    /// If there is no text, an empty string is returned.
-    #[inline(always)]
-    pub fn right_chunk(&self) -> &str {
-        let chunk = &self.buffer[(self.gap_start + self.gap_size) as usize..];
-        debug_assert!(std::str::from_utf8(chunk).is_ok());
-        unsafe { std::str::from_utf8_unchecked(chunk) }
+    pub fn chunks(&self) -> [&str; 2] {
+        let chunk_l = &self.buffer[..self.gap_start as usize];
+        let chunk_r = &self.buffer[(self.gap_start + self.gap_size) as usize..];
+        debug_assert!(std::str::from_utf8(chunk_l).is_ok());
+        debug_assert!(std::str::from_utf8(chunk_r).is_ok());
+        [unsafe { std::str::from_utf8_unchecked(chunk_l) }, unsafe {
+            std::str::from_utf8_unchecked(chunk_r)
+        }]
     }
 
     /// Splits the leaf into two leaves, with roughly half the text in
@@ -118,7 +112,7 @@ impl Leaf {
         };
 
         self.move_gap_start(split_idx);
-        let right = Self::from_str(self.right_chunk());
+        let right = Self::from_str(self.chunks()[1]);
         self.gap_size = LEAF_SIZE as u16 - self.gap_start;
 
         right
@@ -131,8 +125,9 @@ impl Leaf {
         assert!((self.len() + other.len()) <= LEAF_SIZE);
 
         self.move_gap_start(self.len());
-        self.insert(self.len(), other.left_chunk());
-        self.insert(self.len(), other.right_chunk());
+        let [left_chunk, right_chunk] = other.chunks();
+        self.insert(self.len(), left_chunk);
+        self.insert(self.len(), right_chunk);
     }
 
     pub fn move_gap_start(&mut self, byte_idx: usize) {
@@ -178,12 +173,8 @@ impl std::cmp::PartialEq<Leaf> for Leaf {
             return false;
         }
 
-        let mut a = [self.left_chunk().as_bytes(), self.right_chunk().as_bytes()].into_iter();
-        let mut b = [
-            other.left_chunk().as_bytes(),
-            other.right_chunk().as_bytes(),
-        ]
-        .into_iter();
+        let mut a = self.chunks().into_iter().map(|c| c.as_bytes());
+        let mut b = other.chunks().into_iter().map(|c| c.as_bytes());
 
         let mut buf_a: &[u8] = &[];
         let mut buf_b: &[u8] = &[];
@@ -228,10 +219,10 @@ impl std::cmp::PartialEq<str> for Leaf {
         if self.len() != other.len() {
             return false;
         }
-        let left = self.left_chunk().as_bytes();
-        let right = self.right_chunk().as_bytes();
+        let [left, right] = self.chunks();
 
-        (left == &other.as_bytes()[..left.len()]) && (right == &other.as_bytes()[left.len()..])
+        (left.as_bytes() == &other.as_bytes()[..left.len()])
+            && (right.as_bytes() == &other.as_bytes()[left.len()..])
     }
 }
 
@@ -260,8 +251,8 @@ impl std::fmt::Debug for Leaf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_fmt(format_args!(
             "Leaf {{ \"{}\", \"{}\" }}",
-            self.left_chunk(),
-            self.right_chunk()
+            self.chunks()[0],
+            self.chunks()[1],
         ))
     }
 }
@@ -275,16 +266,14 @@ mod tests {
     #[test]
     fn from_str_01() {
         let leaf = Leaf::from_str("");
-        assert_eq!(leaf.left_chunk(), "");
-        assert_eq!(leaf.right_chunk(), "");
+        assert_eq!(leaf.chunks(), ["", ""]);
     }
 
     #[test]
     fn from_str_02() {
         let text = "Hello world!";
         let leaf = Leaf::from_str(text);
-        assert_eq!(leaf.left_chunk(), text);
-        assert_eq!(leaf.right_chunk(), "");
+        assert_eq!(leaf.chunks(), [text, ""]);
     }
 
     #[test]
@@ -293,8 +282,7 @@ mod tests {
         let mut leaf = Leaf::from_str(text);
         for i in 0..(text.len() + 1) {
             leaf.move_gap_start(i);
-            assert_eq!(leaf.left_chunk(), &text[..i]);
-            assert_eq!(leaf.right_chunk(), &text[i..]);
+            assert_eq!(leaf.chunks(), [&text[..i], &text[i..]]);
         }
     }
 
@@ -305,8 +293,7 @@ mod tests {
         for i in 0..(text.len() + 1) {
             let ii = text.len() - i;
             leaf.move_gap_start(ii);
-            assert_eq!(leaf.left_chunk(), &text[..ii]);
-            assert_eq!(leaf.right_chunk(), &text[ii..]);
+            assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
         }
     }
 
