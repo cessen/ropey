@@ -1,6 +1,6 @@
 [package]
 name = "ropey"
-version = "1.6.0"
+version = "1.6.1"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 description = "A fast and robust text rope for Rust"
 documentation = "https://docs.rs/ropey"
@@ -24,7 +24,7 @@ small_chunks = []
 
 [dependencies]
 smallvec = "1.0.0"
-str_indices = { version = "0.4.0", default-features = false }
+str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 rand = "0.8"
