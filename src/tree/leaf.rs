@@ -97,21 +97,14 @@ impl Leaf {
         }]
     }
 
-    /// Splits the leaf into two leaves, with roughly half the text in
-    /// each.
+    /// Splits the leaf into two leaves, at the given byte offset.
     ///
     /// This leaf will contain the left half of the text, and the
     /// returned leaf will contain the right half.
-    pub fn split(&mut self) -> Self {
-        let split_idx = {
-            let mut idx = self.len() / 2;
-            while !self.is_char_boundary(idx) {
-                idx += 1;
-            }
-            idx
-        };
+    pub fn split(&mut self, byte_idx: usize) -> Self {
+        assert!(self.is_char_boundary(byte_idx));
 
-        self.move_gap_start(split_idx);
+        self.move_gap_start(byte_idx);
         let right = Self::from_str(self.chunks()[1]);
         self.gap_size = LEAF_SIZE as u16 - self.gap_start;
 
@@ -426,43 +419,32 @@ mod tests {
 
     #[test]
     fn split_01() {
-        let mut leaf = Leaf::from_str("Hello world!");
-        let right = leaf.split();
-        assert_eq!(leaf, "Hello ");
-        assert_eq!(right, "world!");
+        let text = "Hello world!";
+        let mut leaf = Leaf::from_str(text);
+        for j in 0..(text.len() + 1) {
+            leaf.move_gap_start(j);
+            for i in 0..(text.len() + 1) {
+                let mut left = leaf.clone();
+                let right = left.split(i);
+                assert_eq!(left, &text[..i]);
+                assert_eq!(right, &text[i..]);
+            }
+        }
     }
 
     #[test]
     fn split_02() {
-        let mut leaf = Leaf::from_str("Hello world!");
-        leaf.move_gap_start(8);
-        let right = leaf.split();
-        assert_eq!(leaf, "Hello ");
-        assert_eq!(right, "world!");
-    }
-
-    #[test]
-    fn split_03() {
         let mut leaf = Leaf::from_str("");
-        let right = leaf.split();
+        let right = leaf.split(0);
         assert_eq!(leaf, "");
         assert_eq!(right, "");
     }
 
     #[test]
-    fn split_04() {
-        let mut leaf = Leaf::from_str("H");
-        let right = leaf.split();
-        assert_eq!(leaf, "");
-        assert_eq!(right, "H");
-    }
-
-    #[test]
-    fn split_05() {
+    #[should_panic]
+    fn split_03() {
         let mut leaf = Leaf::from_str("人");
-        let right = leaf.split();
-        assert_eq!(leaf, "人");
-        assert_eq!(right, "");
+        let right = leaf.split(1);
     }
 
     #[test]
