@@ -444,7 +444,7 @@ mod tests {
     #[should_panic]
     fn split_03() {
         let mut leaf = Leaf::from_str("人");
-        let right = leaf.split(1);
+        let _ = leaf.split(1);
     }
 
     #[test]

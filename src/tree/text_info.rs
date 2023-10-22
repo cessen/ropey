@@ -1,5 +1,5 @@
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct TextInfo {
+pub(crate) struct TextInfo {
     pub bytes: u64,
     pub chars: u64,
     pub utf16_surrogates: u64,
