@@ -14,8 +14,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test-stable:
-    name: Build and test, Rust-stable
+  build-and-test:
+    name: Build and test
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - beta
+          - "1.65"
     runs-on: ubuntu-latest
     steps:
       # Get a checkout and rust toolchain.
@@ -23,32 +29,16 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: ${{matrix.toolchain}}
           override: true
 
       # Build and test
-      - run: cargo +stable build
-      - run: cargo +stable test
-      - run: cargo +stable test --no-default-features line
-      - run: cargo +stable test --no-default-features --features=cr_lines line
-      - run: cargo +stable bench --no-run
+      - run: cargo +${{matrix.toolchain}} build
+      - run: cargo +${{matrix.toolchain}} test
+      - run: cargo +${{matrix.toolchain}} test --no-default-features line
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features=cr_lines line
+      - run: cargo +${{matrix.toolchain}} bench --no-run
 
-  build-and-test-beta:
-    name: Build and test, Rust-beta
-    runs-on: ubuntu-latest
-    steps:
-      # Get a checkout and rust toolchain.
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: beta
-          override: true
-
-      # Build and test
-      - run: cargo +beta build
-      - run: cargo +beta test
-      - run: cargo +beta bench --no-run
   run-miri:
     name: Run Miri
     runs-on: ubuntu-latest
