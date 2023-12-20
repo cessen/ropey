@@ -1,16 +1,15 @@
 use super::{node::Node, text_info::TextInfo, MAX_CHILDREN};
 
+/// Internal node of the Rope, with other nodes as children.
 #[derive(Debug, Clone)]
-pub(crate) struct Internal {
-    children: inner::NodeChildrenInternal,
-}
+pub(crate) struct Children(inner::ChildrenInternal);
 
 //===========================================================================
 
-/// The unsafe guts of NodeChildren, exposed through a safe API.
+/// The unsafe guts of Children, exposed through a safe API.
 ///
 /// Try to keep this as small as possible, and implement functionality on
-/// NodeChildren via the safe APIs whenever possible.
+/// Children via the safe APIs whenever possible.
 ///
 /// It's split out this way because it was too easy to accidentally access the
 /// fixed size arrays directly, leading to memory-unsafety bugs when accidentally
@@ -28,7 +27,7 @@ mod inner {
     /// it actually containts _two_ arrays rather than just one, but which
     /// share a length.
     #[repr(C)]
-    pub(crate) struct NodeChildrenInternal {
+    pub(crate) struct ChildrenInternal {
         /// An array of the child nodes.
         /// INVARIANT: The nodes from `0..len` must be initialized
         nodes: [MaybeUninit<Arc<Node>>; MAX_CHILDREN],
@@ -38,13 +37,13 @@ mod inner {
         len: u8,
     }
 
-    impl NodeChildrenInternal {
+    impl ChildrenInternal {
         /// Creates a new empty array.
         #[inline(always)]
-        pub fn new() -> NodeChildrenInternal {
+        pub fn new() -> ChildrenInternal {
             // SAFETY: Uninit data is valid for arrays of MaybeUninit.
             // `len` is zero, so it's ok for all of them to be uninit
-            NodeChildrenInternal {
+            ChildrenInternal {
                 nodes: unsafe { MaybeUninit::uninit().assume_init() },
                 info: unsafe { MaybeUninit::uninit().assume_init() },
                 len: 0,
@@ -188,7 +187,7 @@ mod inner {
         }
     }
 
-    impl Drop for NodeChildrenInternal {
+    impl Drop for ChildrenInternal {
         fn drop(&mut self) {
             // The `.nodes` array contains `MaybeUninit` wrappers, which need
             // to be manually dropped if valid.  We drop only the valid ones
@@ -199,10 +198,10 @@ mod inner {
         }
     }
 
-    impl Clone for NodeChildrenInternal {
-        fn clone(&self) -> NodeChildrenInternal {
-            // Create an empty NodeChildrenInternal first, then fill it
-            let mut clone_array = NodeChildrenInternal::new();
+    impl Clone for ChildrenInternal {
+        fn clone(&self) -> ChildrenInternal {
+            // Create an empty ChildrenInternal first, then fill it
+            let mut clone_array = ChildrenInternal::new();
 
             // Copy nodes... carefully.
             for (clone_arc, arc) in Iterator::zip(
@@ -247,9 +246,9 @@ mod inner {
         }
     }
 
-    impl fmt::Debug for NodeChildrenInternal {
+    impl fmt::Debug for ChildrenInternal {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            f.debug_struct("NodeChildrenInternal")
+            f.debug_struct("ChildrenInternal")
                 .field("nodes", &&self.nodes())
                 .field("info", &&self.info())
                 .field("len", &self.len())

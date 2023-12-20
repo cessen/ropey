@@ -1,6 +1,6 @@
-mod internal;
-mod leaf;
+mod children;
 mod node;
+mod text;
 mod text_info;
 
 const MAX_CHILDREN: usize = 16;

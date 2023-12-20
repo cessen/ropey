@@ -1,7 +1,7 @@
-use super::{internal::Internal, leaf::Leaf};
+use super::{children::Children, text::Text};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
-    Internal(Internal),
-    Leaf(Leaf),
+    Internal(Children),
+    Leaf(Text),
 }

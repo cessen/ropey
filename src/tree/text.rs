@@ -2,19 +2,19 @@ use super::{text_info::TextInfo, LEAF_SIZE};
 
 /// A leaf node of the Rope, containing text.
 ///
-/// Leaf nodes store their text as a gap buffer.  However, with the
+/// Text nodes store their text as a gap buffer.  However, with the
 /// exception of the methods for getting direct access to the left/right
 /// text chunks of the gap buffer, all of its APIs behave as if the text
 /// is a simple contiguous string.
 #[derive(Copy, Clone)]
-pub(crate) struct Leaf {
+pub(crate) struct Text {
     buffer: [u8; LEAF_SIZE],
     gap_start: u16,
     gap_size: u16,
 }
 
-impl Leaf {
-    /// Creates a new `Leaf` with the same contents as the given `&str`.
+impl Text {
+    /// Creates a new `Text` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
         assert!(string.len() <= LEAF_SIZE);
 
@@ -158,10 +158,10 @@ impl Leaf {
 
 //-------------------------------------------------------------
 
-impl std::cmp::Eq for Leaf {}
+impl std::cmp::Eq for Text {}
 
-impl std::cmp::PartialEq<Leaf> for Leaf {
-    fn eq(&self, other: &Leaf) -> bool {
+impl std::cmp::PartialEq<Text> for Text {
+    fn eq(&self, other: &Text) -> bool {
         if self.len() != other.len() {
             return false;
         }
@@ -206,7 +206,7 @@ impl std::cmp::PartialEq<Leaf> for Leaf {
     }
 }
 
-impl std::cmp::PartialEq<str> for Leaf {
+impl std::cmp::PartialEq<str> for Text {
     #[inline]
     fn eq(&self, other: &str) -> bool {
         if self.len() != other.len() {
@@ -219,31 +219,31 @@ impl std::cmp::PartialEq<str> for Leaf {
     }
 }
 
-impl std::cmp::PartialEq<&str> for Leaf {
+impl std::cmp::PartialEq<&str> for Text {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
         self == *other
     }
 }
 
-impl std::cmp::PartialEq<Leaf> for str {
+impl std::cmp::PartialEq<Text> for str {
     #[inline]
-    fn eq(&self, other: &Leaf) -> bool {
+    fn eq(&self, other: &Text) -> bool {
         other == self
     }
 }
 
-impl std::cmp::PartialEq<Leaf> for &str {
+impl std::cmp::PartialEq<Text> for &str {
     #[inline]
-    fn eq(&self, other: &Leaf) -> bool {
+    fn eq(&self, other: &Text) -> bool {
         other == self
     }
 }
 
-impl std::fmt::Debug for Leaf {
+impl std::fmt::Debug for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_fmt(format_args!(
-            "Leaf {{ \"{}\", \"{}\" }}",
+            "Text {{ \"{}\", \"{}\" }}",
             self.chunks()[0],
             self.chunks()[1],
         ))
@@ -258,21 +258,21 @@ mod tests {
 
     #[test]
     fn from_str_01() {
-        let leaf = Leaf::from_str("");
+        let leaf = Text::from_str("");
         assert_eq!(leaf.chunks(), ["", ""]);
     }
 
     #[test]
     fn from_str_02() {
         let text = "Hello world!";
-        let leaf = Leaf::from_str(text);
+        let leaf = Text::from_str(text);
         assert_eq!(leaf.chunks(), [text, ""]);
     }
 
     #[test]
     fn move_gap_start_01() {
         let text = "Hello world!";
-        let mut leaf = Leaf::from_str(text);
+        let mut leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             leaf.move_gap_start(i);
             assert_eq!(leaf.chunks(), [&text[..i], &text[i..]]);
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn move_gap_start_02() {
         let text = "Hello world!";
-        let mut leaf = Leaf::from_str(text);
+        let mut leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             let ii = text.len() - i;
             leaf.move_gap_start(ii);
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn is_char_boundary_01() {
         let text = "Hello world!";
-        let leaf = Leaf::from_str(text);
+        let leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
         }
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn is_char_boundary_02() {
         let text = "みんな、こんにちは！";
-        let leaf = Leaf::from_str(text);
+        let leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
         }
@@ -311,8 +311,8 @@ mod tests {
     #[test]
     fn comparison_true() {
         let text = "Hello world!";
-        let mut leaf_1 = Leaf::from_str(text);
-        let mut leaf_2 = Leaf::from_str(text);
+        let mut leaf_1 = Text::from_str(text);
+        let mut leaf_2 = Text::from_str(text);
         let len = text.len();
 
         let gap_idx_list = [
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn comparison_str_true() {
         let text = "Hello world!";
-        let mut leaf = Leaf::from_str(text);
+        let mut leaf = Text::from_str(text);
 
         let gap_idx_list = [0, 6, leaf.len()];
 
@@ -352,8 +352,8 @@ mod tests {
 
     #[test]
     fn comparison_false() {
-        let mut leaf_1 = Leaf::from_str("Hello world!");
-        let mut leaf_2 = Leaf::from_str("Hella world!");
+        let mut leaf_1 = Text::from_str("Hello world!");
+        let mut leaf_2 = Text::from_str("Hella world!");
         let len = leaf_1.len();
 
         let gap_idx_list = [
@@ -380,7 +380,7 @@ mod tests {
     #[test]
     fn comparison_str_false() {
         let text = "Hello world!";
-        let mut leaf = Leaf::from_str("Hella world!");
+        let mut leaf = Text::from_str("Hella world!");
 
         let gap_idx_list = [0, 6, leaf.len()];
 
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn insert_01() {
-        let mut leaf = Leaf::from_str("");
+        let mut leaf = Text::from_str("");
         leaf.insert(0, "o ");
         assert_eq!(leaf, "o ");
         leaf.insert(0, "He");
@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn remove_01() {
-        let mut leaf = Leaf::from_str("Hello world!");
+        let mut leaf = Text::from_str("Hello world!");
         leaf.remove([4, 6]);
         assert_eq!(leaf, "Hellworld!");
         leaf.remove([0, 3]);
@@ -420,7 +420,7 @@ mod tests {
     #[test]
     fn split_01() {
         let text = "Hello world!";
-        let mut leaf = Leaf::from_str(text);
+        let mut leaf = Text::from_str(text);
         for j in 0..(text.len() + 1) {
             leaf.move_gap_start(j);
             for i in 0..(text.len() + 1) {
@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn split_02() {
-        let mut leaf = Leaf::from_str("");
+        let mut leaf = Text::from_str("");
         let right = leaf.split(0);
         assert_eq!(leaf, "");
         assert_eq!(right, "");
@@ -443,15 +443,15 @@ mod tests {
     #[test]
     #[should_panic]
     fn split_03() {
-        let mut leaf = Leaf::from_str("人");
+        let mut leaf = Text::from_str("人");
         let _ = leaf.split(1);
     }
 
     #[test]
     fn append_01() {
         for i in 0..7 {
-            let mut leaf_1 = Leaf::from_str("Hello ");
-            let mut leaf_2 = Leaf::from_str("world!");
+            let mut leaf_1 = Text::from_str("Hello ");
+            let mut leaf_2 = Text::from_str("world!");
             leaf_1.move_gap_start(i);
             leaf_2.move_gap_start(i);
 
