@@ -1,8 +1,431 @@
-use super::{node::Node, text_info::TextInfo, MAX_CHILDREN};
+use std::{
+    iter::{Iterator, Zip},
+    slice,
+    sync::Arc,
+};
+
+use super::{node::Node, text_info::TextInfo, MAX_CHILDREN, MAX_TEXT_SIZE};
 
 /// Internal node of the Rope, with other nodes as children.
 #[derive(Debug, Clone)]
 pub(crate) struct Children(inner::ChildrenInternal);
+
+impl Children {
+    /// Creates a new empty child array.
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self(inner::ChildrenInternal::new())
+    }
+
+    /// Current length of the child array.
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.0.len() as usize
+    }
+
+    /// Returns whether the child array is full or not.
+    #[inline(always)]
+    pub fn is_full(&self) -> bool {
+        self.len() == MAX_CHILDREN
+    }
+
+    /// Access to the nodes array.
+    #[inline(always)]
+    pub fn nodes(&self) -> &[Arc<Node>] {
+        self.0.nodes()
+    }
+
+    /// Mutable access to the nodes array.
+    #[inline(always)]
+    pub fn nodes_mut(&mut self) -> &mut [Arc<Node>] {
+        self.0.nodes_mut()
+    }
+
+    /// Access to the info array.
+    #[inline(always)]
+    pub fn info(&self) -> &[TextInfo] {
+        self.0.info()
+    }
+
+    /// Mutable access to the info array.
+    #[inline(always)]
+    pub fn info_mut(&mut self) -> &mut [TextInfo] {
+        self.0.info_mut()
+    }
+
+    /// Mutable access to both the info and nodes arrays simultaneously.
+    #[inline(always)]
+    pub fn data_mut(&mut self) -> (&mut [TextInfo], &mut [Arc<Node>]) {
+        self.0.data_mut()
+    }
+
+    /// Updates the text info of the child at `idx`.
+    pub fn update_child_info(&mut self, idx: usize) {
+        let (info, nodes) = self.0.data_mut();
+        info[idx] = nodes[idx].text_info();
+    }
+
+    /// Pushes an item onto the end of the child array.
+    ///
+    /// Increases length by one.  Panics if already full.
+    #[inline(always)]
+    pub fn push(&mut self, item: (TextInfo, Arc<Node>)) {
+        self.0.push(item)
+    }
+
+    /// Pushes an element onto the end of the array, and then splits it in half,
+    /// returning the right half.
+    ///
+    /// This works even when the array is full.
+    pub fn push_split(&mut self, new_child: (TextInfo, Arc<Node>)) -> Self {
+        let r_count = (self.len() + 1) / 2;
+        let l_count = (self.len() + 1) - r_count;
+
+        let mut right = self.split_off(l_count);
+        right.push(new_child);
+        right
+    }
+
+    /// Attempts to merge two nodes, and if it's too much data to merge
+    /// equi-distributes the data between the two.
+    ///
+    /// Returns:
+    ///
+    /// - True: merge was successful.
+    /// - False: merge failed, equidistributed instead.
+    pub fn merge_distribute(&mut self, idx1: usize, idx2: usize) -> bool {
+        assert!(idx1 < idx2);
+        assert!(idx2 < self.len());
+        let remove_right = {
+            let ((_, node1), (_, node2)) = self.get_two_mut(idx1, idx2);
+            let node1 = Arc::make_mut(node1);
+            let node2 = Arc::make_mut(node2);
+            match (node1, node2) {
+                (&mut Node::Leaf(ref mut text1), &mut Node::Leaf(ref mut text2)) => {
+                    if (text1.len() + text2.len()) <= MAX_TEXT_SIZE {
+                        text1.append(text2);
+                        true
+                    } else {
+                        text1.distribute(text2);
+                        false
+                    }
+                }
+
+                (
+                    &mut Node::Internal(ref mut children1),
+                    &mut Node::Internal(ref mut children2),
+                ) => {
+                    if (children1.len() + children2.len()) <= MAX_CHILDREN {
+                        for _ in 0..children2.len() {
+                            // TODO: performance.  This is quadratic with
+                            // the number of children in `children2`.
+                            children1.push(children2.remove(0));
+                        }
+                        true
+                    } else {
+                        children1.distribute(children2);
+                        false
+                    }
+                }
+
+                // TODO: possibly handle this case somehow?  Not sure if it's needed.
+                _ => panic!("Siblings have different node types"),
+            }
+        };
+
+        if remove_right {
+            self.remove(idx2);
+            self.update_child_info(idx1);
+            true
+        } else {
+            self.update_child_info(idx1);
+            self.update_child_info(idx2);
+            false
+        }
+    }
+
+    /// Equidistributes the children between the two child arrays,
+    /// preserving ordering.
+    pub fn distribute(&mut self, other: &mut Self) {
+        let r_target_len = (self.len() + other.len()) / 2;
+        while other.len() < r_target_len {
+            other.insert(0, self.pop());
+        }
+        while other.len() > r_target_len {
+            self.push(other.remove(0));
+        }
+    }
+
+    /// Pops an item off the end of the array and returns it.
+    ///
+    /// Decreases length by one.  Panics if already empty.
+    #[inline(always)]
+    pub fn pop(&mut self) -> (TextInfo, Arc<Node>) {
+        self.0.pop()
+    }
+
+    /// Inserts an item into the the array at the given index.
+    ///
+    /// Increases length by one.  Panics if already full.  Preserves ordering
+    /// of the other items.
+    #[inline(always)]
+    pub fn insert(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) {
+        self.0.insert(idx, item)
+    }
+
+    /// Inserts an element into a the array, and then splits it in half, returning
+    /// the right half.
+    ///
+    /// This works even when the array is full.
+    pub fn insert_split(&mut self, idx: usize, item: (TextInfo, Arc<Node>)) -> Self {
+        assert!(self.len() > 0);
+        assert!(idx <= self.len());
+        let extra = if idx < self.len() {
+            let extra = self.pop();
+            self.insert(idx, item);
+            extra
+        } else {
+            item
+        };
+
+        self.push_split(extra)
+    }
+
+    /// Removes the item at the given index from the the array.
+    ///
+    /// Decreases length by one.  Preserves ordering of the other items.
+    #[inline(always)]
+    pub fn remove(&mut self, idx: usize) -> (TextInfo, Arc<Node>) {
+        self.0.remove(idx)
+    }
+
+    /// Splits the array in two at `idx`, returning the right part of the split.
+    pub fn split_off(&mut self, idx: usize) -> Self {
+        assert!(idx <= self.len());
+
+        // TODO: performance.  This is quadratic with
+        // the number of children.
+        let mut other = Children::new();
+        let count = self.len() - idx;
+        for _ in 0..count {
+            other.push(self.remove(idx));
+        }
+
+        other
+    }
+
+    /// Fetches two children simultaneously, returning mutable references
+    /// to their info and nodes.
+    ///
+    /// `idx1` must be less than `idx2`.
+    pub fn get_two_mut(
+        &mut self,
+        idx1: usize,
+        idx2: usize,
+    ) -> (
+        (&mut TextInfo, &mut Arc<Node>),
+        (&mut TextInfo, &mut Arc<Node>),
+    ) {
+        assert!(idx1 < idx2);
+        assert!(idx2 < self.len());
+
+        let split_idx = idx1 + 1;
+        let (info, nodes) = self.data_mut();
+        let (info1, info2) = info.split_at_mut(split_idx);
+        let (nodes1, nodes2) = nodes.split_at_mut(split_idx);
+
+        (
+            (&mut info1[idx1], &mut nodes1[idx1]),
+            (&mut info2[idx2 - split_idx], &mut nodes2[idx2 - split_idx]),
+        )
+    }
+
+    /// Creates an iterator over the array's items.
+    #[inline(always)]
+    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
+        Iterator::zip(self.info().iter(), self.nodes().iter())
+    }
+
+    #[inline(always)]
+    pub fn combined_info(&self) -> TextInfo {
+        self.info()
+            .iter()
+            .fold(TextInfo::new(), |acc, &next| acc.combine(next))
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// first child that matches the given predicate.
+    ///
+    /// If no child matches the predicate, the last child is returned.
+    #[inline(always)]
+    pub fn search_by<F>(&self, pred: F) -> (usize, TextInfo)
+    where
+        // (left-accumulated start info, left-accumulated end info)
+        F: Fn(TextInfo, TextInfo) -> bool,
+    {
+        debug_assert!(self.len() > 0);
+
+        let mut accum = TextInfo::new();
+        let mut idx = 0;
+        while idx < (self.len() - 1) {
+            let next_accum = {
+                let next_info = self.info()[idx];
+                let next_next_info = self
+                    .info()
+                    .get(idx + 1)
+                    .map(|ti| *ti)
+                    .unwrap_or(TextInfo::new());
+                accum + next_info.adjusted_by_next(next_next_info)
+            };
+            if pred(accum, next_accum) {
+                break;
+            }
+            accum = next_accum;
+            idx += 1;
+        }
+
+        (idx, accum)
+    }
+
+    /// Same as `search_byte_idx()` below, except that it only calulates the
+    /// left-side-accumulated _byte_ index rather than the full text info.
+    ///
+    /// Return is (child_index, left_acc_byte_index)
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    #[inline(always)]
+    pub fn search_byte_idx_only(&self, byte_idx: usize) -> (usize, usize) {
+        debug_assert!(self.len() > 0);
+
+        let mut accum_byte_idx = 0;
+        let mut idx = 0;
+        for info in self.info()[0..(self.len() - 1)].iter() {
+            let next_accum = accum_byte_idx + info.bytes as usize;
+            if byte_idx < next_accum {
+                break;
+            }
+            accum_byte_idx = next_accum;
+            idx += 1;
+        }
+
+        debug_assert!(
+            byte_idx <= (accum_byte_idx + self.info()[idx].bytes as usize) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum_byte_idx)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given byte.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) = self.search_by(|_, end| byte_idx < end.bytes as usize);
+
+        debug_assert!(
+            byte_idx <= (accum.bytes + self.info()[idx].bytes) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given char.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) = self.search_by(|_, end| char_idx < end.chars as usize);
+
+        debug_assert!(
+            char_idx <= (accum.chars + self.info()[idx].chars) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given utf16 code unit offset.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) =
+            self.search_by(|_, end| utf16_idx < (end.chars + end.utf16_surrogates) as usize);
+
+        debug_assert!(
+            utf16_idx
+                <= (accum.chars
+                    + accum.utf16_surrogates
+                    + self.info()[idx].chars
+                    + self.info()[idx].utf16_surrogates) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given line break.
+    ///
+    /// Beginning of the rope is considered index 0, although is not
+    /// considered a line break for the returned left-side-accumulated
+    /// text info.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_line_break_lf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks_lf as usize);
+
+        debug_assert!(
+            line_break_idx <= (accum.line_breaks_lf + self.info()[idx].line_breaks_lf + 1) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given line break.
+    ///
+    /// Beginning of the rope is considered index 0, although is not
+    /// considered a line break for the returned left-side-accumulated
+    /// text info.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_line_break_crlf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks_crlf as usize);
+
+        debug_assert!(
+            line_break_idx
+                <= (accum.line_breaks_crlf + self.info()[idx].line_breaks_crlf + 1) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+
+    /// Returns the child index and left-side-accumulated text info of the
+    /// child that contains the given line break.
+    ///
+    /// Beginning of the rope is considered index 0, although is not
+    /// considered a line break for the returned left-side-accumulated
+    /// text info.
+    ///
+    /// One-past-the end is valid, and will return the last child.
+    pub fn search_line_break_unicode_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
+        let (idx, accum) =
+            self.search_by(|_, end| line_break_idx <= end.line_breaks_unicode as usize);
+
+        debug_assert!(
+            line_break_idx
+                <= (accum.line_breaks_unicode + self.info()[idx].line_breaks_unicode + 1) as usize,
+            "Index out of bounds."
+        );
+
+        (idx, accum)
+    }
+}
 
 //===========================================================================
 
@@ -99,7 +522,7 @@ mod inner {
             )
         }
 
-        /// Pushes an item into the end of the array.
+        /// Pushes an item onto the end of the array.
         ///
         /// Increases length by one.  Panics if already full.
         #[inline(always)]

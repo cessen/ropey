@@ -1,4 +1,4 @@
-use super::{text_info::TextInfo, LEAF_SIZE};
+use super::{text_info::TextInfo, MAX_TEXT_SIZE};
 
 /// A leaf node of the Rope, containing text.
 ///
@@ -8,7 +8,7 @@ use super::{text_info::TextInfo, LEAF_SIZE};
 /// is a simple contiguous string.
 #[derive(Copy, Clone)]
 pub(crate) struct Text {
-    buffer: [u8; LEAF_SIZE],
+    buffer: [u8; MAX_TEXT_SIZE],
     gap_start: u16,
     gap_size: u16,
 }
@@ -16,22 +16,22 @@ pub(crate) struct Text {
 impl Text {
     /// Creates a new `Text` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        assert!(string.len() <= LEAF_SIZE);
+        assert!(string.len() <= MAX_TEXT_SIZE);
 
-        let mut buffer = [0; LEAF_SIZE];
+        let mut buffer = [0; MAX_TEXT_SIZE];
         buffer[..string.len()].copy_from_slice(string.as_bytes());
 
         Self {
             buffer: buffer,
             gap_start: string.len() as u16,
-            gap_size: (LEAF_SIZE - string.len()) as u16,
+            gap_size: (MAX_TEXT_SIZE - string.len()) as u16,
         }
     }
 
     /// Returns the total length of the contained text in bytes.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        LEAF_SIZE - self.free_capacity()
+        MAX_TEXT_SIZE - self.free_capacity()
     }
 
     /// Returns the amount of free space in this leaf, in bytes.
@@ -67,6 +67,14 @@ impl Text {
         self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
         self.gap_start += text.len() as u16;
         self.gap_size -= text.len() as u16;
+    }
+
+    /// Appends `text` to the end.
+    ///
+    /// Panics if there isn't enough free space.
+    #[inline(always)]
+    pub fn append_str(&mut self, text: &str) {
+        self.insert(self.len(), text);
     }
 
     /// Removes the text in the given right-exclusive byte range.
@@ -106,21 +114,29 @@ impl Text {
 
         self.move_gap_start(byte_idx);
         let right = Self::from_str(self.chunks()[1]);
-        self.gap_size = LEAF_SIZE as u16 - self.gap_start;
+        self.gap_size = MAX_TEXT_SIZE as u16 - self.gap_start;
 
         right
     }
 
     /// Appends the contents of another leaf to the end of this one.
     ///
-    /// Panics if there isn't enough free space to append.
+    /// Panics if there isn't enough free space to accommodate the append.
     pub fn append(&mut self, other: &Self) {
-        assert!((self.len() + other.len()) <= LEAF_SIZE);
+        assert!((self.len() + other.len()) <= MAX_TEXT_SIZE);
 
         self.move_gap_start(self.len());
         let [left_chunk, right_chunk] = other.chunks();
         self.insert(self.len(), left_chunk);
         self.insert(self.len(), right_chunk);
+    }
+
+    /// Equidistributes text data between `self` and `other`.  This behaves
+    /// as if the text of `other` is appended to the end of `self`, and the
+    /// result is then split between the two, with `other` being the right
+    /// half of the text.
+    pub fn distribute(&mut self, other: &mut Self) {
+        todo!()
     }
 
     pub fn move_gap_start(&mut self, byte_idx: usize) {

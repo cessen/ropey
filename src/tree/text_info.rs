@@ -43,28 +43,60 @@ impl TextInfo {
             ends_with_cr: text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false),
         }
     }
-}
 
-impl Add for TextInfo {
-    type Output = Self;
-    #[inline]
-    fn add(self, rhs: TextInfo) -> TextInfo {
-        let crlf_split_compensation = if self.ends_with_cr && rhs.starts_with_lf {
+    /// Returns the adjusted version of self based on whatever the next block is.
+    #[must_use]
+    pub fn adjusted_by_next(self, next: TextInfo) -> TextInfo {
+        let crlf_split_compensation = if self.ends_with_cr && next.starts_with_lf {
             1
         } else {
             0
         };
         TextInfo {
+            line_breaks_crlf: self.line_breaks_crlf - crlf_split_compensation,
+            line_breaks_unicode: self.line_breaks_unicode - crlf_split_compensation,
+            ..self
+        }
+    }
+
+    /// Combines two TextInfos as if they represented abutting pieces of text data.
+    ///
+    /// This properly accounts for things like split CRLF line breaks, etc.
+    #[must_use]
+    #[inline(always)]
+    pub fn combine(self, rhs: TextInfo) -> TextInfo {
+        let tmp = self.adjusted_by_next(rhs);
+        tmp + rhs
+    }
+}
+
+impl Add for TextInfo {
+    type Output = Self;
+    /// Note: this does *not* account for neccesary compensation for e.g.
+    /// CRLF line breaks that are split across boundaries.  It just does
+    /// a fairly naive sum of the text info stats.
+    ///
+    /// See `combine()` for an equivalent function that does account for
+    /// such things.
+    #[inline]
+    fn add(self, rhs: TextInfo) -> TextInfo {
+        TextInfo {
             bytes: self.bytes + rhs.bytes,
             chars: self.chars + rhs.chars,
             utf16_surrogates: self.utf16_surrogates + rhs.utf16_surrogates,
             line_breaks_lf: self.line_breaks_lf + rhs.line_breaks_lf,
-            line_breaks_crlf: self.line_breaks_crlf + rhs.line_breaks_crlf
-                - crlf_split_compensation,
-            line_breaks_unicode: self.line_breaks_unicode + rhs.line_breaks_unicode
-                - crlf_split_compensation,
-            starts_with_lf: self.starts_with_lf,
-            ends_with_cr: rhs.ends_with_cr,
+            line_breaks_crlf: self.line_breaks_crlf + rhs.line_breaks_crlf,
+            line_breaks_unicode: self.line_breaks_unicode + rhs.line_breaks_unicode,
+            starts_with_lf: if self.bytes > 0 {
+                self.starts_with_lf
+            } else {
+                rhs.starts_with_lf
+            },
+            ends_with_cr: if rhs.bytes > 0 {
+                rhs.ends_with_cr
+            } else {
+                self.ends_with_cr
+            },
         }
     }
 }
