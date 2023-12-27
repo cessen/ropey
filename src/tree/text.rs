@@ -51,7 +51,10 @@ impl Text {
     }
 
     pub fn text_info(&self) -> TextInfo {
-        todo!()
+        let [left, right] = self.chunks();
+        let left_info = TextInfo::from_str(left);
+        let right_info = TextInfo::from_str(right);
+        left_info.combine(right_info)
     }
 
     /// Inserts the given text at the given byte index.
@@ -80,7 +83,7 @@ impl Text {
     /// Removes the text in the given right-exclusive byte range.
     ///
     /// Panics if the range isn't valid or doesn't lie on valid char
-    /// indices.
+    /// boundaries.
     pub fn remove(&mut self, byte_idx_range: [usize; 2]) {
         assert!(byte_idx_range[0] <= byte_idx_range[1]);
         assert!(byte_idx_range[1] <= self.len());
@@ -136,39 +139,62 @@ impl Text {
     /// result is then split between the two, with `other` being the right
     /// half of the text.
     pub fn distribute(&mut self, other: &mut Self) {
-        todo!()
-    }
+        let total_len = self.len() + other.len();
+        let mut split_idx = (total_len + 1) / 2;
 
-    pub fn move_gap_start(&mut self, byte_idx: usize) {
-        assert!(byte_idx <= self.len());
-        if byte_idx < self.gap_start as usize {
-            self.buffer.copy_within(
-                byte_idx..self.gap_start as usize,
-                byte_idx + self.gap_size as usize,
-            );
-            self.gap_start = byte_idx as u16;
-        } else if byte_idx > self.gap_start as usize {
-            self.buffer.copy_within(
-                (self.gap_start + self.gap_size) as usize..(byte_idx + self.gap_size as usize),
-                self.gap_start as usize,
-            );
-            self.gap_start = byte_idx as u16;
+        if split_idx < self.len() {
+            while !self.is_char_boundary(split_idx) {
+                split_idx += 1;
+            }
+            self.move_gap_start(split_idx);
+            other.insert(0, self.chunks()[1]);
+            self.remove([split_idx, self.len()]);
+        } else if split_idx > self.len() {
+            split_idx -= self.len();
+            while !other.is_char_boundary(split_idx) {
+                split_idx += 1;
+            }
+            other.move_gap_start(split_idx);
+            self.insert(self.len(), other.chunks()[0]);
+            other.remove([0, split_idx]);
         } else {
-            // Gap is already there, so do nothing.
+            // Already equidistributed, so do nothing.
         }
     }
 
     //---------------------------------------------------------
 
+    fn move_gap_start(&mut self, byte_idx: usize) {
+        assert!(byte_idx <= self.len());
+        assert!(self.is_char_boundary(byte_idx));
+
+        if byte_idx < self.gap_start as usize {
+            self.buffer.copy_within(
+                byte_idx..self.gap_start as usize,
+                byte_idx + self.gap_size as usize,
+            );
+        } else if byte_idx > self.gap_start as usize {
+            self.buffer.copy_within(
+                (self.gap_start + self.gap_size) as usize..(byte_idx + self.gap_size as usize),
+                self.gap_start as usize,
+            );
+        } else {
+            // Gap is already there, so do nothing.
+        }
+
+        self.gap_start = byte_idx as u16;
+    }
+
     /// Converts the string byte index to the actual buffer index,
     /// accounting for the gap.
     #[inline(always)]
     fn real_idx(&self, byte_idx: usize) -> usize {
-        if byte_idx >= self.gap_start as usize {
-            self.gap_size as usize + byte_idx
+        let offset = if byte_idx >= self.gap_start as usize {
+            self.gap_size as usize
         } else {
-            byte_idx
-        }
+            0
+        };
+        offset + byte_idx
     }
 }
 
@@ -307,20 +333,49 @@ mod tests {
     }
 
     #[test]
+    fn move_gap_start_03() {
+        let text = "こんにちは！";
+        let mut leaf = Text::from_str(text);
+        for i in 0..=(text.len() / 3) {
+            let ii = text.len() - (i * 3);
+            leaf.move_gap_start(ii);
+            assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn move_gap_start_04() {
+        let text = "こんにちは！";
+        let mut leaf = Text::from_str(text);
+        for i in 0..(text.len() + 1) {
+            let ii = text.len() - i;
+            leaf.move_gap_start(ii);
+            assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
+        }
+    }
+
+    #[test]
     fn is_char_boundary_01() {
         let text = "Hello world!";
-        let leaf = Text::from_str(text);
-        for i in 0..(text.len() + 1) {
-            assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
+        let mut leaf = Text::from_str(text);
+        for gap_i in 0..=text.len() {
+            leaf.move_gap_start(gap_i);
+            for i in 0..(text.len() + 1) {
+                assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
+            }
         }
     }
 
     #[test]
     fn is_char_boundary_02() {
         let text = "みんな、こんにちは！";
-        let leaf = Text::from_str(text);
-        for i in 0..(text.len() + 1) {
-            assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
+        let mut leaf = Text::from_str(text);
+        for gap_i in 0..=(text.len() / 3) {
+            leaf.move_gap_start(gap_i * 3);
+            for i in 0..(text.len() + 1) {
+                assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
+            }
         }
     }
 
@@ -474,6 +529,45 @@ mod tests {
             leaf_1.append(&leaf_2);
 
             assert_eq!("Hello world!", leaf_1);
+        }
+    }
+
+    #[test]
+    fn distribute_01() {
+        let text = "Hello world!!";
+        let expected_left = "Hello w";
+        let expected_right = "orld!!";
+        for split_i in 0..=text.len() {
+            for gap_l_i in 0..=split_i {
+                for gap_r_i in 0..=(text.len() - split_i) {
+                    let mut leaf_1 = Text::from_str(&text[..split_i]);
+                    let mut leaf_2 = Text::from_str(&text[split_i..]);
+                    leaf_1.distribute(&mut leaf_2);
+                    assert_eq!(leaf_1, expected_left);
+                    assert_eq!(leaf_2, expected_right);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn distribute_02() {
+        let text = "こんにちは！！";
+        let expected_left = "こんにち";
+        let expected_right = "は！！";
+        for split_i in 0..=(text.len() / 3) {
+            for gap_l_i in 0..=split_i {
+                for gap_r_i in 0..=((text.len() / 3) - split_i) {
+                    let split_i = split_i * 3;
+                    let gap_l_i = gap_l_i * 3;
+                    let gap_r_i = gap_r_i * 3;
+                    let mut leaf_1 = Text::from_str(&text[..split_i]);
+                    let mut leaf_2 = Text::from_str(&text[split_i..]);
+                    leaf_1.distribute(&mut leaf_2);
+                    assert_eq!(leaf_1, expected_left);
+                    assert_eq!(leaf_2, expected_right);
+                }
+            }
         }
     }
 }
