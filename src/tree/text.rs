@@ -542,6 +542,8 @@ mod tests {
                 for gap_r_i in 0..=(text.len() - split_i) {
                     let mut leaf_1 = Text::from_str(&text[..split_i]);
                     let mut leaf_2 = Text::from_str(&text[split_i..]);
+                    leaf_1.move_gap_start(gap_l_i);
+                    leaf_2.move_gap_start(gap_r_i);
                     leaf_1.distribute(&mut leaf_2);
                     assert_eq!(leaf_1, expected_left);
                     assert_eq!(leaf_2, expected_right);
@@ -563,6 +565,8 @@ mod tests {
                     let gap_r_i = gap_r_i * 3;
                     let mut leaf_1 = Text::from_str(&text[..split_i]);
                     let mut leaf_2 = Text::from_str(&text[split_i..]);
+                    leaf_1.move_gap_start(gap_l_i);
+                    leaf_2.move_gap_start(gap_r_i);
                     leaf_1.distribute(&mut leaf_2);
                     assert_eq!(leaf_1, expected_left);
                     assert_eq!(leaf_2, expected_right);
