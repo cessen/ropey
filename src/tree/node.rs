@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use super::{children::Children, text::Text, text_info::TextInfo};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
-    Internal(Children),
-    Leaf(Text),
+    Internal(Arc<Children>),
+    Leaf(Arc<Text>),
 }
 
 impl Node {
