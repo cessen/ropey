@@ -11,7 +11,16 @@ impl Node {
     ///
     /// Assumes that the info of this node's children is up to date.
     pub(crate) fn text_info(&self) -> TextInfo {
-        todo!()
+        match &self {
+            Node::Internal(children) => {
+                let mut acc_info = TextInfo::new();
+                for info in children.info() {
+                    acc_info = acc_info.combine(*info);
+                }
+                acc_info
+            }
+            Node::Leaf(text) => text.text_info(),
+        }
     }
 
     #[inline(always)]
