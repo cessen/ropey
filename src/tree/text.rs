@@ -61,7 +61,7 @@ impl Text {
     ///
     /// Panics if there isn't enough free space or if the byte index
     /// isn't on a valid char boundary.
-    pub fn insert(&mut self, byte_idx: usize, text: &str) {
+    pub fn insert_str(&mut self, byte_idx: usize, text: &str) {
         assert!(text.len() <= self.free_capacity());
         assert!(byte_idx <= self.len());
         assert!(self.is_char_boundary(byte_idx));
@@ -77,7 +77,7 @@ impl Text {
     /// Panics if there isn't enough free space.
     #[inline(always)]
     pub fn append_str(&mut self, text: &str) {
-        self.insert(self.len(), text);
+        self.insert_str(self.len(), text);
     }
 
     /// Removes the text in the given right-exclusive byte range.
@@ -122,16 +122,16 @@ impl Text {
         right
     }
 
-    /// Appends the contents of another leaf to the end of this one.
+    /// Appends the contents of another `Text` to the end of this one.
     ///
     /// Panics if there isn't enough free space to accommodate the append.
-    pub fn append(&mut self, other: &Self) {
+    pub fn append_text(&mut self, other: &Self) {
         assert!((self.len() + other.len()) <= MAX_TEXT_SIZE);
 
         self.move_gap_start(self.len());
         let [left_chunk, right_chunk] = other.chunks();
-        self.insert(self.len(), left_chunk);
-        self.insert(self.len(), right_chunk);
+        self.insert_str(self.len(), left_chunk);
+        self.insert_str(self.len(), right_chunk);
     }
 
     /// Equidistributes text data between `self` and `other`.  This behaves
@@ -147,7 +147,7 @@ impl Text {
                 split_idx += 1;
             }
             self.move_gap_start(split_idx);
-            other.insert(0, self.chunks()[1]);
+            other.insert_str(0, self.chunks()[1]);
             self.remove([split_idx, self.len()]);
         } else if split_idx > self.len() {
             split_idx -= self.len();
@@ -155,7 +155,7 @@ impl Text {
                 split_idx += 1;
             }
             other.move_gap_start(split_idx);
-            self.insert(self.len(), other.chunks()[0]);
+            self.insert_str(self.len(), other.chunks()[0]);
             other.remove([0, split_idx]);
         } else {
             // Already equidistributed, so do nothing.
@@ -463,15 +463,15 @@ mod tests {
     }
 
     #[test]
-    fn insert_01() {
+    fn insert_str_01() {
         let mut leaf = Text::from_str("");
-        leaf.insert(0, "o ");
+        leaf.insert_str(0, "o ");
         assert_eq!(leaf, "o ");
-        leaf.insert(0, "He");
+        leaf.insert_str(0, "He");
         assert_eq!(leaf, "Heo ");
-        leaf.insert(2, "ll");
+        leaf.insert_str(2, "ll");
         assert_eq!(leaf, "Hello ");
-        leaf.insert(6, "world!");
+        leaf.insert_str(6, "world!");
         assert_eq!(leaf, "Hello world!");
     }
 
@@ -519,14 +519,14 @@ mod tests {
     }
 
     #[test]
-    fn append_01() {
+    fn append_text_01() {
         for i in 0..7 {
             let mut leaf_1 = Text::from_str("Hello ");
             let mut leaf_2 = Text::from_str("world!");
             leaf_1.move_gap_start(i);
             leaf_2.move_gap_start(i);
 
-            leaf_1.append(&leaf_2);
+            leaf_1.append_text(&leaf_2);
 
             assert_eq!("Hello world!", leaf_1);
         }

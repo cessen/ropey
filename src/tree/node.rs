@@ -102,7 +102,7 @@ impl Node {
                 let leaf_text = Arc::make_mut(leaf_text);
                 if text.len() <= leaf_text.free_capacity() {
                     // Enough room to insert.
-                    leaf_text.insert(byte_idx, text);
+                    leaf_text.insert_str(byte_idx, text);
                     return (leaf_text.text_info(), None);
                 } else {
                     // Not enough room to insert.  Need to split into two nodes.
@@ -110,7 +110,7 @@ impl Node {
                     let text_split_idx =
                         crate::find_split(leaf_text.free_capacity(), text.as_bytes());
                     leaf_text.append_str(&text[..text_split_idx]);
-                    right_text.insert(0, &text[text_split_idx..]);
+                    right_text.insert_str(0, &text[text_split_idx..]);
                     leaf_text.distribute(&mut right_text);
                     return (
                         leaf_text.text_info(),

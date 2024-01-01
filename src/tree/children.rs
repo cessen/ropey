@@ -103,7 +103,7 @@ impl Children {
                     let text1 = Arc::make_mut(text1);
                     let text2 = Arc::make_mut(text2);
                     if (text1.len() + text2.len()) <= MAX_TEXT_SIZE {
-                        text1.append(text2);
+                        text1.append_text(text2);
                         true
                     } else {
                         text1.distribute(text2);
