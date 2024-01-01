@@ -144,8 +144,11 @@ impl RopeBuilder {
         }
 
         // Create the rope.
+        let root = self.stack.pop().unwrap();
+        let root_info = root.text_info();
         Rope {
-            root: self.stack.pop().unwrap(),
+            root: root,
+            root_info: root_info,
         }
     }
 

@@ -18,11 +18,12 @@ pub use rope_builder::RopeBuilder;
 /// This is used to find an appropriate split position on utf8 strings.
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
+///
+/// Note for convenience, if `byte_idx > text.len()`, this simply
+/// returns `text.len()`.
 pub fn find_split(mut byte_idx: usize, text: &[u8]) -> usize {
-    debug_assert!(byte_idx <= text.len());
-
     if byte_idx >= text.len() {
-        return byte_idx;
+        return text.len();
     }
 
     while (text[byte_idx] >> 6) == 0b10 && byte_idx > 0 {

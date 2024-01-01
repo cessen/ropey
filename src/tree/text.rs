@@ -63,8 +63,8 @@ impl Text {
     /// isn't on a valid char boundary.
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
         assert!(text.len() <= self.free_capacity());
-        assert!(self.is_char_boundary(byte_idx));
         assert!(byte_idx <= self.len());
+        assert!(self.is_char_boundary(byte_idx));
 
         self.move_gap_start(byte_idx);
         self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());

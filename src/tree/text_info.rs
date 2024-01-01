@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 use str_indices::{chars, lines, lines_crlf, lines_lf, utf16};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -105,5 +105,36 @@ impl AddAssign for TextInfo {
     #[inline]
     fn add_assign(&mut self, other: TextInfo) {
         *self = *self + other;
+    }
+}
+
+impl Sub for TextInfo {
+    type Output = Self;
+    /// Note: this does *not* account for neccesary compensation for e.g.
+    /// CRLF line breaks that are split across boundaries.  It just does
+    /// a fairly naive subtraction of the text info stats.
+    ///
+    /// Because of that, using this correctly requires knowledge of the
+    /// specific chunks of text that the text info represents, and doing
+    /// some special handling based on that.
+    #[inline]
+    fn sub(self, rhs: TextInfo) -> TextInfo {
+        TextInfo {
+            bytes: self.bytes - rhs.bytes,
+            chars: self.chars - rhs.chars,
+            utf16_surrogates: self.utf16_surrogates - rhs.utf16_surrogates,
+            line_breaks_lf: self.line_breaks_lf - rhs.line_breaks_lf,
+            line_breaks_cr_lf: self.line_breaks_cr_lf - rhs.line_breaks_cr_lf,
+            line_breaks_unicode: self.line_breaks_unicode - rhs.line_breaks_unicode,
+            starts_with_lf: false,
+            ends_with_cr: false,
+        }
+    }
+}
+
+impl SubAssign for TextInfo {
+    #[inline]
+    fn sub_assign(&mut self, other: TextInfo) {
+        *self = *self - other;
     }
 }
