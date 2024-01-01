@@ -82,7 +82,7 @@ impl Rope {
             // the repeated insertions can keep re-using the same
             // insertion point.  Note that the minus 4 is to guarantee
             // that nodes can split into node-sized chunks even in the
-            // face of mult-byte chars that may prevent splits at
+            // face of multi-byte chars that may prevent splits at
             // certain byte indices.
             let split_idx = crate::find_split(
                 text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
