@@ -117,22 +117,27 @@ impl Rope {
         self.root_info.bytes as usize
     }
 
+    #[cfg(feature = "metric_chars")]
     pub fn len_chars(&self) -> usize {
         self.root_info.chars as usize
     }
 
+    #[cfg(feature = "metric_utf16")]
     pub fn len_utf16(&self) -> usize {
         (self.root_info.chars + self.root_info.utf16_surrogates) as usize
     }
 
+    #[cfg(feature = "metric_lines_lf")]
     pub fn len_lines_lf(&self) -> usize {
         (self.root_info.line_breaks_lf + 1) as usize
     }
 
+    #[cfg(feature = "metric_lines_cr_lf")]
     pub fn len_lines_cr_lf(&self) -> usize {
         (self.root_info.line_breaks_cr_lf + 1) as usize
     }
 
+    #[cfg(feature = "metric_lines_unicode")]
     pub fn len_lines_unicode(&self) -> usize {
         (self.root_info.line_breaks_unicode + 1) as usize
     }

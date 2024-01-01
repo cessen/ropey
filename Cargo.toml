@@ -13,7 +13,12 @@ categories = ["text-processing", "data-structures"]
 exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
 
 [features]
-default = ["simd"]
+default = ["metric_lines_cr_lf", "simd"]
+metric_chars = []
+metric_utf16 = []
+metric_lines_lf = []
+metric_lines_cr_lf = []
+metric_lines_unicode = []
 simd = ["str_indices/simd"]
 
 [dependencies]

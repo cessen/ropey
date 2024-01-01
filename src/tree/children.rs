@@ -334,6 +334,7 @@ impl Children {
     /// child that contains the given char.
     ///
     /// One-past-the end is valid, and will return the last child.
+    #[cfg(feature = "metric_chars")]
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|_, end| char_idx < end.chars as usize);
 
@@ -349,6 +350,7 @@ impl Children {
     /// child that contains the given utf16 code unit offset.
     ///
     /// One-past-the end is valid, and will return the last child.
+    #[cfg(feature = "metric_utf16")]
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) =
             self.search_by(|_, end| utf16_idx < (end.chars + end.utf16_surrogates) as usize);
@@ -373,6 +375,7 @@ impl Children {
     /// text info.
     ///
     /// One-past-the end is valid, and will return the last child.
+    #[cfg(feature = "metric_lines_lf")]
     pub fn search_line_break_lf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks_lf as usize);
 
@@ -392,7 +395,8 @@ impl Children {
     /// text info.
     ///
     /// One-past-the end is valid, and will return the last child.
-    pub fn search_line_break_crlf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
+    #[cfg(feature = "metric_lines_cr_lf")]
+    pub fn search_line_break_cr_lf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) =
             self.search_by(|_, end| line_break_idx <= end.line_breaks_cr_lf as usize);
 
@@ -413,6 +417,7 @@ impl Children {
     /// text info.
     ///
     /// One-past-the end is valid, and will return the last child.
+    #[cfg(feature = "metric_lines_unicode")]
     pub fn search_line_break_unicode_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) =
             self.search_by(|_, end| line_break_idx <= end.line_breaks_unicode as usize);
