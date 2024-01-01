@@ -40,4 +40,36 @@ impl Node {
             &Self::Leaf(_) => true,
         }
     }
+
+    pub fn child_count(&self) -> usize {
+        self.children().len()
+    }
+
+    pub fn children(&self) -> &Children {
+        match *self {
+            Node::Internal(ref children) => children,
+            _ => panic!(),
+        }
+    }
+
+    pub fn children_mut(&mut self) -> &mut Children {
+        match *self {
+            Node::Internal(ref mut children) => Arc::make_mut(children),
+            _ => panic!(),
+        }
+    }
+
+    pub fn leaf_text(&self) -> [&str; 2] {
+        match *self {
+            Node::Leaf(ref text) => text.chunks(),
+            _ => panic!(),
+        }
+    }
+
+    pub fn leaf_text_mut(&mut self) -> &mut Text {
+        match *self {
+            Node::Leaf(ref mut text) => Arc::make_mut(text),
+            _ => panic!(),
+        }
+    }
 }

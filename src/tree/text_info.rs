@@ -7,7 +7,7 @@ pub(crate) struct TextInfo {
     pub chars: u64,
     pub utf16_surrogates: u64,
     pub line_breaks_lf: u64,
-    pub line_breaks_crlf: u64,
+    pub line_breaks_cr_lf: u64,
     pub line_breaks_unicode: u64,
 
     // To handle split CRLF line breaks correctly.
@@ -23,7 +23,7 @@ impl TextInfo {
             chars: 0,
             utf16_surrogates: 0,
             line_breaks_lf: 0,
-            line_breaks_crlf: 0,
+            line_breaks_cr_lf: 0,
             line_breaks_unicode: 0,
             starts_with_lf: false,
             ends_with_cr: false,
@@ -37,7 +37,7 @@ impl TextInfo {
             chars: chars::count(text) as u64,
             utf16_surrogates: utf16::count_surrogates(text) as u64,
             line_breaks_lf: lines_lf::count_breaks(text) as u64,
-            line_breaks_crlf: lines_crlf::count_breaks(text) as u64,
+            line_breaks_cr_lf: lines_crlf::count_breaks(text) as u64,
             line_breaks_unicode: lines::count_breaks(text) as u64,
             starts_with_lf: text.as_bytes().get(0).map(|&b| b == 0x0A).unwrap_or(false),
             ends_with_cr: text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false),
@@ -53,7 +53,7 @@ impl TextInfo {
             0
         };
         TextInfo {
-            line_breaks_crlf: self.line_breaks_crlf - crlf_split_compensation,
+            line_breaks_cr_lf: self.line_breaks_cr_lf - crlf_split_compensation,
             line_breaks_unicode: self.line_breaks_unicode - crlf_split_compensation,
             ..self
         }
@@ -85,7 +85,7 @@ impl Add for TextInfo {
             chars: self.chars + rhs.chars,
             utf16_surrogates: self.utf16_surrogates + rhs.utf16_surrogates,
             line_breaks_lf: self.line_breaks_lf + rhs.line_breaks_lf,
-            line_breaks_crlf: self.line_breaks_crlf + rhs.line_breaks_crlf,
+            line_breaks_cr_lf: self.line_breaks_cr_lf + rhs.line_breaks_cr_lf,
             line_breaks_unicode: self.line_breaks_unicode + rhs.line_breaks_unicode,
             starts_with_lf: if self.bytes > 0 {
                 self.starts_with_lf

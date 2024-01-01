@@ -393,11 +393,12 @@ impl Children {
     ///
     /// One-past-the end is valid, and will return the last child.
     pub fn search_line_break_crlf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks_crlf as usize);
+        let (idx, accum) =
+            self.search_by(|_, end| line_break_idx <= end.line_breaks_cr_lf as usize);
 
         debug_assert!(
             line_break_idx
-                <= (accum.line_breaks_crlf + self.info()[idx].line_breaks_crlf + 1) as usize,
+                <= (accum.line_breaks_cr_lf + self.info()[idx].line_breaks_cr_lf + 1) as usize,
             "Index out of bounds."
         );
 

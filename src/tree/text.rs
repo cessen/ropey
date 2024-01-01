@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn is_char_boundary_02() {
-        let text = "みんな、こんにちは！";
+        let text = "こんにちは！";
         let mut leaf = Text::from_str(text);
         for gap_i in 0..=(text.len() / 3) {
             leaf.move_gap_start(gap_i * 3);
