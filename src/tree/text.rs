@@ -9,6 +9,11 @@ use super::{text_info::TextInfo, MAX_TEXT_SIZE};
 #[derive(Copy, Clone)]
 pub(crate) struct Text {
     buffer: [u8; MAX_TEXT_SIZE],
+
+    /// Info for the text preceding the gap.
+    left_info: TextInfo,
+
+    /// Gap tracking data.
     gap_start: u16,
     gap_size: u16,
 }
@@ -23,6 +28,7 @@ impl Text {
 
         Self {
             buffer: buffer,
+            left_info: TextInfo::from_str(string),
             gap_start: string.len() as u16,
             gap_size: (MAX_TEXT_SIZE - string.len()) as u16,
         }
@@ -51,10 +57,8 @@ impl Text {
     }
 
     pub fn text_info(&self) -> TextInfo {
-        let [left, right] = self.chunks();
-        let left_info = TextInfo::from_str(left);
-        let right_info = TextInfo::from_str(right);
-        left_info.combine(right_info)
+        let right_info = TextInfo::from_str(self.chunks()[1]);
+        self.left_info.combine(right_info)
     }
 
     /// Inserts the given text at the given byte index.
@@ -70,6 +74,7 @@ impl Text {
         self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
         self.gap_start += text.len() as u16;
         self.gap_size -= text.len() as u16;
+        self.left_info = self.left_info.combine(TextInfo::from_str(text));
     }
 
     /// Appends `text` to the end.
@@ -92,6 +97,10 @@ impl Text {
 
         self.move_gap_start(byte_idx_range[0]);
         self.gap_size += (byte_idx_range[1] - byte_idx_range[0]) as u16;
+
+        // Note: unlike with insertion, `left_info` doesn't need to be
+        // updated here, because for removal that's entirely taken care of
+        // by the call to `move_gap_start()` above.
     }
 
     /// Returns the two chunk of the gap buffer, in order.
@@ -169,20 +178,45 @@ impl Text {
         assert!(self.is_char_boundary(byte_idx));
 
         if byte_idx < self.gap_start as usize {
+            let chunk_size = self.gap_start as usize - byte_idx;
+
+            // Move chunk to the right.
             self.buffer.copy_within(
                 byte_idx..self.gap_start as usize,
                 byte_idx + self.gap_size as usize,
             );
+            self.gap_start = byte_idx as u16;
+
+            // Update left text info.
+            if byte_idx <= chunk_size {
+                // If the remaining left chunk is smaller than the
+                // moved chunk.
+                self.left_info = TextInfo::from_str(self.chunks()[0]);
+            } else {
+                // If the remaining left chunk is larger than the
+                // moved chunk.
+                self.left_info = self.left_info.truncate(
+                    self.chunks()[0],
+                    TextInfo::from_str(&self.chunks()[1][..chunk_size]),
+                );
+            }
         } else if byte_idx > self.gap_start as usize {
+            let old_gap_start = self.gap_start;
+
+            // Move chunk to the left.
             self.buffer.copy_within(
                 (self.gap_start + self.gap_size) as usize..(byte_idx + self.gap_size as usize),
                 self.gap_start as usize,
             );
+            self.gap_start = byte_idx as u16;
+
+            // Update left text info.
+            self.left_info = self.left_info.combine(TextInfo::from_str(
+                &self.chunks()[0][(old_gap_start as usize)..],
+            ));
         } else {
             // Gap is already there, so do nothing.
         }
-
-        self.gap_start = byte_idx as u16;
     }
 
     /// Converts the string byte index to the actual buffer index,
@@ -307,39 +341,47 @@ mod tests {
     #[test]
     fn from_str_02() {
         let text = "Hello world!";
+        let text_info = TextInfo::from_str(text);
         let leaf = Text::from_str(text);
         assert_eq!(leaf.chunks(), [text, ""]);
+        assert_eq!(leaf.text_info(), text_info);
     }
 
     #[test]
     fn move_gap_start_01() {
         let text = "Hello world!";
+        let text_info = TextInfo::from_str(text);
         let mut leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             leaf.move_gap_start(i);
             assert_eq!(leaf.chunks(), [&text[..i], &text[i..]]);
+            assert_eq!(leaf.text_info(), text_info);
         }
     }
 
     #[test]
     fn move_gap_start_02() {
         let text = "Hello world!";
+        let text_info = TextInfo::from_str(text);
         let mut leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             let ii = text.len() - i;
             leaf.move_gap_start(ii);
             assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
+            assert_eq!(leaf.text_info(), text_info);
         }
     }
 
     #[test]
     fn move_gap_start_03() {
         let text = "こんにちは！";
+        let text_info = TextInfo::from_str(text);
         let mut leaf = Text::from_str(text);
         for i in 0..=(text.len() / 3) {
             let ii = text.len() - (i * 3);
             leaf.move_gap_start(ii);
             assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
+            assert_eq!(leaf.text_info(), text_info);
         }
     }
 
@@ -347,11 +389,13 @@ mod tests {
     #[should_panic]
     fn move_gap_start_04() {
         let text = "こんにちは！";
+        let text_info = TextInfo::from_str(text);
         let mut leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             let ii = text.len() - i;
             leaf.move_gap_start(ii);
             assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
+            assert_eq!(leaf.text_info(), text_info);
         }
     }
 
@@ -467,12 +511,16 @@ mod tests {
         let mut leaf = Text::from_str("");
         leaf.insert_str(0, "o ");
         assert_eq!(leaf, "o ");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("o "));
         leaf.insert_str(0, "He");
         assert_eq!(leaf, "Heo ");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("Heo "));
         leaf.insert_str(2, "ll");
         assert_eq!(leaf, "Hello ");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("Hello "));
         leaf.insert_str(6, "world!");
         assert_eq!(leaf, "Hello world!");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("Hello world!"));
     }
 
     #[test]
@@ -480,12 +528,16 @@ mod tests {
         let mut leaf = Text::from_str("Hello world!");
         leaf.remove([4, 6]);
         assert_eq!(leaf, "Hellworld!");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("Hellworld!"));
         leaf.remove([0, 3]);
         assert_eq!(leaf, "lworld!");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("lworld!"));
         leaf.remove([4, 7]);
         assert_eq!(leaf, "lwor");
+        assert_eq!(leaf.text_info(), TextInfo::from_str("lwor"));
         leaf.remove([0, 4]);
         assert_eq!(leaf, "");
+        assert_eq!(leaf.text_info(), TextInfo::from_str(""));
     }
 
     #[test]

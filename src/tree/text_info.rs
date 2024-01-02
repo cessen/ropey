@@ -91,10 +91,10 @@ impl TextInfo {
             line_breaks_unicode: lines::count_breaks(text) as u64,
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            starts_with_lf: text.as_bytes().get(0).map(|&b| b == 0x0A).unwrap_or(false),
+            starts_with_lf: starts_with_lf(text),
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            ends_with_cr: text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false),
+            ends_with_cr: ends_with_cr(text),
         }
     }
 
@@ -133,6 +133,41 @@ impl TextInfo {
     pub fn combine(self, rhs: TextInfo) -> TextInfo {
         let tmp = self.adjusted_by_next(rhs);
         tmp + rhs
+    }
+
+    /// Computes the new info for a text after removing some of it from
+    /// the right side.
+    ///
+    /// The info this is called on is the pre-truncation text info.
+    ///
+    /// - `remaining_text`: the remaining text after truncation.
+    /// - `removed_info`: the text info for the portion of the text was
+    ///   removed from the right side.
+    pub fn truncate(self, remaining_text: &str, removed_info: TextInfo) -> TextInfo {
+        if remaining_text.is_empty() {
+            return TextInfo::new();
+        }
+
+        let mut info = self - removed_info;
+
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        {
+            info.starts_with_lf = starts_with_lf(remaining_text);
+            info.ends_with_cr = ends_with_cr(remaining_text);
+            if info.ends_with_cr && removed_info.starts_with_lf {
+                #[cfg(feature = "metric_lines_cr_lf")]
+                {
+                    info.line_breaks_cr_lf += 1;
+                }
+
+                #[cfg(feature = "metric_lines_unicode")]
+                {
+                    info.line_breaks_unicode += 1;
+                }
+            }
+        }
+
+        info
     }
 }
 
@@ -229,4 +264,14 @@ impl SubAssign for TextInfo {
     fn sub_assign(&mut self, other: TextInfo) {
         *self = *self - other;
     }
+}
+
+#[inline(always)]
+fn starts_with_lf(text: &str) -> bool {
+    text.as_bytes().get(0).map(|&b| b == 0x0A).unwrap_or(false)
+}
+
+#[inline(always)]
+fn ends_with_cr(text: &str) -> bool {
+    text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false)
 }
