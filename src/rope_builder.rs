@@ -128,11 +128,12 @@ impl RopeBuilder {
     }
 
     // Internal workings of `finish()`.
-    //
-    // When `fix_tree` is false, the resulting node tree is NOT fixed up
-    // to adhere to the btree invariants.  This is useful for some testing
-    // code.  But generally, `fix_tree` should be set to true.
     fn finish_internal(mut self) -> Rope {
+        // Empty rope.
+        if self.stack.len() == 0 {
+            return Rope::new();
+        }
+
         // Zip up all the remaining nodes on the stack
         let mut stack_idx = self.stack.len() - 1;
         while stack_idx >= 1 {
