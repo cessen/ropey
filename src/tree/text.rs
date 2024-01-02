@@ -161,11 +161,22 @@ impl Text {
         } else if split_idx > self.len() {
             split_idx -= self.len();
             while !other.is_char_boundary(split_idx) {
+                // We could subtract 1 here instead, which would avoid
+                // needing the special case below.  However, this ensures
+                // consistent splitting behavior regardless of whether
+                // self or other has more data in it.
                 split_idx += 1;
             }
-            other.move_gap_start(split_idx);
-            self.insert_str(self.len(), other.chunks()[0]);
-            other.remove([0, split_idx]);
+            // There is a slim chance that the chosen split point would
+            // overflow the left capacity.  This only happens when both
+            // texts are nearly full, and thus essentially equidistributed
+            // already.  Thus, if we hit that case, we simply skip doing
+            // the equidistribution.
+            if (self.len() + split_idx) <= MAX_TEXT_SIZE {
+                other.move_gap_start(split_idx);
+                self.insert_str(self.len(), other.chunks()[0]);
+                other.remove([0, split_idx]);
+            }
         } else {
             // Already equidistributed, so do nothing.
         }
@@ -625,5 +636,30 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn distribute_03() {
+        // This tests a corner case where we can't split at the exact
+        // desired split point because the left side is just shy of
+        // being full and the right side is full and starts with a
+        // multi-byte character.  In a naive implementation of
+        // `distribute()` this case will panic as it tries to move
+        // more data into the left side than can fit.
+        let mut text_l = String::new();
+        let mut text_r = String::new();
+        while (text_l.len() + "a".len()) <= (MAX_TEXT_SIZE - 1) {
+            text_l.push_str("a");
+        }
+        while (text_r.len() + "🐸".len()) <= MAX_TEXT_SIZE {
+            text_r.push_str("🐸");
+        }
+        while (text_r.len() + "a".len()) <= MAX_TEXT_SIZE {
+            text_r.push_str("a");
+        }
+
+        let mut leaf_1 = Text::from_str(&text_l);
+        let mut leaf_2 = Text::from_str(&text_r);
+        leaf_1.distribute(&mut leaf_2);
     }
 }
