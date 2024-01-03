@@ -76,34 +76,43 @@ impl Node {
     /// Note: `node_info` is the text info *for the node this is being called
     /// on*.  This is because node info for a child is stored in the parent.
     /// This makes it a little inconvenient to call, but is desireable for
-    /// efficiency so that the info can be used for a cheaper update rather
-    /// than being recomputed from scratch.
+    /// efficiency so that the info can be used for a cheaper update rather than
+    /// being recomputed from scratch.
     ///
-    /// Returns the new text info for the current node, and if a split was
-    /// caused returns the right side of the split (the left remaining as the
-    /// current node) and its text info.
+    ///
+    /// On success, returns the new text info for the current node, and if a
+    /// split was caused returns the right side of the split (the left remaining
+    /// as the current node) and its text info.
+    ///
+    /// On non-panicing failure, returns Err(()).  This happens if and only if
+    /// `byte_idx` is not on a char boundary.
+    ///
+    /// Panics:
+    /// - If `byte_idx` is out of bounds.
+    /// - If `text` is too large to handle.  Anything less than or equal to
+    ///   `MAX_TEXT_SIZE - 4` is guaranteed to be okay.
     pub fn insert_at_byte_idx(
         &mut self,
         byte_idx: usize,
         text: &str,
         _node_info: TextInfo,
-    ) -> (TextInfo, Option<(TextInfo, Node)>) {
+    ) -> Result<(TextInfo, Option<(TextInfo, Node)>), ()> {
         // TODO: use `node_info` to do an update of the node info rather
         // than recomputing from scratch.  This will be a bit delicate,
         // because it requires being aware of crlf splits.
 
         match *self {
             Node::Leaf(ref mut leaf_text) => {
-                assert!(
-                    leaf_text.is_char_boundary(byte_idx),
-                    "Cannot insert text at a non-char boundary."
-                );
+                if !leaf_text.is_char_boundary(byte_idx) {
+                    // Not a char boundary, so early-out.
+                    return Err(());
+                }
 
                 let leaf_text = Arc::make_mut(leaf_text);
                 if text.len() <= leaf_text.free_capacity() {
                     // Enough room to insert.
                     leaf_text.insert_str(byte_idx, text);
-                    return (leaf_text.text_info(), None);
+                    Ok((leaf_text.text_info(), None))
                 } else {
                     // Not enough room to insert.  Need to split into two nodes.
                     let mut right_text = leaf_text.split(byte_idx);
@@ -112,10 +121,10 @@ impl Node {
                     leaf_text.append_str(&text[..text_split_idx]);
                     right_text.insert_str(0, &text[text_split_idx..]);
                     leaf_text.distribute(&mut right_text);
-                    return (
+                    Ok((
                         leaf_text.text_info(),
                         Some((right_text.text_info(), Node::Leaf(Arc::new(right_text)))),
-                    );
+                    ))
                 }
             }
             Node::Internal(ref mut children) => {
@@ -130,24 +139,24 @@ impl Node {
                     byte_idx - acc_byte_idx,
                     text,
                     info,
-                );
+                )?;
                 children.info_mut()[child_i] = l_info;
 
                 // Handle the residual node if there is one and return.
                 if let Some((r_info, r_node)) = residual {
                     if children.len() < MAX_CHILDREN {
                         children.insert(child_i + 1, (r_info, r_node));
-                        (children.combined_info(), None)
+                        Ok((children.combined_info(), None))
                     } else {
                         let r = children.insert_split(child_i + 1, (r_info, r_node));
                         let r_info = r.combined_info();
-                        (
+                        Ok((
                             children.combined_info(),
                             Some((r_info, Node::Internal(Arc::new(r)))),
-                        )
+                        ))
                     }
                 } else {
-                    (children.combined_info(), None)
+                    Ok((children.combined_info(), None))
                 }
             }
         }
@@ -158,7 +167,7 @@ impl Node {
         start_idx: usize,
         end_idx: usize,
         _node_info: TextInfo,
-    ) -> TextInfo {
+    ) -> Result<TextInfo, ()> {
         todo!();
     }
 }

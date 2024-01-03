@@ -1,6 +1,6 @@
 // use std::io;
 // use std::iter::FromIterator;
-use std::ops::RangeBounds;
+use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
 use crate::{
@@ -59,7 +59,12 @@ impl Rope {
     /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     /// - If `byte_idx` is not on a char boundary.
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
-        assert!(byte_idx <= self.len_bytes());
+        assert!(
+            byte_idx <= self.len_bytes(),
+            "`byte_idx` ({}) is out of bounds (Rope length: {}).",
+            byte_idx,
+            self.len_bytes(),
+        );
 
         if text.is_empty() {
             return;
@@ -95,9 +100,12 @@ impl Rope {
             text = &text[..split_idx];
 
             // Do the insertion.
-            let (new_root_info, residual) =
-                self.root
-                    .insert_at_byte_idx(byte_idx, ins_text, self.root_info);
+            let (new_root_info, residual) = self
+                .root
+                .insert_at_byte_idx(byte_idx, ins_text, self.root_info)
+                .unwrap_or_else(|()| {
+                    panic!("`byte_idx` ({}) is not at a char boundary.", byte_idx)
+                });
             self.root_info = new_root_info;
 
             // Handle root split.
@@ -142,13 +150,26 @@ impl Rope {
     where
         R: RangeBounds<usize>,
     {
-        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+        // Inner function to avoid code duplication on code gen due to the
+        // generic type of `byte_range`.
+        fn inner(rope: &mut Rope, start: Bound<&usize>, end: Bound<&usize>) {
+            let start_idx = start_bound_to_num(start).unwrap_or(0);
+            let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len_bytes());
 
-        assert!(start_idx <= end_idx);
-        assert!(end_idx <= self.len_bytes());
+            assert!(
+                start_idx <= end_idx,
+                "Invalid byte range: start ({}) is greater than end ({}).",
+                start_idx,
+                end_idx,
+            );
+            assert!(
+                end_idx <= rope.len_bytes(),
+                "Byte range ([{}, {}]) is out of bounds (Rope length: {}).",
+                start_idx,
+                end_idx,
+                rope.len_bytes(),
+            );
 
-        fn remove_(rope: &mut Rope, start_idx: usize, end_idx: usize) {
             if start_idx == end_idx {
                 return;
             }
@@ -161,13 +182,19 @@ impl Rope {
 
             let new_info = rope
                 .root
-                .remove_byte_range(start_idx, end_idx, rope.root_info);
+                .remove_byte_range(start_idx, end_idx, rope.root_info)
+                .unwrap_or_else(|()| {
+                    panic!(
+                        "Byte range [{}, {}] isn't on char boundaries.",
+                        start_idx, end_idx
+                    )
+                });
             rope.root_info = new_info;
 
             // TODO: cleanup.
         }
 
-        remove_(self, start_idx, end_idx);
+        inner(self, byte_range.start_bound(), byte_range.end_bound());
     }
 
     //---------------------------------------------------------
