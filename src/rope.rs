@@ -1,11 +1,13 @@
 // use std::io;
 // use std::iter::FromIterator;
-// use std::ops::RangeBounds;
+use std::ops::RangeBounds;
 use std::sync::Arc;
 
 use crate::{
+    end_bound_to_num,
     iter::Chunks,
     rope_builder::RopeBuilder,
+    start_bound_to_num,
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
 };
 
@@ -52,9 +54,8 @@ impl Rope {
     ///
     /// # Panics
     ///
-    /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`)
-    /// or not a char boundary.
-    #[inline]
+    /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    /// - If `byte_idx` is not on a char boundary.
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
         assert!(byte_idx <= self.len_bytes());
 
@@ -108,6 +109,52 @@ impl Rope {
                 self.root_info = children.combined_info();
             }
         }
+    }
+
+    /// Removes the text in the given byte index range.
+    ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.
+    ///
+    /// Runs in O(M + log N) time, where N is the length of the `Rope` and M
+    /// is the length of the range being removed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// let mut rope = Rope::from_str("Hello world!");
+    /// rope.remove(5..);
+    ///
+    /// assert_eq!("Hello", rope);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// - If the start of the range is greater than the end.
+    /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
+    /// - If the range ends are not on char boundaries.
+    #[inline(always)]
+    pub fn remove<R>(&mut self, byte_range: R)
+    where
+        R: RangeBounds<usize>,
+    {
+        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
+        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+
+        assert!(start_idx <= end_idx);
+        assert!(end_idx <= self.len_bytes());
+
+        if start_idx == end_idx {
+            return;
+        }
+
+        fn remove_(rope: &mut Rope, start_idx: usize, end_idx: usize) {
+            rope.root.remove_byte_range(start_idx, end_idx);
+
+            // TODO: cleanup.
+        }
+
+        remove_(self, start_idx, end_idx);
     }
 
     //---------------------------------------------------------

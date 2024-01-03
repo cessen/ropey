@@ -152,4 +152,8 @@ impl Node {
             }
         }
     }
+
+    pub fn remove_byte_range(&mut self, start_idx: usize, end_idx: usize) {
+        todo!();
+    }
 }

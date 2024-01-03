@@ -5,6 +5,8 @@
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::type_complexity)]
 
+use std::ops::Bound;
+
 pub mod iter;
 mod rope;
 mod rope_builder;
@@ -31,4 +33,25 @@ pub fn find_split(mut byte_idx: usize, text: &[u8]) -> usize {
     }
 
     byte_idx
+}
+
+//==============================================================
+// Range handling utilities.
+
+#[inline(always)]
+pub(crate) fn start_bound_to_num(b: Bound<&usize>) -> Option<usize> {
+    match b {
+        Bound::Included(n) => Some(*n),
+        Bound::Excluded(n) => Some(*n + 1),
+        Bound::Unbounded => None,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn end_bound_to_num(b: Bound<&usize>) -> Option<usize> {
+    match b {
+        Bound::Included(n) => Some(*n + 1),
+        Bound::Excluded(n) => Some(*n),
+        Bound::Unbounded => None,
+    }
 }
