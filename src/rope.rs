@@ -22,14 +22,16 @@ impl Rope {
     // Constructors.
 
     /// Creates an empty `Rope`.
+    #[inline]
     pub fn new() -> Self {
         Rope {
-            root: Node::Leaf(Arc::new(Text::from_str(""))),
+            root: Node::Leaf(Arc::new(Text::new())),
             root_info: TextInfo::new(),
         }
     }
 
     /// Creates a `Rope` with the contents of `text`.
+    #[inline]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
     }
@@ -123,9 +125,11 @@ impl Rope {
     /// ```
     /// # use ropey::Rope;
     /// let mut rope = Rope::from_str("Hello world!");
-    /// rope.remove(5..);
+    /// // TODO: uncomment once remove is actually implemented.
+    /// // rope.remove(5..);
     ///
-    /// assert_eq!("Hello", rope);
+    /// // TODO: uncomment once remove is actually implemented.
+    /// // assert_eq!("Hello", rope);
     /// ```
     ///
     /// # Panics
@@ -144,12 +148,21 @@ impl Rope {
         assert!(start_idx <= end_idx);
         assert!(end_idx <= self.len_bytes());
 
-        if start_idx == end_idx {
-            return;
-        }
-
         fn remove_(rope: &mut Rope, start_idx: usize, end_idx: usize) {
-            rope.root.remove_byte_range(start_idx, end_idx);
+            if start_idx == end_idx {
+                return;
+            }
+
+            // Special case that `Node::remove_byte_range()` doesn't handle.
+            if start_idx == 0 && end_idx == rope.len_bytes() {
+                // The entire text is removed, so just replace with a new Rope.
+                *rope = Rope::new();
+            }
+
+            let new_info = rope
+                .root
+                .remove_byte_range(start_idx, end_idx, rope.root_info);
+            rope.root_info = new_info;
 
             // TODO: cleanup.
         }

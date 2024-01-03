@@ -15,10 +15,21 @@ pub(crate) struct Text {
 
     /// Gap tracking data.
     gap_start: u16,
-    gap_size: u16,
+    gap_len: u16,
 }
 
 impl Text {
+    /// Creates a new empty `Text`.
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            buffer: [0; MAX_TEXT_SIZE],
+            left_info: TextInfo::new(),
+            gap_start: 0,
+            gap_len: MAX_TEXT_SIZE as u16,
+        }
+    }
+
     /// Creates a new `Text` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
         assert!(string.len() <= MAX_TEXT_SIZE);
@@ -30,7 +41,7 @@ impl Text {
             buffer: buffer,
             left_info: TextInfo::from_str(string),
             gap_start: string.len() as u16,
-            gap_size: (MAX_TEXT_SIZE - string.len()) as u16,
+            gap_len: (MAX_TEXT_SIZE - string.len()) as u16,
         }
     }
 
@@ -43,7 +54,7 @@ impl Text {
     /// Returns the amount of free space in this leaf, in bytes.
     #[inline(always)]
     pub fn free_capacity(&self) -> usize {
-        self.gap_size as usize
+        self.gap_len as usize
     }
 
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
@@ -73,7 +84,7 @@ impl Text {
         self.move_gap_start(byte_idx);
         self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
         self.gap_start += text.len() as u16;
-        self.gap_size -= text.len() as u16;
+        self.gap_len -= text.len() as u16;
         self.left_info = self.left_info.combine(TextInfo::from_str(text));
     }
 
@@ -96,7 +107,7 @@ impl Text {
         assert!(self.is_char_boundary(byte_idx_range[1]));
 
         self.move_gap_start(byte_idx_range[0]);
-        self.gap_size += (byte_idx_range[1] - byte_idx_range[0]) as u16;
+        self.gap_len += (byte_idx_range[1] - byte_idx_range[0]) as u16;
 
         // Note: unlike with insertion, `left_info` doesn't need to be
         // updated here, because for removal that's entirely taken care of
@@ -109,7 +120,7 @@ impl Text {
     #[inline(always)]
     pub fn chunks(&self) -> [&str; 2] {
         let chunk_l = &self.buffer[..self.gap_start as usize];
-        let chunk_r = &self.buffer[(self.gap_start + self.gap_size) as usize..];
+        let chunk_r = &self.buffer[(self.gap_start + self.gap_len) as usize..];
         debug_assert!(std::str::from_utf8(chunk_l).is_ok());
         debug_assert!(std::str::from_utf8(chunk_r).is_ok());
         [unsafe { std::str::from_utf8_unchecked(chunk_l) }, unsafe {
@@ -126,7 +137,7 @@ impl Text {
 
         self.move_gap_start(byte_idx);
         let right = Self::from_str(self.chunks()[1]);
-        self.gap_size = MAX_TEXT_SIZE as u16 - self.gap_start;
+        self.gap_len = MAX_TEXT_SIZE as u16 - self.gap_start;
 
         right
     }
@@ -194,7 +205,7 @@ impl Text {
             // Move chunk to the right.
             self.buffer.copy_within(
                 byte_idx..self.gap_start as usize,
-                byte_idx + self.gap_size as usize,
+                byte_idx + self.gap_len as usize,
             );
             self.gap_start = byte_idx as u16;
 
@@ -216,7 +227,7 @@ impl Text {
 
             // Move chunk to the left.
             self.buffer.copy_within(
-                (self.gap_start + self.gap_size) as usize..(byte_idx + self.gap_size as usize),
+                (self.gap_start + self.gap_len) as usize..(byte_idx + self.gap_len as usize),
                 self.gap_start as usize,
             );
             self.gap_start = byte_idx as u16;
@@ -235,7 +246,7 @@ impl Text {
     #[inline(always)]
     fn real_idx(&self, byte_idx: usize) -> usize {
         let offset = if byte_idx >= self.gap_start as usize {
-            self.gap_size as usize
+            self.gap_len as usize
         } else {
             0
         };
@@ -342,6 +353,12 @@ impl std::fmt::Debug for Text {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn new_01() {
+        let leaf = Text::new();
+        assert_eq!(leaf.chunks(), ["", ""]);
+    }
 
     #[test]
     fn from_str_01() {
@@ -519,7 +536,7 @@ mod tests {
 
     #[test]
     fn insert_str_01() {
-        let mut leaf = Text::from_str("");
+        let mut leaf = Text::new();
         leaf.insert_str(0, "o ");
         assert_eq!(leaf, "o ");
         assert_eq!(leaf.text_info(), TextInfo::from_str("o "));
@@ -568,7 +585,7 @@ mod tests {
 
     #[test]
     fn split_02() {
-        let mut leaf = Text::from_str("");
+        let mut leaf = Text::new();
         let right = leaf.split(0);
         assert_eq!(leaf, "");
         assert_eq!(right, "");

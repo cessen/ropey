@@ -42,7 +42,12 @@ pub(crate) struct TextInfo {
 }
 
 impl TextInfo {
-    #[inline]
+    /// Creates a new empty `TextInfo`.
+    ///
+    /// The returned `TextInfo` is identical to what `TextInfo::from_str("")`
+    /// would return, but is constructed more efficiently since this can skip
+    /// all of the text scan function calls.
+    #[inline(always)]
     pub fn new() -> TextInfo {
         TextInfo {
             bytes: 0,
@@ -274,4 +279,34 @@ fn starts_with_lf(text: &str) -> bool {
 #[inline(always)]
 fn ends_with_cr(text: &str) -> bool {
     text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starts_with_lf_01() {
+        assert_eq!(false, starts_with_lf(""));
+        assert_eq!(false, starts_with_lf("Hello!"));
+        assert_eq!(true, starts_with_lf("\n"));
+        assert_eq!(true, starts_with_lf("\nHello!"));
+    }
+
+    #[test]
+    fn end_with_cr_01() {
+        assert_eq!(false, ends_with_cr(""));
+        assert_eq!(false, ends_with_cr("Hello!"));
+        assert_eq!(true, ends_with_cr("\r"));
+        assert_eq!(true, ends_with_cr("Hello!\r"));
+    }
+
+    #[test]
+    fn new_01() {
+        assert_eq!(TextInfo::new(), TextInfo::from_str(""));
+    }
+
+    // TODO: test building from text.
+
+    // TODO: test combining, truncating, etc.
 }
