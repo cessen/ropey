@@ -69,7 +69,7 @@ impl Text {
 
     pub fn text_info(&self) -> TextInfo {
         let right_info = TextInfo::from_str(self.chunks()[1]);
-        self.left_info.combine(right_info)
+        self.left_info.append(right_info)
     }
 
     /// Inserts the given text at the given byte index.
@@ -85,7 +85,7 @@ impl Text {
         self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
         self.gap_start += text.len() as u16;
         self.gap_len -= text.len() as u16;
-        self.left_info = self.left_info.combine(TextInfo::from_str(text));
+        self.left_info = self.left_info.append(TextInfo::from_str(text));
     }
 
     /// Appends `text` to the end.
@@ -233,7 +233,7 @@ impl Text {
             self.gap_start = byte_idx as u16;
 
             // Update left text info.
-            self.left_info = self.left_info.combine(TextInfo::from_str(
+            self.left_info = self.left_info.append(TextInfo::from_str(
                 &self.chunks()[0][(old_gap_start as usize)..],
             ));
         } else {

@@ -17,7 +17,7 @@ impl Node {
             Node::Internal(children) => {
                 let mut acc_info = TextInfo::new();
                 for info in children.info() {
-                    acc_info = acc_info.combine(*info);
+                    acc_info = acc_info.append(*info);
                 }
                 acc_info
             }

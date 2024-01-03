@@ -130,12 +130,12 @@ impl TextInfo {
         }
     }
 
-    /// Combines two TextInfos as if they represented abutting pieces of text data.
+    /// Combines two TextInfos as if their texts were appended together.
     ///
     /// This properly accounts for things like split CRLF line breaks, etc.
     #[must_use]
     #[inline(always)]
-    pub fn combine(self, rhs: TextInfo) -> TextInfo {
+    pub fn append(self, rhs: TextInfo) -> TextInfo {
         let tmp = self.adjusted_by_next(rhs);
         tmp + rhs
     }
@@ -306,7 +306,101 @@ mod tests {
         assert_eq!(TextInfo::new(), TextInfo::from_str(""));
     }
 
-    // TODO: test building from text.
+    #[test]
+    fn from_str_bytes_01() {
+        assert_eq!(0, TextInfo::from_str("").bytes);
+        assert_eq!(6, TextInfo::from_str("Hello!").bytes);
+        assert_eq!(18, TextInfo::from_str("こんにちは！").bytes);
+    }
 
-    // TODO: test combining, truncating, etc.
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn from_str_chars_01() {
+        assert_eq!(0, TextInfo::from_str("").chars);
+        assert_eq!(6, TextInfo::from_str("Hello!").chars);
+        assert_eq!(6, TextInfo::from_str("こんにちは！").chars);
+    }
+
+    #[cfg(feature = "metric_lines_lf")]
+    #[test]
+    fn from_str_line_breaks_lf_01() {
+        assert_eq!(0, TextInfo::from_str("").line_breaks_lf);
+        assert_eq!(0, TextInfo::from_str("\u{0085}").line_breaks_lf);
+        assert_eq!(0, TextInfo::from_str("\r").line_breaks_lf);
+        assert_eq!(1, TextInfo::from_str("\n").line_breaks_lf);
+        assert_eq!(1, TextInfo::from_str("\r\n").line_breaks_lf);
+        assert_eq!(1, TextInfo::from_str("Hello\n world!").line_breaks_lf);
+        assert_eq!(3, TextInfo::from_str("\nこんにち\nは！\n").line_breaks_lf);
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    fn from_str_line_breaks_cr_lf_01() {
+        assert_eq!(0, TextInfo::from_str("").line_breaks_cr_lf);
+        assert_eq!(0, TextInfo::from_str("\u{0085}").line_breaks_cr_lf);
+        assert_eq!(1, TextInfo::from_str("\r").line_breaks_cr_lf);
+        assert_eq!(1, TextInfo::from_str("\n").line_breaks_cr_lf);
+        assert_eq!(1, TextInfo::from_str("\r\n").line_breaks_cr_lf);
+        assert_eq!(1, TextInfo::from_str("Hello\n world!").line_breaks_cr_lf);
+        assert_eq!(
+            4,
+            TextInfo::from_str("\nこん\rにち\nは！\r\n").line_breaks_cr_lf
+        );
+    }
+
+    #[cfg(feature = "metric_lines_unicode")]
+    #[test]
+    fn from_str_line_breaks_unicode_01() {
+        assert_eq!(0, TextInfo::from_str("").line_breaks_unicode);
+        assert_eq!(1, TextInfo::from_str("\u{0085}").line_breaks_unicode);
+        assert_eq!(1, TextInfo::from_str("\r").line_breaks_unicode);
+        assert_eq!(1, TextInfo::from_str("\n").line_breaks_unicode);
+        assert_eq!(1, TextInfo::from_str("\r\n").line_breaks_unicode);
+        assert_eq!(1, TextInfo::from_str("Hello\n world!").line_breaks_unicode);
+        assert_eq!(
+            4,
+            TextInfo::from_str("\nこん\rにち\nは！\r\n").line_breaks_unicode
+        );
+    }
+
+    fn append_01() {
+        let test_texts = [
+            "Hello world!",
+            "\nHello\nworld!\n",
+            "\r\nHello\r\nworld!\r\n",
+            "\r\n\r\n\r\n\r\n\r\n\r\n",
+        ];
+
+        for text in test_texts {
+            for split in 0..(text.len() + 1) {
+                let left = &text[..split];
+                let right = &text[split..];
+                assert_eq!(
+                    TextInfo::from_str(text),
+                    TextInfo::from_str(left).append(TextInfo::from_str(right)),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn truncate_01() {
+        let test_texts = [
+            "Hello world!",
+            "\nHello\nworld!\n",
+            "\r\nHello\r\nworld!\r\n",
+            "\r\n\r\n\r\n\r\n\r\n\r\n",
+        ];
+
+        for text in test_texts {
+            for split in 0..(text.len() + 1) {
+                let left = &text[..split];
+                let right = &text[split..];
+                assert_eq!(
+                    TextInfo::from_str(left),
+                    TextInfo::from_str(text).truncate(left, TextInfo::from_str(right),),
+                );
+            }
+        }
+    }
 }

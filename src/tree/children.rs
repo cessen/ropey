@@ -249,7 +249,7 @@ impl Children {
     pub fn combined_info(&self) -> TextInfo {
         self.info()
             .iter()
-            .fold(TextInfo::new(), |acc, &next| acc.combine(next))
+            .fold(TextInfo::new(), |acc, &next| acc.append(next))
     }
 
     /// Returns the child index and left-side-accumulated text info of the
