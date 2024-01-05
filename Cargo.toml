@@ -21,8 +21,15 @@ metric_lines_cr_lf = []
 metric_lines_unicode = []
 simd = ["str_indices/simd"]
 
+# Internal feature: Not part of public stable API
+# enables a much smaller chunk size that makes it
+# easier to catch bugs without requiring huge text
+# sizes during fuzzing and certain testing.
+small_chunks = []
+
 [dependencies]
 str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
+rand = "0.8"
 proptest = "1.4"

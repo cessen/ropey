@@ -201,6 +201,18 @@ impl Children {
         self.0.remove(idx)
     }
 
+    /// Removes the items in the given index range (right exclusive).
+    ///
+    /// Preserves ordering of the remaining items.
+    #[inline(always)]
+    pub fn remove_multiple(&mut self, idx_range: [usize; 2]) {
+        // TODO: make this efficient.  This is a throw-away quadratic
+        // implementation just to get things up and running.
+        for _ in idx_range[0]..idx_range[1] {
+            self.0.remove(idx_range[0]);
+        }
+    }
+
     /// Splits the array in two at `idx`, returning the right part of the split.
     pub fn split_off(&mut self, idx: usize) -> Self {
         assert!(idx <= self.len());
@@ -246,7 +258,7 @@ impl Children {
     }
 
     #[inline(always)]
-    pub fn combined_info(&self) -> TextInfo {
+    pub fn combined_text_info(&self) -> TextInfo {
         self.info()
             .iter()
             .fold(TextInfo::new(), |acc, &next| acc.append(next))

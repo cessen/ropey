@@ -117,7 +117,7 @@ impl Node {
                     // Not enough room to insert.  Need to split into two nodes.
                     let mut right_text = leaf_text.split(byte_idx);
                     let text_split_idx =
-                        crate::find_split(leaf_text.free_capacity(), text.as_bytes());
+                        crate::find_split_l(leaf_text.free_capacity(), text.as_bytes());
                     leaf_text.append_str(&text[..text_split_idx]);
                     right_text.insert_str(0, &text[text_split_idx..]);
                     leaf_text.distribute(&mut right_text);
@@ -146,17 +146,17 @@ impl Node {
                 if let Some((r_info, r_node)) = residual {
                     if children.len() < MAX_CHILDREN {
                         children.insert(child_i + 1, (r_info, r_node));
-                        Ok((children.combined_info(), None))
+                        Ok((children.combined_text_info(), None))
                     } else {
                         let r = children.insert_split(child_i + 1, (r_info, r_node));
-                        let r_info = r.combined_info();
+                        let r_info = r.combined_text_info();
                         Ok((
-                            children.combined_info(),
+                            children.combined_text_info(),
                             Some((r_info, Node::Internal(Arc::new(r)))),
                         ))
                     }
                 } else {
-                    Ok((children.combined_info(), None))
+                    Ok((children.combined_text_info(), None))
                 }
             }
         }
@@ -164,10 +164,94 @@ impl Node {
 
     pub fn remove_byte_range(
         &mut self,
-        start_idx: usize,
-        end_idx: usize,
+        byte_idx_range: [usize; 2],
         _node_info: TextInfo,
     ) -> Result<TextInfo, ()> {
-        todo!();
+        // TODO: use `node_info` to do an update of the node info rather
+        // than recomputing from scratch.  This will be a bit delicate,
+        // because it requires being aware of crlf splits.
+
+        match *self {
+            Node::Leaf(ref mut leaf_text) => {
+                if byte_idx_range
+                    .iter()
+                    .any(|&i| !leaf_text.is_char_boundary(i))
+                {
+                    // Not a char boundary, so early-out.
+                    return Err(());
+                }
+
+                let leaf_text = Arc::make_mut(leaf_text);
+                leaf_text.remove(byte_idx_range);
+
+                Ok(leaf_text.text_info())
+            }
+            Node::Internal(ref mut children) => {
+                let children = Arc::make_mut(children);
+
+                // Find the start and end children of the range, and
+                // their left-side byte indices within this node.
+                let (start_child_i, start_child_byte_idx) =
+                    children.search_byte_idx_only(byte_idx_range[0]);
+                let (end_child_i, end_child_byte_idx) =
+                    children.search_byte_idx_only(byte_idx_range[1]);
+                let start_info = children.info()[start_child_i];
+                let end_info = children.info()[end_child_i];
+
+                // Compute the start index relative to the contents of the
+                // first child, and the end index relative to the contents
+                // of the second.
+                let start_byte_idx = byte_idx_range[0] - start_child_byte_idx;
+                let end_byte_idx = byte_idx_range[1] - end_child_byte_idx;
+
+                if start_child_i == end_child_i {
+                    // Simple case: the removal is entirely within a single child.
+                    let new_info = children.nodes_mut()[start_child_i]
+                        .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
+                    children.info_mut()[start_child_i] = new_info;
+                    Ok(children.combined_text_info())
+                } else {
+                    let remove_whole_start_child = start_byte_idx == 0;
+                    let remove_whole_end_child =
+                        end_byte_idx == children.info()[end_child_i].bytes as usize;
+
+                    // Handle partial removal of leftmost child.
+                    if !remove_whole_start_child {
+                        let new_info = children.nodes_mut()[start_child_i].remove_byte_range(
+                            [start_byte_idx, start_info.bytes as usize],
+                            start_info,
+                        )?;
+                        children.info_mut()[start_child_i] = new_info;
+                    }
+
+                    // Handle partial removal of rightmost child.
+                    if !remove_whole_end_child {
+                        let new_info = children.nodes_mut()[end_child_i]
+                            .remove_byte_range([0, end_byte_idx], end_info)?;
+                        children.info_mut()[end_child_i] = new_info;
+                    }
+
+                    // Remove nodes that need to be completely removed.
+                    {
+                        let removal_start = if remove_whole_start_child {
+                            start_child_i
+                        } else {
+                            start_child_i + 1
+                        };
+                        let removal_end = if remove_whole_end_child {
+                            end_child_i + 1
+                        } else {
+                            end_child_i
+                        };
+
+                        if removal_start < removal_end {
+                            children.remove_multiple([removal_start, removal_end]);
+                        }
+                    }
+
+                    Ok(children.combined_text_info())
+                }
+            }
+        }
     }
 }

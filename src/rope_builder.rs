@@ -169,16 +169,13 @@ impl RopeBuilder {
         // Simplest case: empty buffer and enough in `text` for a full
         // chunk, so just chop a chunk off from `text` and use that.
         if self.buffer.is_empty() && text.len() >= MAX_TEXT_SIZE {
-            let split_idx = crate::find_split(
-                MAX_TEXT_SIZE.min(text.len() - 1), // - 1 to avoid CRLF split.
-                text.as_bytes(),
-            );
+            let split_idx = crate::find_split_l(MAX_TEXT_SIZE.min(text.len()), text.as_bytes());
             return (NextText::String(&text[..split_idx]), &text[split_idx..]);
         }
         // If the buffer + `text` is enough for a full chunk, push enough
         // of `text` onto the buffer to fill it and use that.
         else if (text.len() + self.buffer.len()) >= MAX_TEXT_SIZE {
-            let split_idx = crate::find_split(MAX_TEXT_SIZE - self.buffer.len(), text.as_bytes());
+            let split_idx = crate::find_split_l(MAX_TEXT_SIZE - self.buffer.len(), text.as_bytes());
             self.buffer.push_str(&text[..split_idx]);
             return (NextText::UseBuffer, &text[split_idx..]);
         }
@@ -281,41 +278,24 @@ mod tests {
     fn rope_builder_01() {
         let mut b = RopeBuilder::new();
 
-        dbg!();
         b.append("Hello there!  How're you doing?\r");
-        dbg!();
         b.append("\nIt's a fine ");
-        dbg!();
         b.append("d");
-        dbg!();
         b.append("a");
-        dbg!();
         b.append("y,");
-        dbg!();
         b.append(" ");
-        dbg!();
         b.append("isn't it?");
-        dbg!();
         b.append("\r");
-        dbg!();
         b.append("\nAren't you ");
-        dbg!();
         b.append("glad we're alive?\r");
-        dbg!();
         b.append("\n");
-        dbg!();
         b.append("こんにち");
-        dbg!();
         b.append("は、みんなさ");
-        dbg!();
         b.append("ん！");
-        dbg!();
 
         let r = b.finish();
-        dbg!();
 
         assert_eq!(r, TEXT);
-        dbg!();
 
         // r.assert_integrity();
         // r.assert_invariants();

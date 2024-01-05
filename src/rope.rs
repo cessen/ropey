@@ -86,13 +86,16 @@ impl Rope {
         let mut text = text;
         while !text.is_empty() {
             // Split a chunk off from the end of the text.
-            // We do this from the end instead of the front so that
-            // the repeated insertions can keep re-using the same
-            // insertion point.  Note that the minus 4 is to guarantee
-            // that nodes can split into node-sized chunks even in the
-            // face of multi-byte chars that may prevent splits at
-            // certain byte indices.
-            let split_idx = crate::find_split(
+            // We do this from the end instead of the front so that the repeated
+            // insertions can keep re-using the same insertion point.
+            //
+            // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than just
+            // `MAX_TEXT_SIZE` to guarantee that nodes can split into node-sized
+            // chunks even in the face of multi-byte chars that may prevent
+            // splits at certain byte indices.  This is a subtle issue that in
+            // practice only very rarely manifest, but causes panics when it
+            // does.  Please do not remove that `- 4`!
+            let split_idx = crate::find_split_r(
                 text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
                 text.as_bytes(),
             );
@@ -116,7 +119,7 @@ impl Rope {
                 let children = self.root.children_mut();
                 children.push((self.root_info, left_node));
                 children.push((right_info, right_node));
-                self.root_info = children.combined_info();
+                self.root_info = children.combined_text_info();
             }
         }
     }
@@ -133,11 +136,9 @@ impl Rope {
     /// ```
     /// # use ropey::Rope;
     /// let mut rope = Rope::from_str("Hello world!");
-    /// // TODO: uncomment once remove is actually implemented.
-    /// // rope.remove(5..);
+    /// rope.remove(5..);
     ///
-    /// // TODO: uncomment once remove is actually implemented.
-    /// // assert_eq!("Hello", rope);
+    /// assert_eq!("Hello", rope);
     /// ```
     ///
     /// # Panics
@@ -170,19 +171,9 @@ impl Rope {
                 rope.len_bytes(),
             );
 
-            if start_idx == end_idx {
-                return;
-            }
-
-            // Special case that `Node::remove_byte_range()` doesn't handle.
-            if start_idx == 0 && end_idx == rope.len_bytes() {
-                // The entire text is removed, so just replace with a new Rope.
-                *rope = Rope::new();
-            }
-
             let new_info = rope
                 .root
-                .remove_byte_range(start_idx, end_idx, rope.root_info)
+                .remove_byte_range([start_idx, end_idx], rope.root_info)
                 .unwrap_or_else(|()| {
                     panic!(
                         "Byte range [{}, {}] isn't on char boundaries.",
@@ -291,5 +282,76 @@ impl std::fmt::Display for Rope {
             write!(f, "{}", chunk)?
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 127 bytes, 103 chars, 1 line
+    const TEXT: &str = "Hello there!  How're you doing?  It's \
+                        a fine day, isn't it?  Aren't you glad \
+                        we're alive?  こんにちは、みんなさん！";
+    // // 124 bytes, 100 chars, 4 lines
+    // const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
+    //                           a fine day, isn't it?\nAren't you glad \
+    //                           we're alive?\nこんにちは、みんなさん！";
+    // // 127 bytes, 107 chars, 111 utf16 code units, 1 line
+    // const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
+    //                           a fine day, isn't it?🐸  Aren't you glad \
+    //                           we're alive?🐸  こんにちは、みんなさん！";
+
+    fn string_remove(text: &mut String, byte_start: usize, byte_end: usize) {
+        let text_r = text.split_off(byte_end);
+        text.truncate(byte_start);
+        text.push_str(&text_r);
+    }
+
+    #[test]
+    fn remove_01() {
+        let mut rope = Rope::from_str(TEXT);
+        rope.remove(0..4);
+        rope.remove(5..7);
+        rope.remove(28..37);
+        rope.remove(35..109);
+
+        assert_eq!(rope, "o the!  How're you doing?  Ie day, ！");
+    }
+
+    #[test]
+    fn remove_02() {
+        let mut rope = Rope::from_str(TEXT);
+        rope.remove(..42);
+
+        assert_eq!(
+            rope,
+            "ne day, isn't it?  Aren't you glad we're \
+             alive?  こんにちは、みんなさん！"
+        );
+    }
+
+    #[test]
+    fn remove_03() {
+        let mut rope = Rope::from_str(TEXT);
+        rope.remove(42..);
+
+        assert_eq!(rope, "Hello there!  How're you doing?  It's a fi");
+    }
+
+    #[test]
+    fn remove_04() {
+        let mut rope = Rope::from_str(TEXT);
+        rope.remove(..);
+
+        assert_eq!(rope, "");
+    }
+
+    #[test]
+    fn remove_05() {
+        let mut rope = Rope::from_str(TEXT);
+        rope.remove(42..42);
+
+        assert_eq!(rope, TEXT);
     }
 }

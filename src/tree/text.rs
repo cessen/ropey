@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn move_gap_start_03() {
-        let text = "こんにちは！";
+        let text = "こんにちは";
         let text_info = TextInfo::from_str(text);
         let mut leaf = Text::from_str(text);
         for i in 0..=(text.len() / 3) {
@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn is_char_boundary_02() {
-        let text = "こんにちは！";
+        let text = "こんにちは";
         let mut leaf = Text::from_str(text);
         for gap_i in 0..=(text.len() / 3) {
             leaf.move_gap_start(gap_i * 3);
@@ -634,9 +634,9 @@ mod tests {
 
     #[test]
     fn distribute_02() {
-        let text = "こんにちは！！";
-        let expected_left = "こんにち";
-        let expected_right = "は！！";
+        let text = "こんにちは";
+        let expected_left = "こんに";
+        let expected_right = "ちは";
         for split_i in 0..=(text.len() / 3) {
             for gap_l_i in 0..=split_i {
                 for gap_r_i in 0..=((text.len() / 3) - split_i) {

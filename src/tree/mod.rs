@@ -12,8 +12,8 @@ mod constants {
 #[cfg(any(test, feature = "small_chunks"))]
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 4;
-    pub(crate) const MAX_TEXT_SIZE: usize = 24;
-    pub(crate) const MIN_TEXT_SIZE: usize = 10;
+    pub(crate) const MAX_TEXT_SIZE: usize = 15;
+    pub(crate) const MIN_TEXT_SIZE: usize = 7;
 }
 pub(crate) use constants::{MAX_CHILDREN, MAX_TEXT_SIZE, MIN_TEXT_SIZE};
 

@@ -23,13 +23,33 @@ pub use rope_builder::RopeBuilder;
 ///
 /// Note for convenience, if `byte_idx > text.len()`, this simply
 /// returns `text.len()`.
-pub fn find_split(mut byte_idx: usize, text: &[u8]) -> usize {
+pub fn find_split_l(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }
 
     while (text[byte_idx] >> 6) == 0b10 && byte_idx > 0 {
         byte_idx -= 1;
+    }
+
+    byte_idx
+}
+
+/// Scans right from `byte_idx` to find a char boundary.
+///
+/// This is used to find an appropriate split position on utf8 strings.
+///
+/// Precondition: `text` must be a well-formed utf8 string.
+///
+/// Note for convenience, if `byte_idx > text.len()`, this simply
+/// returns `text.len()`.
+pub fn find_split_r(mut byte_idx: usize, text: &[u8]) -> usize {
+    if byte_idx >= text.len() {
+        return text.len();
+    }
+
+    while (text[byte_idx] >> 6) == 0b10 {
+        byte_idx += 1;
     }
 
     byte_idx
