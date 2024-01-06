@@ -178,6 +178,15 @@ impl Rope {
                 rope.len_bytes(),
             );
 
+            // Special case: if we're removing everything, just replace with a
+            // fresh new rope.  This is to ensure the invariant that an empty
+            // rope is always composed of a single empty leaf, which is not
+            // ensured by the general removal code.
+            if start_idx == 0 && end_idx == rope.len_bytes() {
+                *rope = Rope::new();
+                return;
+            }
+
             let new_info = rope
                 .root
                 .remove_byte_range([start_idx, end_idx], rope.root_info)
