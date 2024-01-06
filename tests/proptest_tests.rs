@@ -4,6 +4,13 @@ use proptest::test_runner::Config;
 
 use ropey::Rope;
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+use ropey::LineType;
+
 fn closest_char_boundary(text: &str, mut byte_idx: usize) -> usize {
     byte_idx = byte_idx.min(text.len());
     while !text.is_char_boundary(byte_idx) {
@@ -38,7 +45,7 @@ fn assert_metrics_eq(rope: &Rope, text: &str) {
     #[cfg(feature = "metric_lines_lf")]
     {
         assert_eq!(
-            rope.len_lines_lf(),
+            rope.len_lines(LineType::LF),
             str_indices::lines_lf::count_breaks(text) + 1
         );
     }
@@ -46,7 +53,7 @@ fn assert_metrics_eq(rope: &Rope, text: &str) {
     #[cfg(feature = "metric_lines_cr_lf")]
     {
         assert_eq!(
-            rope.len_lines_cr_lf(),
+            rope.len_lines(LineType::CRLF),
             str_indices::lines_crlf::count_breaks(text) + 1
         );
     }
@@ -54,7 +61,7 @@ fn assert_metrics_eq(rope: &Rope, text: &str) {
     #[cfg(feature = "metric_lines_unicode")]
     {
         assert_eq!(
-            rope.len_lines_unicode(),
+            rope.len_lines(LineType::All),
             str_indices::lines::count_breaks(text) + 1
         );
     }

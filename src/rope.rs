@@ -11,6 +11,13 @@ use crate::{
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
 };
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+
 #[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Node,
@@ -205,19 +212,20 @@ impl Rope {
         (self.root_info.chars + self.root_info.utf16_surrogates) as usize
     }
 
-    #[cfg(feature = "metric_lines_lf")]
-    pub fn len_lines_lf(&self) -> usize {
-        (self.root_info.line_breaks_lf + 1) as usize
-    }
-
-    #[cfg(feature = "metric_lines_cr_lf")]
-    pub fn len_lines_cr_lf(&self) -> usize {
-        (self.root_info.line_breaks_cr_lf + 1) as usize
-    }
-
-    #[cfg(feature = "metric_lines_unicode")]
-    pub fn len_lines_unicode(&self) -> usize {
-        (self.root_info.line_breaks_unicode + 1) as usize
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub fn len_lines(&self, line_type: LineType) -> usize {
+        match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => (self.root_info.line_breaks_lf + 1) as usize,
+            #[cfg(feature = "metric_lines_cr_lf")]
+            LineType::CRLF => (self.root_info.line_breaks_cr_lf + 1) as usize,
+            #[cfg(feature = "metric_lines_unicode")]
+            LineType::All => (self.root_info.line_breaks_unicode + 1) as usize,
+        }
     }
 
     //---------------------------------------------------------

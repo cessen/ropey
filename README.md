@@ -7,7 +7,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [x] Insertion.
 - [x] Removal.
 - [ ] Tree rebalancing.
-- [ ] Change line APIs to take an enum that determines which kind of lines.
+- [x] Change line APIs to take an enum that determines which kind of lines.
 - [ ] `RopeSlice`
 - [ ] Iterators:
   - [ ] `Chunks`

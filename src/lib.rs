@@ -15,6 +15,24 @@ mod tree;
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum LineType {
+    #[cfg(feature = "metric_lines_lf")]
+    LF,
+    #[cfg(feature = "metric_lines_cr_lf")]
+    CRLF,
+    #[cfg(feature = "metric_lines_unicode")]
+    All,
+}
+
+//=============================================================
+// Utilities.
+
 /// Scans left from `byte_idx` to find a char boundary.
 ///
 /// This is used to find an appropriate split position on utf8 strings.
@@ -23,7 +41,7 @@ pub use rope_builder::RopeBuilder;
 ///
 /// Note for convenience, if `byte_idx > text.len()`, this simply
 /// returns `text.len()`.
-pub fn find_split_l(mut byte_idx: usize, text: &[u8]) -> usize {
+pub(crate) fn find_split_l(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }
@@ -43,7 +61,7 @@ pub fn find_split_l(mut byte_idx: usize, text: &[u8]) -> usize {
 ///
 /// Note for convenience, if `byte_idx > text.len()`, this simply
 /// returns `text.len()`.
-pub fn find_split_r(mut byte_idx: usize, text: &[u8]) -> usize {
+pub(crate) fn find_split_r(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }
@@ -55,7 +73,7 @@ pub fn find_split_r(mut byte_idx: usize, text: &[u8]) -> usize {
     byte_idx
 }
 
-//==============================================================
+//-------------------------------------------------------------
 // Range handling utilities.
 
 #[inline(always)]
