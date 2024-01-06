@@ -6,10 +6,17 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 
 - [x] Insertion.
 - [x] Removal.
-- [ ] Tree rebalancing.
 - [x] Change line APIs to take an enum that determines which kind of lines.
+- [x] Rope length queries.
+- [ ] Tree rebalancing.
+- [ ] Chunk fetching functions.
+- [ ] Try rewriting `RopeBuilder` to be cleaner/faster.
 - [ ] `RopeSlice`
-- [ ] Iterators:
+- Metric conversion functions:
+  - [ ] Chars <-> bytes.
+  - [ ] UTF16 <-> bytes.
+  - [ ] Lines <-> bytes.
+- Iterators:
   - [ ] `Chunks`
     - [x] Forward.
     - [ ] Bidirectional.
@@ -21,22 +28,33 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [ ] LF + CR
     - [ ] Full Unicode
   - [ ] Creating iterators at a specific offset.
-- [x] Rope length queries.
-- [ ] Metric conversion functions:
-  - [ ] Chars <-> bytes.
-  - [ ] UTF16 <-> bytes.
-  - [ ] Lines <-> bytes.
-- [ ] Chunk fetching functions.
-- [ ] Try rewriting `RopeBuilder` to be cleaner.
-- [ ] Conversion implementations:
-  - [ ] `RopeSlice` -> `String`
-  - [ ] `RopeSlice` -> `Option<str>`
-  - [ ] `RopeSlice` -> `Cow<str>`
-  - [ ] `RopeSlice` -> `Rope`
-- [ ] Implement `Hash` for `Rope` and `RopeSlice`.
-- [ ] Comparison operators:
-  - [ ] `Eq` / `PartialEq`
-  - [ ] `Ord` / `PartialOrd`
+- Standard library trait impls:
+  - [ ] `From`:
+    - [ ] `RopeSlice` -> `String`
+    - [ ] `RopeSlice` -> `Option<str>`
+    - [ ] `RopeSlice` -> `Cow<str>`
+    - [ ] `Rope` -> `String`
+    - [ ] `Rope` -> `RopeSlice`
+    - [ ] `RopeSlice` -> `Rope`
+    - [ ] `String` -> `Rope`
+    - [ ] `Option<str>` -> `Rope`
+    - [ ] `Cow<str>` -> `Rope`
+  - [ ] `Hash`
+    - [ ] `Rope`
+    - [ ] `RopeSlice`.
+  - [ ] Comparison operators:
+    - [ ] `Eq` / `PartialEq`
+      - [ ] `Rope` <-> `Rope`
+      - [ ] `Rope` <-> `RopeSlice`
+      - [ ] `Rope` <-> `str`
+      - [ ] `Rope` <-> `String`
+      - [ ] `Rope` <-> `Cow<str>`
+      - [ ] `RopeSlice` <-> `str`
+      - [ ] `RopeSlice` <-> `String`
+      - [ ] `RopeSlice` <-> `Cow<str>`
+    - [ ] `Ord` / `PartialOrd`
+      - [ ] `Rope`
+      - [ ] `RopeSlice`
 
 
 ## License
