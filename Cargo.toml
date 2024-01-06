@@ -21,11 +21,11 @@ metric_lines_cr_lf = []
 metric_lines_unicode = []
 simd = ["str_indices/simd"]
 
-# Internal feature: Not part of public stable API
-# enables a much smaller chunk size that makes it
-# easier to catch bugs without requiring huge text
-# sizes during fuzzing and certain testing.
-small_chunks = []
+# DO NOT USE THIS FEATURE.  It is for internal debugging and testing purposes
+# only, and makes Ropey much slower and more memory hungry.  It is also not
+# part of the stable public API, and may be removed or changed in non-breaking
+# releases.
+internal_dev_small_chunks = []
 
 [dependencies]
 str_indices = { version = "0.4", default-features = false }

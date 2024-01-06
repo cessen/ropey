@@ -3,13 +3,13 @@ mod node;
 mod text;
 mod text_info;
 
-#[cfg(not(any(test, feature = "small_chunks")))]
+#[cfg(not(any(test, feature = "internal_dev_small_chunks")))]
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 16;
     pub(crate) const MAX_TEXT_SIZE: usize = 2048;
     pub(crate) const MIN_TEXT_SIZE: usize = MAX_TEXT_SIZE / 2 - 64;
 }
-#[cfg(any(test, feature = "small_chunks"))]
+#[cfg(any(test, feature = "internal_dev_small_chunks"))]
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 5;
     pub(crate) const MAX_TEXT_SIZE: usize = 15;
