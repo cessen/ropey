@@ -33,3 +33,18 @@ str_indices = { version = "0.4", default-features = false }
 [dev-dependencies]
 rand = "0.8"
 proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+#-----------------------------------------
+
+[[bench]]
+name = "create"
+harness = false
+
+[[bench]]
+name = "insert"
+harness = false
+
+[[bench]]
+name = "remove"
+harness = false

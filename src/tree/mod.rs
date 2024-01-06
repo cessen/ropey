@@ -7,7 +7,7 @@ mod text_info;
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 16;
     pub(crate) const MAX_TEXT_SIZE: usize = 2048;
-    pub(crate) const MIN_TEXT_SIZE: usize = MAX_TEXT_SIZE / 2 - 64;
+    pub(crate) const MIN_TEXT_SIZE: usize = (MAX_TEXT_SIZE / 2) - (MAX_TEXT_SIZE / 32);
 }
 #[cfg(any(test, feature = "internal_dev_small_chunks"))]
 mod constants {
