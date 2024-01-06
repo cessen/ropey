@@ -1,4 +1,7 @@
-use super::{text_info::TextInfo, MAX_TEXT_SIZE};
+use super::{
+    text_info::{ends_with_cr, starts_with_lf, TextInfo},
+    MAX_TEXT_SIZE,
+};
 
 /// A leaf node of the Rope, containing text.
 ///
@@ -9,9 +12,6 @@ use super::{text_info::TextInfo, MAX_TEXT_SIZE};
 #[derive(Copy, Clone)]
 pub(crate) struct Text {
     buffer: [u8; MAX_TEXT_SIZE],
-
-    /// Info for the text preceding the gap.
-    pub(crate) left_info: TextInfo,
 
     /// Gap tracking data.
     gap_start: u16,
@@ -24,7 +24,6 @@ impl Text {
     pub fn new() -> Self {
         Self {
             buffer: [0; MAX_TEXT_SIZE],
-            left_info: TextInfo::new(),
             gap_start: 0,
             gap_len: MAX_TEXT_SIZE as u16,
         }
@@ -39,7 +38,6 @@ impl Text {
 
         Self {
             buffer: buffer,
-            left_info: TextInfo::from_str(string),
             gap_start: string.len() as u16,
             gap_len: (MAX_TEXT_SIZE - string.len()) as u16,
         }
@@ -68,8 +66,9 @@ impl Text {
     }
 
     pub fn text_info(&self) -> TextInfo {
+        let left_info = TextInfo::from_str(self.chunks()[0]);
         let right_info = TextInfo::from_str(self.chunks()[1]);
-        self.left_info.append(right_info)
+        left_info.concat(right_info)
     }
 
     /// Inserts the given text at the given byte index.
@@ -85,7 +84,68 @@ impl Text {
         self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
         self.gap_start += text.len() as u16;
         self.gap_len -= text.len() as u16;
-        self.left_info = self.left_info.append(TextInfo::from_str(text));
+    }
+
+    /// Inserts the given text at the given byte index, and computes an
+    /// updated TextInfo for the text at the same time.
+    ///
+    /// This is preferable when TextInfo is already available, because
+    /// the update can be done much more efficiently than doing a full
+    /// recompute of the info.
+    ///
+    /// Panics if there isn't enough free space or if the byte index
+    /// isn't on a valid char boundary.
+    pub fn insert_str_and_update_info(
+        &mut self,
+        byte_idx: usize,
+        text: &str,
+        mut current_info: TextInfo,
+    ) -> TextInfo {
+        assert!(text.len() <= self.free_capacity());
+        assert!(byte_idx <= self.len());
+        assert!(self.is_char_boundary(byte_idx));
+
+        if text.is_empty() {
+            return current_info;
+        }
+
+        self.move_gap_start(byte_idx);
+
+        // Update text info based on the upcoming insertion.
+        let text_info = TextInfo::from_str(text);
+        current_info += text_info;
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        {
+            let crlf_split_compensation_1 =
+                (ends_with_cr(self.chunks()[0]) && starts_with_lf(self.chunks()[1])) as usize;
+            let crlf_split_compensation_2 = (ends_with_cr(self.chunks()[0])
+                && text_info.starts_with_lf) as usize
+                + (text_info.ends_with_cr && starts_with_lf(self.chunks()[1])) as usize;
+            #[cfg(feature = "metric_lines_cr_lf")]
+            {
+                current_info.line_breaks_cr_lf += crlf_split_compensation_1 as u64;
+                current_info.line_breaks_cr_lf -= crlf_split_compensation_2 as u64;
+            }
+            #[cfg(feature = "metric_lines_unicode")]
+            {
+                current_info.line_breaks_unicode += crlf_split_compensation_1 as u64;
+                current_info.line_breaks_unicode -= crlf_split_compensation_2 as u64;
+            }
+
+            if byte_idx == 0 {
+                current_info.starts_with_lf = text_info.starts_with_lf;
+            }
+            if byte_idx == self.len() {
+                current_info.ends_with_cr = text_info.ends_with_cr;
+            }
+        }
+
+        // Do the actual insert at the start of the gap.
+        self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
+        self.gap_start += text.len() as u16;
+        self.gap_len -= text.len() as u16;
+
+        current_info
     }
 
     /// Appends `text` to the end.
@@ -108,10 +168,6 @@ impl Text {
 
         self.move_gap_start(byte_idx_range[0]);
         self.gap_len += (byte_idx_range[1] - byte_idx_range[0]) as u16;
-
-        // Note: unlike with insertion, `left_info` doesn't need to be
-        // updated here, because for removal that's entirely taken care of
-        // by the call to `move_gap_start()` above.
     }
 
     /// Returns the two chunk of the gap buffer, in order.
@@ -208,20 +264,6 @@ impl Text {
                 byte_idx + self.gap_len as usize,
             );
             self.gap_start = byte_idx as u16;
-
-            // Update left text info.
-            if byte_idx <= chunk_size {
-                // If the remaining left chunk is smaller than the
-                // moved chunk.
-                self.left_info = TextInfo::from_str(self.chunks()[0]);
-            } else {
-                // If the remaining left chunk is larger than the
-                // moved chunk.
-                self.left_info = self.left_info.truncate(
-                    self.chunks()[0],
-                    TextInfo::from_str(&self.chunks()[1][..chunk_size]),
-                );
-            }
         } else if byte_idx > self.gap_start as usize {
             let old_gap_start = self.gap_start;
 
@@ -231,11 +273,6 @@ impl Text {
                 self.gap_start as usize,
             );
             self.gap_start = byte_idx as u16;
-
-            // Update left text info.
-            self.left_info = self.left_info.append(TextInfo::from_str(
-                &self.chunks()[0][(old_gap_start as usize)..],
-            ));
         } else {
             // Gap is already there, so do nothing.
         }

@@ -24,7 +24,7 @@ impl Node {
             Node::Internal(children) => {
                 let mut acc_info = TextInfo::new();
                 for info in children.info() {
-                    acc_info = acc_info.append(*info);
+                    acc_info = acc_info.concat(*info);
                 }
                 acc_info
             }
@@ -109,7 +109,7 @@ impl Node {
         &mut self,
         byte_idx: usize,
         text: &str,
-        _node_info: TextInfo,
+        node_info: TextInfo,
     ) -> Result<(TextInfo, Option<(TextInfo, Node)>), ()> {
         // TODO: use `node_info` to do an update of the node info rather
         // than recomputing from scratch.  This will be a bit delicate,
@@ -125,8 +125,8 @@ impl Node {
                 let leaf_text = Arc::make_mut(leaf_text);
                 if text.len() <= leaf_text.free_capacity() {
                     // Enough room to insert.
-                    leaf_text.insert_str(byte_idx, text);
-                    Ok((leaf_text.text_info(), None))
+                    let new_info = leaf_text.insert_str_and_update_info(byte_idx, text, node_info);
+                    Ok((new_info, None))
                 } else {
                     // Not enough room to insert.  Need to split into two nodes.
                     let mut right_text = leaf_text.split(byte_idx);
@@ -331,7 +331,7 @@ impl Node {
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = metric_scanner(&children, metric_idx);
-                    left_info = left_info.append(acc_info);
+                    left_info = left_info.concat(acc_info);
                     text_info = children.info()[child_i];
 
                     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
@@ -471,11 +471,10 @@ impl Node {
                 // Freshly compute the relevant info from scratch.
                 let info_l = TextInfo::from_str(text.chunks()[0]);
                 let info_r = TextInfo::from_str(text.chunks()[1]);
-                let info = info_l.append(info_r);
+                let info = info_l.concat(info_r);
 
                 // Make sure everything matches.
                 assert_eq!(text.text_info(), info);
-                assert_eq!(text.left_info, info_l);
 
                 info
             }
@@ -483,7 +482,7 @@ impl Node {
                 let mut acc_info = TextInfo::new();
                 for (node, &info) in children.nodes().iter().zip(children.info().iter()) {
                     assert_eq!(info, node.assert_accurate_text_info());
-                    acc_info = acc_info.append(info);
+                    acc_info = acc_info.concat(info);
                 }
 
                 acc_info

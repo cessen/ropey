@@ -263,7 +263,7 @@ impl Children {
     pub fn combined_text_info(&self) -> TextInfo {
         self.info()
             .iter()
-            .fold(TextInfo::new(), |acc, &next| acc.append(next))
+            .fold(TextInfo::new(), |acc, &next| acc.concat(next))
     }
 
     /// Returns the child index and left-side-accumulated text info of the
@@ -291,7 +291,12 @@ impl Children {
                     .get(idx + 1)
                     .map(|ti| *ti)
                     .unwrap_or(TextInfo::new());
-                accum + next_info.adjusted_by_next(next_next_info)
+                TextInfo {
+                    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+                    ends_with_cr: (next_info.bytes == 0 && accum.ends_with_cr)
+                        || next_info.ends_with_cr,
+                    ..(accum + next_info.adjusted_by_next(next_next_info))
+                }
             };
             if pred(accum, next_accum) {
                 break;
