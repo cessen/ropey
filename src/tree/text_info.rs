@@ -15,6 +15,13 @@ use str_indices::lines_lf;
 #[cfg(feature = "metric_lines_unicode")]
 use str_indices::lines;
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct TextInfo {
     pub bytes: u64,
@@ -103,8 +110,28 @@ impl TextInfo {
         }
     }
 
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[inline(always)]
+    pub fn line_breaks(&self, line_type: LineType) -> u64 {
+        match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => self.line_breaks_lf,
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            LineType::CRLF => self.line_breaks_cr_lf,
+
+            #[cfg(feature = "metric_lines_unicode")]
+            LineType::All => self.line_breaks_unicode,
+        }
+    }
+
     /// Returns the adjusted version of self based on whatever the next block is.
     #[must_use]
+    #[inline(always)]
     pub fn adjusted_by_next(
         self,
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
@@ -114,6 +141,34 @@ impl TextInfo {
     ) -> TextInfo {
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         let crlf_split_compensation = if self.ends_with_cr && next.starts_with_lf {
+            1
+        } else {
+            0
+        };
+
+        TextInfo {
+            #[cfg(feature = "metric_lines_cr_lf")]
+            line_breaks_cr_lf: self.line_breaks_cr_lf - crlf_split_compensation,
+
+            #[cfg(feature = "metric_lines_unicode")]
+            line_breaks_unicode: self.line_breaks_unicode - crlf_split_compensation,
+
+            ..self
+        }
+    }
+
+    /// Returns the adjusted version of self based on whatever the next block is.
+    #[must_use]
+    #[inline(always)]
+    pub fn adjusted_by_next_is_lf(
+        self,
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        next_is_lf: bool,
+        #[cfg(not(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode")))]
+        _next_is_lf: bool,
+    ) -> TextInfo {
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        let crlf_split_compensation = if self.ends_with_cr && next_is_lf {
             1
         } else {
             0

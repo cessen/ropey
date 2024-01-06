@@ -1,5 +1,12 @@
 use std::sync::Arc;
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+
 use super::{Children, Text, TextInfo, MAX_CHILDREN};
 
 #[derive(Debug, Clone)]
@@ -265,6 +272,152 @@ impl Node {
                 Ok(children.combined_text_info())
             }
         }
+    }
+
+    //---------------------------------------------------------
+    // `Text` fetching.
+
+    /// The internal implementation of `get_text_at_*()` further below.
+    ///
+    /// Returns the `Text` that contains the given index of the specified
+    /// metric.
+    ///
+    /// - `text_info`: if available, the text info of the node this is being
+    ///   called on.  This is just an optimization: if provided, it avoids
+    ///   having to recompute the info.
+    /// - `metric_scanner`: a function that scans `Children` to find the
+    ///   child that contains `metric_idx`, returning the child's index and
+    ///   it's left-side accumulated text info within its sublings. See
+    ///   `Children::search_*_idx()` for methods that do exactly this for
+    ///   various metrics.  Note that the returned TextInfo should already
+    ///   have split-CRLF compensation applied.
+    /// - `metric_subtractor`: a simple function that subtracts the relevant
+    ///   metric in a TextInfo from a usize.  This is usually just a simple
+    ///   subtraction, but for utf16 is very slightly more involved due to
+    ///   the way it's metric is stored in TextInfo.
+    ///
+    /// Returns `(left_side_info, Text, Text_info)`.  Both left_side_info and
+    /// Text_info have already had split-CRLF compensation applied.
+    #[inline(always)]
+    fn get_text_at_metric<F1, F2>(
+        &self,
+        metric_idx: usize,
+        text_info: Option<TextInfo>,
+        metric_scanner: F1,
+        metric_subtractor: F2,
+    ) -> (TextInfo, &Text, TextInfo)
+    where
+        F1: Fn(&Children, usize) -> (usize, TextInfo),
+        F2: Fn(usize, &TextInfo) -> usize,
+    {
+        let mut node = self;
+        let mut metric_idx = metric_idx;
+        let mut left_info = TextInfo::new();
+        let mut text_info = if let Some(info) = text_info {
+            info
+        } else {
+            self.text_info()
+        };
+        let mut next_chunk_starts_with_lf = false;
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => {
+                    return (
+                        left_info,
+                        text,
+                        text_info.adjusted_by_next_is_lf(next_chunk_starts_with_lf),
+                    );
+                }
+                Node::Internal(ref children) => {
+                    let (child_i, acc_info) = metric_scanner(&children, metric_idx);
+                    left_info = left_info.append(acc_info);
+                    text_info = children.info()[child_i];
+
+                    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+                    if children.len() > (child_i + 1) {
+                        next_chunk_starts_with_lf = children.info()[child_i + 1].starts_with_lf;
+                    }
+
+                    node = &children.nodes()[child_i];
+                    metric_idx = metric_subtractor(metric_idx, &acc_info);
+                }
+            }
+        }
+    }
+
+    /// Returns the `Text` that contains the given byte.
+    ///
+    /// See `get_text_at_metric()` for further documentation.
+    fn get_text_at_byte(
+        &self,
+        byte_idx: usize,
+        text_info: Option<TextInfo>,
+    ) -> (TextInfo, &Text, TextInfo) {
+        self.get_text_at_metric(
+            byte_idx,
+            text_info,
+            |children, idx| children.search_byte_idx(idx),
+            |idx, traversed_info| idx - traversed_info.bytes as usize,
+        )
+    }
+
+    /// Returns the `Text` that contains the given char.
+    ///
+    /// See `get_text_at_metric()` for further documentation.
+    #[cfg(feature = "metric_chars")]
+    fn get_text_at_char(
+        &self,
+        char_idx: usize,
+        text_info: Option<TextInfo>,
+    ) -> (TextInfo, &Text, TextInfo) {
+        self.get_text_at_metric(
+            char_idx,
+            text_info,
+            |children, idx| children.search_char_idx(idx),
+            |idx, traversed_info| idx - traversed_info.chars as usize,
+        )
+    }
+
+    /// Returns the `Text` that contains the given utf16 code unit.
+    ///
+    /// See `get_text_at_metric()` for further documentation.
+    #[cfg(feature = "metric_utf16")]
+    fn get_text_at_utf16(
+        &self,
+        utf16_idx: usize,
+        text_info: Option<TextInfo>,
+    ) -> (TextInfo, &Text, TextInfo) {
+        self.get_text_at_metric(
+            utf16_idx,
+            text_info,
+            |children, idx| children.search_utf16_code_unit_idx(idx),
+            |idx, traversed_info| {
+                idx - (traversed_info.chars as usize + traversed_info.utf16_surrogates as usize)
+            },
+        )
+    }
+
+    /// Returns the `Text` that contains the given line break.
+    ///
+    /// See `get_text_at_metric()` for further documentation.
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_text_at_line_break(
+        &self,
+        line_break_idx: usize,
+        text_info: Option<TextInfo>,
+        line_type: LineType,
+    ) -> (TextInfo, &Text, TextInfo) {
+        self.get_text_at_metric(
+            line_break_idx,
+            text_info,
+            |children, idx| children.search_line_break_idx(idx, line_type),
+            |idx, traversed_info| idx - traversed_info.line_breaks(line_type) as usize,
+        )
     }
 
     //---------------------------------------------------------

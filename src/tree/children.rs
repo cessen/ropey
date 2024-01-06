@@ -6,6 +6,13 @@ use std::{
 
 use super::{node::Node, text_info::TextInfo, MAX_CHILDREN, MAX_TEXT_SIZE};
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+
 /// Internal node of the Rope, with other nodes as children.
 #[derive(Debug, Clone)]
 pub(crate) struct Children(inner::ChildrenInternal);
@@ -263,6 +270,9 @@ impl Children {
     /// first child that matches the given predicate.
     ///
     /// If no child matches the predicate, the last child is returned.
+    ///
+    /// The returned TextInfo has already had split-CRLF compensation
+    /// applied.
     #[inline(always)]
     pub fn search_by<F>(&self, pred: F) -> (usize, TextInfo)
     where
@@ -299,7 +309,9 @@ impl Children {
     /// Return is (child_index, left_acc_byte_index)
     ///
     /// One-past-the end is valid, and will return the last child.
-    #[inline(always)]
+    ///
+    /// The returned TextInfo has already had split-CRLF compensation
+    /// applied.
     pub fn search_byte_idx_only(&self, byte_idx: usize) -> (usize, usize) {
         debug_assert!(self.len() > 0);
 
@@ -326,6 +338,9 @@ impl Children {
     /// child that contains the given byte.
     ///
     /// One-past-the end is valid, and will return the last child.
+    ///
+    /// The returned TextInfo has already had split-CRLF compensation
+    /// applied.
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|_, end| byte_idx < end.bytes as usize);
 
@@ -341,6 +356,9 @@ impl Children {
     /// child that contains the given char.
     ///
     /// One-past-the end is valid, and will return the last child.
+    ///
+    /// The returned TextInfo has already had split-CRLF compensation
+    /// applied.
     #[cfg(feature = "metric_chars")]
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|_, end| char_idx < end.chars as usize);
@@ -357,6 +375,9 @@ impl Children {
     /// child that contains the given utf16 code unit offset.
     ///
     /// One-past-the end is valid, and will return the last child.
+    ///
+    /// The returned TextInfo has already had split-CRLF compensation
+    /// applied.
     #[cfg(feature = "metric_utf16")]
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) =
@@ -382,56 +403,26 @@ impl Children {
     /// text info.
     ///
     /// One-past-the end is valid, and will return the last child.
-    #[cfg(feature = "metric_lines_lf")]
-    pub fn search_line_break_lf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks_lf as usize);
-
-        debug_assert!(
-            line_break_idx <= (accum.line_breaks_lf + self.info()[idx].line_breaks_lf + 1) as usize,
-            "Index out of bounds."
-        );
-
-        (idx, accum)
-    }
-
-    /// Returns the child index and left-side-accumulated text info of the
-    /// child that contains the given line break.
     ///
-    /// Beginning of the rope is considered index 0, although is not
-    /// considered a line break for the returned left-side-accumulated
-    /// text info.
-    ///
-    /// One-past-the end is valid, and will return the last child.
-    #[cfg(feature = "metric_lines_cr_lf")]
-    pub fn search_line_break_cr_lf_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
+    /// The returned TextInfo has already had split-CRLF compensation
+    /// applied.
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub fn search_line_break_idx(
+        &self,
+        line_break_idx: usize,
+        line_type: LineType,
+    ) -> (usize, TextInfo) {
         let (idx, accum) =
-            self.search_by(|_, end| line_break_idx <= end.line_breaks_cr_lf as usize);
+            self.search_by(|_, end| line_break_idx <= end.line_breaks(line_type) as usize);
 
         debug_assert!(
             line_break_idx
-                <= (accum.line_breaks_cr_lf + self.info()[idx].line_breaks_cr_lf + 1) as usize,
-            "Index out of bounds."
-        );
-
-        (idx, accum)
-    }
-
-    /// Returns the child index and left-side-accumulated text info of the
-    /// child that contains the given line break.
-    ///
-    /// Beginning of the rope is considered index 0, although is not
-    /// considered a line break for the returned left-side-accumulated
-    /// text info.
-    ///
-    /// One-past-the end is valid, and will return the last child.
-    #[cfg(feature = "metric_lines_unicode")]
-    pub fn search_line_break_unicode_idx(&self, line_break_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) =
-            self.search_by(|_, end| line_break_idx <= end.line_breaks_unicode as usize);
-
-        debug_assert!(
-            line_break_idx
-                <= (accum.line_breaks_unicode + self.info()[idx].line_breaks_unicode + 1) as usize,
+                <= (accum.line_breaks(line_type) + self.info()[idx].line_breaks(line_type) + 1)
+                    as usize,
             "Index out of bounds."
         );
 
