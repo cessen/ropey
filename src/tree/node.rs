@@ -197,13 +197,13 @@ impl Node {
                 let (end_child_i, end_child_left_byte_idx) =
                     children.search_byte_idx_only(byte_idx_range[1]);
 
-                // Text info the the start and end children.
+                // Text info of the the start and end children.
                 let start_info = children.info()[start_child_i];
                 let end_info = children.info()[end_child_i];
 
                 // Compute the start index relative to the contents of the
-                // first child, and the end index relative to the contents
-                // of the second.
+                // start child, and the end index relative to the contents
+                // of the end child.
                 let start_byte_idx = byte_idx_range[0] - start_child_left_byte_idx;
                 let end_byte_idx = byte_idx_range[1] - end_child_left_byte_idx;
 
@@ -216,7 +216,6 @@ impl Node {
                             .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
                         children.info_mut()[start_child_i] = new_info;
                     }
-                    Ok(children.combined_text_info())
                 }
                 // More complex case: the removal spans multiple children.
                 else {
@@ -241,25 +240,22 @@ impl Node {
                     }
 
                     // Remove nodes that need to be completely removed.
-                    {
-                        let removal_start = if remove_whole_start_child {
-                            start_child_i
-                        } else {
-                            start_child_i + 1
-                        };
-                        let removal_end = if remove_whole_end_child {
-                            end_child_i + 1
-                        } else {
-                            end_child_i
-                        };
-
-                        if removal_start < removal_end {
-                            children.remove_multiple([removal_start, removal_end]);
-                        }
+                    let removal_start = if remove_whole_start_child {
+                        start_child_i
+                    } else {
+                        start_child_i + 1
+                    };
+                    let removal_end = if remove_whole_end_child {
+                        end_child_i + 1
+                    } else {
+                        end_child_i
+                    };
+                    if removal_start < removal_end {
+                        children.remove_multiple([removal_start, removal_end]);
                     }
-
-                    Ok(children.combined_text_info())
                 }
+
+                Ok(children.combined_text_info())
             }
         }
     }
