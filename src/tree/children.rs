@@ -118,11 +118,12 @@ impl Children {
                     let children1 = Arc::make_mut(children1);
                     let children2 = Arc::make_mut(children2);
                     if (children1.len() + children2.len()) <= MAX_CHILDREN {
-                        for _ in 0..children2.len() {
-                            // TODO: performance.  This is quadratic with
-                            // the number of children in `children2`.
-                            children1.push(children2.remove(0));
-                        }
+                        let children2_len = children2.len(); // Work around borrow checker.
+                        children1.0.steal_range_from(
+                            children1.len(),
+                            &mut children2.0,
+                            [0, children2_len],
+                        );
                         true
                     } else {
                         children1.distribute(children2);
@@ -150,11 +151,13 @@ impl Children {
     /// preserving ordering.
     pub fn distribute(&mut self, other: &mut Self) {
         let r_target_len = (self.len() + other.len()) / 2;
-        while other.len() < r_target_len {
-            other.insert(0, self.pop());
-        }
-        while other.len() > r_target_len {
-            self.push(other.remove(0));
+        if other.len() < r_target_len {
+            let start = self.len() + other.len() - r_target_len;
+            let self_len = self.len(); // Work around borrow checker.
+            other.0.steal_range_from(0, &mut self.0, [start, self_len]);
+        } else if other.len() > r_target_len {
+            let end = other.len() - r_target_len;
+            self.0.steal_range_from(self.len(), &mut other.0, [0, end]);
         }
     }
 
@@ -206,24 +209,16 @@ impl Children {
     /// Preserves ordering of the remaining items.
     #[inline(always)]
     pub fn remove_multiple(&mut self, idx_range: [usize; 2]) {
-        // TODO: make this efficient.  This is a throw-away quadratic
-        // implementation just to get things up and running.
-        for _ in idx_range[0]..idx_range[1] {
-            self.0.remove(idx_range[0]);
-        }
+        self.0.remove_range(idx_range);
     }
 
     /// Splits the array in two at `idx`, returning the right part of the split.
     pub fn split_off(&mut self, idx: usize) -> Self {
         assert!(idx <= self.len());
 
-        // TODO: performance.  This is quadratic with
-        // the number of children.
         let mut other = Children::new();
-        let count = self.len() - idx;
-        for _ in 0..count {
-            other.push(self.remove(idx));
-        }
+        let self_len = self.len(); // Work around the borrow checker.
+        other.0.steal_range_from(0, &mut self.0, [idx, self_len]);
 
         other
     }
@@ -601,7 +596,6 @@ mod inner {
         /// Decreases length by one.  Preserves ordering of the other items.
         #[inline(always)]
         pub fn remove(&mut self, idx: usize) -> (TextInfo, Node) {
-            assert!(self.len() > 0);
             assert!(idx < self.len());
 
             // Read out the item.
@@ -629,6 +623,128 @@ mod inner {
             self.len -= 1;
 
             return item;
+        }
+
+        /// Removes a range of items from `self`.
+        ///
+        /// Panics if the range is out of bounds.
+        #[inline(always)]
+        pub fn remove_range(&mut self, range: [usize; 2]) {
+            assert!(range[0] <= range[1]);
+            assert!(range[1] <= self.len());
+
+            // Step 1: run `drop()` on the nodes to be removed.
+            for node in &mut self.nodes[range[0]..range[1]] {
+                // SAFETY: we know these nodes are initialized because they're
+                // at indices < `self.len`.  By dropping them they become
+                // invalid, but they will be overwritten or put out of range in
+                // the next step.
+                unsafe { node.assume_init_drop() };
+            }
+
+            // Step 2: shift items over to fill in the gap.
+            {
+                let range_len = range[1] - range[0];
+
+                // Nodes.
+                // SAFETY: this acts as a move, and together with reducing
+                // `self.len` fills in the gap from step 1.
+                unsafe {
+                    let ptr = self.nodes.as_mut_ptr();
+                    ptr::copy(
+                        ptr.add(range[1]),
+                        ptr.add(range[0]),
+                        self.len as usize - range[1],
+                    );
+                }
+
+                // Text info.
+                self.info.copy_within(range[1]..self.len as usize, range[0]);
+
+                self.len -= range_len as u8;
+            }
+        }
+
+        /// Removes a range of items from `other`, and inserts them into `self`.
+        ///
+        /// Panics if there isn't enough room to insert, or if the insert index
+        /// or from-range are out of bounds.
+        #[inline(always)]
+        pub fn steal_range_from(
+            &mut self,
+            to_idx: usize,
+            other: &mut Self,
+            from_range: [usize; 2],
+        ) {
+            assert!(to_idx <= self.len());
+            assert!(from_range[0] <= from_range[1]);
+            assert!(from_range[1] <= other.len());
+
+            let from_len = from_range[1] - from_range[0];
+            assert!(from_len <= (MAX_CHILDREN - self.len()));
+
+            let to_end_idx = to_idx + from_len;
+
+            // Step 1: make room in `self` for the items.
+            {
+                // Nodes.
+                // SAFETY: this acts as a move.  A gap is left with stale data
+                // in it, but step 2 overwrites that gap with valid data.
+                unsafe {
+                    let ptr = self.nodes.as_mut_ptr();
+                    ptr::copy(
+                        ptr.add(to_idx),
+                        ptr.add(to_end_idx),
+                        self.len as usize - to_idx,
+                    );
+                }
+
+                // Text info.
+                self.info.copy_within(to_idx..self.len as usize, to_end_idx);
+
+                self.len += from_len as u8;
+            }
+
+            // Step 2: move the items from other to self.
+            {
+                // Nodes.
+                // SAFETY: this acts as a move, and fills in the gap in `self`
+                // from step 1. However, it now leaves a gap of stale data in
+                // `other` where all the items we just moved over were.  Step 3
+                // fills in that gap.
+                unsafe {
+                    let ptr_other = other.nodes.as_ptr();
+                    let ptr_self = self.nodes.as_mut_ptr();
+                    ptr::copy(ptr_other.add(from_range[0]), ptr_self.add(to_idx), from_len);
+                }
+
+                // Text info.
+                self.info[to_idx..to_end_idx]
+                    .copy_from_slice(&other.info[from_range[0]..from_range[1]]);
+            }
+
+            // Step 3: shift over the items in `other` to fill the gap.
+            {
+                // Nodes.
+                // SAFETY: this acts as a move, and fills in the gap in `other`
+                // from step 2. `other.len` is then adjusted so there is no gap
+                // left at the end.
+                unsafe {
+                    let ptr = other.nodes.as_mut_ptr();
+                    ptr::copy(
+                        ptr.add(from_range[1]),
+                        ptr.add(from_range[0]),
+                        other.len as usize - from_range[1],
+                    );
+                }
+
+                // Text info.
+                other
+                    .info
+                    .copy_within(from_range[1]..other.len as usize, from_range[0]);
+
+                other.len -= from_len as u8;
+            }
         }
     }
 
