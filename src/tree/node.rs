@@ -59,9 +59,9 @@ impl Node {
         }
     }
 
-    pub fn leaf_text(&self) -> [&str; 2] {
+    pub fn leaf_text(&self) -> &Text {
         match *self {
-            Node::Leaf(ref text) => text.chunks(),
+            Node::Leaf(ref text) => text,
             _ => panic!(),
         }
     }
@@ -69,6 +69,13 @@ impl Node {
     pub fn leaf_text_mut(&mut self) -> &mut Text {
         match *self {
             Node::Leaf(ref mut text) => Arc::make_mut(text),
+            _ => panic!(),
+        }
+    }
+
+    pub fn leaf_text_chunks(&self) -> [&str; 2] {
+        match *self {
+            Node::Leaf(ref text) => text.chunks(),
             _ => panic!(),
         }
     }

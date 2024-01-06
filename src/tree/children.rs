@@ -444,12 +444,7 @@ impl Children {
 /// The unsafe guts of Children, exposed through a safe API.
 ///
 /// Try to keep this as small as possible, and implement functionality on
-/// Children via the safe APIs whenever possible.
-///
-/// It's split out this way because it was too easy to accidentally access the
-/// fixed size arrays directly, leading to memory-unsafety bugs when accidentally
-/// accessing elements that are semantically out of bounds.  This happened once,
-/// and it was a pain to track down--as memory safety bugs often are.
+/// `Children` via the safe APIs whenever possible.
 mod inner {
     use super::{Node, TextInfo, MAX_CHILDREN};
     use std::fmt;
@@ -822,6 +817,177 @@ mod inner {
                 .field("info", &&self.info())
                 .field("len", &self.len())
                 .finish()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::tree::Text;
+
+        // Generates a unique string with unique text info for any usize.
+        fn i_to_s(i: usize) -> String {
+            let mut s = String::with_capacity(i);
+            let tmp = i.to_string();
+            for _ in 0..(i + 1) {
+                s.push_str(&tmp);
+            }
+            s
+        }
+
+        fn make_info_and_node(text: &str) -> (TextInfo, Node) {
+            (
+                TextInfo::from_str(text),
+                Node::Leaf(Arc::new(Text::from_str(text))),
+            )
+        }
+
+        fn make_children_full() -> ChildrenInternal {
+            let mut children = ChildrenInternal::new();
+            for i in 0..MAX_CHILDREN {
+                children.push(make_info_and_node(&i_to_s(i)));
+            }
+
+            children
+        }
+
+        fn make_children_half_full() -> ChildrenInternal {
+            let mut children = ChildrenInternal::new();
+            for i in 0..(MAX_CHILDREN / 2) {
+                children.push(make_info_and_node(&i_to_s(i)));
+            }
+
+            children
+        }
+
+        #[test]
+        fn push_01() {
+            let mut children = ChildrenInternal::new();
+            for i in 0..MAX_CHILDREN {
+                children.push(make_info_and_node(&i_to_s(i)));
+            }
+            for i in 0..MAX_CHILDREN {
+                assert_eq!(children.info()[i].bytes as usize, i_to_s(i).len());
+                assert_eq!(children.nodes()[i].leaf_text(), i_to_s(i).as_str());
+            }
+        }
+
+        #[test]
+        fn pop_01() {
+            let mut children = make_children_full();
+            for i in (0..MAX_CHILDREN).rev() {
+                let (info, node) = children.pop();
+
+                assert_eq!(children.len(), i);
+                assert_eq!(info.bytes as usize, i_to_s(i).len());
+                assert_eq!(node.leaf_text(), i_to_s(i).as_str());
+            }
+        }
+
+        #[test]
+        fn insert_01() {
+            let mut children = make_children_half_full();
+
+            children.insert(1, make_info_and_node("a"));
+            children.insert(children.len(), make_info_and_node("b"));
+            children.insert(0, make_info_and_node("c"));
+
+            for i in 0..MAX_CHILDREN {
+                let text: String = match i {
+                    0 => "c".into(),
+                    2 => "a".into(),
+                    i if i == (children.len() - 1) => "b".into(),
+                    i if i < 2 => i_to_s(i - 1),
+                    _ => i_to_s(i - 2),
+                };
+
+                assert_eq!(children.info()[i].bytes as usize, text.len());
+                assert_eq!(children.nodes()[i].leaf_text(), text.as_str());
+            }
+        }
+
+        #[test]
+        fn remove_01() {
+            let mut children = make_children_full();
+
+            let last_i = children.len() - 1;
+
+            let last = children.remove(last_i);
+            let first = children.remove(0);
+            let middle = children.remove(1);
+
+            assert_eq!(children.len(), MAX_CHILDREN - 3);
+
+            assert_eq!(last.0.bytes as usize, i_to_s(last_i).len());
+            assert_eq!(last.1.leaf_text(), i_to_s(last_i).as_str());
+
+            assert_eq!(first.0.bytes as usize, i_to_s(0).len());
+            assert_eq!(first.1.leaf_text(), i_to_s(0).as_str());
+
+            assert_eq!(middle.0.bytes as usize, i_to_s(2).len());
+            assert_eq!(middle.1.leaf_text(), i_to_s(2).as_str());
+        }
+
+        #[test]
+        fn remove_range_01() {
+            let ranges = &[[1, 1], [0, 2], [1, 3], [2, MAX_CHILDREN]];
+
+            for &range in ranges {
+                let mut children = make_children_full();
+                let range_len = range[1] - range[0];
+
+                children.remove_range(range);
+                assert_eq!(children.len(), MAX_CHILDREN - range_len);
+                for i in 0..children.len() {
+                    let original_i = if i < range[0] { i } else { i + range_len };
+                    let text = i_to_s(original_i);
+
+                    assert_eq!(children.info()[i].bytes as usize, text.len());
+                    assert_eq!(children.nodes()[i].leaf_text(), text.as_str());
+                }
+            }
+        }
+
+        #[test]
+        fn steal_range_from_01() {
+            let idxs = &[0, 1, MAX_CHILDREN / 2];
+            let ranges = &[[1, 1], [0, 2], [1, 3], [MAX_CHILDREN - 2, MAX_CHILDREN]];
+
+            for &idx in idxs {
+                for &range in ranges {
+                    let mut children_to = make_children_half_full();
+                    let mut children_from = make_children_full();
+                    let range_len = range[1] - range[0];
+
+                    children_to.steal_range_from(idx, &mut children_from, range);
+
+                    // Verify `children_from`.
+                    assert_eq!(children_from.len(), MAX_CHILDREN - range_len);
+                    for i in 0..children_from.len() {
+                        let original_i = if i < range[0] { i } else { i + range_len };
+                        let text = i_to_s(original_i);
+
+                        assert_eq!(children_from.info()[i].bytes as usize, text.len());
+                        assert_eq!(children_from.nodes()[i].leaf_text(), text.as_str());
+                    }
+
+                    // Verify `children_to`.
+                    assert_eq!(children_to.len(), MAX_CHILDREN / 2 + range_len);
+                    for i in 0..children_to.len() {
+                        let original_i = if i < idx {
+                            i
+                        } else if i < (idx + range_len) {
+                            i - idx + range[0]
+                        } else {
+                            i - range_len
+                        };
+                        let text = i_to_s(original_i);
+
+                        assert_eq!(children_to.info()[i].bytes as usize, text.len());
+                        assert_eq!(children_to.nodes()[i].leaf_text(), text.as_str());
+                    }
+                }
+            }
         }
     }
 }

@@ -26,7 +26,7 @@ impl<'a> Iterator for Chunks<'a> {
             // Leaf.
             if self.node_stack.last().unwrap().0.is_leaf() {
                 let (text, _) = self.node_stack.pop().unwrap();
-                return Some(text.leaf_text());
+                return Some(text.leaf_text_chunks());
             }
 
             let i = self.node_stack.len() - 1;
