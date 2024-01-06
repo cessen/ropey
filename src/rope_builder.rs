@@ -296,9 +296,7 @@ mod tests {
         let r = b.finish();
 
         assert_eq!(r, TEXT);
-
-        // r.assert_integrity();
-        // r.assert_invariants();
+        r.assert_invariants();
     }
 
     #[test]
@@ -312,8 +310,6 @@ mod tests {
         let r = b.finish();
 
         assert_eq!(r, TEXT);
-
-        // r.assert_integrity();
-        // r.assert_invariants();
+        r.assert_invariants();
     }
 }

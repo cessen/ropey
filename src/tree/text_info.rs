@@ -363,6 +363,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn append_01() {
         let test_texts = [
             "Hello world!",

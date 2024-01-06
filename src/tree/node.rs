@@ -173,6 +173,7 @@ impl Node {
 
         match *self {
             Node::Leaf(ref mut leaf_text) => {
+                debug_assert!(byte_idx_range[0] > 0 || byte_idx_range[1] < leaf_text.len());
                 if byte_idx_range
                     .iter()
                     .any(|&i| !leaf_text.is_char_boundary(i))
@@ -191,26 +192,34 @@ impl Node {
 
                 // Find the start and end children of the range, and
                 // their left-side byte indices within this node.
-                let (start_child_i, start_child_byte_idx) =
+                let (start_child_i, start_child_left_byte_idx) =
                     children.search_byte_idx_only(byte_idx_range[0]);
-                let (end_child_i, end_child_byte_idx) =
+                let (end_child_i, end_child_left_byte_idx) =
                     children.search_byte_idx_only(byte_idx_range[1]);
+
+                // Text info the the start and end children.
                 let start_info = children.info()[start_child_i];
                 let end_info = children.info()[end_child_i];
 
                 // Compute the start index relative to the contents of the
                 // first child, and the end index relative to the contents
                 // of the second.
-                let start_byte_idx = byte_idx_range[0] - start_child_byte_idx;
-                let end_byte_idx = byte_idx_range[1] - end_child_byte_idx;
+                let start_byte_idx = byte_idx_range[0] - start_child_left_byte_idx;
+                let end_byte_idx = byte_idx_range[1] - end_child_left_byte_idx;
 
+                // Simple case: the removal is entirely within a single child.
                 if start_child_i == end_child_i {
-                    // Simple case: the removal is entirely within a single child.
-                    let new_info = children.nodes_mut()[start_child_i]
-                        .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
-                    children.info_mut()[start_child_i] = new_info;
+                    if start_byte_idx == 0 && end_byte_idx == start_info.bytes as usize {
+                        children.remove(start_child_i);
+                    } else {
+                        let new_info = children.nodes_mut()[start_child_i]
+                            .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
+                        children.info_mut()[start_child_i] = new_info;
+                    }
                     Ok(children.combined_text_info())
-                } else {
+                }
+                // More complex case: the removal spans multiple children.
+                else {
                     let remove_whole_start_child = start_byte_idx == 0;
                     let remove_whole_end_child =
                         end_byte_idx == children.info()[end_child_i].bytes as usize;
@@ -251,6 +260,77 @@ impl Node {
 
                     Ok(children.combined_text_info())
                 }
+            }
+        }
+    }
+
+    //---------------------------------------------------------
+    // Debugging helpers.
+
+    /// Checks that all leaf nodes are at the same depth.
+    pub fn assert_equal_leaf_depth(&self) -> usize {
+        match *self {
+            Node::Leaf(_) => 1,
+            Node::Internal(ref children) => {
+                let first_depth = children.nodes()[0].assert_equal_leaf_depth();
+                for node in &children.nodes()[1..] {
+                    assert_eq!(node.assert_equal_leaf_depth(), first_depth);
+                }
+                first_depth + 1
+            }
+        }
+    }
+
+    /// Checks that there are no empty internal nodes in the tree.
+    pub fn assert_no_empty_internal(&self) {
+        match *self {
+            Node::Leaf(_) => {}
+            Node::Internal(ref children) => {
+                assert!(children.len() > 0);
+                for node in children.nodes() {
+                    node.assert_no_empty_internal();
+                }
+            }
+        }
+    }
+
+    /// Checks that there are no empty internal nodes in the tree.
+    pub fn assert_no_empty_leaf(&self) {
+        match *self {
+            Node::Leaf(ref text) => {
+                assert!(text.len() > 0);
+            }
+            Node::Internal(ref children) => {
+                for node in children.nodes() {
+                    node.assert_no_empty_leaf();
+                }
+            }
+        }
+    }
+
+    /// Checks that all cached TextInfo in the tree is correct.
+    pub fn assert_accurate_text_info(&self) -> TextInfo {
+        match *self {
+            Node::Leaf(ref text) => {
+                // Freshly compute the relevant info from scratch.
+                let info_l = TextInfo::from_str(text.chunks()[0]);
+                let info_r = TextInfo::from_str(text.chunks()[1]);
+                let info = info_l.append(info_r);
+
+                // Make sure everything matches.
+                assert_eq!(text.text_info(), info);
+                assert_eq!(text.left_info, info_l);
+
+                info
+            }
+            Node::Internal(ref children) => {
+                let mut acc_info = TextInfo::new();
+                for (node, &info) in children.nodes().iter().zip(children.info().iter()) {
+                    assert_eq!(info, node.assert_accurate_text_info());
+                    acc_info = acc_info.append(info);
+                }
+
+                acc_info
             }
         }
     }

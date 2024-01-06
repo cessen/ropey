@@ -226,6 +226,46 @@ impl Rope {
     pub fn chunks(&self) -> Chunks<'_> {
         Chunks::new(&self.root)
     }
+
+    //---------------------------------------------------------
+    // Debugging helpers.
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_invariants(&self) {
+        self.assert_equal_leaf_depth();
+        self.assert_no_empty_internal();
+        self.assert_no_empty_non_root_leaf();
+        self.assert_accurate_text_info();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_equal_leaf_depth(&self) {
+        self.root.assert_equal_leaf_depth();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_no_empty_internal(&self) {
+        self.root.assert_no_empty_internal();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_no_empty_non_root_leaf(&self) {
+        if self.root.is_leaf() {
+            // The root is allowed to be empty if it's a leaf.
+            return;
+        }
+        self.root.assert_no_empty_leaf();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_accurate_text_info(&self) {
+        self.root.assert_accurate_text_info();
+    }
 }
 
 //==============================================================

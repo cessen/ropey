@@ -11,7 +11,7 @@ pub(crate) struct Text {
     buffer: [u8; MAX_TEXT_SIZE],
 
     /// Info for the text preceding the gap.
-    left_info: TextInfo,
+    pub(crate) left_info: TextInfo,
 
     /// Gap tracking data.
     gap_start: u16,
