@@ -443,11 +443,12 @@ impl Children {
 /// `Children` via the safe APIs whenever possible.
 mod inner {
     use super::{Node, TextInfo, MAX_CHILDREN};
-    use std::fmt;
-    use std::mem;
-    use std::mem::MaybeUninit;
-    use std::ptr;
-    use std::sync::Arc;
+    use std::{
+        fmt,
+        mem::{self, MaybeUninit},
+        ptr,
+        sync::Arc,
+    };
 
     /// This is essentially a fixed-capacity, stack-allocated `Vec`.  However,
     /// it actually containts _two_ arrays rather than just one, but which

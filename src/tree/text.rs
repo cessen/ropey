@@ -10,64 +10,43 @@ use super::{
 /// text chunks of the gap buffer, all of its APIs behave as if the text
 /// is a simple contiguous string.
 #[derive(Copy, Clone)]
-pub(crate) struct Text {
-    buffer: [u8; MAX_TEXT_SIZE],
-
-    /// Gap tracking data.
-    gap_start: u16,
-    gap_len: u16,
-}
+pub(crate) struct Text(inner::GapBuffer);
 
 impl Text {
     /// Creates a new empty `Text`.
     #[inline(always)]
     pub fn new() -> Self {
-        Self {
-            buffer: [0; MAX_TEXT_SIZE],
-            gap_start: 0,
-            gap_len: MAX_TEXT_SIZE as u16,
-        }
+        Self(inner::GapBuffer::new())
     }
 
     /// Creates a new `Text` with the same contents as the given `&str`.
     pub fn from_str(string: &str) -> Self {
-        assert!(string.len() <= MAX_TEXT_SIZE);
-
-        let mut buffer = [0; MAX_TEXT_SIZE];
-        buffer[..string.len()].copy_from_slice(string.as_bytes());
-
-        Self {
-            buffer: buffer,
-            gap_start: string.len() as u16,
-            gap_len: (MAX_TEXT_SIZE - string.len()) as u16,
-        }
+        let mut text = Self::new();
+        text.0.append_to_gap(string);
+        text
     }
 
     /// Returns the total length of the contained text in bytes.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        MAX_TEXT_SIZE - self.free_capacity()
+        self.0.len()
     }
 
     /// Returns the amount of free space in this leaf, in bytes.
     #[inline(always)]
     pub fn free_capacity(&self) -> usize {
-        self.gap_len as usize
+        self.0.free_capacity()
     }
 
+    #[inline(always)]
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
         assert!(byte_idx <= self.len());
-        if byte_idx == self.len() {
-            true
-        } else {
-            let idx = self.real_idx(byte_idx);
-            (self.buffer[idx] & 0xC0) != 0x80
-        }
+        self.0.is_char_boundary(byte_idx)
     }
 
     pub fn text_info(&self) -> TextInfo {
-        let left_info = TextInfo::from_str(self.chunks()[0]);
-        let right_info = TextInfo::from_str(self.chunks()[1]);
+        let left_info = TextInfo::from_str(self.0.chunks()[0]);
+        let right_info = TextInfo::from_str(self.0.chunks()[1]);
         left_info.concat(right_info)
     }
 
@@ -76,14 +55,8 @@ impl Text {
     /// Panics if there isn't enough free space or if the byte index
     /// isn't on a valid char boundary.
     pub fn insert_str(&mut self, byte_idx: usize, text: &str) {
-        assert!(text.len() <= self.free_capacity());
-        assert!(byte_idx <= self.len());
-        assert!(self.is_char_boundary(byte_idx));
-
-        self.move_gap_start(byte_idx);
-        self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
-        self.gap_start += text.len() as u16;
-        self.gap_len -= text.len() as u16;
+        self.0.move_gap(byte_idx);
+        self.0.append_to_gap(text);
     }
 
     /// Inserts the given text at the given byte index, and computes an
@@ -101,15 +74,11 @@ impl Text {
         text: &str,
         mut current_info: TextInfo,
     ) -> TextInfo {
-        assert!(text.len() <= self.free_capacity());
-        assert!(byte_idx <= self.len());
-        assert!(self.is_char_boundary(byte_idx));
-
         if text.is_empty() {
             return current_info;
         }
 
-        self.move_gap_start(byte_idx);
+        self.0.move_gap(byte_idx);
 
         // Update text info based on the upcoming insertion.
         let text_info = TextInfo::from_str(text);
@@ -117,10 +86,10 @@ impl Text {
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         {
             let crlf_split_compensation_1 =
-                (ends_with_cr(self.chunks()[0]) && starts_with_lf(self.chunks()[1])) as usize;
-            let crlf_split_compensation_2 = (ends_with_cr(self.chunks()[0])
+                (ends_with_cr(self.0.chunks()[0]) && starts_with_lf(self.0.chunks()[1])) as usize;
+            let crlf_split_compensation_2 = (ends_with_cr(self.0.chunks()[0])
                 && text_info.starts_with_lf) as usize
-                + (text_info.ends_with_cr && starts_with_lf(self.chunks()[1])) as usize;
+                + (text_info.ends_with_cr && starts_with_lf(self.0.chunks()[1])) as usize;
             #[cfg(feature = "metric_lines_cr_lf")]
             {
                 current_info.line_breaks_cr_lf += crlf_split_compensation_1 as u64;
@@ -135,15 +104,13 @@ impl Text {
             if byte_idx == 0 {
                 current_info.starts_with_lf = text_info.starts_with_lf;
             }
-            if byte_idx == self.len() {
+            if byte_idx == self.0.len() {
                 current_info.ends_with_cr = text_info.ends_with_cr;
             }
         }
 
         // Do the actual insert at the start of the gap.
-        self.buffer[byte_idx..(byte_idx + text.len())].copy_from_slice(text.as_bytes());
-        self.gap_start += text.len() as u16;
-        self.gap_len -= text.len() as u16;
+        self.0.append_to_gap(text);
 
         current_info
     }
@@ -153,7 +120,8 @@ impl Text {
     /// Panics if there isn't enough free space.
     #[inline(always)]
     pub fn append_str(&mut self, text: &str) {
-        self.insert_str(self.len(), text);
+        self.0.move_gap(self.0.len());
+        self.0.append_to_gap(text);
     }
 
     /// Removes the text in the given right-exclusive byte range.
@@ -162,12 +130,8 @@ impl Text {
     /// boundaries.
     pub fn remove(&mut self, byte_idx_range: [usize; 2]) {
         assert!(byte_idx_range[0] <= byte_idx_range[1]);
-        assert!(byte_idx_range[1] <= self.len());
-        assert!(self.is_char_boundary(byte_idx_range[0]));
-        assert!(self.is_char_boundary(byte_idx_range[1]));
-
-        self.move_gap_start(byte_idx_range[0]);
-        self.gap_len += (byte_idx_range[1] - byte_idx_range[0]) as u16;
+        self.0.move_gap(byte_idx_range[0]);
+        self.0.grow_gap_r(byte_idx_range[1] - byte_idx_range[0]);
     }
 
     /// Returns the two chunk of the gap buffer, in order.
@@ -175,13 +139,7 @@ impl Text {
     /// Note: one or both chunks can be the empty string.
     #[inline(always)]
     pub fn chunks(&self) -> [&str; 2] {
-        let chunk_l = &self.buffer[..self.gap_start as usize];
-        let chunk_r = &self.buffer[(self.gap_start + self.gap_len) as usize..];
-        debug_assert!(std::str::from_utf8(chunk_l).is_ok());
-        debug_assert!(std::str::from_utf8(chunk_r).is_ok());
-        [unsafe { std::str::from_utf8_unchecked(chunk_l) }, unsafe {
-            std::str::from_utf8_unchecked(chunk_r)
-        }]
+        self.0.chunks()
     }
 
     /// Splits the leaf into two leaves, at the given byte offset.
@@ -189,12 +147,9 @@ impl Text {
     /// This leaf will contain the left half of the text, and the
     /// returned leaf will contain the right half.
     pub fn split(&mut self, byte_idx: usize) -> Self {
-        assert!(self.is_char_boundary(byte_idx));
-
-        self.move_gap_start(byte_idx);
-        let right = Self::from_str(self.chunks()[1]);
-        self.gap_len = MAX_TEXT_SIZE as u16 - self.gap_start;
-
+        self.0.move_gap(byte_idx);
+        let right = Self::from_str(self.0.chunks()[1]);
+        self.0.grow_gap_r(self.0.len() - byte_idx);
         right
     }
 
@@ -202,12 +157,10 @@ impl Text {
     ///
     /// Panics if there isn't enough free space to accommodate the append.
     pub fn append_text(&mut self, other: &Self) {
-        assert!((self.len() + other.len()) <= MAX_TEXT_SIZE);
-
-        self.move_gap_start(self.len());
-        let [left_chunk, right_chunk] = other.chunks();
-        self.insert_str(self.len(), left_chunk);
-        self.insert_str(self.len(), right_chunk);
+        self.0.move_gap(self.0.len());
+        let [left_chunk, right_chunk] = other.0.chunks();
+        self.0.append_to_gap(left_chunk);
+        self.0.append_to_gap(right_chunk);
     }
 
     /// Equidistributes text data between `self` and `other`.  This behaves
@@ -215,16 +168,17 @@ impl Text {
     /// result is then split between the two, with `other` being the right
     /// half of the text.
     pub fn distribute(&mut self, other: &mut Self) {
-        let total_len = self.len() + other.len();
+        let total_len = self.0.len() + other.0.len();
         let mut split_idx = (total_len + 1) / 2;
 
         if split_idx < self.len() {
-            while !self.is_char_boundary(split_idx) {
+            while !self.0.is_char_boundary(split_idx) {
                 split_idx += 1;
             }
-            self.move_gap_start(split_idx);
-            other.insert_str(0, self.chunks()[1]);
-            self.remove([split_idx, self.len()]);
+            self.0.move_gap(split_idx);
+            other.0.move_gap(0);
+            other.0.append_to_gap(self.0.chunks()[1]);
+            self.0.grow_gap_r(self.len() - split_idx);
         } else if split_idx > self.len() {
             split_idx -= self.len();
             while !other.is_char_boundary(split_idx) {
@@ -240,54 +194,14 @@ impl Text {
             // already.  Thus, if we hit that case, we simply skip doing
             // the equidistribution.
             if (self.len() + split_idx) <= MAX_TEXT_SIZE {
-                other.move_gap_start(split_idx);
-                self.insert_str(self.len(), other.chunks()[0]);
-                other.remove([0, split_idx]);
+                other.0.move_gap(split_idx);
+                self.0.move_gap(self.len());
+                self.0.append_to_gap(other.0.chunks()[0]);
+                other.0.grow_gap_l(split_idx);
             }
         } else {
             // Already equidistributed, so do nothing.
         }
-    }
-
-    //---------------------------------------------------------
-
-    fn move_gap_start(&mut self, byte_idx: usize) {
-        assert!(byte_idx <= self.len());
-        assert!(self.is_char_boundary(byte_idx));
-
-        if byte_idx < self.gap_start as usize {
-            let chunk_size = self.gap_start as usize - byte_idx;
-
-            // Move chunk to the right.
-            self.buffer.copy_within(
-                byte_idx..self.gap_start as usize,
-                byte_idx + self.gap_len as usize,
-            );
-            self.gap_start = byte_idx as u16;
-        } else if byte_idx > self.gap_start as usize {
-            let old_gap_start = self.gap_start;
-
-            // Move chunk to the left.
-            self.buffer.copy_within(
-                (self.gap_start + self.gap_len) as usize..(byte_idx + self.gap_len as usize),
-                self.gap_start as usize,
-            );
-            self.gap_start = byte_idx as u16;
-        } else {
-            // Gap is already there, so do nothing.
-        }
-    }
-
-    /// Converts the string byte index to the actual buffer index,
-    /// accounting for the gap.
-    #[inline(always)]
-    fn real_idx(&self, byte_idx: usize) -> usize {
-        let offset = if byte_idx >= self.gap_start as usize {
-            self.gap_len as usize
-        } else {
-            0
-        };
-        offset + byte_idx
     }
 }
 
@@ -301,8 +215,8 @@ impl std::cmp::PartialEq<Text> for Text {
             return false;
         }
 
-        let mut a = self.chunks().into_iter().map(|c| c.as_bytes());
-        let mut b = other.chunks().into_iter().map(|c| c.as_bytes());
+        let mut a = self.0.chunks().into_iter().map(|c| c.as_bytes());
+        let mut b = other.0.chunks().into_iter().map(|c| c.as_bytes());
 
         let mut buf_a: &[u8] = &[];
         let mut buf_b: &[u8] = &[];
@@ -347,7 +261,7 @@ impl std::cmp::PartialEq<str> for Text {
         if self.len() != other.len() {
             return false;
         }
-        let [left, right] = self.chunks();
+        let [left, right] = self.0.chunks();
 
         (left.as_bytes() == &other.as_bytes()[..left.len()])
             && (right.as_bytes() == &other.as_bytes()[left.len()..])
@@ -379,13 +293,374 @@ impl std::fmt::Debug for Text {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_fmt(format_args!(
             "Text {{ \"{}\", \"{}\" }}",
-            self.chunks()[0],
-            self.chunks()[1],
+            self.0.chunks()[0],
+            self.0.chunks()[1],
         ))
     }
 }
 
-//-------------------------------------------------------------
+//=============================================================
+
+/// The unsafe guts of `Text`, exposed through a safe API.
+///
+/// Try to keep this as small as possible, and implement functionality on
+/// `Text` via the safe APIs whenever possible.
+mod inner {
+    use super::MAX_TEXT_SIZE;
+    use std::mem::{self, MaybeUninit};
+
+    #[derive(Copy, Clone)]
+    pub(crate) struct GapBuffer {
+        buffer: [MaybeUninit<u8>; MAX_TEXT_SIZE],
+
+        /// Gap tracking data.
+        gap_start: u16,
+        gap_len: u16,
+    }
+
+    impl GapBuffer {
+        #[inline(always)]
+        pub fn new() -> Self {
+            Self {
+                buffer: [MaybeUninit::uninit(); MAX_TEXT_SIZE],
+                gap_start: 0,
+                gap_len: MAX_TEXT_SIZE as u16,
+            }
+        }
+
+        #[inline(always)]
+        pub fn len(&self) -> usize {
+            MAX_TEXT_SIZE - self.gap_len as usize
+        }
+
+        #[inline(always)]
+        pub fn free_capacity(&self) -> usize {
+            self.gap_len as usize
+        }
+
+        #[inline(always)]
+        pub fn gap_idx(&self) -> usize {
+            self.gap_start as usize
+        }
+
+        /// Returns whether the given byte index is a valid char
+        /// boundary or not.
+        ///
+        /// Note: always returns true for out-of-bounds indices.  This is
+        /// because it results in better code gen, and bounds checking will
+        /// happen elsewhere anyway.
+        #[inline(always)]
+        pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
+            let byte_idx = self.real_idx(byte_idx);
+            if byte_idx >= self.buffer.len() {
+                true
+            } else {
+                // SAFETY: `real_idx()` only returns indices to bytes outside
+                // of the gap, and thus this is guaranteed to be initialized
+                // memory.
+                let byte = unsafe { self.buffer[byte_idx].assume_init() };
+                (byte & 0xC0) != 0x80
+            }
+        }
+
+        /// Returns the two chunk of the gap buffer, in order.
+        ///
+        /// Note: one or both chunks can be the empty string.
+        #[inline(always)]
+        pub fn chunks(&self) -> [&str; 2] {
+            // SAFETY: `MaybeUninit<T>` is layout compatible with `T`, and
+            // the bytes outside of the gap are guaranteed to be initialized.
+            let (chunk_l, chunk_r) = unsafe {
+                (
+                    mem::transmute(&self.buffer[..self.gap_start as usize]),
+                    mem::transmute(&self.buffer[(self.gap_start + self.gap_len) as usize..]),
+                )
+            };
+
+            // SAFETY: we know that the chunks must be valid utf8, because the
+            // API doesn't allow the creation of not-utf8 data or incorrectly
+            // split utf8 data.
+            debug_assert!(std::str::from_utf8(chunk_l).is_ok());
+            debug_assert!(std::str::from_utf8(chunk_r).is_ok());
+            [unsafe { std::str::from_utf8_unchecked(chunk_l) }, unsafe {
+                std::str::from_utf8_unchecked(chunk_r)
+            }]
+        }
+
+        pub fn move_gap(&mut self, byte_idx: usize) {
+            assert!(self.real_idx(byte_idx) <= self.buffer.len());
+            assert!(self.is_char_boundary(byte_idx));
+
+            if byte_idx < self.gap_start as usize {
+                // SAFETY: the unsafe code below should be equivalent to
+                // the following, except without bounds and range validity
+                // checks.
+                // ```
+                // self.buffer.copy_within(
+                //     byte_idx..self.gap_start as usize,
+                //     byte_idx + self.gap_len as usize,
+                // );
+                //```
+                // In practice, the safe version produced very bloated branchy
+                // code, being unable to elide undeeded bounds checks etc.
+                unsafe {
+                    let ptr = self.buffer.as_mut_ptr();
+                    std::ptr::copy(
+                        ptr.offset(byte_idx as isize),
+                        ptr.offset(byte_idx as isize + self.gap_len as isize),
+                        self.gap_start as usize - byte_idx,
+                    );
+                }
+            } else if byte_idx > self.gap_start as usize {
+                // SAFETY: the unsafe code below should be equivalent to
+                // the following, except without bounds and range validity
+                // checks.
+                // ```
+                // self.buffer.copy_within(
+                //     (self.gap_start + self.gap_len) as usize..(byte_idx + self.gap_len as usize),
+                //     self.gap_start as usize,
+                // );
+                //```
+                // In practice, the safe version produced very bloated branchy
+                // code, being unable to elide undeeded bounds checks etc.
+                unsafe {
+                    let ptr = self.buffer.as_mut_ptr();
+                    std::ptr::copy(
+                        ptr.offset((self.gap_start + self.gap_len) as isize),
+                        ptr.offset(self.gap_start as isize),
+                        byte_idx - self.gap_start as usize,
+                    );
+                }
+            }
+
+            self.gap_start = byte_idx as u16;
+        }
+
+        #[inline(always)]
+        pub fn append_to_gap(&mut self, text: &str) {
+            assert!(text.len() <= self.free_capacity());
+            let gap_slice =
+                &mut self.buffer[self.gap_start as usize..(self.gap_start as usize + text.len())];
+
+            // SAFETY: `&[MaybeUninit<u8>]` and `&[u8]` are layout compatible,
+            // with elements that are `Copy`.
+            gap_slice.copy_from_slice(unsafe { mem::transmute(text.as_bytes()) });
+
+            self.gap_start += text.len() as u16;
+            self.gap_len -= text.len() as u16;
+        }
+
+        #[inline(always)]
+        pub fn grow_gap_l(&mut self, amount: usize) {
+            assert!(amount <= self.gap_start as usize);
+            assert!(self.is_char_boundary(self.gap_start as usize - amount));
+            self.gap_start -= amount as u16;
+            self.gap_len += amount as u16;
+        }
+
+        #[inline(always)]
+        pub fn grow_gap_r(&mut self, amount: usize) {
+            assert!(self.gap_start as usize + self.gap_len as usize + amount <= MAX_TEXT_SIZE);
+            assert!(self.is_char_boundary(self.gap_start as usize + amount));
+            self.gap_len += amount as u16;
+        }
+
+        //-----------------------------------------------------
+
+        /// Converts a byte index relative to the total data to the actual
+        /// buffer index, accounting for the gap.
+        #[inline(always)]
+        fn real_idx(&self, byte_idx: usize) -> usize {
+            let offset = if byte_idx >= self.gap_start as usize {
+                self.gap_len as usize
+            } else {
+                0
+            };
+            offset + byte_idx
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::tree::text_info::TextInfo;
+
+        fn buffer_from_str(text: &str) -> GapBuffer {
+            let mut buffer = GapBuffer::new();
+            buffer.append_to_gap(text);
+            buffer
+        }
+
+        #[test]
+        fn new_01() {
+            let leaf = GapBuffer::new();
+            assert_eq!(leaf.chunks(), ["", ""]);
+        }
+
+        #[test]
+        fn is_char_boundary_01() {
+            let text = "Hello world!";
+            let mut buf = buffer_from_str(&text);
+            for gap_i in 0..=text.len() {
+                buf.move_gap(gap_i);
+                for i in 0..(text.len() + 1) {
+                    assert_eq!(text.is_char_boundary(i), buf.is_char_boundary(i));
+                }
+            }
+        }
+
+        #[test]
+        fn is_char_boundary_02() {
+            let text = "こんにちは";
+            let mut buf = buffer_from_str(&text);
+            for gap_i in 0..=(text.len() / 3) {
+                buf.move_gap(gap_i * 3);
+                for i in 0..(text.len() + 1) {
+                    assert_eq!(text.is_char_boundary(i), buf.is_char_boundary(i));
+                }
+            }
+        }
+
+        #[test]
+        fn move_gap_01() {
+            let text = "Hello world!";
+            let text_info = TextInfo::from_str(text);
+            let mut buf = buffer_from_str(text);
+            for i in 0..(text.len() + 1) {
+                buf.move_gap(i);
+                assert_eq!(buf.chunks(), [&text[..i], &text[i..]]);
+            }
+        }
+
+        #[test]
+        fn move_gap_02() {
+            let text = "Hello world!";
+            let text_info = TextInfo::from_str(text);
+            let mut buf = buffer_from_str(text);
+            for i in 0..(text.len() + 1) {
+                let ii = text.len() - i;
+                buf.move_gap(ii);
+                assert_eq!(buf.chunks(), [&text[..ii], &text[ii..]]);
+            }
+        }
+
+        #[test]
+        fn move_gap_03() {
+            let text = "こんにちは";
+            let text_info = TextInfo::from_str(text);
+            let mut buf = buffer_from_str(&text);
+            for i in 0..=(text.len() / 3) {
+                let ii = text.len() - (i * 3);
+                buf.move_gap(ii);
+                assert_eq!(buf.chunks(), [&text[..ii], &text[ii..]]);
+            }
+        }
+
+        #[test]
+        #[should_panic]
+        fn move_gap_04() {
+            let text = "こんにちは！";
+            let text_info = TextInfo::from_str(text);
+            let mut buf = buffer_from_str(&text);
+            for i in 0..(text.len() + 1) {
+                let ii = text.len() - i;
+                buf.move_gap(ii);
+                assert_eq!(buf.chunks(), [&text[..ii], &text[ii..]]);
+            }
+        }
+
+        #[test]
+        fn append_to_gap_01() {
+            let text = "Hello!";
+            for i in 0..(text.len() + 1) {
+                let mut buf = buffer_from_str(&text);
+                buf.move_gap(i);
+                buf.append_to_gap("foo");
+                assert_eq!(&buf.chunks()[0][..i], &text[..i]);
+                assert_eq!(&buf.chunks()[0][i..], "foo");
+                assert_eq!(buf.chunks()[1], &text[i..]);
+            }
+        }
+
+        #[test]
+        #[should_panic]
+        fn append_to_gap_02() {
+            // Should panic because of trying to grow the text beyond capacity.
+            let text: String = ['a'].iter().cycle().take(MAX_TEXT_SIZE - 2).collect();
+            let mut buf = buffer_from_str(&text);
+            buf.move_gap(4);
+            buf.append_to_gap("foo");
+        }
+
+        #[test]
+        fn grow_gap_l_01() {
+            let text = "Hello!";
+            for i in 0..text.len() {
+                for g in 0..i {
+                    let mut buf = buffer_from_str(&text);
+                    buf.move_gap(i);
+                    buf.grow_gap_l(g);
+                    assert_eq!(buf.chunks()[0], &text[..(i - g)]);
+                    assert_eq!(buf.chunks()[1], &text[i..]);
+                }
+            }
+        }
+
+        #[test]
+        #[should_panic]
+        fn grow_gap_l_02() {
+            // Should panic because of char boundary violation.
+            let text = "こんにちは";
+            let mut buf = buffer_from_str(&text);
+            buf.move_gap(6);
+            buf.grow_gap_l(2);
+        }
+
+        #[test]
+        #[should_panic]
+        fn grow_gap_l_03() {
+            // Should panic because of trying to grow the gap beyond the end.
+            let mut buf = buffer_from_str("Hello!");
+            buf.move_gap(3);
+            buf.grow_gap_l(4);
+        }
+
+        #[test]
+        fn grow_gap_r_01() {
+            let text = "Hello!";
+            for i in 0..text.len() {
+                for g in 0..(text.len() - i) {
+                    let mut buf = buffer_from_str(&text);
+                    buf.move_gap(i);
+                    buf.grow_gap_r(g);
+                    assert_eq!(buf.chunks()[0], &text[..i]);
+                    assert_eq!(buf.chunks()[1], &text[(i + g)..]);
+                }
+            }
+        }
+
+        #[test]
+        #[should_panic]
+        fn grow_gap_r_02() {
+            // Should panic because of char boundary violation.
+            let text = "こんにちは";
+            let mut buf = buffer_from_str(&text);
+            buf.move_gap(3);
+            buf.grow_gap_r(2);
+        }
+
+        #[test]
+        #[should_panic]
+        fn grow_gap_r_03() {
+            // Should panic because of trying to grow the gap beyond the end.
+            let mut buf = buffer_from_str("Hello!");
+            buf.move_gap(3);
+            buf.grow_gap_r(4);
+        }
+    }
+}
+
+//=============================================================
 
 #[cfg(test)]
 mod tests {
@@ -413,82 +688,6 @@ mod tests {
     }
 
     #[test]
-    fn move_gap_start_01() {
-        let text = "Hello world!";
-        let text_info = TextInfo::from_str(text);
-        let mut leaf = Text::from_str(text);
-        for i in 0..(text.len() + 1) {
-            leaf.move_gap_start(i);
-            assert_eq!(leaf.chunks(), [&text[..i], &text[i..]]);
-            assert_eq!(leaf.text_info(), text_info);
-        }
-    }
-
-    #[test]
-    fn move_gap_start_02() {
-        let text = "Hello world!";
-        let text_info = TextInfo::from_str(text);
-        let mut leaf = Text::from_str(text);
-        for i in 0..(text.len() + 1) {
-            let ii = text.len() - i;
-            leaf.move_gap_start(ii);
-            assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
-            assert_eq!(leaf.text_info(), text_info);
-        }
-    }
-
-    #[test]
-    fn move_gap_start_03() {
-        let text = "こんにちは";
-        let text_info = TextInfo::from_str(text);
-        let mut leaf = Text::from_str(text);
-        for i in 0..=(text.len() / 3) {
-            let ii = text.len() - (i * 3);
-            leaf.move_gap_start(ii);
-            assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
-            assert_eq!(leaf.text_info(), text_info);
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn move_gap_start_04() {
-        let text = "こんにちは！";
-        let text_info = TextInfo::from_str(text);
-        let mut leaf = Text::from_str(text);
-        for i in 0..(text.len() + 1) {
-            let ii = text.len() - i;
-            leaf.move_gap_start(ii);
-            assert_eq!(leaf.chunks(), [&text[..ii], &text[ii..]]);
-            assert_eq!(leaf.text_info(), text_info);
-        }
-    }
-
-    #[test]
-    fn is_char_boundary_01() {
-        let text = "Hello world!";
-        let mut leaf = Text::from_str(text);
-        for gap_i in 0..=text.len() {
-            leaf.move_gap_start(gap_i);
-            for i in 0..(text.len() + 1) {
-                assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
-            }
-        }
-    }
-
-    #[test]
-    fn is_char_boundary_02() {
-        let text = "こんにちは";
-        let mut leaf = Text::from_str(text);
-        for gap_i in 0..=(text.len() / 3) {
-            leaf.move_gap_start(gap_i * 3);
-            for i in 0..(text.len() + 1) {
-                assert_eq!(text.is_char_boundary(i), leaf.is_char_boundary(i));
-            }
-        }
-    }
-
-    #[test]
     fn comparison_true() {
         let text = "Hello world!";
         let mut leaf_1 = Text::from_str(text);
@@ -510,8 +709,8 @@ mod tests {
         ];
 
         for [i1, i2] in gap_idx_list {
-            leaf_1.move_gap_start(i1);
-            leaf_2.move_gap_start(i2);
+            leaf_1.0.move_gap(i1);
+            leaf_2.0.move_gap(i2);
             assert_eq!(leaf_1, leaf_2);
         }
     }
@@ -524,7 +723,7 @@ mod tests {
         let gap_idx_list = [0, 6, leaf.len()];
 
         for i in gap_idx_list {
-            leaf.move_gap_start(i);
+            leaf.0.move_gap(i);
             assert_eq!(leaf, text);
             assert_eq!(&leaf, text);
         }
@@ -551,8 +750,8 @@ mod tests {
         ];
 
         for [i1, i2] in gap_idx_list {
-            leaf_1.move_gap_start(i1);
-            leaf_2.move_gap_start(i2);
+            leaf_1.0.move_gap(i1);
+            leaf_2.0.move_gap(i2);
             assert!(leaf_1 != leaf_2);
         }
     }
@@ -565,7 +764,7 @@ mod tests {
         let gap_idx_list = [0, 6, leaf.len()];
 
         for i in gap_idx_list {
-            leaf.move_gap_start(i);
+            leaf.0.move_gap(i);
             assert!(leaf != text);
             assert!(&leaf != text);
         }
@@ -610,7 +809,7 @@ mod tests {
         let text = "Hello world!";
         let mut leaf = Text::from_str(text);
         for j in 0..(text.len() + 1) {
-            leaf.move_gap_start(j);
+            leaf.0.move_gap(j);
             for i in 0..(text.len() + 1) {
                 let mut left = leaf.clone();
                 let right = left.split(i);
@@ -640,8 +839,8 @@ mod tests {
         for i in 0..7 {
             let mut leaf_1 = Text::from_str("Hello ");
             let mut leaf_2 = Text::from_str("world!");
-            leaf_1.move_gap_start(i);
-            leaf_2.move_gap_start(i);
+            leaf_1.0.move_gap(i);
+            leaf_2.0.move_gap(i);
 
             leaf_1.append_text(&leaf_2);
 
@@ -659,8 +858,8 @@ mod tests {
                 for gap_r_i in 0..=(text.len() - split_i) {
                     let mut leaf_1 = Text::from_str(&text[..split_i]);
                     let mut leaf_2 = Text::from_str(&text[split_i..]);
-                    leaf_1.move_gap_start(gap_l_i);
-                    leaf_2.move_gap_start(gap_r_i);
+                    leaf_1.0.move_gap(gap_l_i);
+                    leaf_2.0.move_gap(gap_r_i);
                     leaf_1.distribute(&mut leaf_2);
                     assert_eq!(leaf_1, expected_left);
                     assert_eq!(leaf_2, expected_right);
@@ -682,8 +881,8 @@ mod tests {
                     let gap_r_i = gap_r_i * 3;
                     let mut leaf_1 = Text::from_str(&text[..split_i]);
                     let mut leaf_2 = Text::from_str(&text[split_i..]);
-                    leaf_1.move_gap_start(gap_l_i);
-                    leaf_2.move_gap_start(gap_r_i);
+                    leaf_1.0.move_gap(gap_l_i);
+                    leaf_2.0.move_gap(gap_r_i);
                     leaf_1.distribute(&mut leaf_2);
                     assert_eq!(leaf_1, expected_left);
                     assert_eq!(leaf_2, expected_right);
