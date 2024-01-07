@@ -66,12 +66,6 @@ impl Children {
         self.0.data_mut()
     }
 
-    /// Updates the text info of the child at `idx`.
-    pub fn update_child_info(&mut self, idx: usize) {
-        let (info, nodes) = self.0.data_mut();
-        info[idx] = nodes[idx].text_info();
-    }
-
     /// Pushes an item onto the end of the child array.
     ///
     /// Increases length by one.  Panics if already full.
@@ -93,78 +87,112 @@ impl Children {
         right
     }
 
+    /// Merges two nodes together.
+    ///
+    /// Assumes the two nodes are adjecent to each other, with `idx1`
+    /// preceding `idx2`.
+    ///
+    /// Note: will panic internally if there's too much data to
+    /// combine into one node.
+    pub fn merge(&mut self, idx1: usize, idx2: usize) {
+        debug_assert_eq!(idx1 + 1, idx2);
+        debug_assert!(idx2 < self.len());
+
+        let ((info1, node1), (info2, node2)) = self.get_two_mut(idx1, idx2);
+        match (node1, node2) {
+            (&mut Node::Leaf(ref mut text1), &mut Node::Leaf(ref mut text2)) => {
+                let text1 = Arc::make_mut(text1);
+                text1.append_text(text2);
+            }
+
+            (&mut Node::Internal(ref mut children1), &mut Node::Internal(ref mut children2)) => {
+                let children1 = Arc::make_mut(children1);
+                let children2 = Arc::make_mut(children2);
+                let children2_len = children2.len(); // Work around borrow checker.
+                children1
+                    .0
+                    .steal_range_from(children1.len(), &mut children2.0, [0, children2_len]);
+            }
+
+            _ => panic!("Can't merge two nodes of different types."),
+        }
+
+        *info1 = info1.concat(*info2);
+        self.remove(idx2);
+    }
+
+    /// Equally distributes the data between two nodes.
+    ///
+    /// Assumes the two nodes are adjecent to each other, with `idx1`
+    /// preceding `idx2`.
+    pub fn distribute(&mut self, idx1: usize, idx2: usize) {
+        debug_assert_eq!(idx1 + 1, idx2);
+        debug_assert!(idx2 < self.len());
+
+        let ((info1, node1), (info2, node2)) = self.get_two_mut(idx1, idx2);
+        match (node1, node2) {
+            (Node::Leaf(ref mut text1), Node::Leaf(ref mut text2)) => {
+                let text1 = Arc::make_mut(text1);
+                let text2 = Arc::make_mut(text2);
+                text1.distribute(text2);
+
+                *info1 = text1.text_info();
+                *info2 = text2.text_info();
+            }
+
+            (Node::Internal(ref mut children1), Node::Internal(ref mut children2)) => {
+                let lhs = Arc::make_mut(children1);
+                let rhs = Arc::make_mut(children2);
+                let rhs_target_len = (lhs.len() + rhs.len()) / 2;
+                if rhs.len() < rhs_target_len {
+                    let start = lhs.len() + rhs.len() - rhs_target_len;
+                    let lhs_len = lhs.len(); // Work around borrow checker.
+                    rhs.0.steal_range_from(0, &mut lhs.0, [start, lhs_len]);
+                } else if rhs.len() > rhs_target_len {
+                    let end = rhs.len() - rhs_target_len;
+                    lhs.0.steal_range_from(lhs.len(), &mut rhs.0, [0, end]);
+                }
+
+                *info1 = lhs.combined_text_info();
+                *info2 = rhs.combined_text_info();
+            }
+
+            _ => panic!("Can't distribute data between two nodes of different types."),
+        }
+    }
+
     /// Attempts to merge two nodes, and if it's too much data to merge
     /// equi-distributes the data between the two.
+    ///
+    /// Assumes the two nodes are adjecent to each other, with `idx1`
+    /// preceding `idx2`.
     ///
     /// Returns:
     ///
     /// - True: merge was successful.
     /// - False: merge failed, equidistributed instead.
     pub fn merge_distribute(&mut self, idx1: usize, idx2: usize) -> bool {
-        assert!(idx1 < idx2);
-        assert!(idx2 < self.len());
-        let remove_right = {
-            let ((_, node1), (_, node2)) = self.get_two_mut(idx1, idx2);
-            match (node1, node2) {
-                (&mut Node::Leaf(ref mut text1), &mut Node::Leaf(ref mut text2)) => {
-                    let text1 = Arc::make_mut(text1);
-                    let text2 = Arc::make_mut(text2);
-                    if (text1.len() + text2.len()) <= MAX_TEXT_SIZE {
-                        text1.append_text(text2);
-                        true
-                    } else {
-                        text1.distribute(text2);
-                        false
-                    }
-                }
+        debug_assert_eq!(idx1 + 1, idx2);
+        debug_assert!(idx2 < self.len());
 
-                (
-                    &mut Node::Internal(ref mut children1),
-                    &mut Node::Internal(ref mut children2),
-                ) => {
-                    let children1 = Arc::make_mut(children1);
-                    let children2 = Arc::make_mut(children2);
-                    if (children1.len() + children2.len()) <= MAX_CHILDREN {
-                        let children2_len = children2.len(); // Work around borrow checker.
-                        children1.0.steal_range_from(
-                            children1.len(),
-                            &mut children2.0,
-                            [0, children2_len],
-                        );
-                        true
-                    } else {
-                        children1.distribute(children2);
-                        false
-                    }
-                }
-
-                // TODO: possibly handle this case somehow?  Not sure if it's needed.
-                _ => panic!("Siblings have different node types"),
+        let do_merge = match (&self.nodes()[idx1], &self.nodes()[idx2]) {
+            (Node::Leaf(ref text1), Node::Leaf(ref text2)) => {
+                (text1.len() + text2.len()) <= MAX_TEXT_SIZE
             }
+
+            (Node::Internal(ref children1), Node::Internal(ref children2)) => {
+                (children1.len() + children2.len()) <= MAX_CHILDREN
+            }
+
+            _ => panic!("Siblings have different node types"),
         };
 
-        if remove_right {
-            self.remove(idx2);
-            self.update_child_info(idx1);
+        if do_merge {
+            self.merge(idx1, idx2);
             true
         } else {
-            self.update_child_info(idx1);
-            self.update_child_info(idx2);
+            self.distribute(idx1, idx2);
             false
-        }
-    }
-
-    /// Equidistributes the children between the two child arrays,
-    /// preserving ordering.
-    pub fn distribute(&mut self, other: &mut Self) {
-        let r_target_len = (self.len() + other.len()) / 2;
-        if other.len() < r_target_len {
-            let start = self.len() + other.len() - r_target_len;
-            let self_len = self.len(); // Work around borrow checker.
-            other.0.steal_range_from(0, &mut self.0, [start, self_len]);
-        } else if other.len() > r_target_len {
-            let end = other.len() - r_target_len;
-            self.0.steal_range_from(self.len(), &mut other.0, [0, end]);
         }
     }
 
