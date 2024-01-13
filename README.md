@@ -33,12 +33,13 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [ ] `RopeSlice` -> `String`
     - [ ] `RopeSlice` -> `Option<str>`
     - [ ] `RopeSlice` -> `Cow<str>`
-    - [ ] `Rope` -> `String`
-    - [ ] `Rope` -> `RopeSlice`
     - [ ] `RopeSlice` -> `Rope`
-    - [ ] `String` -> `Rope`
-    - [ ] `Option<str>` -> `Rope`
-    - [ ] `Cow<str>` -> `Rope`
+    - [ ] `Rope` -> `RopeSlice`
+    - [x] `Rope` -> `String`
+    - [x] `Rope` -> `Cow<str>`
+    - [x] `String` -> `Rope`
+    - [x] `str` -> `Rope`
+    - [x] `Cow<str>` -> `Rope`
   - [ ] `Hash`
     - [ ] `Rope`
     - [ ] `RopeSlice`.
@@ -46,7 +47,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [ ] `Eq` / `PartialEq`
       - [ ] `Rope` <-> `Rope`
       - [ ] `Rope` <-> `RopeSlice`
-      - [ ] `Rope` <-> `str`
+      - [x] `Rope` <-> `str`
       - [ ] `Rope` <-> `String`
       - [ ] `Rope` <-> `Cow<str>`
       - [ ] `RopeSlice` <-> `str`

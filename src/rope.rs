@@ -317,6 +317,100 @@ impl<'a> std::cmp::PartialEq<Rope> for &'a str {
 }
 
 //==============================================================
+// Conversions.
+
+impl From<String> for Rope {
+    fn from(s: String) -> Rope {
+        Rope::from_str(&s)
+    }
+}
+
+impl From<Rope> for String {
+    fn from(r: Rope) -> String {
+        (&r).into()
+    }
+}
+
+impl<'a> From<&'a Rope> for String {
+    #[inline]
+    fn from(r: &'a Rope) -> Self {
+        let mut s = String::with_capacity(r.len_bytes());
+        s.extend(r.chunks().flatten());
+        s
+    }
+}
+
+impl<'a> From<&'a str> for Rope {
+    fn from(s: &'a str) -> Rope {
+        Rope::from_str(&s)
+    }
+}
+
+impl<'a> From<std::borrow::Cow<'a, str>> for Rope {
+    #[inline]
+    fn from(s: std::borrow::Cow<'a, str>) -> Self {
+        Rope::from_str(&s)
+    }
+}
+
+impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn from(r: Rope) -> Self {
+        std::borrow::Cow::Owned(String::from(r))
+    }
+}
+
+/// Attempts to borrow the contents of the `Rope`, but will convert to an
+/// owned string if the contents is not contiguous in memory.
+///
+/// Runs in best case O(1), worst case O(N).
+impl<'a> From<&'a Rope> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn from(r: &'a Rope) -> Self {
+        todo!()
+    }
+}
+
+impl<'a> FromIterator<&'a str> for Rope {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = &'a str>,
+    {
+        let mut builder = RopeBuilder::new();
+        for chunk in iter {
+            builder.append(chunk);
+        }
+        builder.finish()
+    }
+}
+
+impl<'a> FromIterator<std::borrow::Cow<'a, str>> for Rope {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = std::borrow::Cow<'a, str>>,
+    {
+        let mut builder = RopeBuilder::new();
+        for chunk in iter {
+            builder.append(&chunk);
+        }
+        builder.finish()
+    }
+}
+
+impl FromIterator<String> for Rope {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = String>,
+    {
+        let mut builder = RopeBuilder::new();
+        for chunk in iter {
+            builder.append(&chunk);
+        }
+        builder.finish()
+    }
+}
+
+//==============================================================
 // Other impls.
 
 impl std::default::Default for Rope {
