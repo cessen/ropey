@@ -349,7 +349,7 @@ impl Node {
     /// Returns the `Text` that contains the given byte.
     ///
     /// See `get_text_at_metric()` for further documentation.
-    fn get_text_at_byte(
+    pub fn get_text_at_byte(
         &self,
         byte_idx: usize,
         text_info: Option<TextInfo>,
@@ -366,7 +366,7 @@ impl Node {
     ///
     /// See `get_text_at_metric()` for further documentation.
     #[cfg(feature = "metric_chars")]
-    fn get_text_at_char(
+    pub fn get_text_at_char(
         &self,
         char_idx: usize,
         text_info: Option<TextInfo>,
@@ -383,7 +383,7 @@ impl Node {
     ///
     /// See `get_text_at_metric()` for further documentation.
     #[cfg(feature = "metric_utf16")]
-    fn get_text_at_utf16(
+    pub fn get_text_at_utf16(
         &self,
         utf16_idx: usize,
         text_info: Option<TextInfo>,
@@ -406,7 +406,7 @@ impl Node {
         feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
-    fn get_text_at_line_break(
+    pub fn get_text_at_line_break(
         &self,
         line_break_idx: usize,
         text_info: Option<TextInfo>,

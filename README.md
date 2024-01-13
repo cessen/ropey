@@ -13,8 +13,8 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [ ] Try rewriting `RopeBuilder` to be cleaner/faster.
 - [ ] `RopeSlice`
 - Metric conversion functions:
-  - [ ] Chars <-> bytes.
-  - [ ] UTF16 <-> bytes.
+  - [x] Chars <-> bytes.
+  - [x] UTF16 <-> bytes.
   - [ ] Lines <-> bytes.
 - Iterators:
   - [ ] `Chunks`

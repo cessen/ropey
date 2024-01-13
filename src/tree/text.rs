@@ -3,6 +3,28 @@ use super::{
     MAX_TEXT_SIZE,
 };
 
+#[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
+use str_indices::chars;
+
+#[cfg(feature = "metric_utf16")]
+use str_indices::utf16;
+
+#[cfg(feature = "metric_lines_cr_lf")]
+use str_indices::lines_crlf;
+
+#[cfg(feature = "metric_lines_lf")]
+use str_indices::lines_lf;
+
+#[cfg(feature = "metric_lines_unicode")]
+use str_indices::lines;
+
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+
 /// A leaf node of the Rope, containing text.
 ///
 /// Text nodes store their text as a gap buffer.  However, with the
@@ -13,6 +35,9 @@ use super::{
 pub(crate) struct Text(inner::GapBuffer);
 
 impl Text {
+    //---------------------------------------------------------
+    // Create.
+
     /// Creates a new empty `Text`.
     #[inline(always)]
     pub fn new() -> Self {
@@ -26,6 +51,9 @@ impl Text {
         text
     }
 
+    //---------------------------------------------------------
+    // Query.
+
     /// Returns the total length of the contained text in bytes.
     #[inline(always)]
     pub fn len(&self) -> usize {
@@ -38,17 +66,135 @@ impl Text {
         self.0.free_capacity()
     }
 
+    pub fn text_info(&self) -> TextInfo {
+        let left_info = TextInfo::from_str(self.0.chunks()[0]);
+        let right_info = TextInfo::from_str(self.0.chunks()[1]);
+        left_info.concat(right_info)
+    }
+
+    /// Returns the two chunk of the gap buffer, in order.
+    ///
+    /// Note: one or both chunks can be the empty string.
+    #[inline(always)]
+    pub fn chunks(&self) -> [&str; 2] {
+        self.0.chunks()
+    }
+
     #[inline(always)]
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
         assert!(byte_idx <= self.len());
         self.0.is_char_boundary(byte_idx)
     }
 
-    pub fn text_info(&self) -> TextInfo {
-        let left_info = TextInfo::from_str(self.0.chunks()[0]);
-        let right_info = TextInfo::from_str(self.0.chunks()[1]);
-        left_info.concat(right_info)
+    #[inline(always)]
+    pub fn find_char_boundary_l(&self, mut byte_idx: usize) -> usize {
+        let [c1, c2] = self.chunks();
+
+        if byte_idx < c1.len() {
+            while (c1.as_bytes()[byte_idx] >> 6) == 0b10 && byte_idx > 0 {
+                byte_idx -= 1;
+            }
+            return byte_idx;
+        } else {
+            byte_idx -= c1.len();
+            if byte_idx >= c2.len() {
+                return self.len();
+            }
+
+            while (c2.as_bytes()[byte_idx] >> 6) == 0b10 && byte_idx > 0 {
+                byte_idx -= 1;
+            }
+            return byte_idx + c1.len();
+        }
     }
+
+    //---------------------------------------------------------
+    // Metric conversions.
+
+    #[cfg(feature = "metric_chars")]
+    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+        let byte_idx = self.find_char_boundary_l(byte_idx);
+        let [c0, c1] = self.chunks();
+
+        if byte_idx < c0.len() {
+            let char_idx = chars::from_byte_idx(c0, byte_idx);
+            char_idx
+        } else {
+            let start_char_idx = chars::count(c0);
+            let char_idx = chars::from_byte_idx(c1, byte_idx - c0.len());
+            start_char_idx + char_idx
+        }
+    }
+
+    #[cfg(feature = "metric_chars")]
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        let [c0, c1] = self.chunks();
+
+        // TODO: if `chars::to_byte_idx()` also returned the char count if it
+        // goes off the end, that would allow us to skip this count and be more
+        // efficient.
+        let c0_char_len = chars::count(c0);
+        if char_idx < c0_char_len {
+            let byte_idx = chars::to_byte_idx(c0, char_idx);
+            byte_idx
+        } else {
+            let byte_idx = chars::to_byte_idx(c1, char_idx - c0_char_len);
+            c0.len() + byte_idx
+        }
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
+        let byte_idx = self.find_char_boundary_l(byte_idx);
+        let [c0, c1] = self.chunks();
+
+        if byte_idx < c0.len() {
+            let char_idx = utf16::from_byte_idx(c0, byte_idx);
+            char_idx
+        } else {
+            let start_char_idx = utf16::count(c0);
+            let char_idx = utf16::from_byte_idx(c1, byte_idx - c0.len());
+            start_char_idx + char_idx
+        }
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
+        let [c0, c1] = self.chunks();
+
+        // TODO: if `utf16::to_byte_idx()` also returned the char count if it
+        // goes off the end, that would allow us to skip this count and be more
+        // efficient.
+        let c0_utf16_len = utf16::count(c0);
+        if utf16_idx < c0_utf16_len {
+            let byte_idx = utf16::to_byte_idx(c0, utf16_idx);
+            byte_idx
+        } else {
+            let byte_idx = utf16::to_byte_idx(c1, utf16_idx - c0_utf16_len);
+            c0.len() + byte_idx
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+        todo!()
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub fn line_to_byte(&self, byte_idx: usize, line_type: LineType) -> usize {
+        todo!()
+    }
+
+    //---------------------------------------------------------
+    // Modify.
 
     /// Inserts the given text at the given byte index.
     ///
@@ -132,14 +278,6 @@ impl Text {
         assert!(byte_idx_range[0] <= byte_idx_range[1]);
         self.0.move_gap(byte_idx_range[0]);
         self.0.grow_gap_r(byte_idx_range[1] - byte_idx_range[0]);
-    }
-
-    /// Returns the two chunk of the gap buffer, in order.
-    ///
-    /// Note: one or both chunks can be the empty string.
-    #[inline(always)]
-    pub fn chunks(&self) -> [&str; 2] {
-        self.0.chunks()
     }
 
     /// Splits the leaf into two leaves, at the given byte offset.
@@ -767,6 +905,88 @@ mod tests {
             leaf.0.move_gap(i);
             assert!(leaf != text);
             assert!(&leaf != text);
+        }
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn byte_to_char_01() {
+        let mut text = Text::from_str("こんmちは");
+        let gap_idx_list = [0, 3, 6, 7, 10, 13];
+
+        for i in gap_idx_list {
+            text.0.move_gap(i);
+            assert_eq!(0, text.byte_to_char(0));
+            assert_eq!(0, text.byte_to_char(1));
+            assert_eq!(0, text.byte_to_char(2));
+            assert_eq!(1, text.byte_to_char(3));
+            assert_eq!(1, text.byte_to_char(4));
+            assert_eq!(1, text.byte_to_char(5));
+            assert_eq!(2, text.byte_to_char(6));
+            assert_eq!(3, text.byte_to_char(7));
+            assert_eq!(3, text.byte_to_char(8));
+            assert_eq!(3, text.byte_to_char(9));
+            assert_eq!(4, text.byte_to_char(10));
+            assert_eq!(4, text.byte_to_char(11));
+            assert_eq!(4, text.byte_to_char(12));
+            assert_eq!(5, text.byte_to_char(13));
+        }
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn char_to_byte_01() {
+        let mut text = Text::from_str("こんmちは");
+        let gap_idx_list = [0, 3, 6, 7, 10, 13];
+
+        for i in gap_idx_list {
+            text.0.move_gap(i);
+            assert_eq!(0, text.char_to_byte(0));
+            assert_eq!(3, text.char_to_byte(1));
+            assert_eq!(6, text.char_to_byte(2));
+            assert_eq!(7, text.char_to_byte(3));
+            assert_eq!(10, text.char_to_byte(4));
+            assert_eq!(13, text.char_to_byte(5));
+        }
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn byte_to_utf16_01() {
+        let mut text = Text::from_str("ん🐸mち");
+        let gap_idx_list = [0, 3, 7, 8, 11];
+
+        for i in gap_idx_list {
+            text.0.move_gap(i);
+            assert_eq!(0, text.byte_to_utf16(0));
+            assert_eq!(0, text.byte_to_utf16(1));
+            assert_eq!(0, text.byte_to_utf16(2));
+            assert_eq!(1, text.byte_to_utf16(3));
+            assert_eq!(1, text.byte_to_utf16(4));
+            assert_eq!(1, text.byte_to_utf16(5));
+            assert_eq!(1, text.byte_to_utf16(6));
+            assert_eq!(3, text.byte_to_utf16(7));
+            assert_eq!(4, text.byte_to_utf16(8));
+            assert_eq!(4, text.byte_to_utf16(9));
+            assert_eq!(4, text.byte_to_utf16(10));
+            assert_eq!(5, text.byte_to_utf16(11));
+        }
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn utf16_to_byte_01() {
+        let mut text = Text::from_str("ん🐸mち");
+        let gap_idx_list = [0, 3, 7, 8, 11];
+
+        for i in gap_idx_list {
+            text.0.move_gap(i);
+            assert_eq!(0, text.utf16_to_byte(0));
+            assert_eq!(3, text.utf16_to_byte(1));
+            assert_eq!(3, text.utf16_to_byte(2));
+            assert_eq!(7, text.utf16_to_byte(3));
+            assert_eq!(8, text.utf16_to_byte(4));
+            assert_eq!(11, text.utf16_to_byte(5));
         }
     }
 

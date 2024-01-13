@@ -21,6 +21,7 @@ pub use rope_builder::RopeBuilder;
     feature = "metric_lines_unicode"
 ))]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum LineType {
     #[cfg(feature = "metric_lines_lf")]
     LF,

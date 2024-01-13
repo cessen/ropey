@@ -238,6 +238,64 @@ impl Rope {
     }
 
     //---------------------------------------------------------
+    // Metric conversions.
+
+    #[cfg(feature = "metric_chars")]
+    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+        assert!(byte_idx <= self.len_bytes());
+
+        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
+        start_info.chars as usize + text.byte_to_char(byte_idx - start_info.bytes as usize)
+    }
+
+    #[cfg(feature = "metric_chars")]
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        assert!(char_idx <= self.len_chars());
+
+        let (start_info, text, _) = self.root.get_text_at_char(char_idx, Some(self.root_info));
+        start_info.bytes as usize + text.char_to_byte(char_idx - start_info.chars as usize)
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
+        assert!(byte_idx <= self.len_bytes());
+
+        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
+        start_info.chars as usize
+            + start_info.utf16_surrogates as usize
+            + text.byte_to_utf16(byte_idx - start_info.bytes as usize)
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
+        assert!(utf16_idx <= self.len_utf16());
+
+        let (start_info, text, _) = self.root.get_text_at_utf16(utf16_idx, Some(self.root_info));
+        start_info.bytes as usize
+            + text.utf16_to_byte(
+                utf16_idx - (start_info.chars as usize + start_info.utf16_surrogates as usize),
+            )
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+        todo!()
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+        todo!()
+    }
+
+    //---------------------------------------------------------
     // Iterators.
 
     pub fn chunks(&self) -> Chunks<'_> {
@@ -448,10 +506,10 @@ mod tests {
     // const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
     //                           a fine day, isn't it?\nAren't you glad \
     //                           we're alive?\nこんにちは、みんなさん！";
-    // // 127 bytes, 107 chars, 111 utf16 code units, 1 line
-    // const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
-    //                           a fine day, isn't it?🐸  Aren't you glad \
-    //                           we're alive?🐸  こんにちは、みんなさん！";
+    // 143 bytes, 107 chars, 111 utf16 code units, 1 line
+    const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
+                              a fine day, isn't it?🐸  Aren't you glad \
+                              we're alive?🐸  こんにちは、みんなさん！";
 
     fn string_remove(text: &mut String, byte_start: usize, byte_end: usize) {
         let text_r = text.split_off(byte_end);
@@ -504,5 +562,94 @@ mod tests {
         rope.remove(42..42);
 
         assert_eq!(rope, TEXT);
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn byte_to_char_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(0, r.byte_to_char(0));
+        assert_eq!(1, r.byte_to_char(1));
+        assert_eq!(2, r.byte_to_char(2));
+
+        assert_eq!(91, r.byte_to_char(91));
+        assert_eq!(91, r.byte_to_char(92));
+        assert_eq!(91, r.byte_to_char(93));
+
+        assert_eq!(92, r.byte_to_char(94));
+        assert_eq!(92, r.byte_to_char(95));
+        assert_eq!(92, r.byte_to_char(96));
+
+        assert_eq!(102, r.byte_to_char(124));
+        assert_eq!(102, r.byte_to_char(125));
+        assert_eq!(102, r.byte_to_char(126));
+        assert_eq!(103, r.byte_to_char(127));
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn char_to_byte_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(0, r.char_to_byte(0));
+        assert_eq!(1, r.char_to_byte(1));
+        assert_eq!(2, r.char_to_byte(2));
+
+        assert_eq!(91, r.char_to_byte(91));
+        assert_eq!(94, r.char_to_byte(92));
+        assert_eq!(97, r.char_to_byte(93));
+        assert_eq!(100, r.char_to_byte(94));
+
+        assert_eq!(124, r.char_to_byte(102));
+        assert_eq!(127, r.char_to_byte(103));
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn byte_to_utf16_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(0, r.byte_to_utf16(0));
+
+        assert_eq!(12, r.byte_to_utf16(12));
+        assert_eq!(12, r.byte_to_utf16(13));
+        assert_eq!(14, r.byte_to_utf16(16));
+
+        assert_eq!(33, r.byte_to_utf16(35));
+        assert_eq!(33, r.byte_to_utf16(36));
+        assert_eq!(35, r.byte_to_utf16(39));
+
+        assert_eq!(63, r.byte_to_utf16(67));
+        assert_eq!(63, r.byte_to_utf16(70));
+        assert_eq!(65, r.byte_to_utf16(71));
+
+        assert_eq!(95, r.byte_to_utf16(101));
+        assert_eq!(95, r.byte_to_utf16(102));
+        assert_eq!(97, r.byte_to_utf16(105));
+
+        assert_eq!(111, r.byte_to_utf16(143));
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn utf16_to_byte_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(0, r.utf16_to_byte(0));
+
+        assert_eq!(12, r.utf16_to_byte(12));
+        assert_eq!(16, r.utf16_to_byte(14));
+
+        assert_eq!(35, r.utf16_to_byte(33));
+        assert_eq!(39, r.utf16_to_byte(35));
+
+        assert_eq!(67, r.utf16_to_byte(63));
+        assert_eq!(71, r.utf16_to_byte(65));
+
+        assert_eq!(101, r.utf16_to_byte(95));
+        assert_eq!(105, r.utf16_to_byte(97));
+
+        assert_eq!(143, r.utf16_to_byte(111));
     }
 }
