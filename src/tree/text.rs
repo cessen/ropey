@@ -1,7 +1,4 @@
-use super::{
-    text_info::{ends_with_cr, starts_with_lf, TextInfo},
-    MAX_TEXT_SIZE,
-};
+use super::{text_info::TextInfo, MAX_TEXT_SIZE};
 
 #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
 use str_indices::chars;
@@ -24,6 +21,8 @@ use str_indices::lines;
     feature = "metric_lines_unicode"
 ))]
 use crate::LineType;
+
+use crate::{ends_with_cr, starts_with_lf};
 
 /// A leaf node of the Rope, containing text.
 ///
@@ -113,12 +112,10 @@ impl Text {
 
     #[cfg(feature = "metric_chars")]
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        let byte_idx = self.find_char_boundary_l(byte_idx);
         let [c0, c1] = self.chunks();
 
         if byte_idx < c0.len() {
-            let char_idx = chars::from_byte_idx(c0, byte_idx);
-            char_idx
+            chars::from_byte_idx(c0, byte_idx)
         } else {
             let start_char_idx = chars::count(c0);
             let char_idx = chars::from_byte_idx(c1, byte_idx - c0.len());
@@ -135,8 +132,7 @@ impl Text {
         // efficient.
         let c0_char_len = chars::count(c0);
         if char_idx < c0_char_len {
-            let byte_idx = chars::to_byte_idx(c0, char_idx);
-            byte_idx
+            chars::to_byte_idx(c0, char_idx)
         } else {
             let byte_idx = chars::to_byte_idx(c1, char_idx - c0_char_len);
             c0.len() + byte_idx
@@ -145,12 +141,10 @@ impl Text {
 
     #[cfg(feature = "metric_utf16")]
     pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
-        let byte_idx = self.find_char_boundary_l(byte_idx);
         let [c0, c1] = self.chunks();
 
         if byte_idx < c0.len() {
-            let char_idx = utf16::from_byte_idx(c0, byte_idx);
-            char_idx
+            utf16::from_byte_idx(c0, byte_idx)
         } else {
             let start_char_idx = utf16::count(c0);
             let char_idx = utf16::from_byte_idx(c1, byte_idx - c0.len());
@@ -162,13 +156,12 @@ impl Text {
     pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
         let [c0, c1] = self.chunks();
 
-        // TODO: if `utf16::to_byte_idx()` also returned the char count if it
+        // TODO: if `utf16::to_byte_idx()` also returned the utf16 count if it
         // goes off the end, that would allow us to skip this count and be more
         // efficient.
         let c0_utf16_len = utf16::count(c0);
         if utf16_idx < c0_utf16_len {
-            let byte_idx = utf16::to_byte_idx(c0, utf16_idx);
-            byte_idx
+            utf16::to_byte_idx(c0, utf16_idx)
         } else {
             let byte_idx = utf16::to_byte_idx(c1, utf16_idx - c0_utf16_len);
             c0.len() + byte_idx
@@ -181,7 +174,58 @@ impl Text {
         feature = "metric_lines_unicode"
     ))]
     pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-        todo!()
+        #[inline(always)]
+        fn do_byte_to_line<F1, F2>(
+            byte_idx: usize,
+            count: F1,
+            from_byte_idx: F2,
+            has_crlf_split: bool,
+            c0: &str,
+            c1: &str,
+        ) -> usize
+        where
+            F1: Fn(&str) -> usize,
+            F2: Fn(&str, usize) -> usize,
+        {
+            if byte_idx < c0.len() {
+                from_byte_idx(c0, byte_idx)
+            } else {
+                let start_line_idx = count(c0) - has_crlf_split as usize;
+                let line_idx = from_byte_idx(c1, byte_idx - c0.len());
+                start_line_idx + line_idx
+            }
+        }
+
+        let [c0, c1] = self.chunks();
+        match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => do_byte_to_line(
+                byte_idx,
+                lines_lf::count_breaks,
+                lines_lf::from_byte_idx,
+                false,
+                c0,
+                c1,
+            ),
+            #[cfg(feature = "metric_lines_cr_lf")]
+            LineType::CRLF => do_byte_to_line(
+                byte_idx,
+                lines_crlf::count_breaks,
+                lines_crlf::from_byte_idx,
+                ends_with_cr(c0) && starts_with_lf(c1),
+                c0,
+                c1,
+            ),
+            #[cfg(feature = "metric_lines_unicode")]
+            LineType::All => do_byte_to_line(
+                byte_idx,
+                lines::count_breaks,
+                lines::from_byte_idx,
+                ends_with_cr(c0) && starts_with_lf(c1),
+                c0,
+                c1,
+            ),
+        }
     }
 
     #[cfg(any(
@@ -189,8 +233,62 @@ impl Text {
         feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
-    pub fn line_to_byte(&self, byte_idx: usize, line_type: LineType) -> usize {
-        todo!()
+    pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+        #[inline(always)]
+        fn do_line_to_byte<F1, F2>(
+            line_idx: usize,
+            count: F1,
+            to_byte_idx: F2,
+            has_crlf_split: bool,
+            c0: &str,
+            c1: &str,
+        ) -> usize
+        where
+            F1: Fn(&str) -> usize,
+            F2: Fn(&str, usize) -> usize,
+        {
+            // TODO: if `to_byte_idx()` also returned the line break count if it
+            // goes off the end, that would allow us to skip this count and be
+            // more efficient.
+            let c0_line_len = count(c0) - has_crlf_split as usize;
+            if line_idx <= c0_line_len {
+                to_byte_idx(c0, line_idx)
+            } else {
+                let byte_idx = to_byte_idx(c1, line_idx - c0_line_len);
+                c0.len() + byte_idx
+            }
+        }
+
+        let [c0, c1] = self.chunks();
+        match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => do_line_to_byte(
+                line_idx,
+                lines_lf::count_breaks,
+                lines_lf::to_byte_idx,
+                false,
+                c0,
+                c1,
+            ),
+            #[cfg(feature = "metric_lines_cr_lf")]
+            LineType::CRLF => do_line_to_byte(
+                line_idx,
+                lines_crlf::count_breaks,
+                lines_crlf::to_byte_idx,
+                ends_with_cr(c0) && starts_with_lf(c1),
+                c0,
+                c1,
+            ),
+            #[cfg(feature = "metric_lines_unicode")]
+            LineType::All => do_line_to_byte(
+                line_idx,
+                lines::count_breaks,
+                lines::to_byte_idx,
+                ends_with_cr(c0) && starts_with_lf(c1),
+                c0,
+                c1,
+            ),
+        }
     }
 
     //---------------------------------------------------------
@@ -662,7 +760,6 @@ mod inner {
         #[test]
         fn move_gap_01() {
             let text = "Hello world!";
-            let text_info = TextInfo::from_str(text);
             let mut buf = buffer_from_str(text);
             for i in 0..(text.len() + 1) {
                 buf.move_gap(i);
@@ -673,7 +770,6 @@ mod inner {
         #[test]
         fn move_gap_02() {
             let text = "Hello world!";
-            let text_info = TextInfo::from_str(text);
             let mut buf = buffer_from_str(text);
             for i in 0..(text.len() + 1) {
                 let ii = text.len() - i;
@@ -685,7 +781,6 @@ mod inner {
         #[test]
         fn move_gap_03() {
             let text = "こんにちは";
-            let text_info = TextInfo::from_str(text);
             let mut buf = buffer_from_str(&text);
             for i in 0..=(text.len() / 3) {
                 let ii = text.len() - (i * 3);
@@ -698,7 +793,6 @@ mod inner {
         #[should_panic]
         fn move_gap_04() {
             let text = "こんにちは！";
-            let text_info = TextInfo::from_str(text);
             let mut buf = buffer_from_str(&text);
             for i in 0..(text.len() + 1) {
                 let ii = text.len() - i;
@@ -987,6 +1081,68 @@ mod tests {
             assert_eq!(7, text.utf16_to_byte(3));
             assert_eq!(8, text.utf16_to_byte(4));
             assert_eq!(11, text.utf16_to_byte(5));
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn byte_to_line_01() {
+        let mut text = Text::from_str("\r\n\r\n\n\r\r\n");
+        let line_idxs = [
+            [0, 0],
+            [0, 0],
+            [1, 1],
+            [1, 1],
+            [2, 2],
+            [3, 3],
+            [3, 4],
+            [3, 4],
+            [4, 5],
+        ];
+
+        for i in 0..=text.len() {
+            text.0.move_gap(i);
+            #[allow(unused_variables)]
+            for (j, [lf, crlf]) in line_idxs.iter().copied().enumerate() {
+                #[cfg(feature = "metric_lines_lf")]
+                assert_eq!(lf, text.byte_to_line(j, LineType::LF));
+                #[cfg(feature = "metric_lines_cr_lf")]
+                assert_eq!(crlf, text.byte_to_line(j, LineType::CRLF));
+                #[cfg(feature = "metric_lines_unicode")]
+                assert_eq!(crlf, text.byte_to_line(j, LineType::All));
+            }
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn line_to_byte_01() {
+        let mut text = Text::from_str("\r\n\r\n\n\r\r\n");
+        let line_lf_byte_idxs = [0, 2, 4, 5, 8];
+        let line_crlf_byte_idxs = [0, 2, 4, 5, 6, 8];
+
+        for i in 0..=text.len() {
+            text.0.move_gap(i);
+            #[cfg(feature = "metric_lines_lf")]
+            for (l, byte_idx) in line_lf_byte_idxs.iter().copied().enumerate() {
+                assert_eq!(byte_idx, text.line_to_byte(l, LineType::LF));
+            }
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            for (l, byte_idx) in line_crlf_byte_idxs.iter().copied().enumerate() {
+                #[cfg(feature = "metric_lines_cr_lf")]
+                assert_eq!(byte_idx, text.line_to_byte(l, LineType::CRLF));
+                #[cfg(feature = "metric_lines_unicode")]
+                assert_eq!(byte_idx, text.line_to_byte(l, LineType::All));
+            }
         }
     }
 

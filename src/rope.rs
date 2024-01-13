@@ -283,7 +283,22 @@ impl Rope {
         feature = "metric_lines_unicode"
     ))]
     pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-        todo!()
+        assert!(byte_idx <= self.len_bytes());
+
+        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
+
+        let start_line_breaks = match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => start_info.line_breaks_lf as usize,
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            LineType::CRLF => start_info.line_breaks_cr_lf as usize,
+
+            #[cfg(feature = "metric_lines_unicode")]
+            LineType::All => start_info.line_breaks_unicode as usize,
+        };
+
+        start_line_breaks + text.byte_to_line(byte_idx - start_info.bytes as usize, line_type)
     }
 
     #[cfg(any(
@@ -292,7 +307,25 @@ impl Rope {
         feature = "metric_lines_unicode"
     ))]
     pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-        todo!()
+        assert!(line_idx <= self.len_lines(line_type));
+
+        let (start_info, text, _) =
+            self.root
+                .get_text_at_line_break(line_idx, Some(self.root_info), line_type);
+
+        let start_line_breaks = match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => start_info.line_breaks_lf as usize,
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            LineType::CRLF => start_info.line_breaks_cr_lf as usize,
+
+            #[cfg(feature = "metric_lines_unicode")]
+            LineType::All => start_info.line_breaks_unicode as usize,
+        };
+
+        start_info.bytes as usize
+            + text.line_to_byte(line_idx - start_line_breaks as usize, line_type)
     }
 
     //---------------------------------------------------------
@@ -651,5 +684,25 @@ mod tests {
         assert_eq!(105, r.utf16_to_byte(97));
 
         assert_eq!(143, r.utf16_to_byte(111));
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn byte_to_line_01() {
+        todo!()
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn line_to_byte_01() {
+        todo!()
     }
 }

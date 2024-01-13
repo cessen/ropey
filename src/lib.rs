@@ -74,6 +74,16 @@ pub(crate) fn find_split_r(mut byte_idx: usize, text: &[u8]) -> usize {
     byte_idx
 }
 
+#[inline(always)]
+pub(crate) fn starts_with_lf(text: &str) -> bool {
+    text.as_bytes().get(0).map(|&b| b == 0x0A).unwrap_or(false)
+}
+
+#[inline(always)]
+pub(crate) fn ends_with_cr(text: &str) -> bool {
+    text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false)
+}
+
 //-------------------------------------------------------------
 // Range handling utilities.
 
@@ -92,5 +102,28 @@ pub(crate) fn end_bound_to_num(b: Bound<&usize>) -> Option<usize> {
         Bound::Included(n) => Some(*n + 1),
         Bound::Excluded(n) => Some(*n),
         Bound::Unbounded => None,
+    }
+}
+
+//=============================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn starts_with_lf_01() {
+        assert_eq!(false, starts_with_lf(""));
+        assert_eq!(false, starts_with_lf("Hello!"));
+        assert_eq!(true, starts_with_lf("\n"));
+        assert_eq!(true, starts_with_lf("\nHello!"));
+    }
+
+    #[test]
+    fn ends_with_cr_01() {
+        assert_eq!(false, ends_with_cr(""));
+        assert_eq!(false, ends_with_cr("Hello!"));
+        assert_eq!(true, ends_with_cr("\r"));
+        assert_eq!(true, ends_with_cr("Hello!\r"));
     }
 }
