@@ -22,26 +22,26 @@ use str_indices::lines;
 ))]
 use crate::LineType;
 
-use crate::{ends_with_cr, starts_with_lf};
+use crate::str_utils::{ends_with_cr, starts_with_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct TextInfo {
-    pub bytes: u64,
+    pub bytes: usize,
 
     #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
-    pub chars: u64,
+    pub chars: usize,
 
     #[cfg(feature = "metric_utf16")]
-    pub utf16_surrogates: u64,
+    pub utf16_surrogates: usize,
 
     #[cfg(feature = "metric_lines_lf")]
-    pub line_breaks_lf: u64,
+    pub line_breaks_lf: usize,
 
     #[cfg(feature = "metric_lines_cr_lf")]
-    pub line_breaks_cr_lf: u64,
+    pub line_breaks_cr_lf: usize,
 
     #[cfg(feature = "metric_lines_unicode")]
-    pub line_breaks_unicode: u64,
+    pub line_breaks_unicode: usize,
 
     // To handle split CRLF line breaks correctly.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
@@ -87,22 +87,22 @@ impl TextInfo {
     #[inline]
     pub fn from_str(text: &str) -> TextInfo {
         TextInfo {
-            bytes: text.len() as u64,
+            bytes: text.len(),
 
             #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
-            chars: chars::count(text) as u64,
+            chars: chars::count(text),
 
             #[cfg(feature = "metric_utf16")]
-            utf16_surrogates: utf16::count_surrogates(text) as u64,
+            utf16_surrogates: utf16::count_surrogates(text),
 
             #[cfg(feature = "metric_lines_lf")]
-            line_breaks_lf: lines_lf::count_breaks(text) as u64,
+            line_breaks_lf: lines_lf::count_breaks(text),
 
             #[cfg(feature = "metric_lines_cr_lf")]
-            line_breaks_cr_lf: lines_crlf::count_breaks(text) as u64,
+            line_breaks_cr_lf: lines_crlf::count_breaks(text),
 
             #[cfg(feature = "metric_lines_unicode")]
-            line_breaks_unicode: lines::count_breaks(text) as u64,
+            line_breaks_unicode: lines::count_breaks(text),
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
             starts_with_lf: starts_with_lf(text),
@@ -118,7 +118,7 @@ impl TextInfo {
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
-    pub fn line_breaks(&self, line_type: LineType) -> u64 {
+    pub fn line_breaks(&self, line_type: LineType) -> usize {
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => self.line_breaks_lf,

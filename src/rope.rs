@@ -208,17 +208,17 @@ impl Rope {
     // Queries.
 
     pub fn len_bytes(&self) -> usize {
-        self.root_info.bytes as usize
+        self.root_info.bytes
     }
 
     #[cfg(feature = "metric_chars")]
     pub fn len_chars(&self) -> usize {
-        self.root_info.chars as usize
+        self.root_info.chars
     }
 
     #[cfg(feature = "metric_utf16")]
     pub fn len_utf16(&self) -> usize {
-        (self.root_info.chars + self.root_info.utf16_surrogates) as usize
+        (self.root_info.chars + self.root_info.utf16_surrogates)
     }
 
     #[cfg(any(
@@ -227,14 +227,7 @@ impl Rope {
         feature = "metric_lines_unicode"
     ))]
     pub fn len_lines(&self, line_type: LineType) -> usize {
-        match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => (self.root_info.line_breaks_lf + 1) as usize,
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => (self.root_info.line_breaks_cr_lf + 1) as usize,
-            #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => (self.root_info.line_breaks_unicode + 1) as usize,
-        }
+        self.root_info.line_breaks(line_type) + 1
     }
 
     //---------------------------------------------------------
@@ -245,7 +238,7 @@ impl Rope {
         assert!(byte_idx <= self.len_bytes());
 
         let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-        start_info.chars as usize + text.byte_to_char(byte_idx - start_info.bytes as usize)
+        start_info.chars + text.byte_to_char(byte_idx - start_info.bytes)
     }
 
     #[cfg(feature = "metric_chars")]
@@ -253,7 +246,7 @@ impl Rope {
         assert!(char_idx <= self.len_chars());
 
         let (start_info, text, _) = self.root.get_text_at_char(char_idx, Some(self.root_info));
-        start_info.bytes as usize + text.char_to_byte(char_idx - start_info.chars as usize)
+        start_info.bytes + text.char_to_byte(char_idx - start_info.chars)
     }
 
     #[cfg(feature = "metric_utf16")]
@@ -261,9 +254,9 @@ impl Rope {
         assert!(byte_idx <= self.len_bytes());
 
         let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-        start_info.chars as usize
-            + start_info.utf16_surrogates as usize
-            + text.byte_to_utf16(byte_idx - start_info.bytes as usize)
+        start_info.chars
+            + start_info.utf16_surrogates
+            + text.byte_to_utf16(byte_idx - start_info.bytes)
     }
 
     #[cfg(feature = "metric_utf16")]
@@ -271,10 +264,8 @@ impl Rope {
         assert!(utf16_idx <= self.len_utf16());
 
         let (start_info, text, _) = self.root.get_text_at_utf16(utf16_idx, Some(self.root_info));
-        start_info.bytes as usize
-            + text.utf16_to_byte(
-                utf16_idx - (start_info.chars as usize + start_info.utf16_surrogates as usize),
-            )
+        start_info.bytes
+            + text.utf16_to_byte(utf16_idx - (start_info.chars + start_info.utf16_surrogates))
     }
 
     #[cfg(any(
@@ -287,18 +278,8 @@ impl Rope {
 
         let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
 
-        let start_line_breaks = match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => start_info.line_breaks_lf as usize,
-
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => start_info.line_breaks_cr_lf as usize,
-
-            #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => start_info.line_breaks_unicode as usize,
-        };
-
-        start_line_breaks + text.byte_to_line(byte_idx - start_info.bytes as usize, line_type)
+        start_info.line_breaks(line_type)
+            + text.byte_to_line(byte_idx - start_info.bytes, line_type)
     }
 
     #[cfg(any(
@@ -313,19 +294,8 @@ impl Rope {
             self.root
                 .get_text_at_line_break(line_idx, Some(self.root_info), line_type);
 
-        let start_line_breaks = match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => start_info.line_breaks_lf as usize,
-
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => start_info.line_breaks_cr_lf as usize,
-
-            #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => start_info.line_breaks_unicode as usize,
-        };
-
-        start_info.bytes as usize
-            + text.line_to_byte(line_idx - start_line_breaks as usize, line_type)
+        start_info.bytes
+            + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
     }
 
     //---------------------------------------------------------

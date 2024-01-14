@@ -223,7 +223,7 @@ impl Node {
 
                 // Simple case: the removal is entirely within a single child.
                 if start_child_i == end_child_i {
-                    if start_byte_idx == 0 && end_byte_idx == start_info.bytes as usize {
+                    if start_byte_idx == 0 && end_byte_idx == start_info.bytes {
                         children.remove(start_child_i);
                     } else {
                         let new_info = children.nodes_mut()[start_child_i]
@@ -234,15 +234,12 @@ impl Node {
                 // More complex case: the removal spans multiple children.
                 else {
                     let remove_whole_start_child = start_byte_idx == 0;
-                    let remove_whole_end_child =
-                        end_byte_idx == children.info()[end_child_i].bytes as usize;
+                    let remove_whole_end_child = end_byte_idx == children.info()[end_child_i].bytes;
 
                     // Handle partial removal of leftmost child.
                     if !remove_whole_start_child {
-                        let new_info = children.nodes_mut()[start_child_i].remove_byte_range(
-                            [start_byte_idx, start_info.bytes as usize],
-                            start_info,
-                        )?;
+                        let new_info = children.nodes_mut()[start_child_i]
+                            .remove_byte_range([start_byte_idx, start_info.bytes], start_info)?;
                         children.info_mut()[start_child_i] = new_info;
                     }
 
@@ -358,7 +355,7 @@ impl Node {
             byte_idx,
             text_info,
             |children, idx| children.search_byte_idx(idx),
-            |idx, traversed_info| idx - traversed_info.bytes as usize,
+            |idx, traversed_info| idx - traversed_info.bytes,
         )
     }
 
@@ -375,7 +372,7 @@ impl Node {
             char_idx,
             text_info,
             |children, idx| children.search_char_idx(idx),
-            |idx, traversed_info| idx - traversed_info.chars as usize,
+            |idx, traversed_info| idx - traversed_info.chars,
         )
     }
 
@@ -392,9 +389,7 @@ impl Node {
             utf16_idx,
             text_info,
             |children, idx| children.search_utf16_code_unit_idx(idx),
-            |idx, traversed_info| {
-                idx - (traversed_info.chars as usize + traversed_info.utf16_surrogates as usize)
-            },
+            |idx, traversed_info| idx - (traversed_info.chars + traversed_info.utf16_surrogates),
         )
     }
 
@@ -416,7 +411,7 @@ impl Node {
             line_break_idx,
             text_info,
             |children, idx| children.search_line_break_idx(idx, line_type),
-            |idx, traversed_info| idx - traversed_info.line_breaks(line_type) as usize,
+            |idx, traversed_info| idx - traversed_info.line_breaks(line_type),
         )
     }
 

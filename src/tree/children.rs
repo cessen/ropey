@@ -27,7 +27,7 @@ impl Children {
     /// Current length of the child array.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.0.len() as usize
+        self.0.len()
     }
 
     /// Returns whether the child array is full or not.
@@ -351,7 +351,7 @@ impl Children {
         let mut accum_byte_idx = 0;
         let mut idx = 0;
         for info in self.info()[0..(self.len() - 1)].iter() {
-            let next_accum = accum_byte_idx + info.bytes as usize;
+            let next_accum = accum_byte_idx + info.bytes;
             if byte_idx < next_accum {
                 break;
             }
@@ -360,7 +360,7 @@ impl Children {
         }
 
         debug_assert!(
-            byte_idx <= (accum_byte_idx + self.info()[idx].bytes as usize) as usize,
+            byte_idx <= (accum_byte_idx + self.info()[idx].bytes),
             "Index out of bounds."
         );
 
@@ -375,10 +375,10 @@ impl Children {
     /// The returned TextInfo has already had split-CRLF compensation
     /// applied.
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| byte_idx < end.bytes as usize);
+        let (idx, accum) = self.search_by(|_, end| byte_idx < end.bytes);
 
         debug_assert!(
-            byte_idx <= (accum.bytes + self.info()[idx].bytes) as usize,
+            byte_idx <= (accum.bytes + self.info()[idx].bytes),
             "Index out of bounds."
         );
 
@@ -394,10 +394,10 @@ impl Children {
     /// applied.
     #[cfg(feature = "metric_chars")]
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| char_idx < end.chars as usize);
+        let (idx, accum) = self.search_by(|_, end| char_idx < end.chars);
 
         debug_assert!(
-            char_idx <= (accum.chars + self.info()[idx].chars) as usize,
+            char_idx <= (accum.chars + self.info()[idx].chars),
             "Index out of bounds."
         );
 
@@ -413,15 +413,14 @@ impl Children {
     /// applied.
     #[cfg(feature = "metric_utf16")]
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) =
-            self.search_by(|_, end| utf16_idx < (end.chars + end.utf16_surrogates) as usize);
+        let (idx, accum) = self.search_by(|_, end| utf16_idx < (end.chars + end.utf16_surrogates));
 
         debug_assert!(
             utf16_idx
                 <= (accum.chars
                     + accum.utf16_surrogates
                     + self.info()[idx].chars
-                    + self.info()[idx].utf16_surrogates) as usize,
+                    + self.info()[idx].utf16_surrogates),
             "Index out of bounds."
         );
 
@@ -449,13 +448,11 @@ impl Children {
         line_break_idx: usize,
         line_type: LineType,
     ) -> (usize, TextInfo) {
-        let (idx, accum) =
-            self.search_by(|_, end| line_break_idx <= end.line_breaks(line_type) as usize);
+        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks(line_type));
 
         debug_assert!(
             line_break_idx
-                <= (accum.line_breaks(line_type) + self.info()[idx].line_breaks(line_type) + 1)
-                    as usize,
+                <= (accum.line_breaks(line_type) + self.info()[idx].line_breaks(line_type) + 1),
             "Index out of bounds."
         );
 
@@ -892,7 +889,7 @@ mod inner {
                 children.push(make_info_and_node(&i_to_s(i)));
             }
             for i in 0..MAX_CHILDREN {
-                assert_eq!(children.info()[i].bytes as usize, i_to_s(i).len());
+                assert_eq!(children.info()[i].bytes, i_to_s(i).len());
                 assert_eq!(children.nodes()[i].leaf_text(), i_to_s(i).as_str());
             }
         }
@@ -904,7 +901,7 @@ mod inner {
                 let (info, node) = children.pop();
 
                 assert_eq!(children.len(), i);
-                assert_eq!(info.bytes as usize, i_to_s(i).len());
+                assert_eq!(info.bytes, i_to_s(i).len());
                 assert_eq!(node.leaf_text(), i_to_s(i).as_str());
             }
         }
@@ -926,7 +923,7 @@ mod inner {
                     _ => i_to_s(i - 2),
                 };
 
-                assert_eq!(children.info()[i].bytes as usize, text.len());
+                assert_eq!(children.info()[i].bytes, text.len());
                 assert_eq!(children.nodes()[i].leaf_text(), text.as_str());
             }
         }
@@ -943,13 +940,13 @@ mod inner {
 
             assert_eq!(children.len(), MAX_CHILDREN - 3);
 
-            assert_eq!(last.0.bytes as usize, i_to_s(last_i).len());
+            assert_eq!(last.0.bytes, i_to_s(last_i).len());
             assert_eq!(last.1.leaf_text(), i_to_s(last_i).as_str());
 
-            assert_eq!(first.0.bytes as usize, i_to_s(0).len());
+            assert_eq!(first.0.bytes, i_to_s(0).len());
             assert_eq!(first.1.leaf_text(), i_to_s(0).as_str());
 
-            assert_eq!(middle.0.bytes as usize, i_to_s(2).len());
+            assert_eq!(middle.0.bytes, i_to_s(2).len());
             assert_eq!(middle.1.leaf_text(), i_to_s(2).as_str());
         }
 
@@ -967,7 +964,7 @@ mod inner {
                     let original_i = if i < range[0] { i } else { i + range_len };
                     let text = i_to_s(original_i);
 
-                    assert_eq!(children.info()[i].bytes as usize, text.len());
+                    assert_eq!(children.info()[i].bytes, text.len());
                     assert_eq!(children.nodes()[i].leaf_text(), text.as_str());
                 }
             }
@@ -992,7 +989,7 @@ mod inner {
                         let original_i = if i < range[0] { i } else { i + range_len };
                         let text = i_to_s(original_i);
 
-                        assert_eq!(children_from.info()[i].bytes as usize, text.len());
+                        assert_eq!(children_from.info()[i].bytes, text.len());
                         assert_eq!(children_from.nodes()[i].leaf_text(), text.as_str());
                     }
 
@@ -1008,7 +1005,7 @@ mod inner {
                         };
                         let text = i_to_s(original_i);
 
-                        assert_eq!(children_to.info()[i].bytes as usize, text.len());
+                        assert_eq!(children_to.info()[i].bytes, text.len());
                         assert_eq!(children_to.nodes()[i].leaf_text(), text.as_str());
                     }
                 }

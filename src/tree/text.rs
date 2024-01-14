@@ -6,23 +6,15 @@ use str_indices::chars;
 #[cfg(feature = "metric_utf16")]
 use str_indices::utf16;
 
-#[cfg(feature = "metric_lines_cr_lf")]
-use str_indices::lines_crlf;
-
-#[cfg(feature = "metric_lines_lf")]
-use str_indices::lines_lf;
-
-#[cfg(feature = "metric_lines_unicode")]
-use str_indices::lines;
-
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_cr_lf",
     feature = "metric_lines_unicode"
 ))]
-use crate::LineType;
-
-use crate::{ends_with_cr, starts_with_lf};
+use crate::{
+    str_utils::{ends_with_cr, lines, starts_with_lf},
+    LineType,
+};
 
 /// A leaf node of the Rope, containing text.
 ///
@@ -174,57 +166,15 @@ impl Text {
         feature = "metric_lines_unicode"
     ))]
     pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-        #[inline(always)]
-        fn do_byte_to_line<F1, F2>(
-            byte_idx: usize,
-            count: F1,
-            from_byte_idx: F2,
-            has_crlf_split: bool,
-            c0: &str,
-            c1: &str,
-        ) -> usize
-        where
-            F1: Fn(&str) -> usize,
-            F2: Fn(&str, usize) -> usize,
-        {
-            if byte_idx < c0.len() {
-                from_byte_idx(c0, byte_idx)
-            } else {
-                let start_line_idx = count(c0) - has_crlf_split as usize;
-                let line_idx = from_byte_idx(c1, byte_idx - c0.len());
-                start_line_idx + line_idx
-            }
-        }
-
         let [c0, c1] = self.chunks();
-        match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => do_byte_to_line(
-                byte_idx,
-                lines_lf::count_breaks,
-                lines_lf::from_byte_idx,
-                false,
-                c0,
-                c1,
-            ),
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => do_byte_to_line(
-                byte_idx,
-                lines_crlf::count_breaks,
-                lines_crlf::from_byte_idx,
-                ends_with_cr(c0) && starts_with_lf(c1),
-                c0,
-                c1,
-            ),
-            #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => do_byte_to_line(
-                byte_idx,
-                lines::count_breaks,
-                lines::from_byte_idx,
-                ends_with_cr(c0) && starts_with_lf(c1),
-                c0,
-                c1,
-            ),
+
+        if byte_idx < c0.len() {
+            lines::from_byte_idx(c0, byte_idx, line_type)
+        } else {
+            let start_line_idx = lines::count_breaks(c0, line_type)
+                - lines::has_crlf_split(c0, c1, line_type) as usize;
+            let line_idx = lines::from_byte_idx(c1, byte_idx - c0.len(), line_type);
+            start_line_idx + line_idx
         }
     }
 
@@ -234,60 +184,18 @@ impl Text {
         feature = "metric_lines_unicode"
     ))]
     pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-        #[inline(always)]
-        fn do_line_to_byte<F1, F2>(
-            line_idx: usize,
-            count: F1,
-            to_byte_idx: F2,
-            has_crlf_split: bool,
-            c0: &str,
-            c1: &str,
-        ) -> usize
-        where
-            F1: Fn(&str) -> usize,
-            F2: Fn(&str, usize) -> usize,
-        {
-            // TODO: if `to_byte_idx()` also returned the line break count if it
-            // goes off the end, that would allow us to skip this count and be
-            // more efficient.
-            let c0_line_len = count(c0) - has_crlf_split as usize;
-            if line_idx <= c0_line_len {
-                to_byte_idx(c0, line_idx)
-            } else {
-                let byte_idx = to_byte_idx(c1, line_idx - c0_line_len);
-                c0.len() + byte_idx
-            }
-        }
-
         let [c0, c1] = self.chunks();
-        match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => do_line_to_byte(
-                line_idx,
-                lines_lf::count_breaks,
-                lines_lf::to_byte_idx,
-                false,
-                c0,
-                c1,
-            ),
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => do_line_to_byte(
-                line_idx,
-                lines_crlf::count_breaks,
-                lines_crlf::to_byte_idx,
-                ends_with_cr(c0) && starts_with_lf(c1),
-                c0,
-                c1,
-            ),
-            #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => do_line_to_byte(
-                line_idx,
-                lines::count_breaks,
-                lines::to_byte_idx,
-                ends_with_cr(c0) && starts_with_lf(c1),
-                c0,
-                c1,
-            ),
+
+        // TODO: if `to_byte_idx()` also returned the line break count if it
+        // goes off the end, that would allow us to skip this count and be
+        // more efficient.
+        let c0_line_len =
+            lines::count_breaks(c0, line_type) - lines::has_crlf_split(c0, c1, line_type) as usize;
+        if line_idx <= c0_line_len {
+            lines::to_byte_idx(c0, line_idx, line_type)
+        } else {
+            let byte_idx = lines::to_byte_idx(c1, line_idx - c0_line_len, line_type);
+            c0.len() + byte_idx
         }
     }
 
@@ -336,13 +244,13 @@ impl Text {
                 + (text_info.ends_with_cr && starts_with_lf(self.0.chunks()[1])) as usize;
             #[cfg(feature = "metric_lines_cr_lf")]
             {
-                current_info.line_breaks_cr_lf += crlf_split_compensation_1 as u64;
-                current_info.line_breaks_cr_lf -= crlf_split_compensation_2 as u64;
+                current_info.line_breaks_cr_lf += crlf_split_compensation_1;
+                current_info.line_breaks_cr_lf -= crlf_split_compensation_2;
             }
             #[cfg(feature = "metric_lines_unicode")]
             {
-                current_info.line_breaks_unicode += crlf_split_compensation_1 as u64;
-                current_info.line_breaks_unicode -= crlf_split_compensation_2 as u64;
+                current_info.line_breaks_unicode += crlf_split_compensation_1;
+                current_info.line_breaks_unicode -= crlf_split_compensation_2;
             }
 
             if byte_idx == 0 {
