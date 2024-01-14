@@ -535,10 +535,10 @@ mod tests {
     const TEXT: &str = "Hello there!  How're you doing?  It's \
                         a fine day, isn't it?  Aren't you glad \
                         we're alive?  こんにちは、みんなさん！";
-    // // 124 bytes, 100 chars, 4 lines
-    // const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
-    //                           a fine day, isn't it?\nAren't you glad \
-    //                           we're alive?\nこんにちは、みんなさん！";
+    // 124 bytes, 100 chars, 4 lines
+    const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
+                              a fine day, isn't it?\nAren't you glad \
+                              we're alive?\nこんにちは、みんなさん！";
     // 143 bytes, 107 chars, 111 utf16 code units, 1 line
     const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
                               a fine day, isn't it?🐸  Aren't you glad \
@@ -693,7 +693,70 @@ mod tests {
     ))]
     #[test]
     fn byte_to_line_01() {
-        todo!()
+        let r = Rope::from_str(TEXT_LINES);
+        let byte_to_line_idxs = &[
+            [0, 0],
+            [1, 0],
+            [31, 0],
+            [32, 1],
+            [33, 1],
+            [58, 1],
+            [59, 2],
+            [60, 2],
+            [87, 2],
+            [88, 3],
+            [89, 3],
+            [124, 3],
+        ];
+        for [b, l] in byte_to_line_idxs.iter().copied() {
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(l, r.byte_to_line(b, LineType::LF));
+            #[cfg(feature = "metric_lines_cr_lf")]
+            assert_eq!(l, r.byte_to_line(b, LineType::CRLF));
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(l, r.byte_to_line(b, LineType::All));
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn byte_to_line_02() {
+        let r = Rope::from_str("");
+
+        #[cfg(feature = "metric_lines_lf")]
+        assert_eq!(0, r.byte_to_line(0, LineType::LF));
+        #[cfg(feature = "metric_lines_cr_lf")]
+        assert_eq!(0, r.byte_to_line(0, LineType::CRLF));
+        #[cfg(feature = "metric_lines_unicode")]
+        assert_eq!(0, r.byte_to_line(0, LineType::All));
+    }
+
+    #[cfg(feature = "metric_lines_lf")]
+    #[test]
+    #[should_panic]
+    fn byte_to_line_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.byte_to_line(125, LineType::LF);
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[should_panic]
+    fn byte_to_line_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.byte_to_line(125, LineType::CRLF);
+    }
+
+    #[cfg(feature = "metric_lines_unicode")]
+    #[test]
+    #[should_panic]
+    fn byte_to_line_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.byte_to_line(125, LineType::All);
     }
 
     #[cfg(any(
@@ -703,6 +766,64 @@ mod tests {
     ))]
     #[test]
     fn line_to_byte_01() {
-        todo!()
+        let r = Rope::from_str(TEXT_LINES);
+        let byte_to_line_idxs = &[[0, 0], [32, 1], [59, 2], [88, 3], [124, 4]];
+        for [b, l] in byte_to_line_idxs.iter().copied() {
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(b, r.line_to_byte(l, LineType::LF));
+            #[cfg(feature = "metric_lines_cr_lf")]
+            assert_eq!(b, r.line_to_byte(l, LineType::CRLF));
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(b, r.line_to_byte(l, LineType::All));
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn line_to_byte_02() {
+        let r = Rope::from_str("");
+        #[cfg(feature = "metric_lines_lf")]
+        {
+            assert_eq!(0, r.line_to_byte(0, LineType::LF));
+            assert_eq!(0, r.line_to_byte(1, LineType::LF));
+        }
+        #[cfg(feature = "metric_lines_cr_lf")]
+        {
+            assert_eq!(0, r.line_to_byte(0, LineType::CRLF));
+            assert_eq!(0, r.line_to_byte(1, LineType::CRLF));
+        }
+        #[cfg(feature = "metric_lines_unicode")]
+        {
+            assert_eq!(0, r.line_to_byte(0, LineType::All));
+            assert_eq!(0, r.line_to_byte(1, LineType::All));
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf")]
+    #[test]
+    #[should_panic]
+    fn line_to_byte_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_to_byte(5, LineType::LF);
+    }
+
+    #[cfg(feature = "metric_lines_crlf")]
+    #[test]
+    #[should_panic]
+    fn line_to_byte_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_to_byte(5, LineType::CRLF);
+    }
+
+    #[cfg(feature = "metric_lines_unicode")]
+    #[test]
+    #[should_panic]
+    fn line_to_byte_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        r.line_to_byte(5, LineType::All);
     }
 }

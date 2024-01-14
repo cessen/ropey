@@ -15,7 +15,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - Metric conversion functions:
   - [x] Chars <-> bytes.
   - [x] UTF16 <-> bytes.
-  - [ ] Lines <-> bytes.
+  - [x] Lines <-> bytes.
 - Iterators:
   - [ ] `Chunks`
     - [x] Forward.

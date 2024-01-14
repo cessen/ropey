@@ -4,6 +4,15 @@ use proptest::test_runner::Config;
 
 use ropey::Rope;
 
+#[cfg(feature = "metric_lines_lf")]
+use str_indices::lines_lf;
+
+#[cfg(feature = "metric_lines_cr_lf")]
+use str_indices::lines_crlf;
+
+#[cfg(feature = "metric_lines_unicode")]
+use str_indices::lines;
+
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_cr_lf",
@@ -154,6 +163,57 @@ proptest::proptest! {
         assert_eq!(rope, text.as_str());
         assert_metrics_eq(&rope, text.as_str());
         rope.assert_invariants();
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn pt_byte_to_line(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
+        let rope = Rope::from_str(text);
+
+        for i in 0..=text.len() {
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(lines_lf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::LF));
+            #[cfg(feature = "metric_lines_cr_lf")]
+            assert_eq!(lines_crlf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::CRLF));
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(lines::from_byte_idx(text, i), rope.byte_to_line(i, LineType::All));
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn pt_line_to_byte(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
+        let rope = Rope::from_str(text);
+
+        #[cfg(feature = "metric_lines_lf")]
+        {
+            let line_count = lines_lf::count_breaks(text) + 1;
+            for i in 0..=line_count {
+                assert_eq!(lines_lf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::LF));
+            }
+        }
+        #[cfg(feature = "metric_lines_crlf")]
+        {
+            let line_count = lines_crlf::count_breaks(text) + 1;
+            for i in 0..=line_count {
+                assert_eq!(lines_crlf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::CRLF));
+            }
+        }
+        #[cfg(feature = "metric_lines_unicode")]
+        {
+            let line_count = lines::count_breaks(text) + 1;
+            for i in 0..=line_count {
+                assert_eq!(lines::to_byte_idx(text, i), rope.line_to_byte(i, LineType::All));
+            }
+        }
     }
 
     #[test]
