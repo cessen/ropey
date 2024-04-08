@@ -147,14 +147,16 @@ Ropey is licensed under the MIT license (LICENSE.md or http://opensource.org/lic
 
 ## Contributing
 
-Contributions are absolutely welcome!  However, please open an issue or email
-me to discuss larger changes, to avoid doing a lot of work that may get
-rejected.
+Contributions are absolutely welcome!  However, please open an issue to discuss
+larger changes, to avoid doing a lot of work that may get rejected.  Also note
+that PRs that add dependencies are very likely to be rejected (Ropey aims to
+have minimal dependencies).
 
 An overview of Ropey's design can be found [here](https://github.com/cessen/ropey/blob/master/design/design.md).
 
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in Ropey by you will be licensed as above, without any additional terms or conditions.
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in Ropey by you will be licensed as above, without any additional
+terms or conditions.
 
 [crates-io-badge]: https://img.shields.io/crates/v/ropey.svg
 [crates-io-url]: https://crates.io/crates/ropey
