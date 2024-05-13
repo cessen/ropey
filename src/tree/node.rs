@@ -80,9 +80,9 @@ impl Node {
         }
     }
 
-    pub fn leaf_text_chunks(&self) -> [&str; 2] {
+    pub fn leaf_text_chunk(&self) -> &str {
         match *self {
-            Node::Leaf(ref text) => text.chunks(),
+            Node::Leaf(ref text) => text.text(),
             _ => panic!(),
         }
     }
@@ -464,14 +464,7 @@ impl Node {
         match *self {
             Node::Leaf(ref text) => {
                 // Freshly compute the relevant info from scratch.
-                let info_l = TextInfo::from_str(text.chunks()[0]);
-                let info_r = TextInfo::from_str(text.chunks()[1]);
-                let info = info_l.concat(info_r);
-
-                // Make sure everything matches.
-                assert_eq!(text.text_info(), info);
-
-                info
+                TextInfo::from_str(text.text())
             }
             Node::Internal(ref children) => {
                 let mut acc_info = TextInfo::new();

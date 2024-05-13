@@ -221,7 +221,7 @@ proptest::proptest! {
         let r = Rope::from_str(text);
 
         let mut idx = 0;
-        for chunk in r.chunks().flatten() {
+        for chunk in r.chunks() {
             assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
             idx += chunk.len();
         }

@@ -358,7 +358,7 @@ impl<'a> std::cmp::PartialEq<&'a str> for Rope {
         let other = other.as_bytes();
 
         let mut idx = 0;
-        for chunk in self.chunks().flatten() {
+        for chunk in self.chunks() {
             let chunk = chunk.as_bytes();
             if chunk != &other[idx..(idx + chunk.len())] {
                 return false;
@@ -396,7 +396,7 @@ impl<'a> From<&'a Rope> for String {
     #[inline]
     fn from(r: &'a Rope) -> Self {
         let mut s = String::with_capacity(r.len_bytes());
-        s.extend(r.chunks().flatten());
+        s.extend(r.chunks());
         s
     }
 }
@@ -490,7 +490,7 @@ impl std::fmt::Debug for Rope {
 impl std::fmt::Display for Rope {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for chunk in self.chunks().flatten() {
+        for chunk in self.chunks() {
             write!(f, "{}", chunk)?
         }
         Ok(())
