@@ -38,7 +38,6 @@ use crate::tree::{Children, Node, Text, MAX_CHILDREN, MAX_TEXT_SIZE};
 pub struct RopeBuilder {
     stack: Vec<Node>,
     buffer: String,
-    last_chunk_len_bytes: usize,
 }
 
 impl RopeBuilder {
@@ -47,7 +46,6 @@ impl RopeBuilder {
         RopeBuilder {
             stack: Vec::new(),
             buffer: String::new(),
-            last_chunk_len_bytes: 0,
         }
     }
 
@@ -59,7 +57,32 @@ impl RopeBuilder {
     ///
     /// `chunk` must be valid utf8 text.
     pub fn append(&mut self, chunk: &str) {
-        self.append_internal(chunk, false);
+        let mut chunk = chunk;
+
+        while !chunk.is_empty() {
+            if self.buffer.is_empty() && chunk.len() >= MAX_TEXT_SIZE {
+                // Process text data directly, skipping the buffer.
+                let split_idx = crate::find_split_l(MAX_TEXT_SIZE, chunk.as_bytes());
+                self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&chunk[..split_idx]))));
+                chunk = &chunk[split_idx..];
+            }
+            // Note: the `- 4` is to account for the variable-length utf8
+            // encoding.  Without that, we could end up stuck in an infinite
+            // loop where the buffer isn't considered full and thus won't be
+            // processed, but there also isn't room at the end of the buffer to
+            // fit the next code point from `chunk`.
+            else if self.buffer.len() > (MAX_TEXT_SIZE - 4) {
+                // Process filled buffer.
+                self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&self.buffer))));
+                self.buffer.clear();
+            } else {
+                // Append to the buffer.
+                let target_len = MAX_TEXT_SIZE - self.buffer.len();
+                let split_idx = crate::find_split_l(target_len, chunk.as_bytes());
+                self.buffer.push_str(&chunk[..split_idx]);
+                chunk = &chunk[split_idx..];
+            }
+        }
     }
 
     /// Finishes the build, and returns the `Rope`.
@@ -69,7 +92,10 @@ impl RopeBuilder {
     /// before calling `finish()`.
     pub fn finish(mut self) -> Rope {
         // Append the last leaf
-        self.append_internal("", true);
+        if !self.buffer.is_empty() {
+            self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&self.buffer))));
+            self.buffer.clear();
+        }
         self.finish_internal()
     }
 
@@ -78,9 +104,16 @@ impl RopeBuilder {
     /// This avoids the creation and use of the internal buffer.  This is
     /// for internal use only, because the public-facing API has
     /// Rope::from_str(), which actually uses this for its implementation.
-    pub(crate) fn build_at_once(mut self, chunk: &str) -> Rope {
-        self.append_internal(chunk, true);
-        self.finish_internal()
+    pub(crate) fn build_at_once(mut self, text: &str) -> Rope {
+        let mut text = text;
+
+        while !text.is_empty() {
+            let split_idx = crate::find_split_l(MAX_TEXT_SIZE, text.as_bytes());
+            self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&text[..split_idx]))));
+            text = &text[split_idx..];
+        }
+
+        self.finish()
     }
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!).
@@ -98,34 +131,6 @@ impl RopeBuilder {
     }
 
     //-----------------------------------------------------------------
-
-    // Internal workings of `append()`.
-    fn append_internal(&mut self, chunk: &str, is_last_chunk: bool) {
-        let mut chunk = chunk;
-
-        // Repeatedly chop text off the end of the input, creating
-        // leaf nodes out of them and appending them to the tree.
-        while !chunk.is_empty() || (!self.buffer.is_empty() && is_last_chunk) {
-            // Get the text for the next leaf.
-            let (leaf_text, remainder) = self.get_next_leaf_text(chunk, is_last_chunk);
-            chunk = remainder;
-
-            self.last_chunk_len_bytes = chunk.len();
-
-            // Append the leaf to the rope.
-            match leaf_text {
-                NextText::None => break,
-                NextText::UseBuffer => {
-                    let leaf_text = Text::from_str(&self.buffer);
-                    self.append_leaf_node(Node::Leaf(Arc::new(leaf_text)));
-                    self.buffer.clear();
-                }
-                NextText::String(s) => {
-                    self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(s))));
-                }
-            }
-        }
-    }
 
     // Internal workings of `finish()`.
     fn finish_internal(mut self) -> Rope {
@@ -153,99 +158,47 @@ impl RopeBuilder {
         }
     }
 
-    // Returns (next_leaf_text, remaining_text)
-    #[inline(always)]
-    fn get_next_leaf_text<'a>(
-        &mut self,
-        text: &'a str,
-        is_last_chunk: bool,
-    ) -> (NextText<'a>, &'a str) {
-        assert!(
-            self.buffer.len() < MAX_TEXT_SIZE,
-            "RopeBuilder: buffer is already full when receiving a chunk! \
-             This should never happen!",
-        );
-
-        // Simplest case: empty buffer and enough in `text` for a full
-        // chunk, so just chop a chunk off from `text` and use that.
-        if self.buffer.is_empty() && text.len() >= MAX_TEXT_SIZE {
-            let split_idx = crate::find_split_l(MAX_TEXT_SIZE.min(text.len()), text.as_bytes());
-            return (NextText::String(&text[..split_idx]), &text[split_idx..]);
-        }
-        // If the buffer + `text` is enough for a full chunk, push enough
-        // of `text` onto the buffer to fill it and use that.
-        else if (text.len() + self.buffer.len()) >= MAX_TEXT_SIZE {
-            let split_idx = crate::find_split_l(MAX_TEXT_SIZE - self.buffer.len(), text.as_bytes());
-            self.buffer.push_str(&text[..split_idx]);
-            return (NextText::UseBuffer, &text[split_idx..]);
-        }
-        // If we don't have enough text for a full chunk.
-        else {
-            // If it's our last chunk, wrap it all up!
-            if is_last_chunk {
-                if self.buffer.is_empty() {
-                    return if text.is_empty() {
-                        (NextText::None, "")
-                    } else {
-                        (NextText::String(text), "")
-                    };
-                } else {
-                    self.buffer.push_str(text);
-                    return (NextText::UseBuffer, "");
-                }
-            }
-            // Otherwise, just push to the buffer.
-            else {
-                self.buffer.push_str(text);
-                return (NextText::None, "");
-            }
-        }
-    }
-
     fn append_leaf_node(&mut self, leaf: Node) {
-        let last = if let Some(last) = self.stack.pop() {
-            last
-        } else {
+        if self.stack.is_empty() {
             self.stack.push(leaf);
             return;
-        };
+        }
 
-        match last {
-            Node::Leaf(_) => {
+        if self.stack.last().unwrap().is_leaf() {
+            let last = self.stack.pop().unwrap();
+
+            let mut children = Children::new();
+            children.push((last.text_info(), last));
+            children.push((leaf.text_info(), leaf));
+
+            self.stack.push(Node::Internal(Arc::new(children)));
+            return;
+        }
+
+        let mut left = leaf;
+        let mut stack_idx = (self.stack.len() - 1) as isize;
+        loop {
+            if stack_idx < 0 {
+                // We're above the root, so do a root split.
                 let mut children = Children::new();
-                children.push((last.text_info(), last));
-                children.push((leaf.text_info(), leaf));
-                self.stack.push(Node::Internal(Arc::new(children)));
-            }
-
-            Node::Internal(_) => {
-                self.stack.push(last);
-                let mut left = leaf;
-                let mut stack_idx = (self.stack.len() - 1) as isize;
-                loop {
-                    if stack_idx < 0 {
-                        // We're above the root, so do a root split.
-                        let mut children = Children::new();
-                        children.push((left.text_info(), left));
-                        self.stack.insert(0, Node::Internal(Arc::new(children)));
-                        break;
-                    } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
-                        // There's room to add a child, so do that.
-                        self.stack[stack_idx as usize]
-                            .children_mut()
-                            .push((left.text_info(), left));
-                        break;
-                    } else {
-                        // Not enough room to fit a child, so split.
-                        left = Node::Internal(Arc::new(
-                            self.stack[stack_idx as usize]
-                                .children_mut()
-                                .push_split((left.text_info(), left)),
-                        ));
-                        std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
-                        stack_idx -= 1;
-                    }
-                }
+                children.push((left.text_info(), left));
+                self.stack.insert(0, Node::Internal(Arc::new(children)));
+                break;
+            } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
+                // There's room to add a child, so do that.
+                self.stack[stack_idx as usize]
+                    .children_mut()
+                    .push((left.text_info(), left));
+                break;
+            } else {
+                // Not enough room to fit a child, so split.
+                left = Node::Internal(Arc::new(
+                    self.stack[stack_idx as usize]
+                        .children_mut()
+                        .push_split((left.text_info(), left)),
+                ));
+                std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
+                stack_idx -= 1;
             }
         }
     }
@@ -255,12 +208,6 @@ impl Default for RopeBuilder {
     fn default() -> Self {
         Self::new()
     }
-}
-
-enum NextText<'a> {
-    None,
-    UseBuffer,
-    String(&'a str),
 }
 
 //===========================================================================
