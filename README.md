@@ -10,7 +10,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [x] Rope length queries.
 - [ ] Tree rebalancing.
 - [ ] Chunk fetching functions.
-- [ ] Try rewriting `RopeBuilder` to be cleaner/faster.
+- [x] Try rewriting `RopeBuilder` to be cleaner/faster.
 - [ ] `RopeSlice`
 - Metric conversion functions:
   - [x] Chars <-> bytes.
