@@ -414,9 +414,11 @@ impl Rope {
 //==============================================================
 // Comparison impls.
 
-impl<'a> std::cmp::PartialEq<&'a str> for Rope {
+// impl std::cmp::Eq for Rope {}
+
+impl std::cmp::PartialEq<&str> for Rope {
     #[inline]
-    fn eq(&self, other: &&'a str) -> bool {
+    fn eq(&self, other: &&str) -> bool {
         if self.len_bytes() != other.len() {
             return false;
         }
@@ -435,10 +437,52 @@ impl<'a> std::cmp::PartialEq<&'a str> for Rope {
     }
 }
 
-impl<'a> std::cmp::PartialEq<Rope> for &'a str {
+impl std::cmp::PartialEq<Rope> for &str {
     #[inline]
     fn eq(&self, other: &Rope) -> bool {
         other == self
+    }
+}
+
+impl std::cmp::PartialEq<str> for Rope {
+    #[inline(always)]
+    fn eq(&self, other: &str) -> bool {
+        std::cmp::PartialEq::<&str>::eq(self, &other)
+    }
+}
+
+impl std::cmp::PartialEq<Rope> for str {
+    #[inline(always)]
+    fn eq(&self, other: &Rope) -> bool {
+        std::cmp::PartialEq::<&str>::eq(other, &self)
+    }
+}
+
+impl std::cmp::PartialEq<String> for Rope {
+    #[inline(always)]
+    fn eq(&self, other: &String) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl std::cmp::PartialEq<Rope> for String {
+    #[inline(always)]
+    fn eq(&self, other: &Rope) -> bool {
+        other == self.as_str()
+    }
+}
+
+impl std::cmp::PartialEq<std::borrow::Cow<'_, str>> for Rope {
+    #[inline]
+    fn eq(&self, other: &std::borrow::Cow<str>) -> bool {
+        *self == **other
+    }
+}
+
+impl std::cmp::PartialEq<Rope> for std::borrow::Cow<'_, str> {
+    #[inline]
+    fn eq(&self, other: &Rope) -> bool {
+        *other == **self
     }
 }
 
@@ -536,7 +580,7 @@ impl FromIterator<String> for Rope {
     }
 }
 
-//==============================================================
+//=============================================================
 // Other impls.
 
 impl std::default::Default for Rope {
@@ -562,8 +606,70 @@ impl std::fmt::Display for Rope {
     }
 }
 
+impl<'a> std::hash::Hash for Rope {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // `std::hash::Hasher` only guarantees the same hash output for
+        // exactly the same calls to `Hasher::write()`.  Just submitting
+        // the same data in the same order isn't enough--it also has to
+        // be split the same between calls.  So we go to some effort here
+        // to ensure that we always submit the text data in the same
+        // fixed-size blocks, even if those blocks don't align with chunk
+        // boundaries at all.
+        //
+        // The naive approach is to always copy to a fixed-size buffer
+        // and submit the buffer whenever it fills up.  We conceptually
+        // follow that approach here, but we do a little better by
+        // skipping the buffer and directly passing the data without
+        // copying when possible.
+        const BLOCK_SIZE: usize = 256;
+
+        let mut buffer = [0u8; BLOCK_SIZE];
+        let mut buffer_len = 0;
+
+        for chunk in self.chunks() {
+            let mut data = chunk.as_bytes();
+
+            while !data.is_empty() {
+                if buffer_len == 0 && data.len() >= BLOCK_SIZE {
+                    // Process data directly, skipping the buffer.
+                    let (head, tail) = data.split_at(BLOCK_SIZE);
+                    state.write(head);
+                    data = tail;
+                } else if buffer_len == BLOCK_SIZE {
+                    // Process the filled buffer.
+                    state.write(&buffer[..]);
+                    buffer_len = 0;
+                } else {
+                    // Append to the buffer.
+                    let n = (BLOCK_SIZE - buffer_len).min(data.len());
+                    let (head, tail) = data.split_at(n);
+                    (&mut buffer[buffer_len..(buffer_len + n)]).copy_from_slice(head);
+                    buffer_len += n;
+                    data = tail;
+                }
+            }
+        }
+
+        // Write any remaining unprocessed data in the buffer.
+        if buffer_len > 0 {
+            state.write(&buffer[..buffer_len]);
+        }
+
+        // Same strategy as `&str` in stdlib, so that e.g. two adjacent
+        // fields in a `#[derive(Hash)]` struct with "Hi " and "there"
+        // vs "Hi t" and "here" give the struct a different hash.
+        state.write_u8(0xff)
+    }
+}
+
+//=============================================================
+
 #[cfg(test)]
 mod tests {
+    use std::hash::{Hash, Hasher};
+
+    use crate::rope_builder::RopeBuilder;
+
     use super::*;
 
     // 127 bytes, 103 chars, 1 line
@@ -860,5 +966,54 @@ mod tests {
     fn line_to_byte_05() {
         let r = Rope::from_str(TEXT_LINES);
         r.line_to_byte(5, LineType::All);
+    }
+
+    #[test]
+    fn hash_01() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r1 = {
+            let mut rb = RopeBuilder::new();
+            rb._append_chunk("Hello ");
+            rb._append_chunk("world!");
+            rb.finish()
+        };
+        let r2 = {
+            let mut rb = RopeBuilder::new();
+            rb._append_chunk("Hell");
+            rb._append_chunk("o world!");
+            rb.finish()
+        };
+
+        r1.hash(&mut h1);
+        r2.hash(&mut h2);
+
+        assert_eq!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn hash_02() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r1 = Rope::from_str("Hello there!");
+        let r2 = Rope::from_str("Hello there.");
+
+        r1.hash(&mut h1);
+        r2.hash(&mut h2);
+
+        assert_ne!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn hash_03() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r = Rope::from_str("Hello there!");
+        let s = [Rope::from_str("Hello "), Rope::from_str("there!")];
+
+        r.hash(&mut h1);
+        Rope::hash_slice(&s, &mut h2);
+
+        assert_ne!(h1.finish(), h2.finish());
     }
 }

@@ -22,11 +22,21 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [ ] Bidirectional.
     - [ ] TextInfo querying.
   - [ ] `Bytes`
+    - [ ] Forward.
+    - [ ] Bidirectional.
   - [ ] `Chars`
+    - [ ] Forward.
+    - [ ] Bidirectional.
   - [ ] `Lines`:
     - [ ] LF
+      - [ ] Forward.
+      - [ ] Bidirectional.
     - [ ] LF + CR
+      - [ ] Forward.
+      - [ ] Bidirectional.
     - [ ] Full Unicode
+      - [ ] Forward.
+      - [ ] Bidirectional.
   - [ ] Creating iterators at a specific offset.
 - Standard library trait impls:
   - [ ] `From`:
@@ -41,18 +51,18 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [x] `str` -> `Rope`
     - [x] `Cow<str>` -> `Rope`
   - [ ] `Hash`
-    - [ ] `Rope`
+    - [x] `Rope`
     - [ ] `RopeSlice`.
   - [ ] Comparison operators:
     - [ ] `Eq` / `PartialEq`
       - [ ] `Rope` <-> `Rope`
       - [ ] `Rope` <-> `RopeSlice`
       - [x] `Rope` <-> `str`
-      - [ ] `Rope` <-> `String`
-      - [ ] `Rope` <-> `Cow<str>`
+      - [x] `Rope` <-> `String`
+      - [x] `Rope` <-> `Cow<str>`
       - [x] `RopeSlice` <-> `str`
       - [x] `RopeSlice` <-> `String`
-      - [ ] `RopeSlice` <-> `Cow<str>`
+      - [x] `RopeSlice` <-> `Cow<str>`
     - [ ] `Ord` / `PartialOrd`
       - [ ] `Rope`
       - [ ] `RopeSlice`

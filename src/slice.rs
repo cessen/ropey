@@ -187,6 +187,8 @@ impl<'a> RopeSlice<'a> {
 //==============================================================
 // Comparison impls.
 
+// impl std::cmp::Eq for RopeSlice<'_> {}
+
 impl std::cmp::PartialEq<&str> for RopeSlice<'_> {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
@@ -262,6 +264,20 @@ impl std::cmp::PartialEq<RopeSlice<'_>> for String {
     #[inline(always)]
     fn eq(&self, other: &RopeSlice) -> bool {
         other == self.as_str()
+    }
+}
+
+impl std::cmp::PartialEq<std::borrow::Cow<'_, str>> for RopeSlice<'_> {
+    #[inline]
+    fn eq(&self, other: &std::borrow::Cow<str>) -> bool {
+        *self == **other
+    }
+}
+
+impl std::cmp::PartialEq<RopeSlice<'_>> for std::borrow::Cow<'_, str> {
+    #[inline]
+    fn eq(&self, other: &RopeSlice) -> bool {
+        *other == **self
     }
 }
 
