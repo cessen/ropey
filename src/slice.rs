@@ -434,11 +434,11 @@ mod tests {
         // Make sure splitting CRLF pairs at the end works properly.
         let r = {
             let mut rb = RopeBuilder::new();
-            rb._append_chunk("\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
         for i in 0..=r.len_bytes() {
@@ -456,11 +456,11 @@ mod tests {
         // Make sure splitting CRLF pairs at the start works properly.
         let r = {
             let mut rb = RopeBuilder::new();
-            rb._append_chunk("\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
         for i in 0..=r.len_bytes() {
@@ -707,11 +707,11 @@ mod tests {
         // Make sure splitting CRLF pairs at the end works properly.
         let r = {
             let mut rb = RopeBuilder::new();
-            rb._append_chunk("\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
         for si in 0..=r.len_bytes() {
@@ -804,11 +804,11 @@ mod tests {
         // Make sure splitting CRLF pairs at the end works properly.
         let r = {
             let mut rb = RopeBuilder::new();
-            rb._append_chunk("\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r");
-            rb._append_chunk("\n\r\n\r\n\r\n");
-            rb._append_chunk("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
+            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
+            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
 

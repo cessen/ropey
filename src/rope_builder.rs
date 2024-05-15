@@ -91,50 +91,13 @@ impl RopeBuilder {
     /// building other ropes with the same prefix, you can clone the builder
     /// before calling `finish()`.
     pub fn finish(mut self) -> Rope {
-        // Append the last leaf
+        // Append the last leaf.
         if !self.buffer.is_empty() {
             self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&self.buffer))));
             self.buffer.clear();
         }
-        self.finish_internal()
-    }
 
-    /// Builds a rope all at once from a single string slice.
-    ///
-    /// This avoids the creation and use of the internal buffer.  This is
-    /// for internal use only, because the public-facing API has
-    /// Rope::from_str(), which actually uses this for its implementation.
-    pub(crate) fn build_at_once(mut self, text: &str) -> Rope {
-        let mut text = text;
-
-        while !text.is_empty() {
-            let split_idx = crate::find_split_l(MAX_TEXT_SIZE, text.as_bytes());
-            self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&text[..split_idx]))));
-            text = &text[split_idx..];
-        }
-
-        self.finish()
-    }
-
-    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!).
-    ///
-    /// Appends `contents` to the in-progress rope as a single leaf
-    /// node (chunk).  This is useful for building ropes with specific
-    /// chunk configurations for testing purposes.  It will happily append
-    /// both empty and more-than-max-size chunks.
-    ///
-    /// This makes no attempt to be consistent with the standard `append()`
-    /// method, and should not be used in conjunction with it.
-    #[doc(hidden)]
-    pub fn _append_chunk(&mut self, contents: &str) {
-        self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(contents))));
-    }
-
-    //-----------------------------------------------------------------
-
-    // Internal workings of `finish()`.
-    fn finish_internal(mut self) -> Rope {
-        // Empty rope.
+        // Special case for empty rope.
         if self.stack.len() == 0 {
             return Rope::new();
         }
@@ -156,6 +119,41 @@ impl RopeBuilder {
             root: root,
             root_info: root_info,
         }
+    }
+
+    //-----------------------------------------------------------------
+
+    /// Builds a rope all at once from a single string slice.
+    ///
+    /// This avoids the creation and use of the internal buffer.  This is for
+    /// internal use only, because the public-facing API has Rope::from_str(),
+    /// which is equivalent and uses this for its implementation.
+    pub(crate) fn build_at_once(mut self, text: &str) -> Rope {
+        let mut text = text;
+
+        while !text.is_empty() {
+            let split_idx = crate::find_split_l(MAX_TEXT_SIZE, text.as_bytes());
+            self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&text[..split_idx]))));
+            text = &text[split_idx..];
+        }
+
+        self.finish()
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!). DO NOT use
+    /// this outside of Ropey's code base. If you do, anything that happens is
+    /// your own fault, and your issue reports will be ignored.
+    ///
+    /// Directly appends `contents` to the in-progress rope as a single leaf
+    /// node (chunk).  This is useful for building ropes with specific chunk
+    /// configurations for testing purposes.  It is exposed publicly only for
+    /// use in Ropey's own test suite.
+    ///
+    /// This makes no attempt to be consistent with the standard `append()`
+    /// method, and should not be used in conjunction with it.
+    #[doc(hidden)]
+    pub fn _append_chunk_as_leaf(&mut self, contents: &str) {
+        self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(contents))));
     }
 
     fn append_leaf_node(&mut self, leaf: Node) {

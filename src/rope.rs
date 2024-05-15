@@ -974,14 +974,14 @@ mod tests {
         let mut h2 = std::collections::hash_map::DefaultHasher::new();
         let r1 = {
             let mut rb = RopeBuilder::new();
-            rb._append_chunk("Hello ");
-            rb._append_chunk("world!");
+            rb._append_chunk_as_leaf("Hello ");
+            rb._append_chunk_as_leaf("world!");
             rb.finish()
         };
         let r2 = {
             let mut rb = RopeBuilder::new();
-            rb._append_chunk("Hell");
-            rb._append_chunk("o world!");
+            rb._append_chunk_as_leaf("Hell");
+            rb._append_chunk_as_leaf("o world!");
             rb.finish()
         };
 
