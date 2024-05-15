@@ -7,7 +7,8 @@ use crate::{
     end_bound_to_num,
     iter::Chunks,
     rope_builder::RopeBuilder,
-    start_bound_to_num,
+    slice::RopeSlice,
+    start_bound_to_num, str_utils,
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
 };
 
@@ -230,6 +231,47 @@ impl Rope {
         self.root_info.line_breaks(line_type) + 1
     }
 
+    pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
+        assert!(byte_idx <= self.len_bytes());
+
+        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
+        text.is_char_boundary(byte_idx - start_info.bytes)
+    }
+
+    /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
+    /// a split would be relevant to the line-counting metrics of `line_type`.
+    ///
+    /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
+    /// for that line type this will always return false.  Otherwise it will
+    /// return if a CRLF pair would be split.
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
+        assert!(byte_idx <= self.len_bytes());
+
+        match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => false,
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            _ => {
+                let (start_info, text, info) =
+                    self.root.get_text_at_byte(byte_idx, Some(self.root_info));
+                let idx = byte_idx - start_info.bytes;
+
+                if idx == 0 {
+                    start_info.ends_with_cr && info.starts_with_lf
+                } else {
+                    str_utils::ends_with_cr(&text.text()[..idx])
+                        && str_utils::starts_with_lf(&text.text()[idx..])
+                }
+            }
+        }
+    }
+
     //---------------------------------------------------------
     // Metric conversions.
 
@@ -296,6 +338,29 @@ impl Rope {
 
         start_info.bytes
             + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
+    }
+
+    //---------------------------------------------------------
+    // Slicing.
+
+    #[inline]
+    pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'_>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
+        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+
+        assert!(
+            start_idx <= end_idx && end_idx <= self.len_bytes(),
+            "Invalid byte range: either end < start or the range is outside the bounds of the rope.",
+        );
+        assert!(
+            self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
+            "Byte range does not align with char boundaries."
+        );
+
+        RopeSlice::new(self, [start_idx, end_idx])
     }
 
     //---------------------------------------------------------

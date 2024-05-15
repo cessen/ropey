@@ -11,7 +11,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [ ] Tree rebalancing.
 - [ ] Chunk fetching functions.
 - [x] Try rewriting `RopeBuilder` to be cleaner/faster.
-- [ ] `RopeSlice`
+- [x] `RopeSlice`
 - Metric conversion functions:
   - [x] Chars <-> bytes.
   - [x] UTF16 <-> bytes.
@@ -33,7 +33,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [ ] `RopeSlice` -> `String`
     - [ ] `RopeSlice` -> `Option<str>`
     - [ ] `RopeSlice` -> `Cow<str>`
-    - [ ] `RopeSlice` -> `Rope`
+    - [ ] `RopeSlice` -> `Rope` (using extra metadata in the rope to make this trivial--metadata then gets discarded and actual trimming happens on first edit).
     - [ ] `Rope` -> `RopeSlice`
     - [x] `Rope` -> `String`
     - [x] `Rope` -> `Cow<str>`
@@ -50,8 +50,8 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
       - [x] `Rope` <-> `str`
       - [ ] `Rope` <-> `String`
       - [ ] `Rope` <-> `Cow<str>`
-      - [ ] `RopeSlice` <-> `str`
-      - [ ] `RopeSlice` <-> `String`
+      - [x] `RopeSlice` <-> `str`
+      - [x] `RopeSlice` <-> `String`
       - [ ] `RopeSlice` <-> `Cow<str>`
     - [ ] `Ord` / `PartialOrd`
       - [ ] `Rope`

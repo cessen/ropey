@@ -7,11 +7,13 @@
 
 use std::ops::Bound;
 
-pub mod iter;
 mod rope;
 mod rope_builder;
 mod str_utils;
 mod tree;
+
+pub mod iter;
+pub mod slice;
 
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;
