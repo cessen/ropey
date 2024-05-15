@@ -218,7 +218,7 @@ impl Rope {
 
     #[cfg(feature = "metric_utf16")]
     pub fn len_utf16(&self) -> usize {
-        (self.root_info.chars + self.root_info.utf16_surrogates)
+        self.root_info.chars + self.root_info.utf16_surrogates
     }
 
     #[cfg(any(
