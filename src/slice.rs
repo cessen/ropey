@@ -1,6 +1,10 @@
 use std::ops::RangeBounds;
 
-use crate::{end_bound_to_num, start_bound_to_num, Rope};
+use crate::{
+    end_bound_to_num, start_bound_to_num,
+    tree::{Node, TextInfo},
+    Rope,
+};
 
 #[cfg(any(
     feature = "metric_lines_lf",
@@ -38,124 +42,47 @@ impl<'a> RopeSlice<'a> {
     }
 
     //---------------------------------------------------------
-    // Queries.
+    // Methods shared between Rope and RopeSlice.
 
-    #[inline(always)]
-    pub fn len_bytes(&self) -> usize {
-        self.byte_range[1] - self.byte_range[0]
-    }
-
-    #[cfg(feature = "metric_chars")]
-    #[inline]
-    pub fn len_chars(&self) -> usize {
-        let char_start_idx = self.rope.byte_to_char(self.byte_range[0]);
-        let char_end_idx = self.rope.byte_to_char(self.byte_range[1]);
-        char_end_idx - char_start_idx
-    }
-
-    #[cfg(feature = "metric_utf16")]
-    #[inline]
-    pub fn len_utf16(&self) -> usize {
-        let utf16_start_idx = self.rope.byte_to_utf16(self.byte_range[0]);
-        let utf16_end_idx = self.rope.byte_to_utf16(self.byte_range[1]);
-        utf16_end_idx - utf16_start_idx
-    }
-
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    #[inline]
-    pub fn len_lines(&self, line_type: LineType) -> usize {
-        let line_start_idx = self.rope.byte_to_line(self.byte_range[0], line_type);
-        let line_end_idx = self.rope.byte_to_line(self.byte_range[1], line_type);
-        let ends_with_crlf_split = self
-            .rope
-            .is_relevant_crlf_split(self.byte_range[1], line_type);
-
-        line_end_idx - line_start_idx + 1 + ends_with_crlf_split as usize
-    }
-
-    #[inline]
-    pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-        assert!(byte_idx <= self.len_bytes());
-
-        self.rope.is_char_boundary(self.byte_range[0] + byte_idx)
-    }
+    crate::shared_impl::impl_shared_methods!();
 
     //---------------------------------------------------------
-    // Metric conversions.
+    // Utility methods needed for `impl_shared_methods!()`.
 
-    #[cfg(feature = "metric_chars")]
-    #[inline]
-    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        assert!(byte_idx <= self.len_bytes());
-
-        self.rope.byte_to_char(self.byte_range[0] + byte_idx)
-            - self.rope.byte_to_char(self.byte_range[0])
+    #[inline(always)]
+    fn get_root(&self) -> &Node {
+        &self.rope.root
     }
 
-    #[cfg(feature = "metric_chars")]
-    pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        assert!(char_idx <= self.len_chars());
-
-        let char_start_idx = self.rope.byte_to_char(self.byte_range[0]);
-        self.rope.char_to_byte(char_start_idx + char_idx) - self.byte_range[0]
+    #[inline(always)]
+    fn get_root_info(&self) -> Option<TextInfo> {
+        Some(self.rope.root_info)
     }
 
-    #[cfg(feature = "metric_utf16")]
-    #[inline]
-    pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
-        assert!(byte_idx <= self.len_bytes());
-
-        self.rope.byte_to_utf16(self.byte_range[0] + byte_idx)
-            - self.rope.byte_to_utf16(self.byte_range[0])
+    #[inline(always)]
+    fn get_full_info(&self) -> Option<TextInfo> {
+        None
     }
 
-    #[cfg(feature = "metric_utf16")]
-    pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
-        assert!(utf16_idx <= self.len_utf16());
-
-        let utf16_start_idx = self.rope.byte_to_utf16(self.byte_range[0]);
-        self.rope.utf16_to_byte(utf16_start_idx + utf16_idx) - self.byte_range[0]
+    #[inline(always)]
+    fn get_byte_range(&self) -> [usize; 2] {
+        self.byte_range
     }
 
+    /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
+    /// a split would be relevant to the line-counting metrics of `line_type`.
+    ///
+    /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
+    /// for that line type this will always return false.  Otherwise it will
+    /// return if a CRLF pair would be split.
     #[cfg(any(
         feature = "metric_lines_lf",
         feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
-    #[inline]
-    pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-        assert!(byte_idx <= self.len_bytes());
-
-        let crlf_split = if byte_idx == self.byte_range[1] {
-            self.rope
-                .is_relevant_crlf_split(self.byte_range[1], line_type)
-        } else {
-            false
-        };
-
-        self.rope
-            .byte_to_line(self.byte_range[0] + byte_idx, line_type)
-            - self.rope.byte_to_line(self.byte_range[0], line_type)
-            + crlf_split as usize
-    }
-
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-        assert!(line_idx <= self.len_lines(line_type));
-
-        let line_start_idx = self.rope.byte_to_line(self.byte_range[0], line_type);
-        self.rope
-            .line_to_byte(line_start_idx + line_idx, line_type)
-            .saturating_sub(self.byte_range[0])
-            .min(self.len_bytes())
+    #[inline(always)]
+    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
+        self.rope.is_relevant_crlf_split(byte_idx, line_type)
     }
 
     //---------------------------------------------------------

@@ -206,36 +206,31 @@ impl Rope {
     }
 
     //---------------------------------------------------------
-    // Queries.
+    // Methods shared between Rope and RopeSlice.
 
-    pub fn len_bytes(&self) -> usize {
-        self.root_info.bytes
+    crate::shared_impl::impl_shared_methods!();
+
+    //---------------------------------------------------------
+    // Utility methods needed for `impl_shared_methods!()`.
+
+    #[inline(always)]
+    fn get_root(&self) -> &Node {
+        &self.root
     }
 
-    #[cfg(feature = "metric_chars")]
-    pub fn len_chars(&self) -> usize {
-        self.root_info.chars
+    #[inline(always)]
+    fn get_root_info(&self) -> Option<TextInfo> {
+        Some(self.root_info)
     }
 
-    #[cfg(feature = "metric_utf16")]
-    pub fn len_utf16(&self) -> usize {
-        self.root_info.chars + self.root_info.utf16_surrogates
+    #[inline(always)]
+    fn get_full_info(&self) -> Option<TextInfo> {
+        Some(self.root_info)
     }
 
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    pub fn len_lines(&self, line_type: LineType) -> usize {
-        self.root_info.line_breaks(line_type) + 1
-    }
-
-    pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-        assert!(byte_idx <= self.len_bytes());
-
-        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-        text.is_char_boundary(byte_idx - start_info.bytes)
+    #[inline(always)]
+    fn get_byte_range(&self) -> [usize; 2] {
+        [0, self.root_info.bytes]
     }
 
     /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
@@ -270,74 +265,6 @@ impl Rope {
                 }
             }
         }
-    }
-
-    //---------------------------------------------------------
-    // Metric conversions.
-
-    #[cfg(feature = "metric_chars")]
-    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-        assert!(byte_idx <= self.len_bytes());
-
-        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-        start_info.chars + text.byte_to_char(byte_idx - start_info.bytes)
-    }
-
-    #[cfg(feature = "metric_chars")]
-    pub fn char_to_byte(&self, char_idx: usize) -> usize {
-        assert!(char_idx <= self.len_chars());
-
-        let (start_info, text, _) = self.root.get_text_at_char(char_idx, Some(self.root_info));
-        start_info.bytes + text.char_to_byte(char_idx - start_info.chars)
-    }
-
-    #[cfg(feature = "metric_utf16")]
-    pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
-        assert!(byte_idx <= self.len_bytes());
-
-        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-        start_info.chars
-            + start_info.utf16_surrogates
-            + text.byte_to_utf16(byte_idx - start_info.bytes)
-    }
-
-    #[cfg(feature = "metric_utf16")]
-    pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
-        assert!(utf16_idx <= self.len_utf16());
-
-        let (start_info, text, _) = self.root.get_text_at_utf16(utf16_idx, Some(self.root_info));
-        start_info.bytes
-            + text.utf16_to_byte(utf16_idx - (start_info.chars + start_info.utf16_surrogates))
-    }
-
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-        assert!(byte_idx <= self.len_bytes());
-
-        let (start_info, text, _) = self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-
-        start_info.line_breaks(line_type)
-            + text.byte_to_line(byte_idx - start_info.bytes, line_type)
-    }
-
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-        assert!(line_idx <= self.len_lines(line_type));
-
-        let (start_info, text, _) =
-            self.root
-                .get_text_at_line_break(line_idx, Some(self.root_info), line_type);
-
-        start_info.bytes
-            + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
     }
 
     //---------------------------------------------------------

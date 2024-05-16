@@ -7,6 +7,8 @@
 
 use std::ops::Bound;
 
+mod shared_impl;
+
 mod rope;
 mod rope_builder;
 mod str_utils;
