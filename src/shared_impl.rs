@@ -216,12 +216,21 @@ macro_rules! impl_shared_methods {
         //---------------------------------------------------------
         // Iterators.
 
+        pub fn bytes(&self) -> Bytes<'_> {
+            Bytes::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0],
+            )
+        }
+
         pub fn chunks(&self) -> Chunks<'_> {
             Chunks::new(
                 &self.get_root(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )
+            .0
         }
     };
 }

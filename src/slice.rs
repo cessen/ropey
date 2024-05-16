@@ -2,7 +2,7 @@ use std::ops::RangeBounds;
 
 use crate::{
     end_bound_to_num,
-    iter::Chunks,
+    iter::{Bytes, Chunks},
     start_bound_to_num,
     tree::{Node, TextInfo},
     Rope,
