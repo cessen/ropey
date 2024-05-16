@@ -99,14 +99,13 @@ impl<'a> RopeSlice<'a> {
             start_idx <= end_idx && end_idx <= self.len_bytes(),
             "Invalid byte range: either end < start or the range is outside the bounds of the rope slice.",
         );
-
-        let start_idx_real = self.byte_range[0] + start_idx;
-        let end_idx_real = self.byte_range[0] + end_idx;
         assert!(
-            self.rope.is_char_boundary(start_idx_real) && self.rope.is_char_boundary(end_idx_real),
+            self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
             "Byte range does not align with char boundaries."
         );
 
+        let start_idx_real = self.byte_range[0] + start_idx;
+        let end_idx_real = self.byte_range[0] + end_idx;
         RopeSlice::new(self.rope, [start_idx_real, end_idx_real])
     }
 }
