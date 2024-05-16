@@ -1,7 +1,9 @@
 use std::ops::RangeBounds;
 
 use crate::{
-    end_bound_to_num, start_bound_to_num,
+    end_bound_to_num,
+    iter::Chunks,
+    start_bound_to_num,
     tree::{Node, TextInfo},
     Rope,
 };
@@ -123,35 +125,13 @@ impl std::cmp::PartialEq<&str> for RopeSlice<'_> {
         }
         let other = other.as_bytes();
 
-        // TODO: this is temporary, just to get things working.  It iterates
-        // over all the chunks in the underlying rope, which is inefficient.
-        // This can be both simplified and optimized by changing to the same
-        // code as the Rope<->str comparison code after `Chunks` is implemented
-        // for RopeSlices.
-        let mut text_idx = 0;
-        let mut chunk_start = 0;
-        for chunk in self.rope.chunks() {
-            if chunk_start + chunk.len() <= self.byte_range[0] {
-                chunk_start += chunk.len();
-                continue;
-            }
-            if text_idx >= other.len() {
-                break;
-            }
-
-            let chunk_bytes = {
-                let mut chunk_bytes = chunk.as_bytes();
-                if chunk_start < self.byte_range[0] {
-                    chunk_bytes = &chunk_bytes[(self.byte_range[0] - chunk_start)..];
-                }
-                &chunk_bytes[..chunk_bytes.len().min(other.len() - text_idx)]
-            };
-
-            if chunk_bytes != &other[text_idx..(text_idx + chunk_bytes.len())] {
+        let mut idx = 0;
+        for chunk in self.chunks() {
+            let chunk = chunk.as_bytes();
+            if chunk != &other[idx..(idx + chunk.len())] {
                 return false;
             }
-            text_idx += chunk_bytes.len();
-            chunk_start += chunk.len();
+            idx += chunk.len();
         }
 
         return true;
@@ -212,70 +192,15 @@ impl std::cmp::PartialEq<RopeSlice<'_>> for std::borrow::Cow<'_, str> {
 
 impl std::fmt::Debug for RopeSlice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // TODO: this is temporary, just to get things working.  It iterates
-        // over all the chunks in the underlying rope, which is inefficient.
-        // This can be both simplified and optimized by changing to the same
-        // code as the Rope::Debug impl after `Chunks` is implemented for
-        // RopeSlices.
-        let mut debug_list = f.debug_list();
-        let mut chunk_start = 0;
-        for chunk in self.rope.chunks() {
-            if chunk_start + chunk.len() <= self.byte_range[0] {
-                chunk_start += chunk.len();
-                continue;
-            }
-            if chunk_start >= self.byte_range[1] {
-                break;
-            }
-
-            {
-                let mut chunk: &str = chunk;
-                if chunk_start + chunk.len() > self.byte_range[1] {
-                    chunk = &chunk[..(self.byte_range[1] - chunk_start)];
-                }
-                if chunk_start < self.byte_range[0] {
-                    chunk = &chunk[(self.byte_range[0] - chunk_start)..];
-                }
-                debug_list.entry(&chunk);
-            }
-
-            chunk_start += chunk.len();
-        }
-        debug_list.finish()
+        f.debug_list().entries(self.chunks()).finish()
     }
 }
 
 impl std::fmt::Display for RopeSlice<'_> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // TODO: this is temporary, just to get things working.  It iterates
-        // over all the chunks in the underlying rope, which is inefficient.
-        // This can be both simplified and optimized by changing to the same
-        // code as the Rope::Display impl after `Chunks` is implemented for
-        // RopeSlices.
-        let mut chunk_start = 0;
-        for chunk in self.rope.chunks() {
-            if chunk_start + chunk.len() <= self.byte_range[0] {
-                chunk_start += chunk.len();
-                continue;
-            }
-            if chunk_start >= self.byte_range[1] {
-                break;
-            }
-
-            {
-                let mut chunk: &str = chunk;
-                if chunk_start + chunk.len() > self.byte_range[1] {
-                    chunk = &chunk[..(self.byte_range[1] - chunk_start)];
-                }
-                if chunk_start < self.byte_range[0] {
-                    chunk = &chunk[(self.byte_range[0] - chunk_start)..];
-                }
-
-                write!(f, "{}", chunk)?;
-            }
-
-            chunk_start += chunk.len();
+        for chunk in self.chunks() {
+            write!(f, "{}", chunk)?
         }
         Ok(())
     }

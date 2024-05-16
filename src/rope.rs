@@ -291,13 +291,6 @@ impl Rope {
     }
 
     //---------------------------------------------------------
-    // Iterators.
-
-    pub fn chunks(&self) -> Chunks<'_> {
-        Chunks::new(&self.root)
-    }
-
-    //---------------------------------------------------------
     // Debugging helpers.
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)

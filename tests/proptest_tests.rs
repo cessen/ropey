@@ -228,6 +228,27 @@ proptest::proptest! {
 
         assert_eq!(idx, text.len());
     }
+
+    #[test]
+    fn pt_slice_chunks_iter_next(idx1: usize, idx2: usize, ref text in "\\PC{0,200}") {
+        let r = Rope::from_str(text);
+        let (start, end) = {
+            let idx1 = closest_char_boundary(text, idx1 % (text.len() + 1));
+            let idx2 = closest_char_boundary(text, idx2 % (text.len() + 1));
+            (idx1.min(idx2), idx1.max(idx2))
+        };
+
+        let text = &text[start..end];
+        let s = r.slice(start..end);
+
+        let mut idx = 0;
+        for chunk in s.chunks() {
+            assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
+            idx += chunk.len();
+        }
+
+        assert_eq!(idx, text.len());
+    }
 }
 
 //===========================================================================

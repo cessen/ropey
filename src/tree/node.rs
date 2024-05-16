@@ -33,6 +33,14 @@ impl Node {
     }
 
     #[inline(always)]
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            &Self::Internal(ref children) => children.nodes().is_empty(),
+            &Self::Leaf(ref text) => text.len() == 0,
+        }
+    }
+
+    #[inline(always)]
     pub(crate) fn is_internal(&self) -> bool {
         match self {
             &Self::Internal(_) => true,

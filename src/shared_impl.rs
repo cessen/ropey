@@ -212,6 +212,17 @@ macro_rules! impl_shared_methods {
             start_info.bytes
                 + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
         }
+
+        //---------------------------------------------------------
+        // Iterators.
+
+        pub fn chunks(&self) -> Chunks<'_> {
+            Chunks::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0],
+            )
+        }
     };
 }
 
