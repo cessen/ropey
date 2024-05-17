@@ -25,7 +25,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [x] Forward.
     - [ ] Bidirectional.
   - [ ] `Chars`
-    - [ ] Forward.
+    - [x] Forward.
     - [ ] Bidirectional.
   - [ ] `Lines`:
     - [ ] LF

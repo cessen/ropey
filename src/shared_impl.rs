@@ -221,6 +221,14 @@ macro_rules! impl_shared_methods {
             )
         }
 
+        pub fn chars(&self) -> Chars<'_> {
+            Chars::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0],
+            )
+        }
+
         pub fn chunks(&self) -> Chunks<'_> {
             Chunks::new(
                 &self.get_root(),

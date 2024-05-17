@@ -140,12 +140,10 @@ impl<'a> Bytes<'a> {
             .next()
             .map(|text| text.as_bytes()[(at_byte_idx - byte_start)..].iter());
 
-        let mut bytes = Bytes {
+        Bytes {
             chunks: chunks,
             current_chunk: first_chunk,
-        };
-
-        bytes
+        }
     }
 }
 
@@ -167,6 +165,51 @@ impl<'a> Iterator for Bytes<'a> {
             }
 
             self.current_chunk = self.chunks.next().map(|text| text.as_bytes().iter());
+        }
+    }
+}
+
+//=============================================================
+
+#[derive(Debug, Clone)]
+pub struct Chars<'a> {
+    chunks: Chunks<'a>,
+    current_chunk: Option<std::str::Chars<'a>>,
+}
+
+impl<'a> Chars<'a> {
+    #[inline(always)]
+    pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Chars {
+        let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
+        let first_chunk = chunks
+            .next()
+            .map(|text| text[(at_byte_idx - byte_start)..].chars());
+
+        Chars {
+            chunks: chunks,
+            current_chunk: first_chunk,
+        }
+    }
+}
+
+impl<'a> Iterator for Chars<'a> {
+    type Item = char;
+
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
+    fn next(&mut self) -> Option<char> {
+        loop {
+            if self.current_chunk.is_none() {
+                return None;
+            }
+
+            if let Some(char) = self.current_chunk.as_mut().unwrap().next() {
+                return Some(char);
+            }
+
+            self.current_chunk = self.chunks.next().map(|text| text.chars());
         }
     }
 }
@@ -256,6 +299,10 @@ mod tests {
         assert_eq!(None, chunks.next());
     }
 
+    // NOTE: when you add support for starting iterators at specific indices,
+    // ensure that the Bytes iterator can be created with a starting index that
+    // splits a char.
+
     #[test]
     fn bytes_iter_01() {
         let r = Rope::from_str(TEXT);
@@ -300,5 +347,51 @@ mod tests {
         let r = Rope::from_str("");
 
         assert_eq!(None, r.bytes().next());
+    }
+
+    #[test]
+    fn chars_iter_01() {
+        let r = Rope::from_str(TEXT);
+
+        let mut iter1 = TEXT.chars();
+        let mut iter2 = r.chars();
+
+        loop {
+            let b1 = iter1.next();
+            let b2 = iter2.next();
+
+            assert_eq!(b1, b2);
+
+            if b1.is_none() && b2.is_none() {
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn chars_iter_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+
+        let mut iter1 = TEXT[5..124].chars();
+        let mut iter2 = s.chars();
+
+        loop {
+            let b1 = iter1.next();
+            let b2 = iter2.next();
+
+            assert_eq!(b1, b2);
+
+            if b1.is_none() && b2.is_none() {
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn chars_iter_03() {
+        let r = Rope::from_str("");
+
+        assert_eq!(None, r.chars().next());
     }
 }
