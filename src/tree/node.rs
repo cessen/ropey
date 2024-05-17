@@ -367,6 +367,29 @@ impl Node {
         )
     }
 
+    /// Like `get_text_at_byte()` but only computes and returns byte
+    /// info, not full text info.  It is also faster for that reason.
+    ///
+    /// Returns the byte index offset of the start of the returned
+    /// text, and the text itself.
+    pub fn get_text_at_byte_fast(&self, byte_idx: usize) -> (usize, &Text) {
+        let mut idx = byte_idx;
+        let mut node = self;
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => {
+                    return (byte_idx - idx, text);
+                }
+                Node::Internal(ref children) => {
+                    let (child_i, byte_idx_offset) = children.search_byte_idx_only(idx);
+                    node = &children.nodes()[child_i];
+                    idx -= byte_idx_offset;
+                }
+            }
+        }
+    }
+
     /// Returns the `Text` that contains the given char.
     ///
     /// See `get_text_at_metric()` for further documentation.
@@ -426,24 +449,9 @@ impl Node {
     //---------------------------------------------------------
     // Misc.
 
-    /// NOTE: assumes that byte_idx is valid.  No explicit checks for that are
-    /// done.
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-        let mut idx = byte_idx;
-        let mut node = self;
-
-        loop {
-            match *node {
-                Node::Leaf(ref text) => {
-                    return text.is_char_boundary(idx);
-                }
-                Node::Internal(ref children) => {
-                    let (child_i, byte_idx_offset) = children.search_byte_idx_only(idx);
-                    node = &children.nodes()[child_i];
-                    idx -= byte_idx_offset;
-                }
-            }
-        }
+        let (offset, text) = self.get_text_at_byte_fast(byte_idx);
+        text.is_char_boundary(byte_idx - offset)
     }
 
     //---------------------------------------------------------

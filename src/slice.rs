@@ -363,6 +363,19 @@ mod tests {
         assert_eq!(s.len_utf16(), 0);
     }
 
+    #[test]
+    fn is_char_boundary_01() {
+        let r = Rope::from_str(TEXT);
+        assert!(r.is_char_boundary(0));
+        assert!(r.is_char_boundary(127));
+
+        let s = r.slice(7..103);
+        let t = &TEXT[7..103];
+        for i in 0..s.len_bytes() {
+            assert_eq!(t.is_char_boundary(i), s.is_char_boundary(i));
+        }
+    }
+
     #[cfg(feature = "metric_chars")]
     #[test]
     fn byte_to_char_01() {
