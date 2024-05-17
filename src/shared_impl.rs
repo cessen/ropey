@@ -51,10 +51,7 @@ macro_rules! impl_shared_methods {
             assert!(byte_idx <= self.len_bytes());
 
             let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (start_info, text, _) = self
-                .get_root()
-                .get_text_at_byte(byte_idx, self.get_full_info());
-            text.is_char_boundary(byte_idx - start_info.bytes)
+            self.get_root().is_char_boundary(byte_idx)
         }
 
         //---------------------------------------------------------

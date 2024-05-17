@@ -424,6 +424,29 @@ impl Node {
     }
 
     //---------------------------------------------------------
+    // Misc.
+
+    /// NOTE: assumes that byte_idx is valid.  No explicit checks for that are
+    /// done.
+    pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
+        let mut idx = byte_idx;
+        let mut node = self;
+
+        loop {
+            match *node {
+                Node::Leaf(ref text) => {
+                    return text.is_char_boundary(idx);
+                }
+                Node::Internal(ref children) => {
+                    let (child_i, byte_idx_offset) = children.search_byte_idx_only(idx);
+                    node = &children.nodes()[child_i];
+                    idx -= byte_idx_offset;
+                }
+            }
+        }
+    }
+
+    //---------------------------------------------------------
     // Debugging helpers.
 
     /// Checks that all leaf nodes are at the same depth.
