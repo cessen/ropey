@@ -25,7 +25,7 @@ use crate::LineType;
 use crate::str_utils::{ends_with_cr, starts_with_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct TextInfo {
+pub struct TextInfo {
     pub bytes: usize,
 
     #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
@@ -45,9 +45,9 @@ pub(crate) struct TextInfo {
 
     // To handle split CRLF line breaks correctly.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-    pub starts_with_lf: bool,
+    pub(crate) starts_with_lf: bool,
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-    pub ends_with_cr: bool,
+    pub(crate) ends_with_cr: bool,
 }
 
 impl TextInfo {
@@ -57,7 +57,7 @@ impl TextInfo {
     /// would return, but is constructed more efficiently since this can skip
     /// all of the text scan function calls.
     #[inline(always)]
-    pub fn new() -> TextInfo {
+    pub(crate) fn new() -> TextInfo {
         TextInfo {
             bytes: 0,
 
@@ -85,7 +85,7 @@ impl TextInfo {
     }
 
     #[inline]
-    pub fn from_str(text: &str) -> TextInfo {
+    pub(crate) fn from_str(text: &str) -> TextInfo {
         #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
         let char_count = chars::count(text);
 
@@ -121,7 +121,7 @@ impl TextInfo {
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
-    pub fn line_breaks(&self, line_type: LineType) -> usize {
+    pub(crate) fn line_breaks(&self, line_type: LineType) -> usize {
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => self.line_breaks_lf,
@@ -141,7 +141,7 @@ impl TextInfo {
     /// left alone.
     #[must_use]
     #[inline(always)]
-    pub fn adjusted_by_next(
+    pub(crate) fn adjusted_by_next(
         self,
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         next: TextInfo,
@@ -164,7 +164,7 @@ impl TextInfo {
     /// left alone.
     #[must_use]
     #[inline(always)]
-    pub fn adjusted_by_next_is_lf(
+    pub(crate) fn adjusted_by_next_is_lf(
         self,
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         next_is_lf: bool,
@@ -200,7 +200,7 @@ impl TextInfo {
     /// the starts/ends_with CRLF tags appropriately.
     #[must_use]
     #[inline(always)]
-    pub fn concat(self, rhs: TextInfo) -> TextInfo {
+    pub(crate) fn concat(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
             starts_with_lf: (self.bytes == 0 && rhs.starts_with_lf) || self.starts_with_lf,
@@ -222,7 +222,7 @@ impl TextInfo {
     ///   removed from the right side.
     #[must_use]
     #[inline(always)]
-    pub fn truncate(self, remaining_text: &str, removed_info: TextInfo) -> TextInfo {
+    pub(crate) fn truncate(self, remaining_text: &str, removed_info: TextInfo) -> TextInfo {
         if remaining_text.is_empty() {
             return TextInfo::new();
         }
@@ -252,15 +252,15 @@ impl TextInfo {
 
 impl Add for TextInfo {
     type Output = Self;
-    /// Note: this does *not* handle anything related to CRLF line breaks, such
-    /// as split CRLF compensation or updating starts/ends_with flags.  It just
-    /// does a straight sum of the text info stats.
-    ///
-    /// Because of that, using this correctly typically requires special
-    /// handling.  Beware.
-    ///
-    /// If you want to combine two TextInfo's as if their text were
-    /// concatenated, see `concat()`.
+    // Note: this does *not* handle anything related to CRLF line breaks, such
+    // as split CRLF compensation or updating starts/ends_with flags.  It just
+    // does a straight sum of the text info stats.
+    //
+    // Because of that, using this correctly typically requires special
+    // handling.  Beware.
+    //
+    // If you want to combine two TextInfo's as if their text were
+    // concatenated, see `concat()`.
     #[inline]
     fn add(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
@@ -295,15 +295,15 @@ impl AddAssign for TextInfo {
 
 impl Sub for TextInfo {
     type Output = Self;
-    /// Note: this does *not* handle anything related to CRLF line breaks, such
-    /// as split CRLF compensation or updating starts/ends_with flags.  It just
-    /// does a straight subtraction of the text info stats.
-    ///
-    /// Because of that, using this correctly typically requires special
-    /// handling.  Beware.
-    ///
-    /// If you want to remove one TextInfo from another as if truncating, see
-    /// `truncate()`.
+    // Note: this does *not* handle anything related to CRLF line breaks, such
+    // as split CRLF compensation or updating starts/ends_with flags.  It just
+    // does a straight subtraction of the text info stats.
+    //
+    // Because of that, using this correctly typically requires special
+    // handling.  Beware.
+    //
+    // If you want to remove one TextInfo from another as if truncating, see
+    // `truncate()`.
     #[inline]
     fn sub(self, rhs: TextInfo) -> TextInfo {
         TextInfo {

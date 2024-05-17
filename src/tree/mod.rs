@@ -3,6 +3,8 @@ mod node;
 mod text;
 mod text_info;
 
+pub use text_info::TextInfo;
+
 #[cfg(not(any(test, feature = "internal_dev_small_chunks")))]
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 16;
@@ -20,4 +22,3 @@ pub(crate) use constants::{MAX_CHILDREN, MAX_TEXT_SIZE, MIN_TEXT_SIZE};
 pub(crate) use children::Children;
 pub(crate) use node::Node;
 pub(crate) use text::Text;
-pub(crate) use text_info::TextInfo;

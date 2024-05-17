@@ -20,6 +20,7 @@ pub mod iter;
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;
 pub use slice::RopeSlice;
+pub use tree::TextInfo;
 
 #[cfg(any(
     feature = "metric_lines_lf",
