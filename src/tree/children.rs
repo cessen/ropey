@@ -413,14 +413,10 @@ impl Children {
     /// applied.
     #[cfg(feature = "metric_utf16")]
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| utf16_idx < (end.chars + end.utf16_surrogates));
+        let (idx, accum) = self.search_by(|_, end| utf16_idx < end.utf16);
 
         debug_assert!(
-            utf16_idx
-                <= (accum.chars
-                    + accum.utf16_surrogates
-                    + self.info()[idx].chars
-                    + self.info()[idx].utf16_surrogates),
+            utf16_idx <= (accum.utf16 + self.info()[idx].utf16),
             "Index out of bounds."
         );
 

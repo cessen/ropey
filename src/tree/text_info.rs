@@ -32,7 +32,7 @@ pub(crate) struct TextInfo {
     pub chars: usize,
 
     #[cfg(feature = "metric_utf16")]
-    pub utf16_surrogates: usize,
+    pub utf16: usize,
 
     #[cfg(feature = "metric_lines_lf")]
     pub line_breaks_lf: usize,
@@ -65,7 +65,7 @@ impl TextInfo {
             chars: 0,
 
             #[cfg(feature = "metric_utf16")]
-            utf16_surrogates: 0,
+            utf16: 0,
 
             #[cfg(feature = "metric_lines_lf")]
             line_breaks_lf: 0,
@@ -86,14 +86,17 @@ impl TextInfo {
 
     #[inline]
     pub fn from_str(text: &str) -> TextInfo {
+        #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
+        let char_count = chars::count(text);
+
         TextInfo {
             bytes: text.len(),
 
             #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
-            chars: chars::count(text),
+            chars: char_count,
 
             #[cfg(feature = "metric_utf16")]
-            utf16_surrogates: utf16::count_surrogates(text),
+            utf16: utf16::count_surrogates(text) + char_count,
 
             #[cfg(feature = "metric_lines_lf")]
             line_breaks_lf: lines_lf::count_breaks(text),
@@ -267,7 +270,7 @@ impl Add for TextInfo {
             chars: self.chars + rhs.chars,
 
             #[cfg(feature = "metric_utf16")]
-            utf16_surrogates: self.utf16_surrogates + rhs.utf16_surrogates,
+            utf16: self.utf16 + rhs.utf16,
 
             #[cfg(feature = "metric_lines_lf")]
             line_breaks_lf: self.line_breaks_lf + rhs.line_breaks_lf,
@@ -310,7 +313,7 @@ impl Sub for TextInfo {
             chars: self.chars - rhs.chars,
 
             #[cfg(feature = "metric_utf16")]
-            utf16_surrogates: self.utf16_surrogates - rhs.utf16_surrogates,
+            utf16: self.utf16 - rhs.utf16,
 
             #[cfg(feature = "metric_lines_lf")]
             line_breaks_lf: self.line_breaks_lf - rhs.line_breaks_lf,

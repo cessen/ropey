@@ -420,7 +420,7 @@ impl Node {
             utf16_idx,
             text_info,
             |children, idx| children.search_utf16_code_unit_idx(idx),
-            |idx, traversed_info| idx - (traversed_info.chars + traversed_info.utf16_surrogates),
+            |idx, traversed_info| idx - traversed_info.utf16,
         )
     }
 

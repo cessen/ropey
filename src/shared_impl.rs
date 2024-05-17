@@ -21,7 +21,7 @@ macro_rules! impl_shared_methods {
         #[cfg(feature = "metric_utf16")]
         pub fn len_utf16(&self) -> usize {
             if let Some(info) = self.get_full_info() {
-                info.chars + info.utf16_surrogates
+                info.utf16
             } else {
                 let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
                 let utf16_end_idx = self._byte_to_utf16(self.get_byte_range()[1]);
@@ -168,9 +168,7 @@ macro_rules! impl_shared_methods {
             let (start_info, text, _) = self
                 .get_root()
                 .get_text_at_byte(byte_idx, self.get_root_info());
-            start_info.chars
-                + start_info.utf16_surrogates
-                + text.byte_to_utf16(byte_idx - start_info.bytes)
+            start_info.utf16 + text.byte_to_utf16(byte_idx - start_info.bytes)
         }
 
         #[cfg(feature = "metric_utf16")]
@@ -178,8 +176,7 @@ macro_rules! impl_shared_methods {
             let (start_info, text, _) = self
                 .get_root()
                 .get_text_at_utf16(utf16_idx, self.get_root_info());
-            start_info.bytes
-                + text.utf16_to_byte(utf16_idx - (start_info.chars + start_info.utf16_surrogates))
+            start_info.bytes + text.utf16_to_byte(utf16_idx - start_info.utf16)
         }
 
         #[cfg(any(
