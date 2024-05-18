@@ -68,21 +68,6 @@ impl Text {
         self.0.is_char_boundary(byte_idx)
     }
 
-    /// Finds the byte index of the closest char boundary
-    /// to-the-left-or-equal-to `byte_idx`.
-    #[inline(always)]
-    pub fn find_char_boundary_l(&self, mut byte_idx: usize) -> usize {
-        if byte_idx >= self.len() {
-            return self.len();
-        }
-
-        let text = self.text();
-        while (text.as_bytes()[byte_idx] >> 6) == 0b10 && byte_idx > 0 {
-            byte_idx -= 1;
-        }
-        return byte_idx;
-    }
-
     //---------------------------------------------------------
     // Metric conversions.
 

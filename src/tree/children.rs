@@ -1,8 +1,4 @@
-use std::{
-    iter::{Iterator, Zip},
-    slice,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use super::{node::Node, text_info::TextInfo, MAX_CHILDREN, MAX_TEXT_SIZE};
 
@@ -28,12 +24,6 @@ impl Children {
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.0.len()
-    }
-
-    /// Returns whether the child array is full or not.
-    #[inline(always)]
-    pub fn is_full(&self) -> bool {
-        self.len() == MAX_CHILDREN
     }
 
     /// Access to the nodes array.
@@ -310,12 +300,6 @@ impl Children {
         } else {
             self.0.clear_unbalance_flag(child_idx);
         }
-    }
-
-    /// Creates an iterator over the array's items.
-    #[inline(always)]
-    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Node>> {
-        Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 
     #[inline(always)]
@@ -838,7 +822,6 @@ mod inner {
 
                 // The unbalance flags.
                 let mask = range_bitmask(from_range[0], from_range[1]);
-                let high_mask = range_bitmask(to_idx, self.len());
                 if from_range[0] <= to_idx {
                     self.subtree_unbalance_flags |=
                         (other.subtree_unbalance_flags & mask) << (to_idx - from_range[0]);

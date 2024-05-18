@@ -41,15 +41,15 @@ pub enum LineType {
 //=============================================================
 // Utilities.
 
-/// Scans left from `byte_idx` to find a char boundary.
-///
-/// This is used to find an appropriate split position on utf8 strings.
+/// Starting from `byte_idx`, scans left to find the first byte index that is a
+/// char boundary.  Note that this is inclusive of `byte_idx` (if it is already
+/// a char boundary, `byte_idx` is returned).
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
 ///
-/// Note for convenience, if `byte_idx > text.len()`, this simply
-/// returns `text.len()`.
-pub(crate) fn find_split_l(mut byte_idx: usize, text: &[u8]) -> usize {
+/// Note for convenience, if `byte_idx > text.len()`, this simply returns
+/// `text.len()`.
+pub(crate) fn find_char_boundary_l(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }
@@ -61,15 +61,15 @@ pub(crate) fn find_split_l(mut byte_idx: usize, text: &[u8]) -> usize {
     byte_idx
 }
 
-/// Scans right from `byte_idx` to find a char boundary.
-///
-/// This is used to find an appropriate split position on utf8 strings.
+/// Starting from `byte_idx`, scans right to find the first byte index that is a
+/// char boundary.  Note that this is inclusive of `byte_idx` (if it is already
+/// a char boundary, `byte_idx` is returned).
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
 ///
-/// Note for convenience, if `byte_idx > text.len()`, this simply
-/// returns `text.len()`.
-pub(crate) fn find_split_r(mut byte_idx: usize, text: &[u8]) -> usize {
+/// Note for convenience, if `byte_idx > text.len()`, this simply returns
+/// `text.len()`.
+pub(crate) fn find_char_boundary_r(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }

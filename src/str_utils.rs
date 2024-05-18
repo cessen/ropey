@@ -14,7 +14,6 @@ pub(crate) fn ends_with_cr(text: &str) -> bool {
     feature = "metric_lines_unicode"
 ))]
 pub(crate) mod lines {
-    use super::{ends_with_cr, starts_with_lf};
     use crate::LineType;
 
     #[inline(always)]
@@ -41,6 +40,7 @@ pub(crate) mod lines {
         }
     }
 
+    #[allow(unused)]
     #[inline(always)]
     pub(crate) fn count_breaks(text: &str, line_type: LineType) -> usize {
         match line_type {
@@ -50,26 +50,6 @@ pub(crate) mod lines {
             LineType::CRLF => str_indices::lines_crlf::count_breaks(text),
             #[cfg(feature = "metric_lines_unicode")]
             LineType::All => str_indices::lines::count_breaks(text),
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn has_crlf_split(
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))] left: &str,
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))] right: &str,
-        #[cfg(not(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode")))]
-        _left: &str,
-        #[cfg(not(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode")))]
-        _right: &str,
-        line_type: LineType,
-    ) -> bool {
-        match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => false,
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => ends_with_cr(left) && starts_with_lf(right),
-            #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => ends_with_cr(left) && starts_with_lf(right),
         }
     }
 }

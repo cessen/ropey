@@ -211,43 +211,6 @@ impl TextInfo {
             ..(self.adjusted_by_next(rhs) + rhs)
         }
     }
-
-    /// Computes the new info for a text after removing some of it from
-    /// the right side.
-    ///
-    /// The info this is called on is the pre-truncation text info.
-    ///
-    /// - `remaining_text`: the remaining text after truncation.
-    /// - `removed_info`: the text info for the portion of the text was
-    ///   removed from the right side.
-    #[must_use]
-    #[inline(always)]
-    pub(crate) fn truncate(self, remaining_text: &str, removed_info: TextInfo) -> TextInfo {
-        if remaining_text.is_empty() {
-            return TextInfo::new();
-        }
-
-        let mut info = self - removed_info;
-
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-        {
-            info.starts_with_lf = starts_with_lf(remaining_text);
-            info.ends_with_cr = ends_with_cr(remaining_text);
-            if info.ends_with_cr && removed_info.starts_with_lf {
-                #[cfg(feature = "metric_lines_cr_lf")]
-                {
-                    info.line_breaks_cr_lf += 1;
-                }
-
-                #[cfg(feature = "metric_lines_unicode")]
-                {
-                    info.line_breaks_unicode += 1;
-                }
-            }
-        }
-
-        info
-    }
 }
 
 impl Add for TextInfo {
@@ -421,27 +384,6 @@ mod tests {
                 assert_eq!(
                     TextInfo::from_str(text),
                     TextInfo::from_str(left).concat(TextInfo::from_str(right)),
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn truncate_01() {
-        let test_texts = [
-            "Hello world!",
-            "\nHello\nworld!\n",
-            "\r\nHello\r\nworld!\r\n",
-            "\r\n\r\n\r\n\r\n\r\n\r\n",
-        ];
-
-        for text in test_texts {
-            for split in 0..(text.len() + 1) {
-                let left = &text[..split];
-                let right = &text[split..];
-                assert_eq!(
-                    TextInfo::from_str(left),
-                    TextInfo::from_str(text).truncate(left, TextInfo::from_str(right),),
                 );
             }
         }
