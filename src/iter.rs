@@ -41,14 +41,14 @@ impl<'a> Chunks<'a> {
         let mut current_node = node;
         let mut byte_offset = 0;
         loop {
-            match current_node {
-                &Node::Leaf(_) => {
+            match *current_node {
+                Node::Leaf(_) => {
                     chunks.node_stack.push((current_node, 0));
                     chunks.current_byte_idx = byte_offset;
                     break;
                 }
 
-                &Node::Internal(ref children) => {
+                Node::Internal(ref children) => {
                     let (child_i, acc_byte_idx) = children.search_byte_idx_only(at_byte_idx);
 
                     byte_offset += acc_byte_idx;

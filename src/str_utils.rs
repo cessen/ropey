@@ -1,6 +1,6 @@
 #[inline(always)]
 pub(crate) fn starts_with_lf(text: &str) -> bool {
-    text.as_bytes().get(0).map(|&b| b == 0x0A).unwrap_or(false)
+    text.as_bytes().first().map(|&b| b == 0x0A).unwrap_or(false)
 }
 
 #[inline(always)]

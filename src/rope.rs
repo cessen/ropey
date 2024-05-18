@@ -485,7 +485,7 @@ impl<'a> From<&'a Rope> for String {
 
 impl<'a> From<&'a str> for Rope {
     fn from(s: &'a str) -> Rope {
-        Rope::from_str(&s)
+        Rope::from_str(s)
     }
 }
 
@@ -579,7 +579,7 @@ impl std::fmt::Display for Rope {
     }
 }
 
-impl<'a> std::hash::Hash for Rope {
+impl std::hash::Hash for Rope {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // `std::hash::Hasher` only guarantees the same hash output for
         // exactly the same calls to `Hasher::write()`.  Just submitting
@@ -616,7 +616,7 @@ impl<'a> std::hash::Hash for Rope {
                     // Append to the buffer.
                     let n = (BLOCK_SIZE - buffer_len).min(data.len());
                     let (head, tail) = data.split_at(n);
-                    (&mut buffer[buffer_len..(buffer_len + n)]).copy_from_slice(head);
+                    buffer[buffer_len..(buffer_len + n)].copy_from_slice(head);
                     buffer_len += n;
                     data = tail;
                 }

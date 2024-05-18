@@ -329,11 +329,7 @@ impl Children {
         while idx < (self.len() - 1) {
             let next_accum = {
                 let next_info = self.info()[idx];
-                let next_next_info = self
-                    .info()
-                    .get(idx + 1)
-                    .map(|ti| *ti)
-                    .unwrap_or(TextInfo::new());
+                let next_next_info = self.info().get(idx + 1).copied().unwrap_or(TextInfo::new());
                 TextInfo {
                     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
                     ends_with_cr: (next_info.bytes == 0 && accum.ends_with_cr)
@@ -902,24 +898,24 @@ mod inner {
             #[cfg(debug_assertions)]
             {
                 for (a, b) in Iterator::zip(
-                    (&clone_array.info[..clone_array.len()]).iter(),
-                    (&self.info[..self.len()]).iter(),
+                    clone_array.info[..clone_array.len()].iter(),
+                    self.info[..self.len()].iter(),
                 ) {
                     assert_eq!(unsafe { a.assume_init() }, unsafe { b.assume_init() },);
                 }
 
                 for (a, b) in Iterator::zip(
-                    (&clone_array.nodes[..clone_array.len()]).iter(),
-                    (&self.nodes[..clone_array.len()]).iter(),
+                    clone_array.nodes[..clone_array.len()].iter(),
+                    self.nodes[..clone_array.len()].iter(),
                 ) {
                     let a = unsafe { a.assume_init_ref() };
                     let b = unsafe { b.assume_init_ref() };
                     match (a, b) {
-                        (Node::Internal(a_arc), Node::Internal(b_arc)) => {
-                            assert!(Arc::ptr_eq(&a_arc, &b_arc));
+                        (Node::Internal(ref a_arc), Node::Internal(ref b_arc)) => {
+                            assert!(Arc::ptr_eq(a_arc, b_arc));
                         }
-                        (Node::Leaf(a_arc), Node::Leaf(b_arc)) => {
-                            assert!(Arc::ptr_eq(&a_arc, &b_arc));
+                        (Node::Leaf(ref a_arc), Node::Leaf(ref b_arc)) => {
+                            assert!(Arc::ptr_eq(a_arc, b_arc));
                         }
                         _ => panic!("Cloned node is not the same type as its source."),
                     }

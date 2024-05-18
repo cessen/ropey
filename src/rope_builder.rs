@@ -98,7 +98,7 @@ impl RopeBuilder {
         }
 
         // Special case for empty rope.
-        if self.stack.len() == 0 {
+        if self.stack.is_empty() {
             return Rope::new();
         }
 

@@ -380,9 +380,9 @@ mod inner {
             unsafe {
                 let ptr = self.buffer.as_mut_ptr();
                 std::ptr::copy(
-                    ptr.offset(byte_idx as isize),
-                    ptr.offset(byte_idx as isize + text.len() as isize),
-                    self.len() as usize - byte_idx,
+                    ptr.add(byte_idx),
+                    ptr.add(byte_idx + text.len()),
+                    self.len() - byte_idx,
                 );
             }
 
@@ -418,9 +418,9 @@ mod inner {
             unsafe {
                 let ptr = self.buffer.as_mut_ptr();
                 std::ptr::copy(
-                    ptr.offset(byte_idx_range[1] as isize),
-                    ptr.offset(byte_idx_range[0] as isize),
-                    self.len() as usize - byte_idx_range[1],
+                    ptr.add(byte_idx_range[1]),
+                    ptr.add(byte_idx_range[0]),
+                    self.len() - byte_idx_range[1],
                 );
             }
 

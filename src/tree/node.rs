@@ -20,55 +20,55 @@ impl Node {
     ///
     /// Assumes that the info of this node's children is up to date.
     pub(crate) fn text_info(&self) -> TextInfo {
-        match &self {
-            Node::Internal(children) => {
+        match *self {
+            Node::Internal(ref children) => {
                 let mut acc_info = TextInfo::new();
                 for info in children.info() {
                     acc_info = acc_info.concat(*info);
                 }
                 acc_info
             }
-            Node::Leaf(text) => text.text_info(),
+            Node::Leaf(ref text) => text.text_info(),
         }
     }
 
     #[inline(always)]
     pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            &Self::Internal(ref children) => children.nodes().is_empty(),
-            &Self::Leaf(ref text) => text.len() == 0,
+        match *self {
+            Self::Internal(ref children) => children.nodes().is_empty(),
+            Self::Leaf(ref text) => text.len() == 0,
         }
     }
 
     #[inline(always)]
     pub(crate) fn is_internal(&self) -> bool {
-        match self {
-            &Self::Internal(_) => true,
-            &Self::Leaf(_) => false,
+        match *self {
+            Self::Internal(_) => true,
+            Self::Leaf(_) => false,
         }
     }
 
     #[inline(always)]
     pub(crate) fn is_leaf(&self) -> bool {
-        match self {
-            &Self::Internal(_) => false,
-            &Self::Leaf(_) => true,
+        match *self {
+            Self::Internal(_) => false,
+            Self::Leaf(_) => true,
         }
     }
 
     #[inline(always)]
     pub fn is_directly_unbalanced(&self) -> bool {
-        match self {
-            &Node::Leaf(ref text) => text.len() < MIN_TEXT_SIZE,
-            &Node::Internal(ref children) => children.len() < MIN_CHILDREN,
+        match *self {
+            Node::Leaf(ref text) => text.len() < MIN_TEXT_SIZE,
+            Node::Internal(ref children) => children.len() < MIN_CHILDREN,
         }
     }
 
     #[inline(always)]
     pub fn is_subtree_unbalanced(&self) -> bool {
-        match self {
-            &Node::Leaf(_) => false,
-            &Node::Internal(ref children) => children.is_any_unbalanced(),
+        match *self {
+            Node::Leaf(_) => false,
+            Node::Internal(ref children) => children.is_any_unbalanced(),
         }
     }
 
@@ -368,7 +368,7 @@ impl Node {
                     );
                 }
                 Node::Internal(ref children) => {
-                    let (child_i, acc_info) = metric_scanner(&children, metric_idx);
+                    let (child_i, acc_info) = metric_scanner(children, metric_idx);
                     left_info = left_info.concat(acc_info);
                     text_info = children.info()[child_i];
 
