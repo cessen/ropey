@@ -113,7 +113,11 @@ impl RopeBuilder {
         }
 
         // Create the rope.
-        let root = self.stack.pop().unwrap();
+        let root = {
+            let mut node = self.stack.pop().unwrap();
+            compute_and_set_unbalance_flags_deep(&mut node);
+            node
+        };
         let root_info = root.text_info();
         Rope {
             root: root,
@@ -205,6 +209,19 @@ impl RopeBuilder {
 impl Default for RopeBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn compute_and_set_unbalance_flags_deep(node: &mut Node) {
+    match *node {
+        Node::Leaf(_) => {}
+        Node::Internal(ref mut children) => {
+            let children = Arc::make_mut(children);
+            for i in 0..children.len() {
+                compute_and_set_unbalance_flags_deep(&mut children.nodes_mut()[i]);
+                children.update_unbalance_flag(i);
+            }
+        }
     }
 }
 

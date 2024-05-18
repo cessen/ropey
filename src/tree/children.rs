@@ -71,7 +71,8 @@ impl Children {
     /// Increases length by one.  Panics if already full.
     #[inline(always)]
     pub fn push(&mut self, item: (TextInfo, Node)) {
-        self.0.push(item)
+        self.0.push(item);
+        self.update_unbalance_flag(self.len());
     }
 
     /// Pushes an element onto the end of the array, and then splits it in half,
@@ -119,6 +120,7 @@ impl Children {
 
         *info1 = info1.concat(*info2);
         self.remove(idx2);
+        self.update_unbalance_flag(idx1);
     }
 
     /// Equally distributes the data between two nodes.
@@ -159,6 +161,8 @@ impl Children {
 
             _ => panic!("Can't distribute data between two nodes of different types."),
         }
+        self.update_unbalance_flag(idx1);
+        self.update_unbalance_flag(idx2);
     }
 
     /// Attempts to merge two nodes, and if it's too much data to merge
@@ -210,7 +214,8 @@ impl Children {
     /// of the other items.
     #[inline(always)]
     pub fn insert(&mut self, idx: usize, item: (TextInfo, Node)) {
-        self.0.insert(idx, item)
+        self.0.insert(idx, item);
+        self.update_unbalance_flag(idx);
     }
 
     /// Inserts an element into a the array, and then splits it in half, returning
@@ -279,6 +284,25 @@ impl Children {
             (&mut info1[idx1], &mut nodes1[idx1]),
             (&mut info2[idx2 - split_idx], &mut nodes2[idx2 - split_idx]),
         )
+    }
+
+    #[inline(always)]
+    pub fn is_node_unbalanced(&self, child_idx: usize) -> bool {
+        self.0.is_node_unbalanced(child_idx)
+    }
+
+    #[inline(always)]
+    pub fn is_any_unbalanced(&self) -> bool {
+        self.0.is_any_unbalanced()
+    }
+
+    #[inline(always)]
+    pub fn update_unbalance_flag(&mut self, child_idx: usize) {
+        if self.nodes()[child_idx].is_unbalanced() {
+            self.0.set_unbalance_flag(child_idx);
+        } else {
+            self.0.clear_unbalance_flag(child_idx);
+        }
     }
 
     /// Creates an iterator over the array's items.
@@ -489,7 +513,7 @@ mod inner {
         /// An array of the child node text infos
         /// INVARIANT: The nodes from `0..len` must be initialized
         info: [MaybeUninit<TextInfo>; MAX_CHILDREN],
-        subtree_unbalanced_flags: u32,
+        subtree_unbalance_flags: u32,
         len: u8,
     }
 
@@ -502,7 +526,7 @@ mod inner {
             ChildrenInternal {
                 nodes: unsafe { MaybeUninit::uninit().assume_init() },
                 info: unsafe { MaybeUninit::uninit().assume_init() },
-                subtree_unbalanced_flags: 0,
+                subtree_unbalance_flags: 0,
                 len: 0,
             }
         }
@@ -556,23 +580,27 @@ mod inner {
             )
         }
 
+        #[inline(always)]
         pub fn is_node_unbalanced(&self, idx: usize) -> bool {
             debug_assert!(idx < self.len());
-            self.subtree_unbalanced_flags & (1 << idx) != 0
+            self.subtree_unbalance_flags & (1 << idx) != 0
         }
 
+        #[inline(always)]
         pub fn is_any_unbalanced(&self) -> bool {
-            self.subtree_unbalanced_flags != 0
+            self.subtree_unbalance_flags != 0
         }
 
-        pub fn set_unbalanced_flag(&mut self, idx: usize) {
+        #[inline(always)]
+        pub fn set_unbalance_flag(&mut self, idx: usize) {
             debug_assert!(idx < self.len());
-            self.subtree_unbalanced_flags |= 1 << idx;
+            self.subtree_unbalance_flags |= 1 << idx;
         }
 
-        pub fn clear_unbalanced_flag(&mut self, idx: usize) {
+        #[inline(always)]
+        pub fn clear_unbalance_flag(&mut self, idx: usize) {
             debug_assert!(idx < self.len());
-            self.subtree_unbalanced_flags &= !(1 << idx);
+            self.subtree_unbalance_flags &= !(1 << idx);
         }
 
         /// Pushes an item onto the end of the array.
@@ -596,7 +624,7 @@ mod inner {
             assert!(self.len() > 0);
             self.len -= 1;
 
-            self.subtree_unbalanced_flags &= !(1 << self.len());
+            self.subtree_unbalance_flags &= !(1 << self.len());
 
             // SAFETY: before this, `len` was long enough to guarantee that
             // both `info` and `node` must be init.  We just decreased the
@@ -635,8 +663,8 @@ mod inner {
             // The unbalance flags.
             let low_mask = range_bitmask(0, idx);
             let high_mask = range_bitmask(idx, self.len());
-            self.subtree_unbalanced_flags = ((self.subtree_unbalanced_flags & high_mask) << 1)
-                | (self.subtree_unbalanced_flags & low_mask);
+            self.subtree_unbalance_flags = ((self.subtree_unbalance_flags & high_mask) << 1)
+                | (self.subtree_unbalance_flags & low_mask);
 
             self.len += 1;
         }
@@ -673,8 +701,8 @@ mod inner {
             // The unbalance flags.
             let low_mask = range_bitmask(0, idx);
             let high_mask = range_bitmask(idx + 1, self.len());
-            self.subtree_unbalanced_flags = ((self.subtree_unbalanced_flags & high_mask) >> 1)
-                | (self.subtree_unbalanced_flags & low_mask);
+            self.subtree_unbalance_flags = ((self.subtree_unbalance_flags & high_mask) >> 1)
+                | (self.subtree_unbalance_flags & low_mask);
 
             self.len -= 1;
 
@@ -720,9 +748,9 @@ mod inner {
                 // Move the unbalance flags.
                 let low_mask = range_bitmask(0, range[0]);
                 let high_mask = range_bitmask(range[1], self.len());
-                self.subtree_unbalanced_flags = ((self.subtree_unbalanced_flags & high_mask)
+                self.subtree_unbalance_flags = ((self.subtree_unbalance_flags & high_mask)
                     >> (range[1] - range[0]))
-                    | (self.subtree_unbalanced_flags & low_mask);
+                    | (self.subtree_unbalance_flags & low_mask);
 
                 self.len -= range_len as u8;
             }
@@ -768,9 +796,9 @@ mod inner {
                 // The unbalance flags.
                 let low_mask = range_bitmask(0, to_idx);
                 let high_mask = range_bitmask(to_idx, self.len());
-                self.subtree_unbalanced_flags = ((self.subtree_unbalanced_flags & high_mask)
+                self.subtree_unbalance_flags = ((self.subtree_unbalance_flags & high_mask)
                     << (from_range[1] - from_range[0]))
-                    | (self.subtree_unbalanced_flags & low_mask);
+                    | (self.subtree_unbalance_flags & low_mask);
 
                 self.len += from_len as u8;
             }
@@ -796,11 +824,11 @@ mod inner {
                 let mask = range_bitmask(from_range[0], from_range[1]);
                 let high_mask = range_bitmask(to_idx, self.len());
                 if from_range[0] <= to_idx {
-                    self.subtree_unbalanced_flags |=
-                        (other.subtree_unbalanced_flags & mask) << (to_idx - from_range[0]);
+                    self.subtree_unbalance_flags |=
+                        (other.subtree_unbalance_flags & mask) << (to_idx - from_range[0]);
                 } else {
-                    self.subtree_unbalanced_flags |=
-                        (other.subtree_unbalanced_flags & mask) >> (from_range[0] - to_idx);
+                    self.subtree_unbalance_flags |=
+                        (other.subtree_unbalance_flags & mask) >> (from_range[0] - to_idx);
                 }
             }
 
@@ -827,9 +855,9 @@ mod inner {
                 // The unbalance flags.
                 let low_mask = range_bitmask(0, from_range[0]);
                 let high_mask = range_bitmask(from_range[1], other.len());
-                other.subtree_unbalanced_flags = ((other.subtree_unbalanced_flags & high_mask)
+                other.subtree_unbalance_flags = ((other.subtree_unbalance_flags & high_mask)
                     >> (from_range[1] - from_range[0]))
-                    | (other.subtree_unbalanced_flags & low_mask);
+                    | (other.subtree_unbalance_flags & low_mask);
 
                 other.len -= from_len as u8;
             }
@@ -974,7 +1002,7 @@ mod inner {
         #[test]
         fn pop_01() {
             let mut children = make_children_full(true);
-            dbg!(children.subtree_unbalanced_flags);
+            dbg!(children.subtree_unbalance_flags);
 
             for i in (0..MAX_CHILDREN).rev() {
                 let (info, node) = children.pop();
@@ -982,7 +1010,7 @@ mod inner {
                 assert_eq!(children.len(), i);
                 assert_eq!(info.bytes, i_to_s(i).len());
                 assert_eq!(node.leaf_text(), i_to_s(i).as_str());
-                assert_eq!(!((!0) << i), children.subtree_unbalanced_flags);
+                assert_eq!(!((!0) << i), children.subtree_unbalance_flags);
             }
         }
 
@@ -1012,7 +1040,7 @@ mod inner {
             expected_bits &= !(1 << 2);
             expected_bits &= !(1 << (children.len() - 1));
 
-            assert_eq!(expected_bits, children.subtree_unbalanced_flags);
+            assert_eq!(expected_bits, children.subtree_unbalance_flags);
         }
 
         #[test]
@@ -1060,7 +1088,7 @@ mod inner {
             assert_eq!(middle.0.bytes, i_to_s(2).len());
             assert_eq!(middle.1.leaf_text(), i_to_s(2).as_str());
 
-            assert_eq!(!((!0) << children.len()), children.subtree_unbalanced_flags);
+            assert_eq!(!((!0) << children.len()), children.subtree_unbalance_flags);
         }
 
         #[test]
@@ -1076,7 +1104,7 @@ mod inner {
 
             assert_eq!(
                 0,
-                children.subtree_unbalanced_flags & ((!0) << children.len()),
+                children.subtree_unbalance_flags & ((!0) << children.len()),
             );
 
             for i in 0..children.len() {
@@ -1107,7 +1135,7 @@ mod inner {
                     assert_eq!(children.nodes()[i].leaf_text(), text.as_str());
                 }
 
-                assert_eq!(!((!0) << children.len()), children.subtree_unbalanced_flags);
+                assert_eq!(!((!0) << children.len()), children.subtree_unbalance_flags);
             }
         }
 
@@ -1152,11 +1180,11 @@ mod inner {
 
                     assert_eq!(
                         !((!0) << children_from.len()),
-                        children_from.subtree_unbalanced_flags
+                        children_from.subtree_unbalance_flags
                     );
                     assert_eq!(
                         !((!0) << children_to.len()),
-                        children_to.subtree_unbalanced_flags
+                        children_to.subtree_unbalance_flags
                     );
                 }
             }

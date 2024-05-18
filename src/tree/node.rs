@@ -7,7 +7,7 @@ use std::sync::Arc;
 ))]
 use crate::LineType;
 
-use super::{Children, Text, TextInfo, MAX_CHILDREN};
+use super::{Children, Text, TextInfo, MAX_CHILDREN, MIN_CHILDREN, MIN_TEXT_SIZE};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
@@ -53,6 +53,15 @@ impl Node {
         match self {
             &Self::Internal(_) => false,
             &Self::Leaf(_) => true,
+        }
+    }
+
+    pub fn is_unbalanced(&self) -> bool {
+        match self {
+            &Node::Leaf(ref text) => text.len() < MIN_TEXT_SIZE,
+            &Node::Internal(ref children) => {
+                children.is_any_unbalanced() || children.len() < MIN_CHILDREN
+            }
         }
     }
 
@@ -163,6 +172,7 @@ impl Node {
                     info,
                 )?;
                 children.info_mut()[child_i] = l_info;
+                children.update_unbalance_flag(child_i);
 
                 // Handle the residual node if there is one and return.
                 if let Some((r_info, r_node)) = residual {
@@ -238,6 +248,7 @@ impl Node {
                             .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
                         children.info_mut()[start_child_i] = new_info;
                     }
+                    children.update_unbalance_flag(start_child_i);
                 }
                 // More complex case: the removal spans multiple children.
                 else {
@@ -249,6 +260,7 @@ impl Node {
                         let new_info = children.nodes_mut()[start_child_i]
                             .remove_byte_range([start_byte_idx, start_info.bytes], start_info)?;
                         children.info_mut()[start_child_i] = new_info;
+                        children.update_unbalance_flag(start_child_i);
                     }
 
                     // Handle partial removal of rightmost child.
@@ -256,6 +268,7 @@ impl Node {
                         let new_info = children.nodes_mut()[end_child_i]
                             .remove_byte_range([0, end_byte_idx], end_info)?;
                         children.info_mut()[end_child_i] = new_info;
+                        children.update_unbalance_flag(end_child_i);
                     }
 
                     // Remove nodes that need to be completely removed.
