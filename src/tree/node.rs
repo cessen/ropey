@@ -56,12 +56,19 @@ impl Node {
         }
     }
 
-    pub fn is_unbalanced(&self) -> bool {
+    #[inline(always)]
+    pub fn is_directly_unbalanced(&self) -> bool {
         match self {
             &Node::Leaf(ref text) => text.len() < MIN_TEXT_SIZE,
-            &Node::Internal(ref children) => {
-                children.is_any_unbalanced() || children.len() < MIN_CHILDREN
-            }
+            &Node::Internal(ref children) => children.len() < MIN_CHILDREN,
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_subtree_unbalanced(&self) -> bool {
+        match self {
+            &Node::Leaf(ref text) => false,
+            &Node::Internal(ref children) => children.is_any_unbalanced(),
         }
     }
 
@@ -247,8 +254,8 @@ impl Node {
                         let new_info = children.nodes_mut()[start_child_i]
                             .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
                         children.info_mut()[start_child_i] = new_info;
+                        children.update_unbalance_flag(start_child_i);
                     }
-                    children.update_unbalance_flag(start_child_i);
                 }
                 // More complex case: the removal spans multiple children.
                 else {
@@ -288,6 +295,33 @@ impl Node {
                 }
 
                 Ok(children.combined_text_info())
+            }
+        }
+    }
+
+    pub fn partial_rebalance(&mut self) {
+        match *self {
+            Node::Leaf(_) => {}
+
+            Node::Internal(ref mut children) => {
+                if let Some(child_i) = children.first_unbalanced_child_idx() {
+                    let children = Arc::make_mut(children);
+
+                    // First: dive deep.
+                    if children.nodes()[child_i].is_subtree_unbalanced() {
+                        children.nodes_mut()[child_i].partial_rebalance();
+                        children.update_unbalance_flag(child_i);
+                    }
+
+                    // Then: do a rebalance at this level if needed.
+                    if children.nodes()[child_i].is_directly_unbalanced() && children.len() > 1 {
+                        if child_i < (children.len() - 1) {
+                            children.merge_distribute(child_i, child_i + 1);
+                        } else {
+                            children.merge_distribute(child_i - 1, child_i);
+                        }
+                    }
+                }
             }
         }
     }
@@ -526,6 +560,29 @@ impl Node {
                 }
 
                 acc_info
+            }
+        }
+    }
+
+    /// Checks that all the unbalance flags in the tree are correct.
+    ///
+    /// Note: the return value is not "success", it's used in the recursion.
+    pub fn assert_accurate_unbalance_flags(&self) -> bool {
+        match *self {
+            Node::Leaf(ref text) => {
+                // Freshly compute whether the leaf is undersized.
+                text.len() < MIN_TEXT_SIZE
+            }
+            Node::Internal(ref children) => {
+                let mut any_unbalanced = false;
+                for i in 0..children.len() {
+                    let unbalanced = children.nodes()[i].assert_accurate_unbalance_flags()
+                        || children.nodes()[i].is_directly_unbalanced();
+                    assert_eq!(unbalanced, children.is_node_unbalanced(i));
+                    any_unbalanced |= unbalanced;
+                }
+
+                any_unbalanced
             }
         }
     }

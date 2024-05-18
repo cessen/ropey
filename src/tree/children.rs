@@ -72,7 +72,7 @@ impl Children {
     #[inline(always)]
     pub fn push(&mut self, item: (TextInfo, Node)) {
         self.0.push(item);
-        self.update_unbalance_flag(self.len());
+        self.update_unbalance_flag(self.len() - 1);
     }
 
     /// Pushes an element onto the end of the array, and then splits it in half,
@@ -297,8 +297,15 @@ impl Children {
     }
 
     #[inline(always)]
+    pub fn first_unbalanced_child_idx(&self) -> Option<usize> {
+        self.0.first_unbalanced_child_idx()
+    }
+
+    #[inline(always)]
     pub fn update_unbalance_flag(&mut self, child_idx: usize) {
-        if self.nodes()[child_idx].is_unbalanced() {
+        let child = &self.nodes()[child_idx];
+
+        if child.is_subtree_unbalanced() || child.is_directly_unbalanced() {
             self.0.set_unbalance_flag(child_idx);
         } else {
             self.0.clear_unbalance_flag(child_idx);
@@ -589,6 +596,15 @@ mod inner {
         #[inline(always)]
         pub fn is_any_unbalanced(&self) -> bool {
             self.subtree_unbalance_flags != 0
+        }
+
+        #[inline(always)]
+        pub fn first_unbalanced_child_idx(&self) -> Option<usize> {
+            if self.is_any_unbalanced() {
+                Some(self.subtree_unbalance_flags.trailing_zeros() as usize)
+            } else {
+                None
+            }
         }
 
         #[inline(always)]
@@ -968,7 +984,7 @@ mod inner {
             for i in 0..MAX_CHILDREN {
                 children.push(make_info_and_node(&i_to_s(i)));
                 if unbalance_flag {
-                    children.set_unbalanced_flag(i);
+                    children.set_unbalance_flag(i);
                 }
             }
 
@@ -980,7 +996,7 @@ mod inner {
             for i in 0..(MAX_CHILDREN / 2) {
                 children.push(make_info_and_node(&i_to_s(i)));
                 if unbalance_flag {
-                    children.set_unbalanced_flag(i);
+                    children.set_unbalance_flag(i);
                 }
             }
 
@@ -1049,7 +1065,7 @@ mod inner {
             children.pop();
             for i in 0..children.len() {
                 if (i % 2) == 0 {
-                    children.set_unbalanced_flag(i);
+                    children.set_unbalance_flag(i);
                 }
             }
 
@@ -1096,7 +1112,7 @@ mod inner {
             let mut children = make_children_full(false);
             for i in 0..children.len() {
                 if (i % 2) == 0 {
-                    children.set_unbalanced_flag(i);
+                    children.set_unbalance_flag(i);
                 }
             }
 

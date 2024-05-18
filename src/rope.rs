@@ -129,6 +129,10 @@ impl Rope {
                 children.push((right_info, right_node));
                 self.root_info = children.combined_text_info();
             }
+
+            // Do a rebalancing step.
+            self.root.partial_rebalance();
+            self.pull_up_singular_nodes();
         }
     }
 
@@ -199,7 +203,9 @@ impl Rope {
                 });
             rope.root_info = new_info;
 
-            // TODO: cleanup.
+            // Do a rebalancing step.
+            rope.root.partial_rebalance();
+            rope.pull_up_singular_nodes();
         }
 
         inner(self, byte_range.start_bound(), byte_range.end_bound());
@@ -291,7 +297,24 @@ impl Rope {
     }
 
     //---------------------------------------------------------
-    // Debugging helpers.
+    // Misc. internal methods.
+
+    /// Iteratively replaces the root node with its child if it only has
+    /// one child.
+    pub(crate) fn pull_up_singular_nodes(&mut self) {
+        while (!self.root.is_leaf()) && self.root.child_count() == 1 {
+            let child = if let Node::Internal(ref children) = self.root {
+                children.nodes()[0].clone()
+            } else {
+                unreachable!()
+            };
+
+            self.root = child;
+        }
+    }
+
+    //---------------------------------------------------------
+    // Debugging and testing helpers.
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
     #[doc(hidden)]
@@ -300,6 +323,7 @@ impl Rope {
         self.assert_no_empty_internal();
         self.assert_no_empty_non_root_leaf();
         self.assert_accurate_text_info();
+        self.assert_accurate_unbalance_flags();
     }
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
@@ -328,6 +352,35 @@ impl Rope {
     #[doc(hidden)]
     pub fn assert_accurate_text_info(&self) {
         self.root.assert_accurate_text_info();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_accurate_unbalance_flags(&self) {
+        self.root.assert_accurate_unbalance_flags();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    ///
+    /// Attempts to fully rebalance the tree within `max_iterations`.
+    ///
+    /// Returns whether it fully rebalanced the tree and the actual number of
+    /// iterations done.
+    #[doc(hidden)]
+    pub fn attempt_full_rebalance(&mut self, max_iterations: usize) -> (bool, usize) {
+        let mut iter_count = 0;
+
+        while self.root.is_subtree_unbalanced() {
+            if iter_count >= max_iterations {
+                return (false, iter_count);
+            }
+
+            self.root.partial_rebalance();
+            self.pull_up_singular_nodes();
+            iter_count += 1;
+        }
+
+        return (true, iter_count);
     }
 }
 

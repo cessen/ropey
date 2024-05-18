@@ -146,6 +146,9 @@ proptest::proptest! {
         assert_eq!(rope, text.as_str());
         assert_metrics_eq(&rope, text.as_str());
         rope.assert_invariants();
+
+        assert!(rope.attempt_full_rebalance(100).0);
+        rope.assert_invariants();
     }
 
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
@@ -162,6 +165,9 @@ proptest::proptest! {
 
         assert_eq!(rope, text.as_str());
         assert_metrics_eq(&rope, text.as_str());
+        rope.assert_invariants();
+
+        assert!(rope.attempt_full_rebalance(100).0);
         rope.assert_invariants();
     }
 

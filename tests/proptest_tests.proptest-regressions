@@ -7,3 +7,4 @@
 cc 7f14fd6a36e10d8368a4449345fd910a76ff55da46fb70858c87ab17b4f01a0b # shrinks to cr_or_lf = false, idx = 3095542431969162165, ref start_text = "\n\n\n\n\r\n\n\r\n\r\n\n\n\n\n\r\n\n\r\n\n\n\n\r\n\n\n\n\n\r\n\n\n\n\n\n\r\n\r\n\r\n\n\n\n\n\n\n\r\n\n\r\r"
 cc fe05c35d6679571b6078ad689a14d11fbf66d48ae0df1b47364d07dd76d5599b # shrinks to cr_or_lf = true, idx = 890428971038572995, ref start_text = "\n\n\n\r\n\r\n\n\r\n\n\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n"
 cc 6faeccd636016f5f7d05297bf249146f49d14b2e21c96371f04195c794d86704 # shrinks to idx1 = 0, idx2 = 0, ref text = ""
+cc 504bbb3746cd2c2268f1ccc60360ac66ef696a66b3bb3d3998dbfd78e86468ee # shrinks to idx1 = 3490, idx2 = 1
