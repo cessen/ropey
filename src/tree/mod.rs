@@ -19,6 +19,11 @@ mod constants {
 }
 pub(crate) use constants::{MAX_CHILDREN, MAX_TEXT_SIZE, MIN_TEXT_SIZE};
 
+const _: () = assert!(
+    constants::MAX_CHILDREN <= 31,
+    "Due to the way tree balance flags are stored and manipulated, the tree cannot have more than 31 children."
+);
+
 pub(crate) use children::Children;
 pub(crate) use node::Node;
 pub(crate) use text::Text;
