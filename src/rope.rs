@@ -510,7 +510,10 @@ impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
 impl<'a> From<&'a Rope> for std::borrow::Cow<'a, str> {
     #[inline]
     fn from(r: &'a Rope) -> Self {
-        todo!()
+        match r.root {
+            Node::Leaf(ref text) => std::borrow::Cow::Borrowed(text.text()),
+            Node::Internal(_) => std::borrow::Cow::Owned(String::from(r)),
+        }
     }
 }
 
