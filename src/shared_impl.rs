@@ -242,7 +242,54 @@ macro_rules! impl_shared_std_traits {
         //=====================================================
         // Comparisons.
 
-        // impl std::cmp::Eq for $rope {}
+        impl std::cmp::Eq for $rope {}
+
+        impl std::cmp::PartialEq<$rope> for $rope {
+            fn eq(&self, other: &$rope) -> bool {
+                if self.len_bytes() != other.len_bytes() {
+                    return false;
+                }
+
+                let mut chunk_itr_1 = self.chunks();
+                let mut chunk_itr_2 = other.chunks();
+                let mut chunk1 = chunk_itr_1.next().unwrap_or("").as_bytes();
+                let mut chunk2 = chunk_itr_2.next().unwrap_or("").as_bytes();
+
+                loop {
+                    if chunk1.len() > chunk2.len() {
+                        if &chunk1[..chunk2.len()] != chunk2 {
+                            return false;
+                        } else {
+                            chunk1 = &chunk1[chunk2.len()..];
+                            chunk2 = &[];
+                        }
+                    } else if &chunk2[..chunk1.len()] != chunk1 {
+                        return false;
+                    } else {
+                        chunk2 = &chunk2[chunk1.len()..];
+                        chunk1 = &[];
+                    }
+
+                    if chunk1.is_empty() {
+                        if let Some(chunk) = chunk_itr_1.next() {
+                            chunk1 = chunk.as_bytes();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if chunk2.is_empty() {
+                        if let Some(chunk) = chunk_itr_2.next() {
+                            chunk2 = chunk.as_bytes();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                return true;
+            }
+        }
 
         impl std::cmp::PartialEq<&str> for $rope {
             #[inline]
@@ -314,7 +361,62 @@ macro_rules! impl_shared_std_traits {
             }
         }
 
-        //==============================================================
+        impl std::cmp::Ord for $rope {
+            #[allow(clippy::op_ref)] // Erroneously thinks with can directly use a slice.
+            fn cmp(&self, other: &$rope) -> std::cmp::Ordering {
+                let mut chunk_itr_1 = self.chunks();
+                let mut chunk_itr_2 = other.chunks();
+                let mut chunk1 = chunk_itr_1.next().unwrap_or("").as_bytes();
+                let mut chunk2 = chunk_itr_2.next().unwrap_or("").as_bytes();
+
+                loop {
+                    if chunk1.len() >= chunk2.len() {
+                        let compared = chunk1[..chunk2.len()].cmp(chunk2);
+                        if compared != std::cmp::Ordering::Equal {
+                            return compared;
+                        }
+
+                        chunk1 = &chunk1[chunk2.len()..];
+                        chunk2 = &[];
+                    } else {
+                        let compared = chunk1.cmp(&chunk2[..chunk1.len()]);
+                        if compared != std::cmp::Ordering::Equal {
+                            return compared;
+                        }
+
+                        chunk1 = &[];
+                        chunk2 = &chunk2[chunk1.len()..];
+                    }
+
+                    if chunk1.is_empty() {
+                        if let Some(chunk) = chunk_itr_1.next() {
+                            chunk1 = chunk.as_bytes();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if chunk2.is_empty() {
+                        if let Some(chunk) = chunk_itr_2.next() {
+                            chunk2 = chunk.as_bytes();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                self.len_bytes().cmp(&other.len_bytes())
+            }
+        }
+
+        impl std::cmp::PartialOrd<$rope> for $rope {
+            #[inline]
+            fn partial_cmp(&self, other: &$rope) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        //=====================================================
         // Conversions.
 
         impl From<$rope> for String {
@@ -332,6 +434,21 @@ macro_rules! impl_shared_std_traits {
             }
         }
 
+        /// Attempts to borrow the text contents, but will return `None` if the
+        /// contents is not contiguous in memory.
+        ///
+        /// Runs in best case O(1), worst case O(N).
+        impl<'a> From<&'a $rope> for Option<&'a str> {
+            #[inline]
+            fn from(r: &'a $rope) -> Self {
+                match r.get_root() {
+                    Node::Leaf(ref text) => Some(text.text()),
+                    Node::Internal(_) => None,
+                }
+            }
+        }
+
+        /// Consumes the rope, turning it into an owned `Cow<str>`.
         impl<'a> From<$rope> for std::borrow::Cow<'a, str> {
             #[inline]
             fn from(r: $rope) -> Self {
@@ -353,7 +470,7 @@ macro_rules! impl_shared_std_traits {
             }
         }
 
-        //==============================================================
+        //=====================================================
         // Misc.
 
         impl std::fmt::Debug for $rope {

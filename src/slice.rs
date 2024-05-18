@@ -120,6 +120,18 @@ impl<'a> RopeSlice<'a> {
 
 crate::shared_impl::impl_shared_std_traits!(RopeSlice<'_>);
 
+impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
+    fn eq(&self, other: &Rope) -> bool {
+        *self == RopeSlice::from(other)
+    }
+}
+
+impl<'a> From<&'a Rope> for RopeSlice<'a> {
+    fn from(r: &Rope) -> RopeSlice {
+        RopeSlice::new(r, [0, r.root_info.bytes])
+    }
+}
+
 //=============================================================
 
 #[cfg(test)]

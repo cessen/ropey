@@ -399,6 +399,22 @@ impl std::default::Default for Rope {
     }
 }
 
+impl std::cmp::PartialEq<RopeSlice<'_>> for Rope {
+    fn eq(&self, other: &RopeSlice) -> bool {
+        RopeSlice::from(self) == *other
+    }
+}
+
+impl From<RopeSlice<'_>> for Rope {
+    fn from(rs: RopeSlice) -> Rope {
+        let mut rb = RopeBuilder::new();
+        for chunk in rs.chunks() {
+            rb.append(chunk);
+        }
+        rb.finish()
+    }
+}
+
 impl From<String> for Rope {
     fn from(s: String) -> Rope {
         Rope::from_str(&s)
