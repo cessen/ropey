@@ -113,98 +113,12 @@ impl<'a> RopeSlice<'a> {
 }
 
 //==============================================================
-// Comparison impls.
+// Stdlib trait impls.
+//
+// Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
+// that need to distinguish between Rope and RopeSlice.
 
-// impl std::cmp::Eq for RopeSlice<'_> {}
-
-impl std::cmp::PartialEq<&str> for RopeSlice<'_> {
-    #[inline]
-    fn eq(&self, other: &&str) -> bool {
-        if self.len_bytes() != other.len() {
-            return false;
-        }
-        let other = other.as_bytes();
-
-        let mut idx = 0;
-        for chunk in self.chunks() {
-            let chunk = chunk.as_bytes();
-            if chunk != &other[idx..(idx + chunk.len())] {
-                return false;
-            }
-            idx += chunk.len();
-        }
-
-        return true;
-    }
-}
-
-impl std::cmp::PartialEq<RopeSlice<'_>> for &str {
-    #[inline(always)]
-    fn eq(&self, other: &RopeSlice) -> bool {
-        other == self
-    }
-}
-
-impl std::cmp::PartialEq<str> for RopeSlice<'_> {
-    #[inline(always)]
-    fn eq(&self, other: &str) -> bool {
-        std::cmp::PartialEq::<&str>::eq(self, &other)
-    }
-}
-
-impl std::cmp::PartialEq<RopeSlice<'_>> for str {
-    #[inline(always)]
-    fn eq(&self, other: &RopeSlice) -> bool {
-        std::cmp::PartialEq::<&str>::eq(other, &self)
-    }
-}
-
-impl std::cmp::PartialEq<String> for RopeSlice<'_> {
-    #[inline(always)]
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
-    }
-}
-
-impl std::cmp::PartialEq<RopeSlice<'_>> for String {
-    #[inline(always)]
-    fn eq(&self, other: &RopeSlice) -> bool {
-        other == self.as_str()
-    }
-}
-
-impl std::cmp::PartialEq<std::borrow::Cow<'_, str>> for RopeSlice<'_> {
-    #[inline]
-    fn eq(&self, other: &std::borrow::Cow<str>) -> bool {
-        *self == **other
-    }
-}
-
-impl std::cmp::PartialEq<RopeSlice<'_>> for std::borrow::Cow<'_, str> {
-    #[inline]
-    fn eq(&self, other: &RopeSlice) -> bool {
-        *other == **self
-    }
-}
-
-//==============================================================
-// Other impls.
-
-impl std::fmt::Debug for RopeSlice<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_list().entries(self.chunks()).finish()
-    }
-}
-
-impl std::fmt::Display for RopeSlice<'_> {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for chunk in self.chunks() {
-            write!(f, "{}", chunk)?
-        }
-        Ok(())
-    }
-}
+crate::shared_impl::impl_shared_std_traits!(RopeSlice<'_>);
 
 //=============================================================
 

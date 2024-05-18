@@ -385,101 +385,23 @@ impl Rope {
 }
 
 //==============================================================
-// Comparison impls.
+// Stdlib trait impls.
+//
+// Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
+// that need to distinguish between Rope and RopeSlice.
 
-// impl std::cmp::Eq for Rope {}
+crate::shared_impl::impl_shared_std_traits!(Rope);
 
-impl std::cmp::PartialEq<&str> for Rope {
+impl std::default::Default for Rope {
     #[inline]
-    fn eq(&self, other: &&str) -> bool {
-        if self.len_bytes() != other.len() {
-            return false;
-        }
-        let other = other.as_bytes();
-
-        let mut idx = 0;
-        for chunk in self.chunks() {
-            let chunk = chunk.as_bytes();
-            if chunk != &other[idx..(idx + chunk.len())] {
-                return false;
-            }
-            idx += chunk.len();
-        }
-
-        return true;
+    fn default() -> Self {
+        Self::new()
     }
 }
-
-impl std::cmp::PartialEq<Rope> for &str {
-    #[inline]
-    fn eq(&self, other: &Rope) -> bool {
-        other == self
-    }
-}
-
-impl std::cmp::PartialEq<str> for Rope {
-    #[inline(always)]
-    fn eq(&self, other: &str) -> bool {
-        std::cmp::PartialEq::<&str>::eq(self, &other)
-    }
-}
-
-impl std::cmp::PartialEq<Rope> for str {
-    #[inline(always)]
-    fn eq(&self, other: &Rope) -> bool {
-        std::cmp::PartialEq::<&str>::eq(other, &self)
-    }
-}
-
-impl std::cmp::PartialEq<String> for Rope {
-    #[inline(always)]
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
-    }
-}
-
-impl std::cmp::PartialEq<Rope> for String {
-    #[inline(always)]
-    fn eq(&self, other: &Rope) -> bool {
-        other == self.as_str()
-    }
-}
-
-impl std::cmp::PartialEq<std::borrow::Cow<'_, str>> for Rope {
-    #[inline]
-    fn eq(&self, other: &std::borrow::Cow<str>) -> bool {
-        *self == **other
-    }
-}
-
-impl std::cmp::PartialEq<Rope> for std::borrow::Cow<'_, str> {
-    #[inline]
-    fn eq(&self, other: &Rope) -> bool {
-        *other == **self
-    }
-}
-
-//==============================================================
-// Conversions.
 
 impl From<String> for Rope {
     fn from(s: String) -> Rope {
         Rope::from_str(&s)
-    }
-}
-
-impl From<Rope> for String {
-    fn from(r: Rope) -> String {
-        (&r).into()
-    }
-}
-
-impl<'a> From<&'a Rope> for String {
-    #[inline]
-    fn from(r: &'a Rope) -> Self {
-        let mut s = String::with_capacity(r.len_bytes());
-        s.extend(r.chunks());
-        s
     }
 }
 
@@ -493,27 +415,6 @@ impl<'a> From<std::borrow::Cow<'a, str>> for Rope {
     #[inline]
     fn from(s: std::borrow::Cow<'a, str>) -> Self {
         Rope::from_str(&s)
-    }
-}
-
-impl<'a> From<Rope> for std::borrow::Cow<'a, str> {
-    #[inline]
-    fn from(r: Rope) -> Self {
-        std::borrow::Cow::Owned(String::from(r))
-    }
-}
-
-/// Attempts to borrow the contents of the `Rope`, but will convert to an
-/// owned string if the contents is not contiguous in memory.
-///
-/// Runs in best case O(1), worst case O(N).
-impl<'a> From<&'a Rope> for std::borrow::Cow<'a, str> {
-    #[inline]
-    fn from(r: &'a Rope) -> Self {
-        match r.root {
-            Node::Leaf(ref text) => std::borrow::Cow::Borrowed(text.text()),
-            Node::Internal(_) => std::borrow::Cow::Owned(String::from(r)),
-        }
     }
 }
 
@@ -553,88 +454,6 @@ impl FromIterator<String> for Rope {
             builder.append(&chunk);
         }
         builder.finish()
-    }
-}
-
-//=============================================================
-// Other impls.
-
-impl std::default::Default for Rope {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl std::fmt::Debug for Rope {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_list().entries(self.chunks()).finish()
-    }
-}
-
-impl std::fmt::Display for Rope {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        for chunk in self.chunks() {
-            write!(f, "{}", chunk)?
-        }
-        Ok(())
-    }
-}
-
-impl std::hash::Hash for Rope {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // `std::hash::Hasher` only guarantees the same hash output for
-        // exactly the same calls to `Hasher::write()`.  Just submitting
-        // the same data in the same order isn't enough--it also has to
-        // be split the same between calls.  So we go to some effort here
-        // to ensure that we always submit the text data in the same
-        // fixed-size blocks, even if those blocks don't align with chunk
-        // boundaries at all.
-        //
-        // The naive approach is to always copy to a fixed-size buffer
-        // and submit the buffer whenever it fills up.  We conceptually
-        // follow that approach here, but we do a little better by
-        // skipping the buffer and directly passing the data without
-        // copying when possible.
-        const BLOCK_SIZE: usize = 256;
-
-        let mut buffer = [0u8; BLOCK_SIZE];
-        let mut buffer_len = 0;
-
-        for chunk in self.chunks() {
-            let mut data = chunk.as_bytes();
-
-            while !data.is_empty() {
-                if buffer_len == 0 && data.len() >= BLOCK_SIZE {
-                    // Process data directly, skipping the buffer.
-                    let (head, tail) = data.split_at(BLOCK_SIZE);
-                    state.write(head);
-                    data = tail;
-                } else if buffer_len == BLOCK_SIZE {
-                    // Process the filled buffer.
-                    state.write(&buffer[..]);
-                    buffer_len = 0;
-                } else {
-                    // Append to the buffer.
-                    let n = (BLOCK_SIZE - buffer_len).min(data.len());
-                    let (head, tail) = data.split_at(n);
-                    buffer[buffer_len..(buffer_len + n)].copy_from_slice(head);
-                    buffer_len += n;
-                    data = tail;
-                }
-            }
-        }
-
-        // Write any remaining unprocessed data in the buffer.
-        if buffer_len > 0 {
-            state.write(&buffer[..buffer_len]);
-        }
-
-        // Same strategy as `&str` in stdlib, so that e.g. two adjacent
-        // fields in a `#[derive(Hash)]` struct with "Hi " and "there"
-        // vs "Hi t" and "here" give the struct a different hash.
-        state.write_u8(0xff)
     }
 }
 
