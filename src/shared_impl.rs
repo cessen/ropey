@@ -144,7 +144,17 @@ macro_rules! impl_shared_methods {
             }
         }
 
-        //---------------------------------------------------------
+        //-----------------------------------------------------
+        // Chunk fetching methods.
+
+        pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
+            let (left_info, chunk, _) = self
+                .get_root()
+                .get_text_at_byte(byte_idx, self.get_root_info());
+            (chunk.text(), left_info)
+        }
+
+        //-----------------------------------------------------
         // Internal utility methods.
 
         #[cfg(feature = "metric_chars")]
