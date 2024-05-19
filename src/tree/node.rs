@@ -414,8 +414,8 @@ impl Node {
     /// Like `get_text_at_byte()` but only computes and returns byte
     /// info, not full text info.  It is also faster for that reason.
     ///
-    /// Returns the text itself and the byte index offset of the start of it's
-    /// left edge in the context of the whole text of the node tree.
+    /// Returns the text itself and the byte offset of the start of its left
+    /// edge in the context of the whole text of the node tree.
     pub fn get_text_at_byte_fast(&self, byte_idx: usize) -> (&Text, usize) {
         let mut idx = byte_idx;
         let mut node = self;
