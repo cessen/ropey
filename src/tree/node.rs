@@ -369,9 +369,7 @@ impl Node {
     ///   various metrics.  Note that the returned TextInfo should already
     ///   have split-CRLF compensation applied.
     /// - `metric_subtractor`: a simple function that subtracts the relevant
-    ///   metric in a TextInfo from a usize.  This is usually just a simple
-    ///   subtraction, but for utf16 is very slightly more involved due to
-    ///   the way it's metric is stored in TextInfo.
+    ///   metric in a TextInfo from a usize.
     #[inline(always)]
     fn get_text_at_metric<F1, F2>(
         &self,
