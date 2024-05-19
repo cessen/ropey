@@ -79,6 +79,14 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    pub fn to_owned_slice(&self) -> Rope {
+        Rope {
+            root: self.root.clone(),
+            root_info: *self.root_info,
+            owned_slice_byte_range: self.byte_range,
+        }
+    }
+
     //---------------------------------------------------------
     // Methods shared between Rope and RopeSlice.
 
@@ -93,37 +101,22 @@ impl<'a> RopeSlice<'a> {
     }
 
     #[inline(always)]
+    fn get_root_info(&self) -> &TextInfo {
+        self.root_info
+    }
+
+    #[inline(always)]
     fn get_full_info(&self) -> Option<&TextInfo> {
-        None
+        if self.byte_range[0] == 0 && self.byte_range[1] == self.root_info.bytes {
+            Some(self.root_info)
+        } else {
+            None
+        }
     }
 
     #[inline(always)]
     fn get_byte_range(&self) -> [usize; 2] {
         self.byte_range
-    }
-
-    //---------------------------------------------------------
-    // Slicing.
-
-    #[inline]
-    pub fn slice<R>(&self, byte_range: R) -> Self
-    where
-        R: RangeBounds<usize>,
-    {
-        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
-        assert!(
-            start_idx <= end_idx && end_idx <= self.len_bytes(),
-            "Invalid byte range: either end < start or the range is outside the bounds of the rope slice.",
-        );
-        assert!(
-            self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
-            "Byte range does not align with char boundaries."
-        );
-
-        let start_idx_real = self.byte_range[0] + start_idx;
-        let end_idx_real = self.byte_range[0] + end_idx;
-        RopeSlice::new(self.root, self.root_info, [start_idx_real, end_idx_real])
     }
 }
 

@@ -12,7 +12,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [x] Chunk fetching function.
 - [x] Try rewriting `RopeBuilder` to be cleaner/faster.
 - [x] `RopeSlice`
-- [ ] "Owned slices": full Ropes but that store meta data about a sliced range, so that owned slices (that don't depend on the lifetime of the original rope) can be created.
+- [x] "Owned slices": full Ropes but that store meta data about a sliced range, so that owned slices (that don't depend on the lifetime of the original rope) can be created.
 - Metric conversion functions:
   - [x] Chars <-> bytes.
   - [x] UTF16 <-> bytes.

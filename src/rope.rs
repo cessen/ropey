@@ -23,6 +23,10 @@ use crate::LineType;
 pub struct Rope {
     pub(crate) root: Node,
     pub(crate) root_info: TextInfo,
+
+    // Normally just set to the full range of `root`, but can be used to create
+    // ropes that behave as "owned slices".
+    pub(crate) owned_slice_byte_range: [usize; 2],
 }
 
 impl Rope {
@@ -35,6 +39,7 @@ impl Rope {
         Rope {
             root: Node::Leaf(Arc::new(Text::new())),
             root_info: TextInfo::new(),
+            owned_slice_byte_range: [0; 2],
         }
     }
 
@@ -76,6 +81,15 @@ impl Rope {
 
         if text.is_empty() {
             return;
+        }
+
+        if self.owned_slice_byte_range[0] != 0
+            || self.owned_slice_byte_range[1] != self.root_info.bytes
+        {
+            // Not actually sure what we want to do here.  We can either
+            // disallow editing of owned slices, or we could trim the sides
+            // first.
+            todo!();
         }
 
         // We have two cases here:
@@ -134,6 +148,8 @@ impl Rope {
             self.root.partial_rebalance();
             self.pull_up_singular_nodes();
         }
+
+        self.owned_slice_byte_range[1] = self.root_info.bytes;
     }
 
     /// Removes the text in the given byte index range.
@@ -166,6 +182,15 @@ impl Rope {
         // Inner function to avoid code duplication on code gen due to the
         // generic type of `byte_range`.
         fn inner(rope: &mut Rope, start: Bound<&usize>, end: Bound<&usize>) {
+            if rope.owned_slice_byte_range[0] != 0
+                || rope.owned_slice_byte_range[1] != rope.root_info.bytes
+            {
+                // Not actually sure what we want to do here.  We can either
+                // disallow editing of owned slices, or we could trim the sides
+                // first.
+                todo!();
+            }
+
             let start_idx = start_bound_to_num(start).unwrap_or(0);
             let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len_bytes());
 
@@ -206,6 +231,8 @@ impl Rope {
             // Do a rebalancing step.
             rope.root.partial_rebalance();
             rope.pull_up_singular_nodes();
+
+            rope.owned_slice_byte_range[1] = rope.root_info.bytes;
         }
 
         inner(self, byte_range.start_bound(), byte_range.end_bound());
@@ -225,36 +252,24 @@ impl Rope {
     }
 
     #[inline(always)]
+    fn get_root_info(&self) -> &TextInfo {
+        &self.root_info
+    }
+
+    #[inline(always)]
     fn get_full_info(&self) -> Option<&TextInfo> {
-        Some(&self.root_info)
+        if self.owned_slice_byte_range[0] == 0
+            && self.owned_slice_byte_range[1] == self.root_info.bytes
+        {
+            Some(&self.root_info)
+        } else {
+            None
+        }
     }
 
     #[inline(always)]
     fn get_byte_range(&self) -> [usize; 2] {
-        [0, self.root_info.bytes]
-    }
-
-    //---------------------------------------------------------
-    // Slicing.
-
-    #[inline]
-    pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'_>
-    where
-        R: RangeBounds<usize>,
-    {
-        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
-
-        assert!(
-            start_idx <= end_idx && end_idx <= self.len_bytes(),
-            "Invalid byte range: either end < start or the range is outside the bounds of the rope.",
-        );
-        assert!(
-            self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
-            "Byte range does not align with char boundaries."
-        );
-
-        RopeSlice::new(&self.root, &self.root_info, [start_idx, end_idx])
+        self.owned_slice_byte_range
     }
 
     //---------------------------------------------------------

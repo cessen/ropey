@@ -64,6 +64,30 @@ macro_rules! impl_shared_methods {
         }
 
         //---------------------------------------------------------
+        // Slicing.
+
+        #[inline]
+        pub fn slice<R>(&self, byte_range: R) -> RopeSlice
+        where
+            R: RangeBounds<usize>,
+        {
+            let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
+            let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+            assert!(
+                start_idx <= end_idx && end_idx <= self.len_bytes(),
+                "Invalid byte range: either end < start or the range is outside the bounds of the rope slice.",
+            );
+            assert!(
+                self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
+                "Byte range does not align with char boundaries."
+            );
+
+            let start_idx_real = self.get_byte_range()[0] + start_idx;
+            let end_idx_real = self.get_byte_range()[0] + end_idx;
+            RopeSlice::new(self.get_root(), self.get_root_info(), [start_idx_real, end_idx_real])
+        }
+
+        //---------------------------------------------------------
         // Metric conversions.
 
         #[cfg(feature = "metric_chars")]
@@ -491,7 +515,7 @@ macro_rules! impl_shared_std_traits {
                 match r.get_root() {
                     Node::Leaf(ref text) => {
                         let [start, end] = r.get_byte_range();
-                        Some(std::borrow::Cow::Borrowed(&text.text()[start..end]))
+                        Some(&text.text()[start..end])
                     }
                     Node::Internal(_) => None,
                 }
