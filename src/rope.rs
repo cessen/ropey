@@ -434,6 +434,14 @@ impl FromIterator<String> for Rope {
     }
 }
 
+impl From<Rope> for std::borrow::Cow<'_, str> {
+    /// Consumes the Rope, turning it into an owned `Cow<str>`.
+    #[inline]
+    fn from(r: Rope) -> Self {
+        std::borrow::Cow::Owned(String::from(r))
+    }
+}
+
 //=============================================================
 
 #[cfg(test)]

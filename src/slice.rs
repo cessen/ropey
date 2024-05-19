@@ -33,15 +33,49 @@ pub struct RopeSlice<'a> {
 }
 
 impl<'a> RopeSlice<'a> {
-    //---------------------------------------------------------
-    // Constructors.
-
-    #[inline(always)]
     pub(crate) fn new(root: &'a Node, root_info: &'a TextInfo, byte_range: [usize; 2]) -> Self {
+        // Special case for performance, since this actually comes up a fair bit.
+        if byte_range[0] == 0 && byte_range[1] == root_info.bytes {
+            return Self {
+                root: root,
+                root_info: root_info,
+                byte_range: byte_range,
+            };
+        }
+
+        // Find the deepest node that still contains the full range given.
+        let mut start = byte_range[0];
+        let mut end = byte_range[1];
+        let mut node = root;
+        let mut node_info = root_info;
+        'outer: loop {
+            match *node {
+                Node::Leaf(_) => {
+                    break;
+                }
+
+                Node::Internal(ref children) => {
+                    let mut child_start_byte = 0;
+                    for (i, info) in children.info().iter().enumerate() {
+                        let child_end_byte = child_start_byte + info.bytes;
+                        if start >= child_start_byte && end <= child_end_byte {
+                            start -= child_start_byte;
+                            end -= child_start_byte;
+                            node = &children.nodes()[i];
+                            node_info = &children.info()[i];
+                            continue 'outer;
+                        }
+                        child_start_byte = child_end_byte;
+                    }
+                    break;
+                }
+            }
+        }
+
         Self {
-            root: root,
-            root_info: root_info,
-            byte_range: byte_range,
+            root: node,
+            root_info: node_info,
+            byte_range: [start, end],
         }
     }
 
@@ -110,6 +144,18 @@ impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
 impl<'a> From<&'a Rope> for RopeSlice<'a> {
     fn from(r: &Rope) -> RopeSlice {
         RopeSlice::new(&r.root, &r.root_info, [0, r.root_info.bytes])
+    }
+}
+
+impl<'a> From<RopeSlice<'a>> for std::borrow::Cow<'a, str> {
+    #[inline]
+    fn from(r: RopeSlice<'a>) -> Self {
+        match *r.root {
+            Node::Leaf(ref text) => {
+                std::borrow::Cow::Borrowed(&text.text()[r.byte_range[0]..r.byte_range[1]])
+            }
+            Node::Internal(_) => std::borrow::Cow::Owned(String::from(r)),
+        }
     }
 }
 
@@ -1261,20 +1307,23 @@ mod tests {
         assert_eq!(s, cow);
     }
 
-    // #[test]
-    // fn to_cow_02() {
-    //     use std::borrow::Cow;
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(13..14);
-    //     let cow: Cow<str> = r.slice(13..14).into();
+    #[test]
+    fn to_cow_02() {
+        use std::borrow::Cow;
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(13..14);
+        let cow: Cow<str> = r.slice(13..14).into();
 
-    //     // Make sure it's borrowed.
-    //     if let Cow::Owned(_) = cow {
-    //         panic!("Small Cow conversions should result in a borrow.");
-    //     }
+        dbg!(s);
+        assert!(s.root.is_leaf());
 
-    //     assert_eq!(s, cow);
-    // }
+        // Make sure it's borrowed.
+        if let Cow::Owned(_) = cow {
+            panic!("Small Cow conversions should result in a borrow.");
+        }
+
+        assert_eq!(s, cow);
+    }
 
     #[test]
     fn hash_01() {

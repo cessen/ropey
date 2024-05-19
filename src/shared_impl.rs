@@ -489,17 +489,12 @@ macro_rules! impl_shared_std_traits {
             #[inline]
             fn from(r: &'a $rope) -> Self {
                 match r.get_root() {
-                    Node::Leaf(ref text) => Some(text.text()),
+                    Node::Leaf(ref text) => {
+                        let [start, end] = r.get_byte_range();
+                        Some(std::borrow::Cow::Borrowed(&text.text()[start..end]))
+                    }
                     Node::Internal(_) => None,
                 }
-            }
-        }
-
-        /// Consumes the rope, turning it into an owned `Cow<str>`.
-        impl<'a> From<$rope> for std::borrow::Cow<'a, str> {
-            #[inline]
-            fn from(r: $rope) -> Self {
-                std::borrow::Cow::Owned(String::from(r))
             }
         }
 
@@ -511,7 +506,10 @@ macro_rules! impl_shared_std_traits {
             #[inline]
             fn from(r: &'a $rope) -> Self {
                 match r.get_root() {
-                    Node::Leaf(ref text) => std::borrow::Cow::Borrowed(text.text()),
+                    Node::Leaf(ref text) => {
+                        let [start, end] = r.get_byte_range();
+                        std::borrow::Cow::Borrowed(&text.text()[start..end])
+                    }
                     Node::Internal(_) => std::borrow::Cow::Owned(String::from(r)),
                 }
             }
