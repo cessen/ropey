@@ -22,7 +22,7 @@ use str_indices::lines;
 ))]
 use crate::LineType;
 
-use crate::str_utils::{ends_with_cr, starts_with_lf};
+use crate::str_utils::{byte_is_cr, byte_is_lf, ends_with_cr, starts_with_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct TextInfo {
@@ -43,11 +43,24 @@ pub struct TextInfo {
     #[cfg(feature = "metric_lines_unicode")]
     pub line_breaks_unicode: usize,
 
-    // To handle split CRLF line breaks correctly.
+    //---------------------------------------------------------
+    // Split CRLF handling.
+
+    // Marks that the text starts with an LF line break.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-    pub(crate) starts_with_lf: bool,
+    starts_with_lf: bool,
+
+    // Marks that the text ends with a CR line break, and whether it's active
+    // or not.
+    //
+    // "Active CR" means that the CR is included in the line break counts.  So,
+    // for example, if the text info is adjusted based on a following chunk of
+    // text that starts with an LF, and thus the ending CR is subtracted from
+    // the line count, the active flag will be set to false.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-    pub(crate) ends_with_cr: bool,
+    ends_with_cr: bool,
+    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+    ending_cr_is_active: bool,
 }
 
 impl TextInfo {
@@ -81,6 +94,9 @@ impl TextInfo {
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
             ends_with_cr: false,
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            ending_cr_is_active: true,
         }
     }
 
@@ -112,7 +128,20 @@ impl TextInfo {
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
             ends_with_cr: ends_with_cr(text),
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            ending_cr_is_active: true,
         }
+    }
+
+    /// NOTE: this intentionally doesn't account for whether the CR is active in
+    /// the line counts or not.
+    pub(crate) fn ends_with_split_crlf(&self, next_is_lf: bool) -> bool {
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        return self.ends_with_cr && next_is_lf;
+
+        #[cfg(not(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode")))]
+        false
     }
 
     #[cfg(any(
@@ -173,11 +202,12 @@ impl TextInfo {
     ) -> TextInfo {
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         {
-            let crlf_split_compensation = if self.ends_with_cr && next_is_lf {
-                1
-            } else {
-                0
-            };
+            let crlf_split_compensation =
+                if self.ends_with_cr && self.ending_cr_is_active && next_is_lf {
+                    1
+                } else {
+                    0
+                };
 
             TextInfo {
                 #[cfg(feature = "metric_lines_cr_lf")]
@@ -185,6 +215,8 @@ impl TextInfo {
 
                 #[cfg(feature = "metric_lines_unicode")]
                 line_breaks_unicode: self.line_breaks_unicode - crlf_split_compensation,
+
+                ending_cr_is_active: false,
 
                 ..self
             }
@@ -203,13 +235,79 @@ impl TextInfo {
     pub(crate) fn concat(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            starts_with_lf: (self.bytes == 0 && rhs.starts_with_lf) || self.starts_with_lf,
+            starts_with_lf: if self.bytes == 0 {
+                rhs.starts_with_lf
+            } else {
+                self.starts_with_lf
+            },
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            ends_with_cr: (rhs.bytes == 0 && self.ends_with_cr) || rhs.ends_with_cr,
+            ends_with_cr: if rhs.bytes == 0 {
+                self.ends_with_cr
+            } else {
+                rhs.ends_with_cr
+            },
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            ending_cr_is_active: if rhs.bytes == 0 {
+                self.ending_cr_is_active
+            } else {
+                rhs.ending_cr_is_active
+            },
 
             ..(self.adjusted_by_next(rhs) + rhs)
         }
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub(crate) fn str_insert(
+        self,
+        text: &str,
+        byte_idx: usize,
+        insertion_info: TextInfo,
+    ) -> TextInfo {
+        // This function only works correctly when these preconditions are met.
+        // It will give errorneous results otherwise.
+        debug_assert!(insertion_info.bytes > 0);
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(self.ending_cr_is_active);
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(insertion_info.ending_cr_is_active);
+
+        let mut new_info = self + insertion_info;
+
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        {
+            let seam_cr = byte_idx > 0 && byte_is_cr(text, byte_idx - 1);
+            let seam_lf = byte_is_lf(text, byte_idx);
+
+            let crlf_split_compensation = (seam_cr && seam_lf) as usize;
+            let crlf_merge_compensation_1 = (seam_cr && insertion_info.starts_with_lf) as usize;
+            let crlf_merge_compensation_2 = (insertion_info.ends_with_cr && seam_lf) as usize;
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            {
+                new_info.line_breaks_cr_lf += crlf_split_compensation;
+                new_info.line_breaks_cr_lf -= crlf_merge_compensation_1;
+                new_info.line_breaks_cr_lf -= crlf_merge_compensation_2;
+            }
+            #[cfg(feature = "metric_lines_unicode")]
+            {
+                new_info.line_breaks_unicode += crlf_split_compensation;
+                new_info.line_breaks_unicode -= crlf_merge_compensation_1;
+                new_info.line_breaks_unicode -= crlf_merge_compensation_2;
+            }
+
+            if byte_idx == 0 {
+                new_info.starts_with_lf = insertion_info.starts_with_lf;
+            }
+            if byte_idx == text.len() {
+                new_info.ends_with_cr = insertion_info.ends_with_cr;
+            }
+        }
+
+        new_info
     }
 }
 
@@ -217,7 +315,7 @@ impl Add for TextInfo {
     type Output = Self;
     // Note: this does *not* handle anything related to CRLF line breaks, such
     // as split CRLF compensation or updating starts/ends_with flags.  It just
-    // does a straight sum of the text info stats.
+    // does a simple sum of the metrics.
     //
     // Because of that, using this correctly typically requires special
     // handling.  Beware.
@@ -258,15 +356,12 @@ impl AddAssign for TextInfo {
 
 impl Sub for TextInfo {
     type Output = Self;
-    // Note: this does *not* handle anything related to CRLF line breaks, such
+    // IMPORTANT: this does *not* handle anything related to CRLF line breaks, such
     // as split CRLF compensation or updating starts/ends_with flags.  It just
-    // does a straight subtraction of the text info stats.
+    // does a simple subtraction of the metrics.
     //
     // Because of that, using this correctly typically requires special
     // handling.  Beware.
-    //
-    // If you want to remove one TextInfo from another as if truncating, see
-    // `truncate()`.
     #[inline]
     fn sub(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
@@ -287,10 +382,7 @@ impl Sub for TextInfo {
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: self.line_breaks_unicode - rhs.line_breaks_unicode,
 
-            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            starts_with_lf: false,
-            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            ends_with_cr: false,
+            ..self
         }
     }
 }

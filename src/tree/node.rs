@@ -335,7 +335,7 @@ impl Node {
                 let idx = byte_idx - start_info.bytes;
 
                 if idx == 0 {
-                    start_info.ends_with_cr && crate::str_utils::starts_with_lf(text.text())
+                    start_info.ends_with_split_crlf(crate::str_utils::starts_with_lf(text.text()))
                 } else {
                     str_utils::ends_with_cr(&text.text()[..idx])
                         && str_utils::starts_with_lf(&text.text()[idx..])

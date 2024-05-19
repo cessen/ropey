@@ -330,12 +330,7 @@ impl Children {
             let next_accum = {
                 let next_info = self.info()[idx];
                 let next_next_info = self.info().get(idx + 1).copied().unwrap_or(TextInfo::new());
-                TextInfo {
-                    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-                    ends_with_cr: (next_info.bytes == 0 && accum.ends_with_cr)
-                        || next_info.ends_with_cr,
-                    ..(accum + next_info.adjusted_by_next(next_next_info))
-                }
+                accum.concat(next_info.adjusted_by_next(next_next_info))
             };
             if pred(accum, next_accum) {
                 break;

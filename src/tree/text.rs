@@ -11,10 +11,7 @@ use str_indices::utf16;
     feature = "metric_lines_cr_lf",
     feature = "metric_lines_unicode"
 ))]
-use crate::{
-    str_utils::{ends_with_cr, lines, starts_with_lf},
-    LineType,
-};
+use crate::{str_utils::lines, LineType};
 
 /// A leaf node of the Rope, containing text.
 #[derive(Copy, Clone)]
@@ -132,47 +129,18 @@ impl Text {
         &mut self,
         byte_idx: usize,
         text: &str,
-        mut current_info: TextInfo,
+        current_info: TextInfo,
     ) -> TextInfo {
         if text.is_empty() {
             return current_info;
         }
 
         // Update text info based on the upcoming insertion.
-        let text_info = TextInfo::from_str(text);
-        current_info += text_info;
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-        {
-            let left = &self.text()[..byte_idx];
-            let right = &self.text()[byte_idx..];
+        let new_info = current_info.str_insert(self.text(), byte_idx, TextInfo::from_str(text));
 
-            let crlf_split_compensation_1 = (ends_with_cr(left) && starts_with_lf(right)) as usize;
-            let crlf_split_compensation_2 = (ends_with_cr(left) && text_info.starts_with_lf)
-                as usize
-                + (text_info.ends_with_cr && starts_with_lf(right)) as usize;
-            #[cfg(feature = "metric_lines_cr_lf")]
-            {
-                current_info.line_breaks_cr_lf += crlf_split_compensation_1;
-                current_info.line_breaks_cr_lf -= crlf_split_compensation_2;
-            }
-            #[cfg(feature = "metric_lines_unicode")]
-            {
-                current_info.line_breaks_unicode += crlf_split_compensation_1;
-                current_info.line_breaks_unicode -= crlf_split_compensation_2;
-            }
-
-            if byte_idx == 0 {
-                current_info.starts_with_lf = text_info.starts_with_lf;
-            }
-            if byte_idx == self.0.len() {
-                current_info.ends_with_cr = text_info.ends_with_cr;
-            }
-        }
-
-        // Do the actual insert.
         self.0.insert(byte_idx, text);
 
-        current_info
+        new_info
     }
 
     /// Appends `text` to the end.
