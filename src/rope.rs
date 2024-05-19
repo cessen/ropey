@@ -8,7 +8,7 @@ use crate::{
     iter::{Bytes, Chars, Chunks},
     rope_builder::RopeBuilder,
     slice::RopeSlice,
-    start_bound_to_num, str_utils,
+    start_bound_to_num,
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
 };
 
@@ -239,40 +239,6 @@ impl Rope {
         [0, self.root_info.bytes]
     }
 
-    /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
-    /// a split would be relevant to the line-counting metrics of `line_type`.
-    ///
-    /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
-    /// for that line type this will always return false.  Otherwise it will
-    /// return if a CRLF pair would be split.
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
-        assert!(byte_idx <= self.len_bytes());
-
-        match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => false,
-
-            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            _ => {
-                let (start_info, text, info) =
-                    self.root.get_text_at_byte(byte_idx, Some(self.root_info));
-                let idx = byte_idx - start_info.bytes;
-
-                if idx == 0 {
-                    start_info.ends_with_cr && info.starts_with_lf
-                } else {
-                    str_utils::ends_with_cr(&text.text()[..idx])
-                        && str_utils::starts_with_lf(&text.text()[idx..])
-                }
-            }
-        }
-    }
-
     //---------------------------------------------------------
     // Slicing.
 
@@ -293,7 +259,7 @@ impl Rope {
             "Byte range does not align with char boundaries."
         );
 
-        RopeSlice::new(self, [start_idx, end_idx])
+        RopeSlice::new(&self.root, &self.root_info, [start_idx, end_idx])
     }
 
     //---------------------------------------------------------

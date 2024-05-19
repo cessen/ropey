@@ -41,7 +41,7 @@ macro_rules! impl_shared_methods {
                 let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
                 let line_end_idx = self._byte_to_line(self.get_byte_range()[1], line_type);
                 let ends_with_crlf_split =
-                    self.is_relevant_crlf_split(self.get_byte_range()[1], line_type);
+                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type);
 
                 line_end_idx - line_start_idx + 1 + ends_with_crlf_split as usize
             }
@@ -116,7 +116,7 @@ macro_rules! impl_shared_methods {
                 self._byte_to_line(byte_idx, line_type)
             } else {
                 let crlf_split = if byte_idx == self.get_byte_range()[1] {
-                    self.is_relevant_crlf_split(self.get_byte_range()[1], line_type)
+                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
                 } else {
                     false
                 };
@@ -242,6 +242,22 @@ macro_rules! impl_shared_methods {
 
             start_info.bytes
                 + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
+        }
+
+        /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
+        /// a split would be relevant to the line-counting metrics of `line_type`.
+        ///
+        /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
+        /// for that line type this will always return false.  Otherwise it will
+        /// return if a CRLF pair would be split.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_unicode"
+        ))]
+        pub(crate) fn _is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
+            self.get_root()
+                .is_relevant_crlf_split(byte_idx, line_type, self.get_root_info())
         }
 
         //---------------------------------------------------------

@@ -27,7 +27,8 @@ use crate::LineType;
 /// surprising here.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a> {
-    rope: &'a Rope,
+    root: &'a Node,
+    root_info: &'a TextInfo,
     byte_range: [usize; 2],
 }
 
@@ -36,9 +37,10 @@ impl<'a> RopeSlice<'a> {
     // Constructors.
 
     #[inline(always)]
-    pub(crate) fn new(rope: &'a Rope, byte_range: [usize; 2]) -> Self {
+    pub(crate) fn new(root: &'a Node, root_info: &'a TextInfo, byte_range: [usize; 2]) -> Self {
         Self {
-            rope: rope,
+            root: root,
+            root_info: root_info,
             byte_range: byte_range,
         }
     }
@@ -53,12 +55,12 @@ impl<'a> RopeSlice<'a> {
 
     #[inline(always)]
     fn get_root(&self) -> &Node {
-        &self.rope.root
+        self.root
     }
 
     #[inline(always)]
     fn get_root_info(&self) -> Option<TextInfo> {
-        Some(self.rope.root_info)
+        Some(*self.root_info)
     }
 
     #[inline(always)]
@@ -69,22 +71,6 @@ impl<'a> RopeSlice<'a> {
     #[inline(always)]
     fn get_byte_range(&self) -> [usize; 2] {
         self.byte_range
-    }
-
-    /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
-    /// a split would be relevant to the line-counting metrics of `line_type`.
-    ///
-    /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
-    /// for that line type this will always return false.  Otherwise it will
-    /// return if a CRLF pair would be split.
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    #[inline(always)]
-    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
-        self.rope.is_relevant_crlf_split(byte_idx, line_type)
     }
 
     //---------------------------------------------------------
@@ -108,7 +94,7 @@ impl<'a> RopeSlice<'a> {
 
         let start_idx_real = self.byte_range[0] + start_idx;
         let end_idx_real = self.byte_range[0] + end_idx;
-        RopeSlice::new(self.rope, [start_idx_real, end_idx_real])
+        RopeSlice::new(self.root, self.root_info, [start_idx_real, end_idx_real])
     }
 }
 
@@ -128,7 +114,7 @@ impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
 
 impl<'a> From<&'a Rope> for RopeSlice<'a> {
     fn from(r: &Rope) -> RopeSlice {
-        RopeSlice::new(r, [0, r.root_info.bytes])
+        RopeSlice::new(&r.root, &r.root_info, [0, r.root_info.bytes])
     }
 }
 
