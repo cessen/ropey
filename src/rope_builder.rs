@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::rope::Rope;
-use crate::tree::{Children, Node, Text, MAX_CHILDREN, MAX_TEXT_SIZE};
+use crate::tree::{Children, Node, Text, MAX_CHILDREN, MAX_TEXT_SIZE, MIN_CHILDREN};
 
 /// An efficient incremental `Rope` builder.
 ///
@@ -36,7 +36,17 @@ use crate::tree::{Children, Node, Text, MAX_CHILDREN, MAX_TEXT_SIZE};
 /// ```
 #[derive(Debug, Clone)]
 pub struct RopeBuilder {
+    // The stack represents the right-most path down the tree of the rope,
+    // starting from the root at vec index 0, and terminating in the deepest,
+    // right-most non-leaf node.  The idea is that as we append more and more
+    // nodes, the right-most nodes down the tree fill up, and as each one
+    // fills up it gets added as a child of the node above it in the stack and
+    // replaced with a fresh new node.
+    //
+    // There is one except to the stack termining in a non-leaf node: when a
+    // leaf is the *only* node in the tree so far (i.e. the root).
     stack: Vec<Node>,
+
     buffer: String,
 }
 
@@ -161,6 +171,10 @@ impl RopeBuilder {
     }
 
     fn append_leaf_node(&mut self, leaf: Node) {
+        // This will fill up the tree nicely, without packing it so tight that
+        // initial edits will be inefficient.
+        const TARGET_CHILDREN: usize = (MIN_CHILDREN + MAX_CHILDREN) / 2;
+
         if self.stack.is_empty() {
             self.stack.push(leaf);
             return;
@@ -177,29 +191,32 @@ impl RopeBuilder {
             return;
         }
 
-        let mut left = leaf;
+        let mut right = leaf;
         let mut stack_idx = (self.stack.len() - 1) as isize;
         loop {
             if stack_idx < 0 {
                 // We're above the root, so do a root split.
                 let mut children = Children::new();
-                children.push((left.text_info(), left));
+                children.push((right.text_info(), right));
                 self.stack.insert(0, Node::Internal(Arc::new(children)));
                 break;
-            } else if self.stack[stack_idx as usize].child_count() < (MAX_CHILDREN - 1) {
+            } else if self.stack[stack_idx as usize].child_count() < TARGET_CHILDREN {
                 // There's room to add a child, so do that.
                 self.stack[stack_idx as usize]
                     .children_mut()
-                    .push((left.text_info(), left));
+                    .push((right.text_info(), right));
                 break;
             } else {
-                // Not enough room to fit a child, so split.
-                left = Node::Internal(Arc::new(
-                    self.stack[stack_idx as usize]
-                        .children_mut()
-                        .push_split((left.text_info(), left)),
-                ));
-                std::mem::swap(&mut left, &mut self.stack[stack_idx as usize]);
+                // We've reached the target child count at this level of the
+                // stack, so swap out the current node at this level with a
+                // fresh new node, and hold on to the reached-target-child-count
+                // node to be added as a child of the next level up.
+                right = {
+                    let mut children = Children::new();
+                    children.push((right.text_info(), right));
+                    Node::Internal(Arc::new(children))
+                };
+                std::mem::swap(&mut right, &mut self.stack[stack_idx as usize]);
                 stack_idx -= 1;
             }
         }
