@@ -46,21 +46,18 @@ pub struct TextInfo {
     //---------------------------------------------------------
     // Split CRLF handling.
 
-    // Marks that the text starts with an LF line break.
+    // Marks whether the text starts with an LF line break.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
     starts_with_lf: bool,
 
-    // Marks that the text ends with a CR line break, and whether it's active
-    // or not.
-    //
-    // "Active CR" means that the CR is included in the line break counts.  So,
-    // for example, if the text info is adjusted based on a following chunk of
-    // text that starts with an LF, and thus the ending CR is subtracted from
-    // the line count, the active flag will be set to false.
+    // Marks whether the text ends with a CR line break.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
     ends_with_cr: bool,
+
+    // Whether split crlf line breaks have already been accounted for in the
+    // line break counts.
     #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-    ending_cr_is_active: bool,
+    split_crlf_compensation_done: bool,
 }
 
 impl TextInfo {
@@ -96,7 +93,42 @@ impl TextInfo {
             ends_with_cr: false,
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            ending_cr_is_active: true,
+            split_crlf_compensation_done: false,
+        }
+    }
+
+    /// Same as `new()` but sets up the CRLF flags to be "already adjusted".
+    ///
+    /// The correct uses for this are very narrow.  Strongly prefer `new()`
+    /// unless you really know what you're doing.
+    #[inline(always)]
+    pub(crate) fn new_adjusted() -> TextInfo {
+        TextInfo {
+            bytes: 0,
+
+            #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
+            chars: 0,
+
+            #[cfg(feature = "metric_utf16")]
+            utf16: 0,
+
+            #[cfg(feature = "metric_lines_lf")]
+            line_breaks_lf: 0,
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            line_breaks_cr_lf: 0,
+
+            #[cfg(feature = "metric_lines_unicode")]
+            line_breaks_unicode: 0,
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            starts_with_lf: false,
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            ends_with_cr: false,
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            split_crlf_compensation_done: true,
         }
     }
 
@@ -130,8 +162,13 @@ impl TextInfo {
             ends_with_cr: ends_with_cr(text),
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            ending_cr_is_active: true,
+            split_crlf_compensation_done: false,
         }
+    }
+
+    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+    pub(crate) fn is_split_crlf_compensation_applied(&self) -> bool {
+        self.split_crlf_compensation_done
     }
 
     /// NOTE: this intentionally doesn't account for whether the CR is active in
@@ -202,12 +239,15 @@ impl TextInfo {
     ) -> TextInfo {
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         {
-            let crlf_split_compensation =
-                if self.ends_with_cr && self.ending_cr_is_active && next_is_lf {
-                    1
-                } else {
-                    0
-                };
+            if self.split_crlf_compensation_done {
+                return self;
+            }
+
+            let crlf_split_compensation = if self.ends_with_cr && next_is_lf {
+                1
+            } else {
+                0
+            };
 
             TextInfo {
                 #[cfg(feature = "metric_lines_cr_lf")]
@@ -216,7 +256,7 @@ impl TextInfo {
                 #[cfg(feature = "metric_lines_unicode")]
                 line_breaks_unicode: self.line_breaks_unicode - crlf_split_compensation,
 
-                ending_cr_is_active: false,
+                split_crlf_compensation_done: true,
 
                 ..self
             }
@@ -249,10 +289,10 @@ impl TextInfo {
             },
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            ending_cr_is_active: if rhs.bytes == 0 {
-                self.ending_cr_is_active
+            split_crlf_compensation_done: if rhs.bytes == 0 {
+                self.split_crlf_compensation_done
             } else {
-                rhs.ending_cr_is_active
+                rhs.split_crlf_compensation_done
             },
 
             ..(self.adjusted_by_next(rhs) + rhs)
@@ -271,9 +311,9 @@ impl TextInfo {
         // It will give errorneous results otherwise.
         debug_assert!(insertion_info.bytes > 0);
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-        debug_assert!(self.ending_cr_is_active);
+        debug_assert!(!self.split_crlf_compensation_done);
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-        debug_assert!(insertion_info.ending_cr_is_active);
+        debug_assert!(!insertion_info.split_crlf_compensation_done);
 
         let mut new_info = self + insertion_info;
 

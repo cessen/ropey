@@ -320,24 +320,27 @@ impl Children {
     pub fn search_by<F>(&self, pred: F) -> (usize, TextInfo)
     where
         // (left-accumulated start info, left-accumulated end info)
-        F: Fn(TextInfo, TextInfo) -> bool,
+        F: Fn(TextInfo) -> bool,
     {
         debug_assert!(self.len() > 0);
 
-        let mut accum = TextInfo::new();
+        let mut accum = TextInfo::new_adjusted();
         let mut idx = 0;
         while idx < (self.len() - 1) {
             let next_accum = {
                 let next_info = self.info()[idx];
                 let next_next_info = self.info().get(idx + 1).copied().unwrap_or(TextInfo::new());
-                accum.concat(next_info.adjusted_by_next(next_next_info))
+                accum.concat(next_info).adjusted_by_next(next_next_info)
             };
-            if pred(accum, next_accum) {
+            if pred(next_accum) {
                 break;
             }
             accum = next_accum;
             idx += 1;
         }
+
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -381,12 +384,14 @@ impl Children {
     /// The returned TextInfo has already had split-CRLF compensation
     /// applied.
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| byte_idx < end.bytes);
+        let (idx, accum) = self.search_by(|end| byte_idx < end.bytes);
 
         debug_assert!(
             byte_idx <= (accum.bytes + self.info()[idx].bytes),
             "Index out of bounds."
         );
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -400,12 +405,14 @@ impl Children {
     /// applied.
     #[cfg(feature = "metric_chars")]
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| char_idx < end.chars);
+        let (idx, accum) = self.search_by(|end| char_idx < end.chars);
 
         debug_assert!(
             char_idx <= (accum.chars + self.info()[idx].chars),
             "Index out of bounds."
         );
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -419,12 +426,14 @@ impl Children {
     /// applied.
     #[cfg(feature = "metric_utf16")]
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| utf16_idx < end.utf16);
+        let (idx, accum) = self.search_by(|end| utf16_idx < end.utf16);
 
         debug_assert!(
             utf16_idx <= (accum.utf16 + self.info()[idx].utf16),
             "Index out of bounds."
         );
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -450,13 +459,22 @@ impl Children {
         line_break_idx: usize,
         line_type: LineType,
     ) -> (usize, TextInfo) {
-        let (idx, accum) = self.search_by(|_, end| line_break_idx <= end.line_breaks(line_type));
+        let (idx, accum) = self.search_by(|end| line_break_idx <= end.line_breaks(line_type));
 
         debug_assert!(
-            line_break_idx
-                <= (accum.line_breaks(line_type) + self.info()[idx].line_breaks(line_type) + 1),
+            {
+                let next_info = if (idx + 1) < self.len() {
+                    self.info()[idx + 1]
+                } else {
+                    TextInfo::new()
+                };
+                let end_info = accum.concat(self.info()[idx]).adjusted_by_next(next_info);
+                line_break_idx <= end_info.line_breaks(line_type) + 1
+            },
             "Index out of bounds."
         );
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }

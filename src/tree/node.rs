@@ -313,46 +313,6 @@ impl Node {
         }
     }
 
-    /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
-    /// a split would be relevant to the line-counting metrics of `line_type`.
-    ///
-    /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
-    /// for that line type this will always return false.  Otherwise it will
-    /// return if a CRLF pair would be split.
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
-        match line_type {
-            #[cfg(feature = "metric_lines_lf")]
-            LineType::LF => false,
-
-            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-            _ => {
-                let (text, start_info) = self.get_text_at_byte(byte_idx);
-                let idx = byte_idx - start_info.bytes;
-
-                if idx == 0 {
-                    start_info.ends_with_split_crlf(crate::str_utils::starts_with_lf(text.text()))
-                } else {
-                    str_utils::ends_with_cr(&text.text()[..idx])
-                        && str_utils::starts_with_lf(&text.text()[idx..])
-                }
-            }
-        }
-    }
-
-    pub fn text_info_at_byte(&self, byte_idx: usize) -> TextInfo {
-        let (text, left_info) = self.get_text_at_byte(byte_idx);
-
-        let internal_byte_idx = byte_idx - left_info.bytes;
-        left_info
-            + TextInfo::from_str(&text.text()[..internal_byte_idx])
-                .adjusted_by_next_is_lf(str_utils::byte_is_lf(text.text(), internal_byte_idx))
-    }
-
     //---------------------------------------------------------
     // `Text` fetching.
 
@@ -481,9 +441,49 @@ impl Node {
     //---------------------------------------------------------
     // Misc.
 
+    pub fn text_info_at_byte(&self, byte_idx: usize) -> TextInfo {
+        let (text, left_info) = self.get_text_at_byte(byte_idx);
+
+        let internal_byte_idx = byte_idx - left_info.bytes;
+        left_info
+            + TextInfo::from_str(&text.text()[..internal_byte_idx])
+                .adjusted_by_next_is_lf(str_utils::byte_is_lf(text.text(), internal_byte_idx))
+    }
+
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
         let (text, offset) = self.get_text_at_byte_fast(byte_idx);
         text.is_char_boundary(byte_idx - offset)
+    }
+
+    /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
+    /// a split would be relevant to the line-counting metrics of `line_type`.
+    ///
+    /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
+    /// for that line type this will always return false.  Otherwise it will
+    /// return if a CRLF pair would be split.
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
+        match line_type {
+            #[cfg(feature = "metric_lines_lf")]
+            LineType::LF => false,
+
+            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            _ => {
+                let (text, start_info) = self.get_text_at_byte(byte_idx);
+                let idx = byte_idx - start_info.bytes;
+
+                if idx == 0 {
+                    start_info.ends_with_split_crlf(crate::str_utils::starts_with_lf(text.text()))
+                } else {
+                    str_utils::ends_with_cr(&text.text()[..idx])
+                        && str_utils::starts_with_lf(&text.text()[idx..])
+                }
+            }
+        }
     }
 
     //---------------------------------------------------------
