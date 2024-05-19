@@ -136,6 +136,8 @@ impl<'a> From<&'a Rope> for RopeSlice<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::hash::{Hash, Hasher};
+
     #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
     use str_indices::chars;
 
@@ -149,10 +151,7 @@ mod tests {
     ))]
     use crate::LineType;
 
-    use crate::{rope_builder::RopeBuilder, str_utils, RopeSlice};
-
-    use crate::Rope;
-    // use std::hash::{Hash, Hasher};
+    use crate::{rope_builder::RopeBuilder, str_utils, Rope, RopeSlice};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -1168,118 +1167,118 @@ mod tests {
         assert_eq!(s, slice);
     }
 
-    // #[test]
-    // fn eq_rope_slice_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(43..43);
+    #[test]
+    fn eq_rope_slice_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43..43);
 
-    //     assert_eq!(s, s);
-    // }
+        assert_eq!(s, s);
+    }
 
-    // #[test]
-    // fn eq_rope_slice_02() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s1 = r.slice(43..97);
-    //     let s2 = r.slice(43..97);
+    #[test]
+    fn eq_rope_slice_02() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(43..97);
+        let s2 = r.slice(43..97);
 
-    //     assert_eq!(s1, s2);
-    // }
+        assert_eq!(s1, s2);
+    }
 
-    // #[test]
-    // fn eq_rope_slice_03() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s1 = r.slice(43..43);
-    //     let s2 = r.slice(43..45);
+    #[test]
+    fn eq_rope_slice_03() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(43..43);
+        let s2 = r.slice(43..45);
 
-    //     assert_ne!(s1, s2);
-    // }
+        assert_ne!(s1, s2);
+    }
 
-    // #[test]
-    // fn eq_rope_slice_04() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s1 = r.slice(43..45);
-    //     let s2 = r.slice(43..43);
+    #[test]
+    fn eq_rope_slice_04() {
+        let r = Rope::from_str(TEXT);
+        let s1 = r.slice(43..45);
+        let s2 = r.slice(43..43);
 
-    //     assert_ne!(s1, s2);
-    // }
+        assert_ne!(s1, s2);
+    }
 
-    // #[test]
-    // fn eq_rope_slice_05() {
-    //     let r = Rope::from_str("");
-    //     let s = r.slice(0..0);
+    #[test]
+    fn eq_rope_slice_05() {
+        let r = Rope::from_str("");
+        let s = r.slice(0..0);
 
-    //     assert_eq!(s, s);
-    // }
+        assert_eq!(s, s);
+    }
 
-    // #[test]
-    // fn cmp_rope_slice_01() {
-    //     let r1 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
-    //     let r2 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
-    //     let s1 = r1.slice(..);
-    //     let s2 = r2.slice(..);
+    #[test]
+    fn cmp_rope_slice_01() {
+        let r1 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
+        let r2 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
+        let s1 = r1.slice(..);
+        let s2 = r2.slice(..);
 
-    //     assert_eq!(s1.cmp(&s2), std::cmp::Ordering::Equal);
-    //     assert_eq!(s1.slice(..24).cmp(&s2), std::cmp::Ordering::Less);
-    //     assert_eq!(s1.cmp(&s2.slice(..24)), std::cmp::Ordering::Greater);
-    // }
+        assert_eq!(s1.cmp(&s2), std::cmp::Ordering::Equal);
+        assert_eq!(s1.slice(..24).cmp(&s2), std::cmp::Ordering::Less);
+        assert_eq!(s1.cmp(&s2.slice(..24)), std::cmp::Ordering::Greater);
+    }
 
-    // #[test]
-    // fn cmp_rope_slice_02() {
-    //     let r1 = Rope::from_str("abcdefghijklmnzpqrstuvwxyz");
-    //     let r2 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
-    //     let s1 = r1.slice(..);
-    //     let s2 = r2.slice(..);
+    #[test]
+    fn cmp_rope_slice_02() {
+        let r1 = Rope::from_str("abcdefghijklmnzpqrstuvwxyz");
+        let r2 = Rope::from_str("abcdefghijklmnopqrstuvwxyz");
+        let s1 = r1.slice(..);
+        let s2 = r2.slice(..);
 
-    //     assert_eq!(s1.cmp(&s2), std::cmp::Ordering::Greater);
-    //     assert_eq!(s2.cmp(&s1), std::cmp::Ordering::Less);
-    // }
+        assert_eq!(s1.cmp(&s2), std::cmp::Ordering::Greater);
+        assert_eq!(s2.cmp(&s1), std::cmp::Ordering::Less);
+    }
 
-    // #[test]
-    // fn to_string_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let slc = r.slice(..);
-    //     let s: String = slc.into();
+    #[test]
+    fn to_string_01() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(..);
+        let s: String = slc.into();
 
-    //     assert_eq!(r, s);
-    //     assert_eq!(slc, s);
-    // }
+        assert_eq!(r, s);
+        assert_eq!(slc, s);
+    }
 
-    // #[test]
-    // fn to_string_02() {
-    //     let r = Rope::from_str(TEXT);
-    //     let slc = r.slice(0..24);
-    //     let s: String = slc.into();
+    #[test]
+    fn to_string_02() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(0..24);
+        let s: String = slc.into();
 
-    //     assert_eq!(slc, s);
-    // }
+        assert_eq!(slc, s);
+    }
 
-    // #[test]
-    // fn to_string_03() {
-    //     let r = Rope::from_str(TEXT);
-    //     let slc = r.slice(13..89);
-    //     let s: String = slc.into();
+    #[test]
+    fn to_string_03() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(13..89);
+        let s: String = slc.into();
 
-    //     assert_eq!(slc, s);
-    // }
+        assert_eq!(slc, s);
+    }
 
-    // #[test]
-    // fn to_string_04() {
-    //     let r = Rope::from_str(TEXT);
-    //     let slc = r.slice(13..41);
-    //     let s: String = slc.into();
+    #[test]
+    fn to_string_04() {
+        let r = Rope::from_str(TEXT);
+        let slc = r.slice(13..41);
+        let s: String = slc.into();
 
-    //     assert_eq!(slc, s);
-    // }
+        assert_eq!(slc, s);
+    }
 
-    // #[test]
-    // fn to_cow_01() {
-    //     use std::borrow::Cow;
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(13..83);
-    //     let cow: Cow<str> = s.into();
+    #[test]
+    fn to_cow_01() {
+        use std::borrow::Cow;
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(13..83);
+        let cow: Cow<str> = s.into();
 
-    //     assert_eq!(s, cow);
-    // }
+        assert_eq!(s, cow);
+    }
 
     // #[test]
     // fn to_cow_02() {
@@ -1296,18 +1295,18 @@ mod tests {
     //     assert_eq!(s, cow);
     // }
 
-    // #[test]
-    // fn hash_01() {
-    //     let mut h1 = std::collections::hash_map::DefaultHasher::new();
-    //     let mut h2 = std::collections::hash_map::DefaultHasher::new();
-    //     let r = Rope::from_str("Hello there!");
-    //     let s = r.slice(..);
+    #[test]
+    fn hash_01() {
+        let mut h1 = std::collections::hash_map::DefaultHasher::new();
+        let mut h2 = std::collections::hash_map::DefaultHasher::new();
+        let r = Rope::from_str("Hello there!");
+        let s = r.slice(..);
 
-    //     r.hash(&mut h1);
-    //     s.hash(&mut h2);
+        r.hash(&mut h1);
+        s.hash(&mut h2);
 
-    //     assert_eq!(h1.finish(), h2.finish());
-    // }
+        assert_eq!(h1.finish(), h2.finish());
+    }
 
     // Iterator tests are in the iter module
 }
