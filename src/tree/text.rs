@@ -31,10 +31,9 @@ impl Text {
     }
 
     /// Creates a new `Text` with the same contents as the given `&str`.
+    #[inline(always)]
     pub fn from_str(string: &str) -> Self {
-        let mut text = Self::new();
-        text.0.insert(0, string);
-        text
+        Text(inner::Buffer::from_str(string))
     }
 
     //---------------------------------------------------------
@@ -314,6 +313,22 @@ mod inner {
                 buffer: [MaybeUninit::uninit(); MAX_TEXT_SIZE],
                 len: 0,
             }
+        }
+
+        #[inline(always)]
+        pub fn from_str(text: &str) -> Self {
+            assert!(text.len() <= MAX_TEXT_SIZE);
+
+            let mut buffer = Self {
+                buffer: [MaybeUninit::uninit(); MAX_TEXT_SIZE],
+                len: text.len() as u16,
+            };
+
+            // SAFETY: `&[MaybeUninit<u8>]` and `&[u8]` are layout compatible,
+            // with elements that are `Copy`.
+            buffer.buffer[..text.len()].copy_from_slice(unsafe { mem::transmute(text.as_bytes()) });
+
+            buffer
         }
 
         #[inline(always)]
