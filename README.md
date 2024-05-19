@@ -9,7 +9,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [x] Change line APIs to take an enum that determines which kind of lines.
 - [x] Rope length queries.
 - [x] Tree rebalancing.
-- [ ] Chunk fetching functions.
+- [x] Chunk fetching function.
 - [x] Try rewriting `RopeBuilder` to be cleaner/faster.
 - [x] `RopeSlice`
 - [ ] "Owned slices": full Ropes but that store meta data about a sliced range, so that owned slices (that don't depend on the lifetime of the original rope) can be created.
