@@ -26,6 +26,11 @@ const _: () = assert!(
     "Due to the way tree balance flags are stored and manipulated, the tree cannot have more than 31 children."
 );
 
+const _: () = assert!(
+    MAX_TEXT_SIZE <= (1 << 16),
+    "Due to the way leaf text length is stored, the maximum text size cannot exceed 2^16."
+);
+
 pub(crate) use children::Children;
 pub(crate) use node::Node;
 pub(crate) use text::Text;
