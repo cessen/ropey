@@ -464,6 +464,106 @@ mod tests {
     }
 
     #[test]
+    fn insert_01() {
+        let mut r = Rope::from_str(TEXT);
+        r.insert(3, "AA");
+
+        assert_eq!(
+            r,
+            "HelAAlo there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_02() {
+        let mut r = Rope::from_str(TEXT);
+        r.insert(0, "AA");
+
+        assert_eq!(
+            r,
+            "AAHello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_03() {
+        let mut r = Rope::from_str(TEXT);
+        r.insert(127, "AA");
+
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！AA"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_04() {
+        let mut r = Rope::new();
+        r.insert(0, "He");
+        r.insert(2, "l");
+        r.insert(3, "l");
+        r.insert(4, "o w");
+        r.insert(7, "o");
+        r.insert(8, "rl");
+        r.insert(10, "d!");
+        r.insert(3, "zopter");
+
+        assert_eq!("Helzopterlo world!", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_05() {
+        let mut r = Rope::new();
+        r.insert(0, "こんいちは、みんなさん！");
+        r.insert(21, "zopter");
+        assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_06() {
+        let mut r = Rope::new();
+        r.insert(0, "こ");
+        r.insert(3, "ん");
+        r.insert(6, "い");
+        r.insert(9, "ち");
+        r.insert(12, "は");
+        r.insert(15, "、");
+        r.insert(18, "み");
+        r.insert(21, "ん");
+        r.insert(24, "な");
+        r.insert(27, "さ");
+        r.insert(30, "ん");
+        r.insert(33, "！");
+        r.insert(21, "zopter");
+        assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_07() {
+        let mut r = Rope::from_str(TEXT);
+        r.insert(128, "A");
+    }
+
+    #[test]
     fn remove_01() {
         let mut rope = Rope::from_str(TEXT);
         rope.remove(0..4);
