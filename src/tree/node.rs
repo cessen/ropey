@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::str_utils;
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_cr_lf",
@@ -310,6 +311,15 @@ impl Node {
                 }
             }
         }
+    }
+
+    pub fn text_info_at_byte(&self, byte_idx: usize, text_info: Option<TextInfo>) -> TextInfo {
+        let (left_info, text, _) = self.get_text_at_byte(byte_idx, text_info);
+
+        let internal_byte_idx = byte_idx - left_info.bytes;
+        left_info
+            + TextInfo::from_str(&text.text()[..internal_byte_idx])
+                .adjusted_by_next_is_lf(str_utils::byte_is_lf(text.text(), internal_byte_idx))
     }
 
     //---------------------------------------------------------

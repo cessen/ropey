@@ -8,6 +8,23 @@ pub(crate) fn ends_with_cr(text: &str) -> bool {
     text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false)
 }
 
+#[inline(always)]
+pub(crate) fn byte_is_lf(text: &str, byte_idx: usize) -> bool {
+    text.as_bytes()
+        .get(byte_idx)
+        .map(|&b| b == 0x0A)
+        .unwrap_or(false)
+}
+
+#[inline(always)]
+#[allow(unused)]
+pub(crate) fn byte_is_cr(text: &str, byte_idx: usize) -> bool {
+    text.as_bytes()
+        .get(byte_idx)
+        .map(|&b| b == 0x0D)
+        .unwrap_or(false)
+}
+
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_cr_lf",

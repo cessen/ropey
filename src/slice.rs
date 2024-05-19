@@ -136,13 +136,21 @@ impl<'a> From<&'a Rope> for RopeSlice<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::rope_builder::RopeBuilder;
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
+    #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
+    use str_indices::chars;
+
+    #[cfg(feature = "metric_utf16")]
+    use str_indices::utf16;
+
+    #[cfg(any(
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_unicode"
+    ))]
     use crate::LineType;
 
-    // use crate::str_utils::{
-    //     byte_to_char_idx, byte_to_line_idx, char_to_byte_idx, char_to_line_idx,
-    // };
+    use crate::{rope_builder::RopeBuilder, str_utils, RopeSlice};
+
     use crate::Rope;
     // use std::hash::{Hash, Hasher};
 
@@ -158,6 +166,27 @@ mod tests {
     const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
                               a fine day, isn't it?🐸  Aren't you glad \
                               we're alive?🐸  こんにちは、みんなさん！";
+
+    /// Note: ensures that the chunks as given become individual leaf nodes in
+    /// the rope.
+    fn make_rope_and_text_from_chunks(chunks: &[&str]) -> (Rope, String) {
+        let rope = {
+            let mut rb = RopeBuilder::new();
+            for chunk in chunks {
+                rb._append_chunk_as_leaf(chunk);
+            }
+            rb.finish()
+        };
+        let text = {
+            let mut text = String::new();
+            for chunk in chunks {
+                text.push_str(chunk);
+            }
+            text
+        };
+
+        (rope, text)
+    }
 
     #[test]
     fn len_bytes_01() {
@@ -880,40 +909,79 @@ mod tests {
     //     assert_eq!(s.line(5).len_lines(), 1);
     // }
 
-    // #[test]
-    // fn chunk_at_byte() {
-    //     let r = Rope::from_str(TEXT_LINES);
-    //     let s = r.slice(34..96);
-    //     let text = &TEXT_LINES[34..112];
-    //     // "'s a fine day, isn't it?\nAren't you glad \
-    //     //  we're alive?\nこんにちは、みん"
+    fn test_chunk_at_byte(s: RopeSlice, text: &str) {
+        let mut current_byte = 0;
+        let mut seen_bytes = 0;
+        let mut prev_info = crate::TextInfo::new();
+        for i in 0..s.len_bytes() {
+            let (chunk, info) = s.chunk_at_byte(i);
 
-    //     let mut t = text;
-    //     let mut prev_chunk = "";
-    //     for i in 0..s.len_bytes() {
-    //         let (chunk, b, c, l) = s.chunk_at_byte(i);
-    //         assert_eq!(c, byte_to_char_idx(text, b));
-    //         assert_eq!(l, byte_to_line_idx(text, b));
-    //         if chunk != prev_chunk {
-    //             assert_eq!(chunk, &t[..chunk.len()]);
-    //             t = &t[chunk.len()..];
-    //             prev_chunk = chunk;
-    //         }
+            if info != prev_info || i == 0 {
+                current_byte = seen_bytes;
+                seen_bytes += chunk.len();
 
-    //         let c1 = {
-    //             let i2 = byte_to_char_idx(text, i);
-    //             text.chars().nth(i2).unwrap()
-    //         };
-    //         let c2 = {
-    //             let i2 = i - b;
-    //             let i3 = byte_to_char_idx(chunk, i2);
-    //             chunk.chars().nth(i3).unwrap()
-    //         };
-    //         assert_eq!(c1, c2);
-    //     }
+                prev_info = info;
+            }
 
-    //     assert_eq!(t.len(), 0);
-    // }
+            assert_eq!(info.bytes, current_byte);
+            assert_eq!(chunk, &text[current_byte..seen_bytes]);
+
+            #[cfg(feature = "metric_chars")]
+            assert_eq!(info.chars, chars::from_byte_idx(text, current_byte));
+
+            #[cfg(feature = "metric_utf16")]
+            assert_eq!(info.utf16, utf16::from_byte_idx(text, current_byte));
+
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(
+                info.line_breaks_lf,
+                str_utils::lines::from_byte_idx(text, current_byte, LineType::LF)
+            );
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            assert_eq!(
+                info.line_breaks_cr_lf,
+                str_utils::lines::from_byte_idx(text, current_byte, LineType::CRLF)
+            );
+
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(
+                info.line_breaks_unicode,
+                str_utils::lines::from_byte_idx(text, current_byte, LineType::All)
+            );
+        }
+
+        assert_eq!(seen_bytes, text.len());
+    }
+
+    #[test]
+    fn chunk_at_byte_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..112);
+        let text = &TEXT_LINES[34..112];
+        // "'s a fine day, isn't it?\nAren't you glad \
+        //  we're alive?\nこんにちは、みん"
+
+        test_chunk_at_byte(s, text);
+    }
+
+    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
+    #[test]
+    fn chunk_at_byte_02() {
+        // Make sure splitting CRLF pairs works properly.
+
+        let (r, text) = make_rope_and_text_from_chunks(&[
+            "\r\n\r\n\r\n",
+            "\r\n\r\n\r",
+            "\n\r\n\r\n\r",
+            "\n\r\n\r\n\r\n",
+            "\r\n\r\n\r\n",
+        ]);
+
+        for si in 0..=r.len_bytes() {
+            test_chunk_at_byte(r.slice(si..), &text[si..]);
+        }
+    }
 
     // #[test]
     // fn chunk_at_char() {

@@ -148,10 +148,37 @@ macro_rules! impl_shared_methods {
         // Chunk fetching methods.
 
         pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
+            assert!(byte_idx <= self.len_bytes());
+
             let (left_info, chunk, _) = self
                 .get_root()
-                .get_text_at_byte(byte_idx, self.get_root_info());
-            (chunk.text(), left_info)
+                .get_text_at_byte(self.get_byte_range()[0] + byte_idx, self.get_root_info());
+
+            if self.get_full_info().is_some() {
+                // Simple case: we have a full rope, so no adjustments are needed.
+                return (chunk.text(), left_info);
+            } else {
+                // Trim chunk.
+                let front_trim_idx = self.get_byte_range()[0].saturating_sub(left_info.bytes);
+                let back_trim_idx = (self.get_byte_range()[1] - left_info.bytes).min(chunk.len());
+                let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
+
+                // Compute left-side text info.
+                let left_info = {
+                    let new_left_info = left_info
+                        + TextInfo::from_str(&chunk.text()[..front_trim_idx])
+                            .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
+                                chunk.text(),
+                                front_trim_idx,
+                            ));
+                    let start_info = self
+                        .get_root()
+                        .text_info_at_byte(self.get_byte_range()[0], self.get_root_info());
+                    new_left_info - start_info
+                };
+
+                (trimmed_chunk, left_info)
+            }
         }
 
         //-----------------------------------------------------
