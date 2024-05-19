@@ -59,12 +59,7 @@ impl<'a> RopeSlice<'a> {
     }
 
     #[inline(always)]
-    fn get_root_info(&self) -> Option<TextInfo> {
-        Some(*self.root_info)
-    }
-
-    #[inline(always)]
-    fn get_full_info(&self) -> Option<TextInfo> {
+    fn get_full_info(&self) -> Option<&TextInfo> {
         None
     }
 

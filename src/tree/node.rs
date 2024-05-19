@@ -324,23 +324,18 @@ impl Node {
         feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
-    pub(crate) fn is_relevant_crlf_split(
-        &self,
-        byte_idx: usize,
-        line_type: LineType,
-        text_info: Option<TextInfo>,
-    ) -> bool {
+    pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => false,
 
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
             _ => {
-                let (start_info, text, info) = self.get_text_at_byte(byte_idx, text_info);
+                let (text, start_info) = self.get_text_at_byte(byte_idx);
                 let idx = byte_idx - start_info.bytes;
 
                 if idx == 0 {
-                    start_info.ends_with_cr && info.starts_with_lf
+                    start_info.ends_with_cr && crate::str_utils::starts_with_lf(text.text())
                 } else {
                     str_utils::ends_with_cr(&text.text()[..idx])
                         && str_utils::starts_with_lf(&text.text()[idx..])
@@ -349,8 +344,8 @@ impl Node {
         }
     }
 
-    pub fn text_info_at_byte(&self, byte_idx: usize, text_info: Option<TextInfo>) -> TextInfo {
-        let (left_info, text, _) = self.get_text_at_byte(byte_idx, text_info);
+    pub fn text_info_at_byte(&self, byte_idx: usize) -> TextInfo {
+        let (text, left_info) = self.get_text_at_byte(byte_idx);
 
         let internal_byte_idx = byte_idx - left_info.bytes;
         left_info
@@ -364,11 +359,9 @@ impl Node {
     /// The internal implementation of `get_text_at_*()` further below.
     ///
     /// Returns the `Text` that contains the given index of the specified
-    /// metric.
+    /// metric, and the left-side info of where it starts in the larger text of
+    /// the node tree.
     ///
-    /// - `text_info`: if available, the text info of the node this is being
-    ///   called on.  This is just an optimization: if provided, it avoids
-    ///   having to recompute the info.
     /// - `metric_scanner`: a function that scans `Children` to find the
     ///   child that contains `metric_idx`, returning the child's index and
     ///   it's left-side accumulated text info within its sublings. See
@@ -379,17 +372,13 @@ impl Node {
     ///   metric in a TextInfo from a usize.  This is usually just a simple
     ///   subtraction, but for utf16 is very slightly more involved due to
     ///   the way it's metric is stored in TextInfo.
-    ///
-    /// Returns `(left_side_info, Text, Text_info)`.  Both left_side_info and
-    /// Text_info have already had split-CRLF compensation applied.
     #[inline(always)]
     fn get_text_at_metric<F1, F2>(
         &self,
         metric_idx: usize,
-        text_info: Option<TextInfo>,
         metric_scanner: F1,
         metric_subtractor: F2,
-    ) -> (TextInfo, &Text, TextInfo)
+    ) -> (&Text, TextInfo)
     where
         F1: Fn(&Children, usize) -> (usize, TextInfo),
         F2: Fn(usize, &TextInfo) -> usize,
@@ -397,32 +386,15 @@ impl Node {
         let mut node = self;
         let mut metric_idx = metric_idx;
         let mut left_info = TextInfo::new();
-        let mut text_info = if let Some(info) = text_info {
-            info
-        } else {
-            self.text_info()
-        };
-        let mut next_chunk_starts_with_lf = false;
 
         loop {
             match *node {
                 Node::Leaf(ref text) => {
-                    return (
-                        left_info,
-                        text,
-                        text_info.adjusted_by_next_is_lf(next_chunk_starts_with_lf),
-                    );
+                    return (text, left_info);
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = metric_scanner(children, metric_idx);
                     left_info = left_info.concat(acc_info);
-                    text_info = children.info()[child_i];
-
-                    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-                    if children.len() > (child_i + 1) {
-                        next_chunk_starts_with_lf = children.info()[child_i + 1].starts_with_lf;
-                    }
-
                     node = &children.nodes()[child_i];
                     metric_idx = metric_subtractor(metric_idx, &acc_info);
                 }
@@ -433,14 +405,9 @@ impl Node {
     /// Returns the `Text` that contains the given byte.
     ///
     /// See `get_text_at_metric()` for further documentation.
-    pub fn get_text_at_byte(
-        &self,
-        byte_idx: usize,
-        text_info: Option<TextInfo>,
-    ) -> (TextInfo, &Text, TextInfo) {
+    pub fn get_text_at_byte(&self, byte_idx: usize) -> (&Text, TextInfo) {
         self.get_text_at_metric(
             byte_idx,
-            text_info,
             |children, idx| children.search_byte_idx(idx),
             |idx, traversed_info| idx - traversed_info.bytes,
         )
@@ -449,16 +416,16 @@ impl Node {
     /// Like `get_text_at_byte()` but only computes and returns byte
     /// info, not full text info.  It is also faster for that reason.
     ///
-    /// Returns the byte index offset of the start of the returned
-    /// text, and the text itself.
-    pub fn get_text_at_byte_fast(&self, byte_idx: usize) -> (usize, &Text) {
+    /// Returns the text itself and the byte index offset of the start of it's
+    /// left edge in the context of the whole text of the node tree.
+    pub fn get_text_at_byte_fast(&self, byte_idx: usize) -> (&Text, usize) {
         let mut idx = byte_idx;
         let mut node = self;
 
         loop {
             match *node {
                 Node::Leaf(ref text) => {
-                    return (byte_idx - idx, text);
+                    return (text, byte_idx - idx);
                 }
                 Node::Internal(ref children) => {
                     let (child_i, byte_idx_offset) = children.search_byte_idx_only(idx);
@@ -473,14 +440,9 @@ impl Node {
     ///
     /// See `get_text_at_metric()` for further documentation.
     #[cfg(feature = "metric_chars")]
-    pub fn get_text_at_char(
-        &self,
-        char_idx: usize,
-        text_info: Option<TextInfo>,
-    ) -> (TextInfo, &Text, TextInfo) {
+    pub fn get_text_at_char(&self, char_idx: usize) -> (&Text, TextInfo) {
         self.get_text_at_metric(
             char_idx,
-            text_info,
             |children, idx| children.search_char_idx(idx),
             |idx, traversed_info| idx - traversed_info.chars,
         )
@@ -490,14 +452,9 @@ impl Node {
     ///
     /// See `get_text_at_metric()` for further documentation.
     #[cfg(feature = "metric_utf16")]
-    pub fn get_text_at_utf16(
-        &self,
-        utf16_idx: usize,
-        text_info: Option<TextInfo>,
-    ) -> (TextInfo, &Text, TextInfo) {
+    pub fn get_text_at_utf16(&self, utf16_idx: usize) -> (&Text, TextInfo) {
         self.get_text_at_metric(
             utf16_idx,
-            text_info,
             |children, idx| children.search_utf16_code_unit_idx(idx),
             |idx, traversed_info| idx - traversed_info.utf16,
         )
@@ -514,12 +471,10 @@ impl Node {
     pub fn get_text_at_line_break(
         &self,
         line_break_idx: usize,
-        text_info: Option<TextInfo>,
         line_type: LineType,
-    ) -> (TextInfo, &Text, TextInfo) {
+    ) -> (&Text, TextInfo) {
         self.get_text_at_metric(
             line_break_idx,
-            text_info,
             |children, idx| children.search_line_break_idx(idx, line_type),
             |idx, traversed_info| idx - traversed_info.line_breaks(line_type),
         )
@@ -529,7 +484,7 @@ impl Node {
     // Misc.
 
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-        let (offset, text) = self.get_text_at_byte_fast(byte_idx);
+        let (text, offset) = self.get_text_at_byte_fast(byte_idx);
         text.is_char_boundary(byte_idx - offset)
     }
 

@@ -1,3 +1,12 @@
+//! The definitions in this module assume that the following methods are defined
+//! on both Rope and RopeSlice:
+//!
+//! - `get_root()`: returns the root node of the Rope or RopeSlice.
+//! - `get_full_info()`: if the root node represents precisely the extent of the
+//!   Rope or RopeSlice, returns its info.  Otherwise returns None.
+//! - `get_byte_range()`: returns the range of bytes of the root node that are
+//!   considered part of the actual text.
+
 macro_rules! impl_shared_methods {
     () => {
         //---------------------------------------------------------
@@ -150,34 +159,32 @@ macro_rules! impl_shared_methods {
         pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
             assert!(byte_idx <= self.len_bytes());
 
-            let (left_info, chunk, _) = self
+            let (chunk, start_info) = self
                 .get_root()
-                .get_text_at_byte(self.get_byte_range()[0] + byte_idx, self.get_root_info());
+                .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
 
             if self.get_full_info().is_some() {
                 // Simple case: we have a full rope, so no adjustments are needed.
-                return (chunk.text(), left_info);
+                return (chunk.text(), start_info);
             } else {
                 // Trim chunk.
-                let front_trim_idx = self.get_byte_range()[0].saturating_sub(left_info.bytes);
-                let back_trim_idx = (self.get_byte_range()[1] - left_info.bytes).min(chunk.len());
+                let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
+                let back_trim_idx = (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
                 let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
 
                 // Compute left-side text info.
-                let left_info = {
-                    let new_left_info = left_info
+                let start_info = {
+                    let new_start_info = start_info
                         + TextInfo::from_str(&chunk.text()[..front_trim_idx])
                             .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
                                 chunk.text(),
                                 front_trim_idx,
                             ));
-                    let start_info = self
-                        .get_root()
-                        .text_info_at_byte(self.get_byte_range()[0], self.get_root_info());
-                    new_left_info - start_info
+                    let start_info = self.get_root().text_info_at_byte(self.get_byte_range()[0]);
+                    new_start_info - start_info
                 };
 
-                (trimmed_chunk, left_info)
+                (trimmed_chunk, start_info)
             }
         }
 
@@ -186,33 +193,25 @@ macro_rules! impl_shared_methods {
 
         #[cfg(feature = "metric_chars")]
         fn _byte_to_char(&self, byte_idx: usize) -> usize {
-            let (start_info, text, _) = self
-                .get_root()
-                .get_text_at_byte(byte_idx, self.get_root_info());
+            let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
             start_info.chars + text.byte_to_char(byte_idx - start_info.bytes)
         }
 
         #[cfg(feature = "metric_chars")]
         fn _char_to_byte(&self, char_idx: usize) -> usize {
-            let (start_info, text, _) = self
-                .get_root()
-                .get_text_at_char(char_idx, self.get_root_info());
+            let (text, start_info) = self.get_root().get_text_at_char(char_idx);
             start_info.bytes + text.char_to_byte(char_idx - start_info.chars)
         }
 
         #[cfg(feature = "metric_utf16")]
         fn _byte_to_utf16(&self, byte_idx: usize) -> usize {
-            let (start_info, text, _) = self
-                .get_root()
-                .get_text_at_byte(byte_idx, self.get_root_info());
+            let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
             start_info.utf16 + text.byte_to_utf16(byte_idx - start_info.bytes)
         }
 
         #[cfg(feature = "metric_utf16")]
         fn _utf16_to_byte(&self, utf16_idx: usize) -> usize {
-            let (start_info, text, _) = self
-                .get_root()
-                .get_text_at_utf16(utf16_idx, self.get_root_info());
+            let (text, start_info) = self.get_root().get_text_at_utf16(utf16_idx);
             start_info.bytes + text.utf16_to_byte(utf16_idx - start_info.utf16)
         }
 
@@ -222,9 +221,7 @@ macro_rules! impl_shared_methods {
             feature = "metric_lines_unicode"
         ))]
         fn _byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-            let (start_info, text, _) = self
-                .get_root()
-                .get_text_at_byte(byte_idx, self.get_root_info());
+            let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
 
             start_info.line_breaks(line_type)
                 + text.byte_to_line(byte_idx - start_info.bytes, line_type)
@@ -236,9 +233,7 @@ macro_rules! impl_shared_methods {
             feature = "metric_lines_unicode"
         ))]
         fn _line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-            let (start_info, text, _) =
-                self.get_root()
-                    .get_text_at_line_break(line_idx, self.get_root_info(), line_type);
+            let (text, start_info) = self.get_root().get_text_at_line_break(line_idx, line_type);
 
             start_info.bytes
                 + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
@@ -256,8 +251,7 @@ macro_rules! impl_shared_methods {
             feature = "metric_lines_unicode"
         ))]
         pub(crate) fn _is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
-            self.get_root()
-                .is_relevant_crlf_split(byte_idx, line_type, self.get_root_info())
+            self.get_root().is_relevant_crlf_split(byte_idx, line_type)
         }
 
         //---------------------------------------------------------

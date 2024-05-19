@@ -225,13 +225,8 @@ impl Rope {
     }
 
     #[inline(always)]
-    fn get_root_info(&self) -> Option<TextInfo> {
-        Some(self.root_info)
-    }
-
-    #[inline(always)]
-    fn get_full_info(&self) -> Option<TextInfo> {
-        Some(self.root_info)
+    fn get_full_info(&self) -> Option<&TextInfo> {
+        Some(&self.root_info)
     }
 
     #[inline(always)]
