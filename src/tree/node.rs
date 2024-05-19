@@ -487,7 +487,7 @@ impl Node {
     }
 
     //---------------------------------------------------------
-    // Debugging helpers.
+    // Debugging/testing helpers.
 
     /// Checks that all leaf nodes are at the same depth.
     pub fn assert_equal_leaf_depth(&self) -> usize {
