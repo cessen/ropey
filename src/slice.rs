@@ -165,8 +165,8 @@ mod tests {
     use str_indices::utf16;
 
     #[cfg(any(
-        feature = "metric_lines_cr_lf",
         feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
     use crate::LineType;
@@ -174,8 +174,8 @@ mod tests {
     use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
 
     #[cfg(any(
-        feature = "metric_lines_cr_lf",
         feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
     use crate::str_utils;
@@ -798,145 +798,182 @@ mod tests {
         s.utf16_to_byte(109);
     }
 
-    // #[test]
-    // fn byte_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..100);
+    #[test]
+    fn byte_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
 
-    //     assert_eq!(s.byte(0), b't');
-    //     assert_eq!(s.byte(10), b' ');
+        assert_eq!(s.byte(0), b't');
+        assert_eq!(s.byte(10), b' ');
 
-    //     // UTF-8 encoding of 'な'.
-    //     assert_eq!(s.byte(s.len_bytes() - 3), 0xE3);
-    //     assert_eq!(s.byte(s.len_bytes() - 2), 0x81);
-    //     assert_eq!(s.byte(s.len_bytes() - 1), 0xAA);
-    // }
+        // UTF-8 encoding of 'な'.
+        assert_eq!(s.byte(s.len_bytes() - 3), 0xE3);
+        assert_eq!(s.byte(s.len_bytes() - 2), 0x81);
+        assert_eq!(s.byte(s.len_bytes() - 1), 0xAA);
+    }
 
-    // #[test]
-    // #[should_panic]
-    // fn byte_02() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..100);
-    //     s.byte(s.len_bytes());
-    // }
+    #[test]
+    #[should_panic]
+    fn byte_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
+        s.byte(s.len_bytes());
+    }
 
-    // #[test]
-    // #[should_panic]
-    // fn byte_03() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(42..42);
-    //     s.byte(0);
-    // }
+    #[test]
+    #[should_panic]
+    fn byte_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(42..42);
+        s.byte(0);
+    }
 
-    // #[test]
-    // fn char_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..100);
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn char_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
 
-    //     // t's \
-    //     // a fine day, isn't it?  Aren't you glad \
-    //     // we're alive?  こんにちは、みんな
+        // t's \
+        // a fine day, isn't it?  Aren't you glad \
+        // we're alive?  こんにちは、みんな
 
-    //     assert_eq!(s.char(0), 't');
-    //     assert_eq!(s.char(10), ' ');
-    //     assert_eq!(s.char(18), 'n');
-    //     assert_eq!(s.char(65), 'な');
-    // }
+        assert_eq!(s.char(0), 't');
+        assert_eq!(s.char(10), ' ');
+        assert_eq!(s.char(18), 'n');
+        assert_eq!(s.char(65), 'な');
+    }
 
-    // #[test]
-    // #[should_panic]
-    // fn char_02() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..100);
-    //     s.char(66);
-    // }
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    #[should_panic]
+    fn char_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
+        s.char(66);
+    }
 
-    // #[test]
-    // #[should_panic]
-    // fn char_03() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(43..43);
-    //     s.char(0);
-    // }
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    #[should_panic]
+    fn char_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43..43);
+        s.char(0);
+    }
 
-    // #[test]
-    // fn line_01() {
-    //     let r = Rope::from_str(TEXT_LINES);
-    //     let s = r.slice(34..96);
-    //     // "'s a fine day, isn't it?\nAren't you glad \
-    //     //  we're alive?\nこんにちは、みん"
+    #[test]
+    fn char_at_byte_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
 
-    //     let l0 = s.line(0);
-    //     assert_eq!(l0, "'s a fine day, isn't it?\n");
-    //     assert_eq!(l0.len_bytes(), 25);
-    //     assert_eq!(l0.len_chars(), 25);
-    //     assert_eq!(l0.len_lines(), 2);
+        // t's \
+        // a fine day, isn't it?  Aren't you glad \
+        // we're alive?  こんにちは、みんな
 
-    //     let l1 = s.line(1);
-    //     assert_eq!(l1, "Aren't you glad we're alive?\n");
-    //     assert_eq!(l1.len_bytes(), 29);
-    //     assert_eq!(l1.len_chars(), 29);
-    //     assert_eq!(l1.len_lines(), 2);
+        assert_eq!(s.char_at_byte(0), 't');
+        assert_eq!(s.char_at_byte(10), ' ');
+        assert_eq!(s.char_at_byte(18), 'n');
+        assert_eq!(s.char_at_byte(81), 'な');
+    }
 
-    //     let l2 = s.line(2);
-    //     assert_eq!(l2, "こんにちは、みん");
-    //     assert_eq!(l2.len_bytes(), 24);
-    //     assert_eq!(l2.len_chars(), 8);
-    //     assert_eq!(l2.len_lines(), 1);
-    // }
+    #[test]
+    #[should_panic]
+    fn char_at_byte_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
+        s.char_at_byte(s.len_bytes());
+    }
 
-    // #[test]
-    // fn line_02() {
-    //     let r = Rope::from_str(TEXT_LINES);
-    //     let s = r.slice(34..59);
-    //     // "'s a fine day, isn't it?\n"
+    #[test]
+    #[should_panic]
+    fn char_at_byte_03() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43..43);
+        s.char_at_byte(0);
+    }
 
-    //     assert_eq!(s.line(0), "'s a fine day, isn't it?\n");
-    //     assert_eq!(s.line(1), "");
-    // }
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    fn line_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..112);
+        // "'s a fine day, isn't it?\nAren't you glad \
+        //  we're alive?\nこんにちは、みん"
 
-    // #[test]
-    // fn line_03() {
-    //     let r = Rope::from_str("Hi\nHi\nHi\nHi\nHi\nHi\n");
-    //     let s = r.slice(1..17);
+        let l0 = s.line(0, LineType::CRLF);
+        assert_eq!(l0, "'s a fine day, isn't it?\n");
+        assert_eq!(l0.len_bytes(), 25);
+        assert_eq!(l0.len_lines(LineType::CRLF), 2);
 
-    //     assert_eq!(s.line(0), "i\n");
-    //     assert_eq!(s.line(1), "Hi\n");
-    //     assert_eq!(s.line(2), "Hi\n");
-    //     assert_eq!(s.line(3), "Hi\n");
-    //     assert_eq!(s.line(4), "Hi\n");
-    //     assert_eq!(s.line(5), "Hi");
-    // }
+        let l1 = s.line(1, LineType::CRLF);
+        assert_eq!(l1, "Aren't you glad we're alive?\n");
+        assert_eq!(l1.len_bytes(), 29);
+        assert_eq!(l1.len_lines(LineType::CRLF), 2);
 
-    // #[test]
-    // fn line_04() {
-    //     let r = Rope::from_str(TEXT_LINES);
-    //     let s = r.slice(43..43);
+        let l2 = s.line(2, LineType::CRLF);
+        assert_eq!(l2, "こんにちは、みん");
+        assert_eq!(l2.len_bytes(), 24);
+        assert_eq!(l2.len_lines(LineType::CRLF), 1);
+    }
 
-    //     assert_eq!(s.line(0), "");
-    // }
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    fn line_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..59);
+        // "'s a fine day, isn't it?\n"
 
-    // #[test]
-    // #[should_panic]
-    // fn line_05() {
-    //     let r = Rope::from_str(TEXT_LINES);
-    //     let s = r.slice(34..96);
-    //     s.line(3);
-    // }
+        assert_eq!(s.line(0, LineType::CRLF), "'s a fine day, isn't it?\n");
+        assert_eq!(s.line(1, LineType::CRLF), "");
+    }
 
-    // #[test]
-    // fn line_06() {
-    //     let r = Rope::from_str("1\n2\n3\n4\n5\n6\n7\n8");
-    //     let s = r.slice(1..11);
-    //     // "\n2\n3\n4\n5\n6"
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    fn line_03() {
+        let r = Rope::from_str("Hi\nHi\nHi\nHi\nHi\nHi\n");
+        let s = r.slice(1..17);
 
-    //     assert_eq!(s.line(0).len_lines(), 2);
-    //     assert_eq!(s.line(1).len_lines(), 2);
-    //     assert_eq!(s.line(2).len_lines(), 2);
-    //     assert_eq!(s.line(3).len_lines(), 2);
-    //     assert_eq!(s.line(4).len_lines(), 2);
-    //     assert_eq!(s.line(5).len_lines(), 1);
-    // }
+        assert_eq!(s.line(0, LineType::CRLF), "i\n");
+        assert_eq!(s.line(1, LineType::CRLF), "Hi\n");
+        assert_eq!(s.line(2, LineType::CRLF), "Hi\n");
+        assert_eq!(s.line(3, LineType::CRLF), "Hi\n");
+        assert_eq!(s.line(4, LineType::CRLF), "Hi\n");
+        assert_eq!(s.line(5, LineType::CRLF), "Hi");
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    fn line_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(43..43);
+
+        assert_eq!(s.line(0, LineType::CRLF), "");
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[should_panic]
+    fn line_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..96);
+        s.line(3, LineType::CRLF);
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    fn line_06() {
+        let r = Rope::from_str("1\n2\n3\n4\n5\n6\n7\n8");
+        let s = r.slice(1..11);
+        // "\n2\n3\n4\n5\n6"
+
+        assert_eq!(s.line(0, LineType::CRLF).len_lines(LineType::CRLF), 2);
+        assert_eq!(s.line(1, LineType::CRLF).len_lines(LineType::CRLF), 2);
+        assert_eq!(s.line(2, LineType::CRLF).len_lines(LineType::CRLF), 2);
+        assert_eq!(s.line(3, LineType::CRLF).len_lines(LineType::CRLF), 2);
+        assert_eq!(s.line(4, LineType::CRLF).len_lines(LineType::CRLF), 2);
+        assert_eq!(s.line(5, LineType::CRLF).len_lines(LineType::CRLF), 1);
+    }
 
     fn test_chunk_at_byte(s: RopeSlice, text: &str) {
         let mut current_byte = 0;

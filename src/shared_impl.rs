@@ -63,7 +63,85 @@ macro_rules! impl_shared_methods {
             self.get_root().is_char_boundary(byte_idx)
         }
 
-        //---------------------------------------------------------
+        //-----------------------------------------------------
+        // Fetching.
+
+        pub fn byte(&self, byte_idx: usize) -> u8 {
+            assert!(byte_idx < self.len_bytes());
+
+            let byte_idx = byte_idx + self.get_byte_range()[0];
+            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+            text.text().as_bytes()[byte_idx - offset]
+        }
+
+        #[cfg(feature = "metric_chars")]
+        pub fn char(&self, char_idx: usize) -> char {
+            assert!(char_idx < self.len_chars());
+
+            let byte_idx = self.char_to_byte(char_idx);
+            self.char_at_byte(byte_idx)
+        }
+
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_unicode"
+        ))]
+        pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice {
+            assert!(line_idx < self.len_lines(line_type));
+
+            let start_byte = self.line_to_byte(line_idx, line_type);
+            let end_byte = self.line_to_byte(line_idx + 1, line_type);
+            self.slice(start_byte..end_byte)
+        }
+
+        pub fn char_at_byte(&self, byte_idx: usize) -> char {
+            assert!(byte_idx < self.len_bytes());
+
+            let byte_idx = byte_idx + self.get_byte_range()[0];
+            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+            let local_idx = byte_idx - offset;
+
+            assert!(text.text().is_char_boundary(local_idx));
+
+            // TODO: something more efficient than constructing a temporary
+            // iterator.
+            text.text()[(byte_idx - offset)..].chars().next().unwrap()
+        }
+
+        pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
+            assert!(byte_idx <= self.len_bytes());
+
+            let (chunk, start_info) = self
+                .get_root()
+                .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
+
+            if self.get_full_info().is_some() {
+                // Simple case: we have a full rope, so no adjustments are needed.
+                return (chunk.text(), start_info);
+            } else {
+                // Trim chunk.
+                let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
+                let back_trim_idx = (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
+                let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
+
+                // Compute left-side text info.
+                let start_info = {
+                    let new_start_info = start_info
+                        + TextInfo::from_str(&chunk.text()[..front_trim_idx])
+                            .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
+                                chunk.text(),
+                                front_trim_idx,
+                            ));
+                    let start_info = self.get_root().text_info_at_byte(self.get_byte_range()[0]);
+                    new_start_info - start_info
+                };
+
+                (trimmed_chunk, start_info)
+            }
+        }
+
+        //-----------------------------------------------------
         // Slicing.
 
         #[inline]
@@ -174,41 +252,6 @@ macro_rules! impl_shared_methods {
                 self._line_to_byte(line_start_idx + line_idx, line_type)
                     .saturating_sub(self.get_byte_range()[0])
                     .min(self.len_bytes())
-            }
-        }
-
-        //-----------------------------------------------------
-        // Chunk fetching methods.
-
-        pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
-            assert!(byte_idx <= self.len_bytes());
-
-            let (chunk, start_info) = self
-                .get_root()
-                .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
-
-            if self.get_full_info().is_some() {
-                // Simple case: we have a full rope, so no adjustments are needed.
-                return (chunk.text(), start_info);
-            } else {
-                // Trim chunk.
-                let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
-                let back_trim_idx = (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
-                let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
-
-                // Compute left-side text info.
-                let start_info = {
-                    let new_start_info = start_info
-                        + TextInfo::from_str(&chunk.text()[..front_trim_idx])
-                            .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
-                                chunk.text(),
-                                front_trim_idx,
-                            ));
-                    let start_info = self.get_root().text_info_at_byte(self.get_byte_range()[0]);
-                    new_start_info - start_info
-                };
-
-                (trimmed_chunk, start_info)
             }
         }
 
