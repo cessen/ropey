@@ -289,6 +289,14 @@ macro_rules! impl_shared_methods {
             )
         }
 
+        pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
+            Bytes::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0] + byte_idx,
+            )
+        }
+
         pub fn chars(&self) -> Chars<'_> {
             Chars::new(
                 &self.get_root(),
@@ -297,11 +305,28 @@ macro_rules! impl_shared_methods {
             )
         }
 
+        pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
+            Chars::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0] + byte_idx,
+            )
+        }
+
         pub fn chunks(&self) -> Chunks<'_> {
             Chunks::new(
                 &self.get_root(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
+            )
+            .0
+        }
+
+        pub fn chunks_at(&self, byte_idx: usize) -> Chunks<'_> {
+            Chunks::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0] + byte_idx,
             )
             .0
         }

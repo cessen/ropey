@@ -17,17 +17,19 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
   - [x] Chars <-> bytes.
   - [x] UTF16 <-> bytes.
   - [x] Lines <-> bytes.
-- Iterators:
-  - [ ] `Chunks`
-    - [x] Forward.
-    - [x] Bidirectional.
-    - [ ] TextInfo querying.
-  - [x] `Bytes`
-    - [x] Forward.
-    - [x] Bidirectional.
-  - [x] `Chars`
-    - [x] Forward.
-    - [x] Bidirectional.
+- [ ] Iterators:
+  - [ ] Non-line:
+    - [ ] `Chunks`
+      - [x] Forward.
+      - [x] Bidirectional.
+      - [ ] TextInfo querying.
+    - [x] `Bytes`
+      - [x] Forward.
+      - [x] Bidirectional.
+    - [x] `Chars`
+      - [x] Forward.
+      - [x] Bidirectional.
+    - [x] Creating iterators at a specific offset.
   - [ ] `Lines`:
     - [ ] LF
       - [ ] Forward.
@@ -38,7 +40,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [ ] Full Unicode
       - [ ] Forward.
       - [ ] Bidirectional.
-  - [ ] Creating iterators at a specific offset.
+    - [ ] Creating iterator at a specific offset.
 - [x] Standard library trait impls:
   - [x] `From`:
     - [x] `RopeSlice` -> `String`

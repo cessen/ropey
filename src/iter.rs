@@ -13,12 +13,11 @@ pub struct Chunks<'a> {
 impl<'a> Chunks<'a> {
     /// Returns the Chunks iterator as well as the actual start byte of the
     /// first chunk, from the start of Node's contents.
-    #[inline(always)]
-    pub(crate) fn new(
-        node: &Node,
-        byte_range: [usize; 2],
-        mut at_byte_idx: usize,
-    ) -> (Chunks, usize) {
+    ///
+    /// Note that all parameters are relative to the entire contents of `node`.
+    /// In particular, `at_byte_idx` is NOT relative to `byte_range`, it is an
+    /// offset from the start of the full contents of `node`.
+    pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> (Chunks, usize) {
         debug_assert!(byte_range[0] <= at_byte_idx && at_byte_idx <= byte_range[1]);
 
         // Special case: if it's an empty rope, don't store anything.
@@ -38,28 +37,28 @@ impl<'a> Chunks<'a> {
             node_stack: vec![],
             byte_range: byte_range,
             current_byte_idx: 0,
-            at_start: true,
+            at_start: false,
         };
 
-        // TODO: make this work properly for arbitrary start indices. In
-        // particular, handling how the `at_start` flag, etc. work. Easiest
-        // might be to find the spot naively, and just walk the iterator back
-        // one step from there.
+        // Find the chunk the contains `at_byte_idx` and set that as the current
+        // chunk of the iterator.
         let mut current_node = node;
-        let mut byte_offset = 0;
+        let mut local_byte_idx = at_byte_idx;
         loop {
             match *current_node {
-                Node::Leaf(_) => {
+                Node::Leaf(ref text) => {
+                    if at_byte_idx >= byte_range[1] {
+                        chunks.current_byte_idx += text.len();
+                    }
                     chunks.node_stack.push((current_node, 0));
-                    chunks.current_byte_idx = byte_offset;
                     break;
                 }
 
                 Node::Internal(ref children) => {
-                    let (child_i, acc_byte_idx) = children.search_byte_idx_only(at_byte_idx);
+                    let (child_i, acc_byte_idx) = children.search_byte_idx_only(local_byte_idx);
 
-                    byte_offset += acc_byte_idx;
-                    at_byte_idx -= acc_byte_idx;
+                    chunks.current_byte_idx += acc_byte_idx;
+                    local_byte_idx -= acc_byte_idx;
 
                     chunks.node_stack.push((current_node, child_i));
                     current_node = &children.nodes()[child_i];
@@ -67,10 +66,15 @@ impl<'a> Chunks<'a> {
             }
         }
 
-        (chunks, byte_offset.max(byte_range[0]))
+        let byte_offset = chunks.current_byte_idx;
+
+        // Take one step back so that `.next()` will return the chunk that
+        // we found.
+        chunks.prev();
+
+        (chunks, byte_offset.max(byte_range[0]).min(byte_range[1]))
     }
 
-    #[inline(always)]
     fn current_chunk(&self) -> Option<&'a str> {
         if self.current_byte_idx >= self.byte_range[1] {
             return None;
@@ -273,7 +277,7 @@ impl<'a> Chars<'a> {
     }
 
     #[inline]
-    fn prev(&mut self) -> Option<char> {
+    pub fn prev(&mut self) -> Option<char> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
                 self.current_chunk = chunk;
@@ -359,6 +363,7 @@ mod tests {
         }
         rb.finish()
     }
+
     #[test]
     fn chunks_iter_01() {
         let r = Rope::from_str(TEXT);
@@ -529,6 +534,44 @@ mod tests {
         assert_eq!(None, chunks.next());
     }
 
+    #[test]
+    fn chunks_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..TEXT.len() {
+            let mut current_byte = r.chunk_at_byte(i).1.bytes;
+
+            for chunk1 in r.chunks_at(i) {
+                let chunk2 = r.chunk_at_byte(current_byte).0;
+                assert_eq!(chunk2, chunk1);
+                current_byte += chunk2.len();
+            }
+        }
+
+        let mut chunks = r.chunks_at(TEXT.len());
+        assert_eq!(None, chunks.next());
+    }
+
+    #[test]
+    fn chunks_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+        let text = &TEXT[5..124];
+
+        for i in 0..text.len() {
+            let mut current_byte = s.chunk_at_byte(i).1.bytes;
+
+            for chunk1 in s.chunks_at(i) {
+                let chunk2 = s.chunk_at_byte(current_byte).0;
+                assert_eq!(chunk2, chunk1);
+                current_byte += chunk2.len();
+            }
+        }
+
+        let mut chunks = s.chunks_at(text.len());
+        assert_eq!(None, chunks.next());
+    }
+
     // NOTE: when you add support for starting iterators at specific indices,
     // ensure that the Bytes iterator can be created with a starting index that
     // splits a char.
@@ -586,6 +629,34 @@ mod tests {
         assert_eq!(None, r.bytes().prev());
     }
 
+    #[test]
+    fn bytes_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..TEXT.len() {
+            let mut bytes = r.bytes_at(i);
+            assert_eq!(TEXT.as_bytes()[i], bytes.next().unwrap());
+        }
+
+        let mut bytes = r.bytes_at(TEXT.len());
+        assert_eq!(None, bytes.next());
+    }
+
+    #[test]
+    fn bytes_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+        let text = &TEXT[5..124];
+
+        for i in 0..text.len() {
+            let mut bytes = s.bytes_at(i);
+            assert_eq!(text.as_bytes()[i], bytes.next().unwrap());
+        }
+
+        let mut bytes = s.bytes_at(text.len());
+        assert_eq!(None, bytes.next());
+    }
+
     fn test_chars_against_text(mut chars: Chars, text: &str) {
         // Forward.
         let mut iter_f = text.chars();
@@ -637,5 +708,39 @@ mod tests {
 
         assert_eq!(None, r.chars().next());
         assert_eq!(None, r.chars().prev());
+    }
+
+    #[test]
+    fn chars_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..TEXT.len() {
+            if !TEXT.is_char_boundary(i) {
+                continue;
+            }
+            let mut chars = r.chars_at(i);
+            assert_eq!(TEXT[i..].chars().next(), chars.next());
+        }
+
+        let mut chars = r.chars_at(TEXT.len());
+        assert_eq!(None, chars.next());
+    }
+
+    #[test]
+    fn chars_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+        let text = &TEXT[5..124];
+
+        for i in 0..text.len() {
+            if !text.is_char_boundary(i) {
+                continue;
+            }
+            let mut chars = s.chars_at(i);
+            assert_eq!(text[i..].chars().next(), chars.next());
+        }
+
+        let mut chars = s.chars_at(text.len());
+        assert_eq!(None, chars.next());
     }
 }
