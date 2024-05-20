@@ -471,20 +471,22 @@ mod tests {
     const TEXT: &str = "Hello there!  How're you doing?  It's \
                         a fine day, isn't it?  Aren't you glad \
                         we're alive?  こんにちは、みんなさん！";
+
     // 124 bytes, 100 chars, 4 lines
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
     const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
                               a fine day, isn't it?\nAren't you glad \
                               we're alive?\nこんにちは、みんなさん！";
+
     // 143 bytes, 107 chars, 111 utf16 code units, 1 line
+    #[cfg(feature = "metric_utf16")]
     const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
                               a fine day, isn't it?🐸  Aren't you glad \
                               we're alive?🐸  こんにちは、みんなさん！";
-
-    fn string_remove(text: &mut String, byte_start: usize, byte_end: usize) {
-        let text_r = text.split_off(byte_end);
-        text.truncate(byte_start);
-        text.push_str(&text_r);
-    }
 
     #[test]
     fn insert_01() {
@@ -847,7 +849,7 @@ mod tests {
         r.line_to_byte(5, LineType::LF);
     }
 
-    #[cfg(feature = "metric_lines_crlf")]
+    #[cfg(feature = "metric_lines_cr_lf")]
     #[test]
     #[should_panic]
     fn line_to_byte_04() {

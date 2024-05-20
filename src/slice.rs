@@ -158,7 +158,7 @@ impl<'a> From<RopeSlice<'a>> for std::borrow::Cow<'a, str> {
 mod tests {
     use std::hash::{Hash, Hasher};
 
-    #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
+    #[cfg(feature = "metric_chars")]
     use str_indices::chars;
 
     #[cfg(feature = "metric_utf16")]
@@ -171,17 +171,27 @@ mod tests {
     ))]
     use crate::LineType;
 
-    use crate::{rope_builder::RopeBuilder, str_utils, Rope, RopeSlice};
+    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
+
+    #[cfg(any(
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_unicode"
+    ))]
+    use crate::str_utils;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
                         a fine day, isn't it?  Aren't you glad \
                         we're alive?  こんにちは、みんなさん！";
+
     // 124 bytes, 100 chars, 4 lines
     const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
                               a fine day, isn't it?\nAren't you glad \
                               we're alive?\nこんにちは、みんなさん！";
+
     // 143 bytes, 107 chars, 111 utf16 code units, 1 line
+    #[cfg(feature = "metric_utf16")]
     const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
                               a fine day, isn't it?🐸  Aren't you glad \
                               we're alive?🐸  こんにちは、みんなさん！";
@@ -984,7 +994,6 @@ mod tests {
         test_chunk_at_byte(s, text);
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
     #[test]
     fn chunk_at_byte_02() {
         // Make sure splitting CRLF pairs works properly.

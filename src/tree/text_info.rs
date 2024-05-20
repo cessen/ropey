@@ -22,6 +22,7 @@ use str_indices::lines;
 ))]
 use crate::LineType;
 
+#[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
 use crate::str_utils::{byte_is_cr, byte_is_lf, ends_with_cr, starts_with_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -173,7 +174,12 @@ impl TextInfo {
 
     /// NOTE: this intentionally doesn't account for whether the CR is active in
     /// the line counts or not.
+    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
     pub(crate) fn ends_with_split_crlf(&self, next_is_lf: bool) -> bool {
+        // To silence unused parameter warnings when the relevant features are
+        // disabled.
+        let _ = next_is_lf;
+
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         return self.ends_with_cr && next_is_lf;
 
@@ -207,13 +213,11 @@ impl TextInfo {
     /// left alone.
     #[must_use]
     #[inline(always)]
-    pub(crate) fn adjusted_by_next(
-        self,
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-        next: TextInfo,
-        #[cfg(not(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode")))]
-        _next: TextInfo,
-    ) -> TextInfo {
+    pub(crate) fn adjusted_by_next(self, next: TextInfo) -> TextInfo {
+        // To silence unused parameter warnings when the relevant features are
+        // disabled.
+        let _ = next;
+
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         {
             self.adjusted_by_next_is_lf(next.starts_with_lf)
@@ -230,13 +234,11 @@ impl TextInfo {
     /// left alone.
     #[must_use]
     #[inline(always)]
-    pub(crate) fn adjusted_by_next_is_lf(
-        self,
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
-        next_is_lf: bool,
-        #[cfg(not(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode")))]
-        _next_is_lf: bool,
-    ) -> TextInfo {
+    pub(crate) fn adjusted_by_next_is_lf(self, next_is_lf: bool) -> TextInfo {
+        // To silence unused parameter warnings when the relevant features are
+        // disabled.
+        let _ = next_is_lf;
+
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         {
             if self.split_crlf_compensation_done {
@@ -307,6 +309,10 @@ impl TextInfo {
         byte_idx: usize,
         insertion_info: TextInfo,
     ) -> TextInfo {
+        // To silence unused parameter warnings when the relevant features are
+        // disabled.
+        let _ = (text, byte_idx, insertion_info);
+
         // This function only works correctly when these preconditions are met.
         // It will give errorneous results otherwise.
         debug_assert!(insertion_info.bytes > 0);
@@ -315,6 +321,8 @@ impl TextInfo {
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         debug_assert!(!insertion_info.split_crlf_compensation_done);
 
+        // Silence unused mut warnings when the relevant features are disabled.
+        #[allow(unused_mut)]
         let mut new_info = self + insertion_info;
 
         #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]

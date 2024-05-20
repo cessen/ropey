@@ -206,7 +206,7 @@ proptest::proptest! {
                 assert_eq!(lines_lf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::LF));
             }
         }
-        #[cfg(feature = "metric_lines_crlf")]
+        #[cfg(feature = "metric_lines_cr_lf")]
         {
             let line_count = lines_crlf::count_breaks(text) + 1;
             for i in 0..=line_count {

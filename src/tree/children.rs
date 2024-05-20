@@ -1108,7 +1108,7 @@ mod inner {
                 }
             }
 
-            let last = children.remove(2);
+            children.remove(2);
 
             assert_eq!(
                 0,

@@ -1,14 +1,20 @@
+// Note: the "allow unused" is because these are only used when certain features
+// are enabled, so this silences the resulting compiler warnings.
+
 #[inline(always)]
+#[allow(unused)]
 pub(crate) fn starts_with_lf(text: &str) -> bool {
     text.as_bytes().first().map(|&b| b == 0x0A).unwrap_or(false)
 }
 
 #[inline(always)]
+#[allow(unused)]
 pub(crate) fn ends_with_cr(text: &str) -> bool {
     text.as_bytes().last().map(|&b| b == 0x0D).unwrap_or(false)
 }
 
 #[inline(always)]
+#[allow(unused)]
 pub(crate) fn byte_is_lf(text: &str, byte_idx: usize) -> bool {
     text.as_bytes()
         .get(byte_idx)

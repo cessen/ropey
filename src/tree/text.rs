@@ -1,6 +1,6 @@
 use super::{text_info::TextInfo, MAX_TEXT_SIZE};
 
-#[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
+#[cfg(feature = "metric_chars")]
 use str_indices::chars;
 
 #[cfg(feature = "metric_utf16")]
@@ -414,7 +414,6 @@ mod inner {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::tree::text_info::TextInfo;
 
         fn buffer_from_str(text: &str) -> Buffer {
             let mut buffer = Buffer::new();
@@ -663,7 +662,10 @@ mod tests {
     #[test]
     fn line_to_byte_01() {
         let text = Text::from_str("\r\n\r\n\n\r\r\n");
+
+        #[cfg(feature = "metric_lines_lf")]
         let line_lf_byte_idxs = [0, 2, 4, 5, 8];
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
         let line_crlf_byte_idxs = [0, 2, 4, 5, 6, 8];
 
         #[cfg(feature = "metric_lines_lf")]
@@ -717,7 +719,7 @@ mod tests {
     #[test]
     fn split_01() {
         let text = "Hello world!";
-        let mut leaf = Text::from_str(text);
+        let leaf = Text::from_str(text);
         for i in 0..(text.len() + 1) {
             let mut left = leaf.clone();
             let right = left.split(i);

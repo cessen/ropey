@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn bytes_iter_01() {
         let r = Rope::from_str(TEXT);
-        let mut iter = r.bytes();
+        let iter = r.bytes();
 
         test_bytes_against_text(iter, TEXT);
     }
@@ -616,7 +616,7 @@ mod tests {
     fn bytes_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..124);
-        let mut iter = s.bytes();
+        let iter = s.bytes();
 
         test_bytes_against_text(iter, &TEXT[5..124]);
     }
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn chars_iter_01() {
         let r = Rope::from_str(TEXT);
-        let mut iter = r.chars();
+        let iter = r.chars();
 
         test_chars_against_text(iter, TEXT);
     }
@@ -697,7 +697,7 @@ mod tests {
     fn chars_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..124);
-        let mut iter = s.chars();
+        let iter = s.chars();
 
         test_chars_against_text(iter, &TEXT[5..124]);
     }

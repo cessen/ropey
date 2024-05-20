@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cargo test --no-default-features --features "simd, metric_utf16"
+cargo test --no-default-features --features "simd, metric_utf16" "$@"

@@ -467,6 +467,9 @@ impl Node {
         feature = "metric_lines_unicode"
     ))]
     pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
+        // Silence unused parameter warning when relevant features are disabled.
+        let _ = byte_idx;
+
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => false,
