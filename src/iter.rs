@@ -7,7 +7,7 @@ pub struct Chunks<'a> {
     node_stack: Vec<(&'a Node, usize)>, // (node ref, index of current child)
     byte_range: [usize; 2],
     current_byte_idx: usize,
-    at_start: bool,
+    at_start_sentinel: bool,
 }
 
 impl<'a> Chunks<'a> {
@@ -27,7 +27,7 @@ impl<'a> Chunks<'a> {
                     node_stack: vec![],
                     byte_range: [0, 0],
                     current_byte_idx: 0,
-                    at_start: true,
+                    at_start_sentinel: true,
                 },
                 0,
             );
@@ -37,7 +37,7 @@ impl<'a> Chunks<'a> {
             node_stack: vec![],
             byte_range: byte_range,
             current_byte_idx: 0,
-            at_start: false,
+            at_start_sentinel: false,
         };
 
         // Find the chunk the contains `at_byte_idx` and set that as the current
@@ -101,7 +101,7 @@ impl<'a> Chunks<'a> {
     pub fn prev(&mut self) -> Option<&'a str> {
         // Already at the start, or it's an empty rope.
         if self.current_byte_idx <= self.byte_range[0] || self.node_stack.is_empty() {
-            self.at_start = true;
+            self.at_start_sentinel = true;
             return None;
         }
 
@@ -155,8 +155,8 @@ impl<'a> Iterator for Chunks<'a> {
         }
 
         // Just starting.
-        if self.at_start {
-            self.at_start = false;
+        if self.at_start_sentinel {
+            self.at_start_sentinel = false;
             return self.current_chunk();
         }
 
