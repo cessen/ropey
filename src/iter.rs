@@ -7,6 +7,7 @@ pub struct Chunks<'a> {
     node_stack: Vec<(&'a Node, usize)>, // (node ref, index of current child)
     byte_range: [usize; 2],
     current_byte_idx: usize,
+    at_start: bool,
 }
 
 impl<'a> Chunks<'a> {
@@ -27,6 +28,7 @@ impl<'a> Chunks<'a> {
                     node_stack: vec![],
                     byte_range: [0, 0],
                     current_byte_idx: 0,
+                    at_start: true,
                 },
                 0,
             );
@@ -36,8 +38,13 @@ impl<'a> Chunks<'a> {
             node_stack: vec![],
             byte_range: byte_range,
             current_byte_idx: 0,
+            at_start: true,
         };
 
+        // TODO: make this work properly for arbitrary start indices. In
+        // particular, handling how the `at_start` flag, etc. work. Easiest
+        // might be to find the spot naively, and just walk the iterator back
+        // one step from there.
         let mut current_node = node;
         let mut byte_offset = 0;
         loop {
@@ -62,22 +69,13 @@ impl<'a> Chunks<'a> {
 
         (chunks, byte_offset.max(byte_range[0]))
     }
-}
 
-impl<'a> Iterator for Chunks<'a> {
-    type Item = &'a str;
-
-    /// Advances the iterator forward and returns the next value.
-    ///
-    /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
-    fn next(&mut self) -> Option<&'a str> {
-        // Already at the end, or it's an empty rope.
-        if self.current_byte_idx >= self.byte_range[1] || self.node_stack.is_empty() {
+    fn current_chunk(&self) -> Option<&'a str> {
+        if self.current_byte_idx >= self.byte_range[1] {
             return None;
         }
 
-        // Prepare the chunk text.
         let text = self.node_stack.last().unwrap().0.leaf_text();
         let trimmed_chunk = {
             let mut chunk = text.text();
@@ -90,23 +88,86 @@ impl<'a> Iterator for Chunks<'a> {
             chunk
         };
 
-        // Update the byte index.
-        self.current_byte_idx += text.len();
+        Some(trimmed_chunk)
+    }
 
-        // If we didn't reach the end, progress the node stack.
-        if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
+    /// Advances the iterator backward and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    pub fn prev(&mut self) -> Option<&'a str> {
+        // Already at the start, or it's an empty rope.
+        if self.current_byte_idx <= self.byte_range[0] || self.node_stack.is_empty() {
+            self.at_start = true;
+            return None;
+        }
+
+        // Just getting started at the end.
+        if self.current_byte_idx >= self.byte_range[1] {
+            self.current_byte_idx -= self.node_stack.last().unwrap().0.leaf_text().len();
+            return self.current_chunk();
+        }
+
+        // Progress the stack backwards.
+        if self.node_stack.len() > 1 {
+            // Pop the leaf.
             self.node_stack.pop();
 
-            // Find the deepest node that's not at it's end already.
+            // Find the deepest node that's not at its start already.
+            while self.node_stack.last().unwrap().1 == 0 {
+                debug_assert!(self.node_stack.len() > 1);
+                self.node_stack.pop();
+            }
+
+            // Refill the stack starting from that node.
+            self.node_stack.last_mut().unwrap().1 -= 1;
+            while self.node_stack.last().unwrap().0.is_internal() {
+                let child_i = self.node_stack.last().unwrap().1;
+                let node = &self.node_stack.last().unwrap().0.children().nodes()[child_i];
+                let position = match *node {
+                    Node::Leaf(_) => 0,
+                    Node::Internal(ref children) => children.len() - 1,
+                };
+                self.node_stack.push((node, position));
+            }
+        }
+
+        self.current_byte_idx -= self.node_stack.last().unwrap().0.leaf_text().len();
+
+        // Finally, return the chunk text.
+        self.current_chunk()
+    }
+}
+
+impl<'a> Iterator for Chunks<'a> {
+    type Item = &'a str;
+
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    fn next(&mut self) -> Option<&'a str> {
+        // Already at the end, or it's an empty rope.
+        if self.current_byte_idx >= self.byte_range[1] || self.node_stack.is_empty() {
+            return None;
+        }
+
+        // Just starting.
+        if self.at_start {
+            self.at_start = false;
+            return self.current_chunk();
+        }
+
+        self.current_byte_idx += self.node_stack.last().unwrap().0.leaf_text().len();
+
+        // Progress the stack.
+        if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
+            // Pop the leaf.
+            self.node_stack.pop();
+
+            // Find the deepest node that's not at its end already.
             while self.node_stack.last().unwrap().1
                 >= (self.node_stack.last().unwrap().0.child_count() - 1)
             {
-                if self.node_stack.len() == 1 {
-                    // This would leave the stack empty if we popped, and should
-                    // be impossible to reach due to checking our position in
-                    // the text against the byte range above.
-                    unreachable!();
-                }
+                debug_assert!(self.node_stack.len() > 1);
                 self.node_stack.pop();
             }
 
@@ -119,8 +180,8 @@ impl<'a> Iterator for Chunks<'a> {
             }
         }
 
-        // Finally, return the prepared chunk text.
-        Some(trimmed_chunk)
+        // Finally, return the chunk text.
+        self.current_chunk()
     }
 }
 
@@ -234,11 +295,22 @@ mod tests {
         rb.finish()
     }
 
+    /// Note: ensures that the chunks as given become individual leaf nodes in
+    /// the rope.
+    fn make_rope_from_chunks(chunks: &[&str]) -> Rope {
+        let mut rb = RopeBuilder::new();
+        for chunk in chunks {
+            rb._append_chunk_as_leaf(chunk);
+        }
+        rb.finish()
+    }
+
     #[test]
     fn chunks_iter_01() {
         let r = hello_world_repeat_rope();
 
         let mut chunks = r.chunks();
+
         assert_eq!(Some("Hello "), chunks.next());
         assert_eq!(Some("world!"), chunks.next());
         assert_eq!(Some("Hello "), chunks.next());
@@ -248,6 +320,16 @@ mod tests {
         assert_eq!(Some("Hello "), chunks.next());
         assert_eq!(Some("world!"), chunks.next());
         assert_eq!(None, chunks.next());
+
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(None, chunks.prev());
     }
 
     #[test]
@@ -256,6 +338,7 @@ mod tests {
 
         let mut chunks = r.chunks();
         assert_eq!(None, chunks.next());
+        assert_eq!(None, chunks.prev());
     }
 
     #[test]
@@ -264,6 +347,7 @@ mod tests {
         let s = r.slice(3..45);
 
         let mut chunks = s.chunks();
+
         assert_eq!(Some("lo "), chunks.next());
         assert_eq!(Some("world!"), chunks.next());
         assert_eq!(Some("Hello "), chunks.next());
@@ -273,6 +357,16 @@ mod tests {
         assert_eq!(Some("Hello "), chunks.next());
         assert_eq!(Some("wor"), chunks.next());
         assert_eq!(None, chunks.next());
+
+        assert_eq!(Some("wor"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("lo "), chunks.prev());
+        assert_eq!(None, chunks.prev());
     }
 
     #[test]
@@ -281,6 +375,7 @@ mod tests {
         let s = r.slice(8..40);
 
         let mut chunks = s.chunks();
+
         assert_eq!(Some("rld!"), chunks.next());
         assert_eq!(Some("Hello "), chunks.next());
         assert_eq!(Some("world!"), chunks.next());
@@ -288,6 +383,14 @@ mod tests {
         assert_eq!(Some("world!"), chunks.next());
         assert_eq!(Some("Hell"), chunks.next());
         assert_eq!(None, chunks.next());
+
+        assert_eq!(Some("Hell"), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("world!"), chunks.prev());
+        assert_eq!(Some("Hello "), chunks.prev());
+        assert_eq!(Some("rld!"), chunks.prev());
+        assert_eq!(None, chunks.prev());
     }
 
     #[test]
@@ -296,6 +399,55 @@ mod tests {
         let s = r.slice(14..14);
 
         let mut chunks = s.chunks();
+        assert_eq!(None, chunks.next());
+        assert_eq!(None, chunks.prev());
+    }
+    #[test]
+    fn chunks_iter_06() {
+        let r = Rope::from_str("A");
+        let mut chunks = r.chunks();
+
+        assert_eq!(Some("A"), chunks.next());
+        assert_eq!(None, chunks.prev());
+
+        assert_eq!(Some("A"), chunks.next());
+        assert_eq!(None, chunks.next());
+        assert_eq!(Some("A"), chunks.prev());
+        assert_eq!(None, chunks.prev());
+
+        assert_eq!(Some("A"), chunks.next());
+    }
+
+    #[test]
+    fn chunks_iter_07() {
+        let r =
+            make_rope_from_chunks(&["ABC", "DEF", "GHI", "JKL", "MNO", "PQR", "STU", "VWX", "YZ"]);
+        let mut chunks = r.chunks();
+
+        assert_eq!(Some("ABC"), chunks.next());
+        assert_eq!(None, chunks.prev());
+
+        assert_eq!(Some("ABC"), chunks.next());
+        assert_eq!(Some("DEF"), chunks.next());
+        assert_eq!(Some("ABC"), chunks.prev());
+
+        assert_eq!(Some("DEF"), chunks.next());
+        assert_eq!(Some("GHI"), chunks.next());
+        assert_eq!(Some("JKL"), chunks.next());
+        assert_eq!(Some("GHI"), chunks.prev());
+
+        assert_eq!(Some("JKL"), chunks.next());
+        assert_eq!(Some("MNO"), chunks.next());
+        assert_eq!(Some("PQR"), chunks.next());
+        assert_eq!(Some("STU"), chunks.next());
+        assert_eq!(Some("VWX"), chunks.next());
+        assert_eq!(Some("STU"), chunks.prev());
+
+        assert_eq!(Some("VWX"), chunks.next());
+        assert_eq!(Some("YZ"), chunks.next());
+        assert_eq!(None, chunks.next());
+        assert_eq!(Some("YZ"), chunks.prev());
+
         assert_eq!(None, chunks.next());
     }
 

@@ -20,7 +20,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - Iterators:
   - [ ] `Chunks`
     - [x] Forward.
-    - [ ] Bidirectional.
+    - [x] Bidirectional.
     - [ ] TextInfo querying.
   - [ ] `Bytes`
     - [x] Forward.
