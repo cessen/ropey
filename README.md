@@ -13,11 +13,13 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [x] Try rewriting `RopeBuilder` to be cleaner/faster.
 - [x] `RopeSlice`
 - [x] "Owned slices": full Ropes but that store meta data about a sliced range, so that owned slices (that don't depend on the lifetime of the original rope) can be created.
-- Metric conversion functions:
-  - [x] Chars <-> bytes.
-  - [x] UTF16 <-> bytes.
-  - [x] Lines <-> bytes.
+- [x] Metric conversion functions:
+  - [x] Chars <-> bytes
+  - [x] UTF16 <-> bytes
+  - [x] Lines <-> bytes
+- [ ] Non-panicking versions of various functions.
 - [ ] Iterators:
+  - [ ] `reversed()` method.
   - [ ] Non-line:
     - [ ] `Chunks`
       - [x] Forward.
@@ -31,16 +33,17 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
       - [x] Bidirectional.
     - [x] Creating iterators at a specific offset.
   - [ ] `Lines`:
-    - [ ] LF
-      - [ ] Forward.
-      - [ ] Bidirectional.
-    - [ ] LF + CR
-      - [ ] Forward.
-      - [ ] Bidirectional.
-    - [ ] Full Unicode
-      - [ ] Forward.
-      - [ ] Bidirectional.
-    - [ ] Creating iterator at a specific offset.
+    - [ ] Efficient implementation.
+    - [x] LF
+      - [x] Forward.
+      - [x] Bidirectional.
+    - [x] LF + CR
+      - [x] Forward.
+      - [x] Bidirectional.
+    - [x] Full Unicode
+      - [x] Forward.
+      - [x] Bidirectional.
+    - [x] Creating iterator at a specific offset.
 - [x] Standard library trait impls:
   - [x] `From`:
     - [x] `RopeSlice` -> `String`
