@@ -152,6 +152,14 @@ impl Rope {
         self.owned_slice_byte_range[1] = self.root_info.bytes;
     }
 
+    #[inline]
+    pub fn insert_char(&mut self, byte_idx: usize, ch: char) {
+        assert!(byte_idx <= self.len_bytes());
+
+        let mut buf = [0u8; 4];
+        self.insert(byte_idx, ch.encode_utf8(&mut buf));
+    }
+
     /// Removes the text in the given byte index range.
     ///
     /// Uses range syntax, e.g. `2..7`, `2..`, etc.
