@@ -198,11 +198,11 @@ impl<'a> Bytes<'a> {
     #[inline(always)]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Bytes {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
-        let first_chunk = chunks.next().map(|text| text.as_bytes()).unwrap_or(&[]);
+        let first_chunk = chunks.next().unwrap_or("");
 
         Bytes {
             chunks: chunks,
-            current_chunk: first_chunk,
+            current_chunk: first_chunk.as_bytes(),
             byte_idx_in_chunk: at_byte_idx - byte_start,
         }
     }
@@ -253,21 +253,47 @@ impl<'a> Iterator for Bytes<'a> {
 #[derive(Debug, Clone)]
 pub struct Chars<'a> {
     chunks: Chunks<'a>,
-    current_chunk: Option<std::str::Chars<'a>>,
+    current_chunk: &'a str,
+    byte_idx_in_chunk: usize,
 }
 
 impl<'a> Chars<'a> {
     #[inline(always)]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Chars {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
-        let first_chunk = chunks
-            .next()
-            .map(|text| text[(at_byte_idx - byte_start)..].chars());
+        let first_chunk = chunks.next().unwrap_or("");
+
+        assert!(first_chunk.is_char_boundary(at_byte_idx - byte_start));
 
         Chars {
             chunks: chunks,
             current_chunk: first_chunk,
+            byte_idx_in_chunk: at_byte_idx - byte_start,
         }
+    }
+
+    #[inline]
+    fn prev(&mut self) -> Option<char> {
+        while self.byte_idx_in_chunk == 0 {
+            if let Some(chunk) = self.chunks.prev() {
+                self.current_chunk = chunk;
+                self.byte_idx_in_chunk = chunk.len();
+            } else {
+                return None;
+            }
+        }
+
+        self.byte_idx_in_chunk -= 1;
+        while !self.current_chunk.is_char_boundary(self.byte_idx_in_chunk) {
+            self.byte_idx_in_chunk -= 1;
+        }
+        // TODO: do this in a more efficient way than constructing a temporary
+        // iterator.
+        let char = self.current_chunk[self.byte_idx_in_chunk..]
+            .chars()
+            .next()
+            .unwrap();
+        Some(char)
     }
 }
 
@@ -277,19 +303,28 @@ impl<'a> Iterator for Chars<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<char> {
-        loop {
-            if self.current_chunk.is_none() {
+        while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            if let Some(chunk) = self.chunks.next() {
+                self.current_chunk = chunk;
+                self.byte_idx_in_chunk = 0;
+            } else {
+                self.current_chunk = "";
+                self.byte_idx_in_chunk = 0;
                 return None;
             }
-
-            if let Some(char) = self.current_chunk.as_mut().unwrap().next() {
-                return Some(char);
-            }
-
-            self.current_chunk = self.chunks.next().map(|text| text.chars());
         }
+
+        // TODO: do this in a more efficient way than constructing a temporary
+        // iterator and then also redundantly recomputing its utf8 length which
+        // the internals of that temporary iterator clearly already know.
+        let char = self.current_chunk[self.byte_idx_in_chunk..]
+            .chars()
+            .next()
+            .unwrap();
+        self.byte_idx_in_chunk += char.len_utf8();
+        Some(char)
     }
 }
 
@@ -551,43 +586,49 @@ mod tests {
         assert_eq!(None, r.bytes().prev());
     }
 
-    #[test]
-    fn chars_iter_01() {
-        let r = Rope::from_str(TEXT);
-
-        let mut iter1 = TEXT.chars();
-        let mut iter2 = r.chars();
-
+    fn test_chars_against_text(mut chars: Chars, text: &str) {
+        // Forward.
+        let mut iter_f = text.chars();
         loop {
-            let b1 = iter1.next();
-            let b2 = iter2.next();
+            let c1 = chars.next();
+            let c2 = iter_f.next();
 
-            assert_eq!(b1, b2);
+            assert_eq!(c1, c2);
 
-            if b1.is_none() && b2.is_none() {
+            if c1.is_none() && c2.is_none() {
+                break;
+            }
+        }
+
+        // Backward.
+        let mut iter_b = text.chars().rev();
+        loop {
+            let c1 = chars.prev();
+            let c2 = iter_b.next();
+
+            assert_eq!(c1, c2);
+
+            if c1.is_none() && c2.is_none() {
                 break;
             }
         }
     }
 
     #[test]
+    fn chars_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let mut iter = r.chars();
+
+        test_chars_against_text(iter, TEXT);
+    }
+
+    #[test]
     fn chars_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..124);
+        let mut iter = s.chars();
 
-        let mut iter1 = TEXT[5..124].chars();
-        let mut iter2 = s.chars();
-
-        loop {
-            let b1 = iter1.next();
-            let b2 = iter2.next();
-
-            assert_eq!(b1, b2);
-
-            if b1.is_none() && b2.is_none() {
-                break;
-            }
-        }
+        test_chars_against_text(iter, &TEXT[5..124]);
     }
 
     #[test]
@@ -595,5 +636,6 @@ mod tests {
         let r = Rope::from_str("");
 
         assert_eq!(None, r.chars().next());
+        assert_eq!(None, r.chars().prev());
     }
 }
