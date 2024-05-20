@@ -22,9 +22,9 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
     - [x] Forward.
     - [x] Bidirectional.
     - [ ] TextInfo querying.
-  - [ ] `Bytes`
+  - [x] `Bytes`
     - [x] Forward.
-    - [ ] Bidirectional.
+    - [x] Bidirectional.
   - [ ] `Chars`
     - [x] Forward.
     - [ ] Bidirectional.

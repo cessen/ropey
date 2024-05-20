@@ -190,21 +190,36 @@ impl<'a> Iterator for Chunks<'a> {
 #[derive(Debug, Clone)]
 pub struct Bytes<'a> {
     chunks: Chunks<'a>,
-    current_chunk: Option<std::slice::Iter<'a, u8>>,
+    current_chunk: &'a [u8],
+    byte_idx_in_chunk: usize,
 }
 
 impl<'a> Bytes<'a> {
     #[inline(always)]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Bytes {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
-        let first_chunk = chunks
-            .next()
-            .map(|text| text.as_bytes()[(at_byte_idx - byte_start)..].iter());
+        let first_chunk = chunks.next().map(|text| text.as_bytes()).unwrap_or(&[]);
 
         Bytes {
             chunks: chunks,
             current_chunk: first_chunk,
+            byte_idx_in_chunk: at_byte_idx - byte_start,
         }
+    }
+
+    #[inline]
+    pub fn prev(&mut self) -> Option<u8> {
+        while self.byte_idx_in_chunk == 0 {
+            if let Some(chunk) = self.chunks.prev() {
+                self.current_chunk = chunk.as_bytes();
+                self.byte_idx_in_chunk = chunk.len();
+            } else {
+                return None;
+            }
+        }
+
+        self.byte_idx_in_chunk -= 1;
+        Some(self.current_chunk[self.byte_idx_in_chunk])
     }
 }
 
@@ -214,19 +229,22 @@ impl<'a> Iterator for Bytes<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<u8> {
-        loop {
-            if self.current_chunk.is_none() {
+        while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            if let Some(chunk) = self.chunks.next() {
+                self.current_chunk = chunk.as_bytes();
+                self.byte_idx_in_chunk = 0;
+            } else {
+                self.current_chunk = &[];
+                self.byte_idx_in_chunk = 0;
                 return None;
             }
-
-            if let Some(byte) = self.current_chunk.as_mut().unwrap().next() {
-                return Some(*byte);
-            }
-
-            self.current_chunk = self.chunks.next().map(|text| text.as_bytes().iter());
         }
+
+        let byte = self.current_chunk[self.byte_idx_in_chunk];
+        self.byte_idx_in_chunk += 1;
+        Some(byte)
     }
 }
 
@@ -279,6 +297,8 @@ impl<'a> Iterator for Chars<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use crate::{rope_builder::RopeBuilder, Rope};
 
     // 127 bytes, 103 chars, 1 line
@@ -304,9 +324,31 @@ mod tests {
         }
         rb.finish()
     }
-
     #[test]
     fn chunks_iter_01() {
+        let r = Rope::from_str(TEXT);
+
+        let mut text = TEXT;
+        let mut chunks = r.chunks();
+        let mut stack = Vec::new();
+
+        // Forward.
+        while let Some(chunk) = chunks.next() {
+            assert_eq!(&text[..chunk.len()], chunk);
+            stack.push(chunk);
+            text = &text[chunk.len()..];
+        }
+        assert_eq!("", text);
+
+        // Backward.
+        while let Some(chunk) = chunks.prev() {
+            assert_eq!(stack.pop().unwrap(), chunk);
+        }
+        assert_eq!(0, stack.len());
+    }
+
+    #[test]
+    fn chunks_iter_02() {
         let r = hello_world_repeat_rope();
 
         let mut chunks = r.chunks();
@@ -333,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    fn chunks_iter_02() {
+    fn chunks_iter_03() {
         let r = Rope::from_str("");
 
         let mut chunks = r.chunks();
@@ -342,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn chunks_iter_03() {
+    fn chunks_iter_04() {
         let r = hello_world_repeat_rope();
         let s = r.slice(3..45);
 
@@ -370,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn chunks_iter_04() {
+    fn chunks_iter_05() {
         let r = hello_world_repeat_rope();
         let s = r.slice(8..40);
 
@@ -394,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn chunks_iter_05() {
+    fn chunks_iter_06() {
         let r = hello_world_repeat_rope();
         let s = r.slice(14..14);
 
@@ -402,8 +444,9 @@ mod tests {
         assert_eq!(None, chunks.next());
         assert_eq!(None, chunks.prev());
     }
+
     #[test]
-    fn chunks_iter_06() {
+    fn chunks_iter_07() {
         let r = Rope::from_str("A");
         let mut chunks = r.chunks();
 
@@ -419,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn chunks_iter_07() {
+    fn chunks_iter_08() {
         let r =
             make_rope_from_chunks(&["ABC", "DEF", "GHI", "JKL", "MNO", "PQR", "STU", "VWX", "YZ"]);
         let mut chunks = r.chunks();
@@ -455,16 +498,25 @@ mod tests {
     // ensure that the Bytes iterator can be created with a starting index that
     // splits a char.
 
-    #[test]
-    fn bytes_iter_01() {
-        let r = Rope::from_str(TEXT);
-
-        let mut iter1 = TEXT.bytes();
-        let mut iter2 = r.bytes();
-
+    fn test_bytes_against_text(mut bytes: Bytes, text: &str) {
+        // Forward.
+        let mut iter_f = text.bytes();
         loop {
-            let b1 = iter1.next();
-            let b2 = iter2.next();
+            let b1 = bytes.next();
+            let b2 = iter_f.next();
+
+            assert_eq!(b1, b2);
+
+            if b1.is_none() && b2.is_none() {
+                break;
+            }
+        }
+
+        // Backward.
+        let mut iter_b = text.bytes().rev();
+        loop {
+            let b1 = bytes.prev();
+            let b2 = iter_b.next();
 
             assert_eq!(b1, b2);
 
@@ -475,23 +527,20 @@ mod tests {
     }
 
     #[test]
+    fn bytes_iter_01() {
+        let r = Rope::from_str(TEXT);
+        let mut iter = r.bytes();
+
+        test_bytes_against_text(iter, TEXT);
+    }
+
+    #[test]
     fn bytes_iter_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(5..124);
+        let mut iter = s.bytes();
 
-        let mut iter1 = TEXT[5..124].bytes();
-        let mut iter2 = s.bytes();
-
-        loop {
-            let b1 = iter1.next();
-            let b2 = iter2.next();
-
-            assert_eq!(b1, b2);
-
-            if b1.is_none() && b2.is_none() {
-                break;
-            }
-        }
+        test_bytes_against_text(iter, &TEXT[5..124]);
     }
 
     #[test]
@@ -499,6 +548,7 @@ mod tests {
         let r = Rope::from_str("");
 
         assert_eq!(None, r.bytes().next());
+        assert_eq!(None, r.bytes().prev());
     }
 
     #[test]
