@@ -334,16 +334,172 @@ impl<'a> Iterator for Chars<'a> {
 
 //=============================================================
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+mod lines {
+    use crate::{tree::Node, LineType, RopeSlice, TextInfo};
+
+    #[derive(Debug, Clone)]
+    pub struct Lines<'a> {
+        node: &'a Node,
+        node_info: &'a TextInfo,
+        byte_range: [usize; 2],
+        line_range: [usize; 2],
+        line_type: LineType,
+        current_line_idx: usize,
+        at_start_sentinel: bool,
+    }
+
+    impl<'a> Lines<'a> {
+        /// Note: unlike the other iterator constructors, this one takes
+        /// `at_line_idx` relative to the slice defined by `byte_range`, not
+        /// relative to the whole contents of `node`.
+        #[inline(always)]
+        pub(crate) fn new(
+            node: &'a Node,
+            node_info: &'a TextInfo,
+            byte_range: [usize; 2],
+            at_line_idx: usize,
+            line_type: LineType,
+        ) -> Lines<'a> {
+            let start_line = {
+                let (text, info) = node.get_text_at_byte(byte_range[0]);
+                info.line_breaks(line_type)
+                    + text.byte_to_line(byte_range[0] - info.bytes, line_type)
+            };
+            let end_line = {
+                let (text, info) = node.get_text_at_byte(byte_range[1]);
+                info.line_breaks(line_type)
+                    + text.byte_to_line(byte_range[1] - info.bytes, line_type)
+                    + 1
+            };
+
+            assert!(start_line + at_line_idx <= end_line);
+
+            Lines {
+                node: node,
+                node_info: node_info,
+                byte_range: byte_range,
+                line_range: [start_line, end_line],
+                line_type: line_type,
+                current_line_idx: start_line + at_line_idx.saturating_sub(1),
+                at_start_sentinel: at_line_idx == 0,
+            }
+        }
+
+        fn current_line(&self) -> Option<RopeSlice<'a>> {
+            if self.at_start_sentinel || self.current_line_idx >= self.line_range[1] {
+                return None;
+            }
+
+            let start_byte = {
+                let (text, start_info) = self
+                    .node
+                    .get_text_at_line_break(self.current_line_idx, self.line_type);
+
+                start_info.bytes
+                    + text.line_to_byte(
+                        self.current_line_idx - start_info.line_breaks(self.line_type),
+                        self.line_type,
+                    )
+            };
+            let end_byte = {
+                let (text, start_info) = self
+                    .node
+                    .get_text_at_line_break(self.current_line_idx + 1, self.line_type);
+
+                start_info.bytes
+                    + text.line_to_byte(
+                        self.current_line_idx + 1 - start_info.line_breaks(self.line_type),
+                        self.line_type,
+                    )
+            };
+
+            Some(RopeSlice::new(
+                self.node,
+                self.node_info,
+                [
+                    start_byte.max(self.byte_range[0]),
+                    end_byte.min(self.byte_range[1]),
+                ],
+            ))
+        }
+
+        #[inline]
+        pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
+            if self.current_line_idx <= self.line_range[0] {
+                self.at_start_sentinel = true;
+                return None;
+            }
+
+            self.current_line_idx -= 1;
+            self.current_line()
+        }
+    }
+
+    impl<'a> Iterator for Lines<'a> {
+        type Item = RopeSlice<'a>;
+
+        /// Advances the iterator forward and returns the next value.
+        ///
+        /// Runs in amortized O(1) time and worst-case O(log N) time.
+        #[inline]
+        fn next(&mut self) -> Option<RopeSlice<'a>> {
+            if self.current_line_idx >= self.line_range[1] {
+                return None;
+            }
+
+            if !self.at_start_sentinel {
+                self.current_line_idx += 1;
+            } else {
+                self.at_start_sentinel = false;
+            }
+
+            self.current_line()
+        }
+    }
+}
+
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_unicode"
+))]
+pub use lines::Lines;
+
+//=============================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::{rope_builder::RopeBuilder, Rope};
 
+    #[cfg(feature = "metric_lines_cr_lf")]
+    use crate::LineType;
+
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
                         a fine day, isn't it?  Aren't you glad \
                         we're alive?  こんにちは、みんなさん！";
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    fn lines_text() -> String {
+        let mut text = String::new();
+        text.push_str("\r\n");
+        for _ in 0..16 {
+            text.push_str(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n\
+                 こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+            );
+        }
+        text
+    }
 
     fn hello_world_repeat_rope() -> Rope {
         let mut rb = RopeBuilder::new();
@@ -743,4 +899,677 @@ mod tests {
         let mut chars = s.chars_at(text.len());
         assert_eq!(None, chars.next());
     }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_01() {
+        let r = Rope::from_str("hi\nyo\nbye");
+
+        let mut lines = r.lines(LineType::CRLF);
+
+        assert_eq!("hi\n", lines.next().unwrap());
+        assert_eq!(None, lines.prev());
+
+        assert_eq!("hi\n", lines.next().unwrap());
+        assert_eq!("yo\n", lines.next().unwrap());
+        assert_eq!("hi\n", lines.prev().unwrap());
+
+        assert_eq!("yo\n", lines.next().unwrap());
+        assert_eq!("bye", lines.next().unwrap());
+        assert_eq!(None, lines.next());
+        assert_eq!("bye", lines.prev().unwrap());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_02() {
+        let text = "Hello there!\nHow goes it?";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(2, r.lines(LineType::CRLF).count());
+        assert_eq!(2, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_03() {
+        let text = "Hello there!\nHow goes it?\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(3, r.lines(LineType::CRLF).count());
+        assert_eq!(3, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_04() {
+        let text = "Hello there!\nHow goes it?\nYeah!";
+        let r = Rope::from_str(text);
+        let s1 = r.slice(..25);
+        let s2 = r.slice(..26);
+
+        assert_eq!(2, s1.lines(LineType::CRLF).count());
+        assert_eq!(3, s2.lines(LineType::CRLF).count());
+
+        let mut lines = s1.lines(LineType::CRLF);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s2.lines(LineType::CRLF);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_05() {
+        let text = "";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(1, r.lines(LineType::CRLF).count());
+        assert_eq!(1, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_06() {
+        let text = "a";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(1, r.lines(LineType::CRLF).count());
+        assert_eq!(1, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("a", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("a", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_07() {
+        let text = "a\nb";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(2, r.lines(LineType::CRLF).count());
+        assert_eq!(2, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_08() {
+        let text = "\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(2, r.lines(LineType::CRLF).count());
+        assert_eq!(2, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_09() {
+        let text = "a\nb\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        assert_eq!(3, r.lines(LineType::CRLF).count());
+        assert_eq!(3, s.lines(LineType::CRLF).count());
+
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_10() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+
+        let mut itr = r.lines(LineType::CRLF);
+
+        assert_eq!(None, itr.prev());
+        assert_eq!(None, itr.prev());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_11() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+
+        let mut lines = Vec::new();
+        let mut itr = r.lines(LineType::CRLF);
+
+        while let Some(line) = itr.next() {
+            lines.push(line);
+        }
+
+        while let Some(line) = itr.prev() {
+            assert_eq!(line, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_12() {
+        let text = lines_text();
+        dbg!(text.len());
+        let r = Rope::from_str(&text);
+        let s = r.slice(34..2031);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines(LineType::CRLF);
+
+        while let Some(line) = itr.next() {
+            lines.push(line);
+        }
+
+        while let Some(line) = itr.prev() {
+            assert_eq!(line, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_13() {
+        let text = "";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines(LineType::CRLF);
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_14() {
+        let text = "a";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines(LineType::CRLF);
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_15() {
+        let text = "a\nb";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines(LineType::CRLF);
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_16() {
+        let text = "\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines(LineType::CRLF);
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_17() {
+        let text = "a\nb\n";
+        let r = Rope::from_str(text);
+        let s = r.slice(..);
+
+        let mut lines = Vec::new();
+        let mut itr = s.lines(LineType::CRLF);
+
+        while let Some(text) = itr.next() {
+            lines.push(text);
+        }
+
+        while let Some(text) = itr.prev() {
+            assert_eq!(text, lines.pop().unwrap());
+        }
+
+        assert!(lines.is_empty());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_18() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        let s = r.slice(..);
+
+        assert_eq!(34, r.lines(LineType::CRLF).count());
+        assert_eq!(34, s.lines(LineType::CRLF).count());
+
+        // Rope
+        let mut lines = r.lines(LineType::CRLF);
+        assert_eq!("\r\n", lines.next().unwrap());
+        for _ in 0..16 {
+            assert_eq!(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n",
+                lines.next().unwrap()
+            );
+            assert_eq!(
+                "こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+                lines.next().unwrap()
+            );
+        }
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        // Slice
+        let mut lines = s.lines(LineType::CRLF);
+        assert_eq!("\r\n", lines.next().unwrap());
+        for _ in 0..16 {
+            assert_eq!(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n",
+                lines.next().unwrap()
+            );
+            assert_eq!(
+                "こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+                lines.next().unwrap()
+            );
+        }
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+    }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_19() {
+    //     let r = Rope::from_str("a\nb\nc\nd\ne\nf\ng\nh\n");
+    //     for (line, c) in r.lines(LineType::CRLF).zip('a'..='h') {
+    //         assert_eq!(line, format!("{c}\n"))
+    //     }
+    //     for (line, c) in r
+    //         .lines_at(r.len_lines() - 1)
+    //         .reversed()
+    //         .zip(('a'..='h').rev())
+    //     {
+    //         assert_eq!(line, format!("{c}\n"))
+    //     }
+
+    //     let r = Rope::from_str("ab\nc\nd\ne\nf\ng\nh\n");
+    //     for (line, c) in r.slice(1..).lines(LineType::CRLF).zip('b'..='h') {
+    //         assert_eq!(line, format!("{c}\n"))
+    //     }
+    // }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_at_01() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+
+        for i in 0..r.len_lines(LineType::CRLF) {
+            let line = r.line(i, LineType::CRLF);
+            let mut lines = r.lines_at(i, LineType::CRLF);
+            assert_eq!(Some(line), lines.next());
+        }
+
+        let mut lines = r.lines_at(r.len_lines(LineType::CRLF), LineType::CRLF);
+        assert_eq!(None, lines.next());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_at_02() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        let s = r.slice(34..2031);
+
+        for i in 0..s.len_lines(LineType::CRLF) {
+            let line = s.line(i, LineType::CRLF);
+            let mut lines = s.lines_at(i, LineType::CRLF);
+            assert_eq!(Some(line), lines.next());
+        }
+
+        let mut lines = s.lines_at(s.len_lines(LineType::CRLF), LineType::CRLF);
+        assert_eq!(None, lines.next());
+    }
+
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_at_03() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        let s = r.slice(34..34);
+
+        let mut lines = s.lines_at(0, LineType::CRLF);
+        assert_eq!("", lines.next().unwrap());
+
+        let mut lines = s.lines_at(1, LineType::CRLF);
+        assert_eq!(None, lines.next());
+    }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_exact_size_iter_01() {
+    //     let r = Rope::from_str(TEXT);
+    //     let s = r.slice(34..301);
+
+    //     let mut line_count = s.len_lines();
+    //     let mut lines = s.lines();
+
+    //     assert_eq!(line_count, lines.len());
+
+    //     while let Some(_) = lines.next() {
+    //         line_count -= 1;
+    //         assert_eq!(line_count, lines.len());
+    //     }
+
+    //     assert_eq!(lines.len(), 0);
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     assert_eq!(lines.len(), 0);
+    //     assert_eq!(line_count, 0);
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_exact_size_iter_02() {
+    //     let r = Rope::from_str(TEXT);
+    //     let s = r.slice(34..301);
+
+    //     for i in 0..=s.len_lines() {
+    //         let lines = s.lines_at(i);
+    //         assert_eq!(s.len_lines() - i, lines.len());
+    //     }
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_exact_size_iter_03() {
+    //     let r = Rope::from_str(TEXT);
+    //     let s = r.slice(34..301);
+
+    //     let mut line_count = 0;
+    //     let mut lines = s.lines_at(s.len_lines());
+
+    //     assert_eq!(line_count, lines.len());
+
+    //     while lines.prev().is_some() {
+    //         line_count += 1;
+    //         assert_eq!(line_count, lines.len());
+    //     }
+
+    //     assert_eq!(lines.len(), s.len_lines());
+    //     lines.prev();
+    //     lines.prev();
+    //     lines.prev();
+    //     lines.prev();
+    //     lines.prev();
+    //     lines.prev();
+    //     lines.prev();
+    //     assert_eq!(lines.len(), s.len_lines());
+    //     assert_eq!(line_count, s.len_lines());
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_exact_size_iter_04() {
+    //     // Make sure splitting CRLF pairs at the end works properly.
+    //     let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+    //     for i in 0..r.len_chars() {
+    //         let s = r.slice(..i);
+    //         let lines = s.lines();
+    //         if cfg!(any(feature = "cr_lines", feature = "unicode_lines")) {
+    //             assert_eq!(lines.len(), 1 + ((i + 1) / 2));
+    //         } else {
+    //             assert_eq!(lines.len(), 1 + (i / 2));
+    //         }
+    //         assert_eq!(lines.len(), lines.count());
+    //     }
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_reverse_01() {
+    //     let r = Rope::from_str(TEXT);
+    //     let mut itr = r.lines();
+    //     let mut stack = Vec::new();
+
+    //     for _ in 0..8 {
+    //         stack.push(itr.next().unwrap());
+    //     }
+    //     itr.reverse();
+    //     for _ in 0..8 {
+    //         assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+    //     }
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_reverse_02() {
+    //     let r = Rope::from_str(TEXT);
+    //     let mut itr = r.lines_at(r.len_lines() / 3);
+    //     let mut stack = Vec::new();
+
+    //     for _ in 0..8 {
+    //         stack.push(itr.next().unwrap());
+    //     }
+    //     itr.reverse();
+    //     for _ in 0..8 {
+    //         assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+    //     }
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_reverse_03() {
+    //     let r = Rope::from_str(TEXT);
+    //     let mut itr = r.lines_at(r.len_lines() / 3);
+    //     let mut stack = Vec::new();
+
+    //     itr.reverse();
+    //     for _ in 0..8 {
+    //         stack.push(itr.next().unwrap());
+    //     }
+    //     itr.reverse();
+    //     for _ in 0..8 {
+    //         assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
+    //     }
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_reverse_04() {
+    //     let mut itr = Lines::from_str("a\n", 1);
+
+    //     assert_eq!(Some("a\n".into()), itr.next());
+    //     assert_eq!(Some("".into()), itr.next());
+    //     assert_eq!(None, itr.next());
+    //     itr.reverse();
+    //     assert_eq!(Some("".into()), itr.next());
+    //     assert_eq!(Some("a\n".into()), itr.next());
+    //     assert_eq!(None, itr.next());
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_reverse_exact_size_iter_01() {
+    //     let r = Rope::from_str(TEXT);
+    //     let s = r.slice(34..301);
+
+    //     let mut lines = s.lines_at(4);
+    //     lines.reverse();
+    //     let mut line_count = 4;
+
+    //     assert_eq!(4, lines.len());
+
+    //     while let Some(_) = lines.next() {
+    //         line_count -= 1;
+    //         assert_eq!(line_count, lines.len());
+    //     }
+
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     lines.next();
+    //     assert_eq!(lines.len(), 0);
+    //     assert_eq!(line_count, 0);
+    // }
+
+    // #[test]
+    // #[cfg_attr(miri, ignore)]
+    // fn lines_reverse_exact_size_iter_02() {
+    //     // Make sure splitting CRLF pairs at the end works properly.
+    //     let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
+    //     for i in 0..r.len_chars() {
+    //         let s = r.slice(..i);
+    //         let lines = s.lines_at((i + 1) / 2).reversed();
+    //         assert_eq!(lines.len(), lines.count());
+    //     }
+    // }
 }

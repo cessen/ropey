@@ -334,7 +334,7 @@ macro_rules! impl_shared_methods {
 
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
             Bytes::new(
-                &self.get_root(),
+                self.get_root(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
             )
@@ -342,7 +342,7 @@ macro_rules! impl_shared_methods {
 
         pub fn chars(&self) -> Chars<'_> {
             Chars::new(
-                &self.get_root(),
+                self.get_root(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )
@@ -350,15 +350,45 @@ macro_rules! impl_shared_methods {
 
         pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
             Chars::new(
-                &self.get_root(),
+                self.get_root(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
             )
         }
 
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_unicode"
+        ))]
+        pub fn lines(&self, line_type: LineType) -> Lines<'_> {
+            Lines::new(
+                self.get_root(),
+                self.get_root_info(),
+                self.get_byte_range(),
+                0,
+                line_type
+            )
+        }
+
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_unicode"
+        ))]
+        pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<'_> {
+            Lines::new(
+                self.get_root(),
+                self.get_root_info(),
+                self.get_byte_range(),
+                line_idx,
+                line_type,
+            )
+        }
+
         pub fn chunks(&self) -> Chunks<'_> {
             Chunks::new(
-                &self.get_root(),
+                self.get_root(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )

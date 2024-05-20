@@ -13,7 +13,7 @@ use crate::{
     feature = "metric_lines_cr_lf",
     feature = "metric_lines_unicode"
 ))]
-use crate::LineType;
+use crate::{iter::Lines, LineType};
 
 /// An immutable view into part of a `Rope`.
 ///

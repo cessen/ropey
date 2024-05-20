@@ -17,7 +17,7 @@ use crate::{
     feature = "metric_lines_cr_lf",
     feature = "metric_lines_unicode"
 ))]
-use crate::LineType;
+use crate::{iter::Lines, LineType};
 
 #[derive(Clone)]
 pub struct Rope {
