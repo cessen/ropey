@@ -2,8 +2,10 @@
 //! on both Rope and RopeSlice:
 //!
 //! - `get_root()`: returns the root node of the Rope or RopeSlice.
-//! - `get_full_info()`: if the root node represents precisely the extent of the
-//!   Rope or RopeSlice, returns its info.  Otherwise returns None.
+//! - `get_root_info()`: returns the TextInfo of the root node.
+//! - `get_full_info()`: like `get_root_info()` except it only returns the info
+//!   if it represents the full extent of the Rope or RopeSlice.  Otherwise
+//!   returns None.
 //! - `get_byte_range()`: returns the range of bytes of the root node that are
 //!   considered part of the actual text.
 
