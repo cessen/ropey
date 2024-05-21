@@ -95,6 +95,52 @@ impl<'a> RopeSlice<'a> {
     }
 
     #[inline]
+    pub fn to_owned_slice(&self) -> Rope {
+        Rope {
+            root: self.root.clone(),
+            root_info: *self.root_info,
+            owned_slice_byte_range: self.byte_range,
+        }
+    }
+
+    //---------------------------------------------------------
+    // Methods shared between Rope and RopeSlice.
+
+    crate::shared_impl::shared_main_impl_methods!();
+
+    //---------------------------------------------------------
+    // Utility methods needed by the shared impl macros in
+    // `crate::shared_impl`.
+
+    #[inline(always)]
+    fn get_root(&self) -> &'a Node {
+        self.root
+    }
+
+    #[allow(dead_code)] // Only used with some features.
+    #[inline(always)]
+    fn get_root_info(&self) -> &'a TextInfo {
+        self.root_info
+    }
+
+    #[inline(always)]
+    fn get_full_info(&self) -> Option<&'a TextInfo> {
+        if self.byte_range[0] == 0 && self.byte_range[1] == self.root_info.bytes {
+            Some(self.root_info)
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn get_byte_range(&self) -> [usize; 2] {
+        self.byte_range
+    }
+}
+
+/// Non-panicking versions of some of `RopeSlice`'s methods.
+impl<'a> RopeSlice<'a> {
+    #[inline]
     pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'a>>
     where
         R: RangeBounds<usize>,
@@ -130,54 +176,18 @@ impl<'a> RopeSlice<'a> {
         inner(self, start_idx, end_idx)
     }
 
-    #[inline]
-    pub fn to_owned_slice(&self) -> Rope {
-        Rope {
-            root: self.root.clone(),
-            root_info: *self.root_info,
-            owned_slice_byte_range: self.byte_range,
-        }
-    }
-
-    //---------------------------------------------------------
-    // Utility methods needed for `impl_shared_methods!()`.
-
-    #[inline(always)]
-    fn get_root(&self) -> &'a Node {
-        self.root
-    }
-
-    #[allow(dead_code)] // Only used with some features.
-    #[inline(always)]
-    fn get_root_info(&self) -> &'a TextInfo {
-        self.root_info
-    }
-
-    #[inline(always)]
-    fn get_full_info(&self) -> Option<&'a TextInfo> {
-        if self.byte_range[0] == 0 && self.byte_range[1] == self.root_info.bytes {
-            Some(self.root_info)
-        } else {
-            None
-        }
-    }
-
-    #[inline(always)]
-    fn get_byte_range(&self) -> [usize; 2] {
-        self.byte_range
-    }
+    // Methods shared between Rope and RopeSlice.
+    crate::shared_impl::shared_no_panic_impl_methods!();
 }
-
-//=============================================================
-// Impls shared between Rope and RopeSlice.
-
-crate::shared_impl::impl_shared_methods!(RopeSlice<'_>);
 
 //=============================================================
 // Stdlib trait impls.
 //
 // Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
 // that need to distinguish between Rope and RopeSlice.
+
+// Impls shared between Rope and RopeSlice.
+crate::shared_impl::shared_std_impls!(RopeSlice<'_>);
 
 impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
     fn eq(&self, other: &Rope) -> bool {

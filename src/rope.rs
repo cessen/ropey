@@ -248,7 +248,7 @@ impl Rope {
         inner(self, byte_range.start_bound(), byte_range.end_bound());
     }
 
-    //-------------------------------------------------
+    //---------------------------------------------------------
     // Slicing.
 
     #[inline(always)]
@@ -262,37 +262,10 @@ impl Rope {
         }
     }
 
-    #[inline(always)]
-    pub fn try_slice<'a, R>(&'a self, byte_range: R) -> Result<RopeSlice<'a>>
-    where
-        R: RangeBounds<usize>,
-    {
-        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+    //---------------------------------------------------------
+    // Methods shared between Rope and RopeSlice.
 
-        fn inner<'a>(rope: &'a Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice<'a>> {
-            if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
-                return Err(NonCharBoundary);
-            }
-            if start_idx > end_idx {
-                return Err(InvalidRange);
-            }
-            if end_idx > rope.len_bytes() {
-                return Err(OutOfBounds);
-            }
-
-            let start_idx_real = rope.get_byte_range()[0] + start_idx;
-            let end_idx_real = rope.get_byte_range()[0] + end_idx;
-
-            Ok(RopeSlice::new(
-                rope.get_root(),
-                rope.get_root_info(),
-                [start_idx_real, end_idx_real],
-            ))
-        }
-
-        inner(self, start_idx, end_idx)
-    }
+    crate::shared_impl::shared_main_impl_methods!();
 
     //---------------------------------------------------------
     // Misc. internal methods.
@@ -382,7 +355,8 @@ impl Rope {
     }
 
     //---------------------------------------------------------
-    // Utility methods needed for `impl_shared_methods!()`.
+    // Utility methods needed by the shared impl macros in
+    // `crate::shared_impl`.
 
     #[inline(always)]
     fn get_root(&self) -> &Node {
@@ -411,16 +385,52 @@ impl Rope {
     }
 }
 
-//=============================================================
-// Impls shared between Rope and RopeSlice.
+/// Non-panicking versions of some of `Rope`'s methods.
+impl Rope {
+    #[inline(always)]
+    pub fn try_slice<'a, R>(&'a self, byte_range: R) -> Result<RopeSlice<'a>>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
+        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
 
-crate::shared_impl::impl_shared_methods!(Rope);
+        fn inner<'a>(rope: &'a Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice<'a>> {
+            if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
+                return Err(NonCharBoundary);
+            }
+            if start_idx > end_idx {
+                return Err(InvalidRange);
+            }
+            if end_idx > rope.len_bytes() {
+                return Err(OutOfBounds);
+            }
+
+            let start_idx_real = rope.get_byte_range()[0] + start_idx;
+            let end_idx_real = rope.get_byte_range()[0] + end_idx;
+
+            Ok(RopeSlice::new(
+                rope.get_root(),
+                rope.get_root_info(),
+                [start_idx_real, end_idx_real],
+            ))
+        }
+
+        inner(self, start_idx, end_idx)
+    }
+
+    // Methods shared between Rope and RopeSlice.
+    crate::shared_impl::shared_no_panic_impl_methods!();
+}
 
 //==============================================================
 // Stdlib trait impls.
 //
 // Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
 // that need to distinguish between Rope and RopeSlice.
+
+// Impls shared between Rope and RopeSlice.
+crate::shared_impl::shared_std_impls!(Rope);
 
 impl std::default::Default for Rope {
     #[inline]
