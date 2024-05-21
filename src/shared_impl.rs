@@ -67,20 +67,15 @@ macro_rules! impl_shared_methods {
             //-------------------------------------------------
             // Fetching.
 
+            #[inline(always)]
             pub fn byte(&self, byte_idx: usize) -> u8 {
-                assert!(byte_idx < self.len_bytes());
-
-                let byte_idx = byte_idx + self.get_byte_range()[0];
-                let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-                text.text().as_bytes()[byte_idx - offset]
+                self.get_byte(byte_idx).unwrap()
             }
 
             #[cfg(feature = "metric_chars")]
+            #[inline(always)]
             pub fn char(&self, char_idx: usize) -> char {
-                assert!(char_idx < self.len_chars());
-
-                let byte_idx = self.char_to_byte(char_idx);
-                self.char_at_byte(byte_idx)
+                self.get_char(char_idx).unwrap()
             }
 
             #[cfg(any(
@@ -88,90 +83,23 @@ macro_rules! impl_shared_methods {
                 feature = "metric_lines_cr_lf",
                 feature = "metric_lines_unicode"
             ))]
+            #[inline(always)]
             pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice {
-                assert!(line_idx < self.len_lines(line_type));
-
-                let start_byte = self.line_to_byte(line_idx, line_type);
-                let end_byte = self.line_to_byte(line_idx + 1, line_type);
-                self.slice(start_byte..end_byte)
+                self.get_line(line_idx, line_type).unwrap()
             }
 
+            #[inline]
             pub fn char_at_byte(&self, byte_idx: usize) -> char {
-                assert!(byte_idx < self.len_bytes());
-
-                let byte_idx = byte_idx + self.get_byte_range()[0];
-                let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-                let local_idx = byte_idx - offset;
-
-                assert!(text.text().is_char_boundary(local_idx));
-
-                // TODO: something more efficient than constructing a temporary
-                // iterator.
-                text.text()[(byte_idx - offset)..].chars().next().unwrap()
-            }
-
-            pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
-                assert!(byte_idx <= self.len_bytes());
-
-                let (chunk, start_info) = self
-                    .get_root()
-                    .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
-
-                if self.get_full_info().is_some() {
-                    // Simple case: we have a full rope, so no adjustments are needed.
-                    return (chunk.text(), start_info);
-                } else {
-                    // Trim chunk.
-                    let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
-                    let back_trim_idx =
-                        (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
-                    let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
-
-                    // Compute left-side text info.
-                    let start_info = {
-                        let new_start_info = start_info
-                            + TextInfo::from_str(&chunk.text()[..front_trim_idx])
-                                .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
-                                    chunk.text(),
-                                    front_trim_idx,
-                                ));
-                        let start_info =
-                            self.get_root().text_info_at_byte(self.get_byte_range()[0]);
-                        new_start_info - start_info
-                    };
-
-                    (trimmed_chunk, start_info)
+                match self.try_char_at_byte(byte_idx) {
+                    Ok(ch) => ch,
+                    Err(NonCharBoundary) => panic!("Attempt to get a char at a non-char boundary."),
+                    Err(e) => e.panic_with_msg(),
                 }
             }
 
-            //-------------------------------------------------
-            // Slicing.
-
-            #[inline]
-            pub fn slice<R>(&self, byte_range: R) -> RopeSlice
-            where
-                R: RangeBounds<usize>,
-            {
-                let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-                let end_idx =
-                    end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
-                assert!(
-                    start_idx <= end_idx && end_idx <= self.len_bytes(),
-                    "Invalid byte range: either end < start or the range is outside \
-                     the bounds of the rope slice.",
-                );
-                assert!(
-                    self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
-                    "Byte range does not align with char boundaries."
-                );
-
-                let start_idx_real = self.get_byte_range()[0] + start_idx;
-                let end_idx_real = self.get_byte_range()[0] + end_idx;
-                RopeSlice::new(
-                    self.get_root(),
-                    self.get_root_info(),
-                    [start_idx_real, end_idx_real],
-                )
+            #[inline(always)]
+            pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
+                self.get_chunk_at_byte(byte_idx).unwrap()
             }
 
             //-------------------------------------------------
@@ -416,6 +344,110 @@ macro_rules! impl_shared_methods {
                 line_type: LineType,
             ) -> bool {
                 self.get_root().is_relevant_crlf_split(byte_idx, line_type)
+            }
+        }
+
+        //=====================================================
+        // Non-panicking.
+
+        /// Non-panicking methods.
+        ///
+        /// These are non-panicking variants of some of Ropey's methods.
+        impl $rope {
+            //-------------------------------------------------
+            // Fetching.
+
+            pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+                if byte_idx >= self.len_bytes() {
+                    return None;
+                }
+
+                let byte_idx = byte_idx + self.get_byte_range()[0];
+                let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+
+                Some(text.text().as_bytes()[byte_idx - offset])
+            }
+
+            #[cfg(feature = "metric_chars")]
+            pub fn get_char(&self, char_idx: usize) -> Option<char> {
+                if char_idx >= self.len_chars() {
+                    return None;
+                }
+
+                let byte_idx = self.char_to_byte(char_idx);
+
+                Some(self.char_at_byte(byte_idx))
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice> {
+                if line_idx >= self.len_lines(line_type) {
+                    return None;
+                }
+
+                let start_byte = self.line_to_byte(line_idx, line_type);
+                let end_byte = self.line_to_byte(line_idx + 1, line_type);
+
+                Some(self.slice(start_byte..end_byte))
+            }
+
+            pub fn try_char_at_byte(&self, byte_idx: usize) -> Result<char> {
+                if byte_idx >= self.len_bytes() {
+                    return Err(OutOfBounds);
+                }
+
+                let byte_idx = byte_idx + self.get_byte_range()[0];
+                let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+                let local_idx = byte_idx - offset;
+
+                if !text.text().is_char_boundary(local_idx) {
+                    return Err(NonCharBoundary);
+                }
+
+                // TODO: something more efficient than constructing a temporary
+                // iterator.
+                Ok(text.text()[(byte_idx - offset)..].chars().next().unwrap())
+            }
+
+            pub fn get_chunk_at_byte(&self, byte_idx: usize) -> Option<(&str, TextInfo)> {
+                if byte_idx > self.len_bytes() {
+                    return None;
+                }
+
+                let (chunk, start_info) = self
+                    .get_root()
+                    .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
+
+                if self.get_full_info().is_some() {
+                    // Simple case: we have a full rope, so no adjustments are
+                    // needed.
+                    Some((chunk.text(), start_info))
+                } else {
+                    // Trim chunk.
+                    let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
+                    let back_trim_idx =
+                        (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
+                    let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
+
+                    // Compute left-side text info.
+                    let start_info = {
+                        let new_start_info = start_info
+                            + TextInfo::from_str(&chunk.text()[..front_trim_idx])
+                                .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
+                                    chunk.text(),
+                                    front_trim_idx,
+                                ));
+                        let start_info =
+                            self.get_root().text_info_at_byte(self.get_byte_range()[0]);
+                        new_start_info - start_info
+                    };
+
+                    Some((trimmed_chunk, start_info))
+                }
             }
         }
 

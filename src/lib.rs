@@ -38,6 +38,26 @@ pub enum LineType {
     All,
 }
 
+type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Error {
+    NonCharBoundary,
+    OutOfBounds,
+    InvalidRange,
+}
+
+impl Error {
+    fn panic_with_msg(&self) -> ! {
+        match *self {
+            Error::NonCharBoundary => panic!("Index is a non-char boundary."),
+            Error::OutOfBounds => panic!("Index out of bounds."),
+            Error::InvalidRange => panic!("Invalid index range: end < start."),
+        }
+    }
+}
+
 //=============================================================
 // Utilities.
 

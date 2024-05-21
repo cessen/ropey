@@ -5,7 +5,8 @@ use crate::{
     iter::{Bytes, Chars, Chunks},
     start_bound_to_num,
     tree::{Node, TextInfo},
-    Rope,
+    Error::*,
+    Result, Rope,
 };
 
 #[cfg(any(
@@ -79,6 +80,57 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    //-------------------------------------------------
+    // Slicing.
+
+    #[inline(always)]
+    pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'a>
+    where
+        R: RangeBounds<usize>,
+    {
+        match self.try_slice(byte_range) {
+            Ok(slice) => slice,
+            Err(e) => e.panic_with_msg(),
+        }
+    }
+
+    #[inline]
+    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'a>>
+    where
+        R: RangeBounds<usize>,
+    {
+        let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
+        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+
+        fn inner<'a>(
+            slice: &RopeSlice<'a>,
+            start_idx: usize,
+            end_idx: usize,
+        ) -> Result<RopeSlice<'a>> {
+            if !slice.is_char_boundary(start_idx) || !slice.is_char_boundary(end_idx) {
+                return Err(NonCharBoundary);
+            }
+            if start_idx > end_idx {
+                return Err(InvalidRange);
+            }
+            if end_idx > slice.len_bytes() {
+                return Err(OutOfBounds);
+            }
+
+            let start_idx_real = slice.byte_range[0] + start_idx;
+            let end_idx_real = slice.byte_range[0] + end_idx;
+
+            Ok(RopeSlice::new(
+                slice.root,
+                slice.root_info,
+                [start_idx_real, end_idx_real],
+            ))
+        }
+
+        inner(self, start_idx, end_idx)
+    }
+
+    #[inline]
     pub fn to_owned_slice(&self) -> Rope {
         Rope {
             root: self.root.clone(),
@@ -91,17 +143,18 @@ impl<'a> RopeSlice<'a> {
     // Utility methods needed for `impl_shared_methods!()`.
 
     #[inline(always)]
-    fn get_root(&self) -> &Node {
+    fn get_root(&self) -> &'a Node {
         self.root
     }
 
+    #[allow(dead_code)] // Only used with some features.
     #[inline(always)]
-    fn get_root_info(&self) -> &TextInfo {
+    fn get_root_info(&self) -> &'a TextInfo {
         self.root_info
     }
 
     #[inline(always)]
-    fn get_full_info(&self) -> Option<&TextInfo> {
+    fn get_full_info(&self) -> Option<&'a TextInfo> {
         if self.byte_range[0] == 0 && self.byte_range[1] == self.root_info.bytes {
             Some(self.root_info)
         } else {
@@ -213,6 +266,20 @@ mod tests {
         };
 
         (rope, text)
+    }
+
+    #[test]
+    fn reslice() {
+        // This is a compile-time test, to make sure that lifetimes work
+        // as expected when taking slices of slices.  The lifetime of a
+        // slice-of-a-slice should depend on the original rope, not the slice it
+        // was sliced from.
+        let r = Rope::from_str(TEXT);
+        let s = {
+            let s1 = r.slice(4..32);
+            s1.slice(2..24)
+        };
+        _ = s;
     }
 
     #[test]
