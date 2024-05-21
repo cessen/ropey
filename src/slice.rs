@@ -88,11 +88,6 @@ impl<'a> RopeSlice<'a> {
     }
 
     //---------------------------------------------------------
-    // Methods shared between Rope and RopeSlice.
-
-    crate::shared_impl::impl_shared_methods!();
-
-    //---------------------------------------------------------
     // Utility methods needed for `impl_shared_methods!()`.
 
     #[inline(always)]
@@ -120,13 +115,16 @@ impl<'a> RopeSlice<'a> {
     }
 }
 
-//==============================================================
+//=============================================================
+// Impls shared between Rope and RopeSlice.
+
+crate::shared_impl::impl_shared_methods!(RopeSlice<'_>);
+
+//=============================================================
 // Stdlib trait impls.
 //
 // Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
 // that need to distinguish between Rope and RopeSlice.
-
-crate::shared_impl::impl_shared_std_traits!(RopeSlice<'_>);
 
 impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
     fn eq(&self, other: &Rope) -> bool {

@@ -8,407 +8,421 @@
 //!   considered part of the actual text.
 
 macro_rules! impl_shared_methods {
-    () => {
-        //---------------------------------------------------------
-        // Queries.
-
-        pub fn len_bytes(&self) -> usize {
-            self.get_byte_range()[1] - self.get_byte_range()[0]
-        }
-
-        #[cfg(feature = "metric_chars")]
-        pub fn len_chars(&self) -> usize {
-            if let Some(info) = self.get_full_info() {
-                info.chars
-            } else {
-                let char_start_idx = self._byte_to_char(self.get_byte_range()[0]);
-                let char_end_idx = self._byte_to_char(self.get_byte_range()[1]);
-                char_end_idx - char_start_idx
-            }
-        }
-
-        #[cfg(feature = "metric_utf16")]
-        pub fn len_utf16(&self) -> usize {
-            if let Some(info) = self.get_full_info() {
-                info.utf16
-            } else {
-                let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
-                let utf16_end_idx = self._byte_to_utf16(self.get_byte_range()[1]);
-                utf16_end_idx - utf16_start_idx
-            }
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        pub fn len_lines(&self, line_type: LineType) -> usize {
-            if let Some(info) = self.get_full_info() {
-                info.line_breaks(line_type) + 1
-            } else {
-                let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
-                let line_end_idx = self._byte_to_line(self.get_byte_range()[1], line_type);
-                let ends_with_crlf_split =
-                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type);
-
-                line_end_idx - line_start_idx + 1 + ends_with_crlf_split as usize
-            }
-        }
-
-        pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-            assert!(byte_idx <= self.len_bytes());
-
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            self.get_root().is_char_boundary(byte_idx)
-        }
-
-        //-----------------------------------------------------
-        // Fetching.
-
-        pub fn byte(&self, byte_idx: usize) -> u8 {
-            assert!(byte_idx < self.len_bytes());
-
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-            text.text().as_bytes()[byte_idx - offset]
-        }
-
-        #[cfg(feature = "metric_chars")]
-        pub fn char(&self, char_idx: usize) -> char {
-            assert!(char_idx < self.len_chars());
-
-            let byte_idx = self.char_to_byte(char_idx);
-            self.char_at_byte(byte_idx)
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice {
-            assert!(line_idx < self.len_lines(line_type));
-
-            let start_byte = self.line_to_byte(line_idx, line_type);
-            let end_byte = self.line_to_byte(line_idx + 1, line_type);
-            self.slice(start_byte..end_byte)
-        }
-
-        pub fn char_at_byte(&self, byte_idx: usize) -> char {
-            assert!(byte_idx < self.len_bytes());
-
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-            let local_idx = byte_idx - offset;
-
-            assert!(text.text().is_char_boundary(local_idx));
-
-            // TODO: something more efficient than constructing a temporary
-            // iterator.
-            text.text()[(byte_idx - offset)..].chars().next().unwrap()
-        }
-
-        pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
-            assert!(byte_idx <= self.len_bytes());
-
-            let (chunk, start_info) = self
-                .get_root()
-                .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
-
-            if self.get_full_info().is_some() {
-                // Simple case: we have a full rope, so no adjustments are needed.
-                return (chunk.text(), start_info);
-            } else {
-                // Trim chunk.
-                let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
-                let back_trim_idx = (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
-                let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
-
-                // Compute left-side text info.
-                let start_info = {
-                    let new_start_info = start_info
-                        + TextInfo::from_str(&chunk.text()[..front_trim_idx])
-                            .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
-                                chunk.text(),
-                                front_trim_idx,
-                            ));
-                    let start_info = self.get_root().text_info_at_byte(self.get_byte_range()[0]);
-                    new_start_info - start_info
-                };
-
-                (trimmed_chunk, start_info)
-            }
-        }
-
-        //-----------------------------------------------------
-        // Slicing.
-
-        #[inline]
-        pub fn slice<R>(&self, byte_range: R) -> RopeSlice
-        where
-            R: RangeBounds<usize>,
-        {
-            let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-            let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
-            assert!(
-                start_idx <= end_idx && end_idx <= self.len_bytes(),
-                "Invalid byte range: either end < start or the range is outside the bounds of the rope slice.",
-            );
-            assert!(
-                self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
-                "Byte range does not align with char boundaries."
-            );
-
-            let start_idx_real = self.get_byte_range()[0] + start_idx;
-            let end_idx_real = self.get_byte_range()[0] + end_idx;
-            RopeSlice::new(self.get_root(), self.get_root_info(), [start_idx_real, end_idx_real])
-        }
-
-        //---------------------------------------------------------
-        // Metric conversions.
-
-        #[cfg(feature = "metric_chars")]
-        #[inline]
-        pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len_bytes());
-
-            if self.get_full_info().is_some() {
-                self._byte_to_char(byte_idx)
-            } else {
-                self._byte_to_char(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_char(self.get_byte_range()[0])
-            }
-        }
-
-        #[cfg(feature = "metric_chars")]
-        pub fn char_to_byte(&self, char_idx: usize) -> usize {
-            assert!(char_idx <= self.len_chars());
-            if self.get_full_info().is_some() {
-                self._char_to_byte(char_idx)
-            } else {
-                let char_start_idx = self._byte_to_char(self.get_byte_range()[0]);
-                self._char_to_byte(char_start_idx + char_idx) - self.get_byte_range()[0]
-            }
-        }
-
-        #[cfg(feature = "metric_utf16")]
-        #[inline]
-        pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len_bytes());
-            if self.get_full_info().is_some() {
-                self._byte_to_utf16(byte_idx)
-            } else {
-                self._byte_to_utf16(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_utf16(self.get_byte_range()[0])
-            }
-        }
-
-        #[cfg(feature = "metric_utf16")]
-        pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
-            assert!(utf16_idx <= self.len_utf16());
-            if self.get_full_info().is_some() {
-                self._utf16_to_byte(utf16_idx)
-            } else {
-                let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
-                self._utf16_to_byte(utf16_start_idx + utf16_idx) - self.get_byte_range()[0]
-            }
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        #[inline]
-        pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-            assert!(byte_idx <= self.len_bytes());
-            if self.get_full_info().is_some() {
-                self._byte_to_line(byte_idx, line_type)
-            } else {
-                let crlf_split = if byte_idx == self.get_byte_range()[1] {
-                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
-                } else {
-                    false
-                };
-
-                self._byte_to_line(self.get_byte_range()[0] + byte_idx, line_type)
-                    - self._byte_to_line(self.get_byte_range()[0], line_type)
-                    + crlf_split as usize
-            }
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-            assert!(line_idx <= self.len_lines(line_type));
-            if self.get_full_info().is_some() {
-                self._line_to_byte(line_idx, line_type)
-            } else {
-                let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
-                self._line_to_byte(line_start_idx + line_idx, line_type)
-                    .saturating_sub(self.get_byte_range()[0])
-                    .min(self.len_bytes())
-            }
-        }
-
-        //-----------------------------------------------------
-        // Internal utility methods.
-
-        #[cfg(feature = "metric_chars")]
-        fn _byte_to_char(&self, byte_idx: usize) -> usize {
-            let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
-            start_info.chars + text.byte_to_char(byte_idx - start_info.bytes)
-        }
-
-        #[cfg(feature = "metric_chars")]
-        fn _char_to_byte(&self, char_idx: usize) -> usize {
-            let (text, start_info) = self.get_root().get_text_at_char(char_idx);
-            start_info.bytes + text.char_to_byte(char_idx - start_info.chars)
-        }
-
-        #[cfg(feature = "metric_utf16")]
-        fn _byte_to_utf16(&self, byte_idx: usize) -> usize {
-            let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
-            start_info.utf16 + text.byte_to_utf16(byte_idx - start_info.bytes)
-        }
-
-        #[cfg(feature = "metric_utf16")]
-        fn _utf16_to_byte(&self, utf16_idx: usize) -> usize {
-            let (text, start_info) = self.get_root().get_text_at_utf16(utf16_idx);
-            start_info.bytes + text.utf16_to_byte(utf16_idx - start_info.utf16)
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        fn _byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-            let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
-
-            start_info.line_breaks(line_type)
-                + text.byte_to_line(byte_idx - start_info.bytes, line_type)
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        fn _line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
-            let (text, start_info) = self.get_root().get_text_at_line_break(line_idx, line_type);
-
-            start_info.bytes
-                + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
-        }
-
-        /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
-        /// a split would be relevant to the line-counting metrics of `line_type`.
-        ///
-        /// Specifically, CRLF pairs are not relevant to LF-only line metrics, so
-        /// for that line type this will always return false.  Otherwise it will
-        /// return if a CRLF pair would be split.
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        pub(crate) fn _is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
-            self.get_root().is_relevant_crlf_split(byte_idx, line_type)
-        }
-
-        //---------------------------------------------------------
-        // Iterators.
-
-        pub fn bytes(&self) -> Bytes<'_> {
-            Bytes::new(
-                &self.get_root(),
-                self.get_byte_range(),
-                self.get_byte_range()[0],
-            )
-        }
-
-        pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
-            Bytes::new(
-                self.get_root(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            )
-        }
-
-        pub fn chars(&self) -> Chars<'_> {
-            Chars::new(
-                self.get_root(),
-                self.get_byte_range(),
-                self.get_byte_range()[0],
-            )
-        }
-
-        pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
-            Chars::new(
-                self.get_root(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            )
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        pub fn lines(&self, line_type: LineType) -> Lines<'_> {
-            Lines::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                0,
-                line_type
-            )
-        }
-
-        #[cfg(any(
-            feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
-            feature = "metric_lines_unicode"
-        ))]
-        pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<'_> {
-            Lines::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                line_idx,
-                line_type,
-            )
-        }
-
-        pub fn chunks(&self) -> Chunks<'_> {
-            Chunks::new(
-                self.get_root(),
-                self.get_byte_range(),
-                self.get_byte_range()[0],
-            )
-            .0
-        }
-
-        pub fn chunks_at(&self, byte_idx: usize) -> Chunks<'_> {
-            Chunks::new(
-                &self.get_root(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            )
-            .0
-        }
-    };
-}
-
-macro_rules! impl_shared_std_traits {
     ($rope:ty) => {
+        impl $rope {
+            //-------------------------------------------------
+            // Queries.
+
+            pub fn len_bytes(&self) -> usize {
+                self.get_byte_range()[1] - self.get_byte_range()[0]
+            }
+
+            #[cfg(feature = "metric_chars")]
+            pub fn len_chars(&self) -> usize {
+                if let Some(info) = self.get_full_info() {
+                    info.chars
+                } else {
+                    let char_start_idx = self._byte_to_char(self.get_byte_range()[0]);
+                    let char_end_idx = self._byte_to_char(self.get_byte_range()[1]);
+                    char_end_idx - char_start_idx
+                }
+            }
+
+            #[cfg(feature = "metric_utf16")]
+            pub fn len_utf16(&self) -> usize {
+                if let Some(info) = self.get_full_info() {
+                    info.utf16
+                } else {
+                    let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
+                    let utf16_end_idx = self._byte_to_utf16(self.get_byte_range()[1]);
+                    utf16_end_idx - utf16_start_idx
+                }
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub fn len_lines(&self, line_type: LineType) -> usize {
+                if let Some(info) = self.get_full_info() {
+                    info.line_breaks(line_type) + 1
+                } else {
+                    let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
+                    let line_end_idx = self._byte_to_line(self.get_byte_range()[1], line_type);
+                    let ends_with_crlf_split =
+                        self._is_relevant_crlf_split(self.get_byte_range()[1], line_type);
+
+                    line_end_idx - line_start_idx + 1 + ends_with_crlf_split as usize
+                }
+            }
+
+            pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
+                assert!(byte_idx <= self.len_bytes());
+
+                let byte_idx = byte_idx + self.get_byte_range()[0];
+                self.get_root().is_char_boundary(byte_idx)
+            }
+
+            //-------------------------------------------------
+            // Fetching.
+
+            pub fn byte(&self, byte_idx: usize) -> u8 {
+                assert!(byte_idx < self.len_bytes());
+
+                let byte_idx = byte_idx + self.get_byte_range()[0];
+                let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+                text.text().as_bytes()[byte_idx - offset]
+            }
+
+            #[cfg(feature = "metric_chars")]
+            pub fn char(&self, char_idx: usize) -> char {
+                assert!(char_idx < self.len_chars());
+
+                let byte_idx = self.char_to_byte(char_idx);
+                self.char_at_byte(byte_idx)
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice {
+                assert!(line_idx < self.len_lines(line_type));
+
+                let start_byte = self.line_to_byte(line_idx, line_type);
+                let end_byte = self.line_to_byte(line_idx + 1, line_type);
+                self.slice(start_byte..end_byte)
+            }
+
+            pub fn char_at_byte(&self, byte_idx: usize) -> char {
+                assert!(byte_idx < self.len_bytes());
+
+                let byte_idx = byte_idx + self.get_byte_range()[0];
+                let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+                let local_idx = byte_idx - offset;
+
+                assert!(text.text().is_char_boundary(local_idx));
+
+                // TODO: something more efficient than constructing a temporary
+                // iterator.
+                text.text()[(byte_idx - offset)..].chars().next().unwrap()
+            }
+
+            pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
+                assert!(byte_idx <= self.len_bytes());
+
+                let (chunk, start_info) = self
+                    .get_root()
+                    .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
+
+                if self.get_full_info().is_some() {
+                    // Simple case: we have a full rope, so no adjustments are needed.
+                    return (chunk.text(), start_info);
+                } else {
+                    // Trim chunk.
+                    let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
+                    let back_trim_idx =
+                        (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
+                    let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
+
+                    // Compute left-side text info.
+                    let start_info = {
+                        let new_start_info = start_info
+                            + TextInfo::from_str(&chunk.text()[..front_trim_idx])
+                                .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
+                                    chunk.text(),
+                                    front_trim_idx,
+                                ));
+                        let start_info =
+                            self.get_root().text_info_at_byte(self.get_byte_range()[0]);
+                        new_start_info - start_info
+                    };
+
+                    (trimmed_chunk, start_info)
+                }
+            }
+
+            //-------------------------------------------------
+            // Slicing.
+
+            #[inline]
+            pub fn slice<R>(&self, byte_range: R) -> RopeSlice
+            where
+                R: RangeBounds<usize>,
+            {
+                let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
+                let end_idx =
+                    end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+                assert!(
+                    start_idx <= end_idx && end_idx <= self.len_bytes(),
+                    "Invalid byte range: either end < start or the range is outside \
+                     the bounds of the rope slice.",
+                );
+                assert!(
+                    self.is_char_boundary(start_idx) && self.is_char_boundary(end_idx),
+                    "Byte range does not align with char boundaries."
+                );
+
+                let start_idx_real = self.get_byte_range()[0] + start_idx;
+                let end_idx_real = self.get_byte_range()[0] + end_idx;
+                RopeSlice::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    [start_idx_real, end_idx_real],
+                )
+            }
+
+            //-------------------------------------------------
+            // Metric conversions.
+
+            #[cfg(feature = "metric_chars")]
+            #[inline]
+            pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+                assert!(byte_idx <= self.len_bytes());
+
+                if self.get_full_info().is_some() {
+                    self._byte_to_char(byte_idx)
+                } else {
+                    self._byte_to_char(self.get_byte_range()[0] + byte_idx)
+                        - self._byte_to_char(self.get_byte_range()[0])
+                }
+            }
+
+            #[cfg(feature = "metric_chars")]
+            pub fn char_to_byte(&self, char_idx: usize) -> usize {
+                assert!(char_idx <= self.len_chars());
+                if self.get_full_info().is_some() {
+                    self._char_to_byte(char_idx)
+                } else {
+                    let char_start_idx = self._byte_to_char(self.get_byte_range()[0]);
+                    self._char_to_byte(char_start_idx + char_idx) - self.get_byte_range()[0]
+                }
+            }
+
+            #[cfg(feature = "metric_utf16")]
+            #[inline]
+            pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
+                assert!(byte_idx <= self.len_bytes());
+                if self.get_full_info().is_some() {
+                    self._byte_to_utf16(byte_idx)
+                } else {
+                    self._byte_to_utf16(self.get_byte_range()[0] + byte_idx)
+                        - self._byte_to_utf16(self.get_byte_range()[0])
+                }
+            }
+
+            #[cfg(feature = "metric_utf16")]
+            pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
+                assert!(utf16_idx <= self.len_utf16());
+                if self.get_full_info().is_some() {
+                    self._utf16_to_byte(utf16_idx)
+                } else {
+                    let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
+                    self._utf16_to_byte(utf16_start_idx + utf16_idx) - self.get_byte_range()[0]
+                }
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            #[inline]
+            pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+                assert!(byte_idx <= self.len_bytes());
+                if self.get_full_info().is_some() {
+                    self._byte_to_line(byte_idx, line_type)
+                } else {
+                    let crlf_split = if byte_idx == self.get_byte_range()[1] {
+                        self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
+                    } else {
+                        false
+                    };
+
+                    self._byte_to_line(self.get_byte_range()[0] + byte_idx, line_type)
+                        - self._byte_to_line(self.get_byte_range()[0], line_type)
+                        + crlf_split as usize
+                }
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+                assert!(line_idx <= self.len_lines(line_type));
+                if self.get_full_info().is_some() {
+                    self._line_to_byte(line_idx, line_type)
+                } else {
+                    let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
+                    self._line_to_byte(line_start_idx + line_idx, line_type)
+                        .saturating_sub(self.get_byte_range()[0])
+                        .min(self.len_bytes())
+                }
+            }
+
+            //-------------------------------------------------
+            // Iterators.
+
+            pub fn bytes(&self) -> Bytes<'_> {
+                Bytes::new(
+                    &self.get_root(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0],
+                )
+            }
+
+            pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
+                Bytes::new(
+                    self.get_root(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            }
+
+            pub fn chars(&self) -> Chars<'_> {
+                Chars::new(
+                    self.get_root(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0],
+                )
+            }
+
+            pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
+                Chars::new(
+                    self.get_root(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub fn lines(&self, line_type: LineType) -> Lines<'_> {
+                Lines::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    0,
+                    line_type,
+                )
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<'_> {
+                Lines::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    line_idx,
+                    line_type,
+                )
+            }
+
+            pub fn chunks(&self) -> Chunks<'_> {
+                Chunks::new(
+                    self.get_root(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0],
+                )
+                .0
+            }
+
+            pub fn chunks_at(&self, byte_idx: usize) -> Chunks<'_> {
+                Chunks::new(
+                    &self.get_root(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+                .0
+            }
+
+            //-------------------------------------------------
+            // Internal utility methods.
+
+            #[cfg(feature = "metric_chars")]
+            fn _byte_to_char(&self, byte_idx: usize) -> usize {
+                let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
+                start_info.chars + text.byte_to_char(byte_idx - start_info.bytes)
+            }
+
+            #[cfg(feature = "metric_chars")]
+            fn _char_to_byte(&self, char_idx: usize) -> usize {
+                let (text, start_info) = self.get_root().get_text_at_char(char_idx);
+                start_info.bytes + text.char_to_byte(char_idx - start_info.chars)
+            }
+
+            #[cfg(feature = "metric_utf16")]
+            fn _byte_to_utf16(&self, byte_idx: usize) -> usize {
+                let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
+                start_info.utf16 + text.byte_to_utf16(byte_idx - start_info.bytes)
+            }
+
+            #[cfg(feature = "metric_utf16")]
+            fn _utf16_to_byte(&self, utf16_idx: usize) -> usize {
+                let (text, start_info) = self.get_root().get_text_at_utf16(utf16_idx);
+                start_info.bytes + text.utf16_to_byte(utf16_idx - start_info.utf16)
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            fn _byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+                let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
+
+                start_info.line_breaks(line_type)
+                    + text.byte_to_line(byte_idx - start_info.bytes, line_type)
+            }
+
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            fn _line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+                let (text, start_info) =
+                    self.get_root().get_text_at_line_break(line_idx, line_type);
+
+                start_info.bytes
+                    + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
+            }
+
+            /// Returns whether splitting at `byte_idx` would split a CRLF pair,
+            /// if such  a split would be relevant to the line-counting metrics
+            /// of `line_type`.   Specifically, CRLF pairs are not relevant to
+            /// LF-only line metrics, so  for that line type this will always
+            /// return false.  Otherwise it will  return if a CRLF pair would
+            /// be split.
+            #[cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_cr_lf",
+                feature = "metric_lines_unicode"
+            ))]
+            pub(crate) fn _is_relevant_crlf_split(
+                &self,
+                byte_idx: usize,
+                line_type: LineType,
+            ) -> bool {
+                self.get_root().is_relevant_crlf_split(byte_idx, line_type)
+            }
+        }
+
         //=====================================================
+        // Stdlib trait impls.
+
+        //-----------------------------------------------------
         // Comparisons.
 
         impl std::cmp::Eq for $rope {}
@@ -585,7 +599,7 @@ macro_rules! impl_shared_std_traits {
             }
         }
 
-        //=====================================================
+        //-----------------------------------------------------
         // Conversions.
 
         impl From<$rope> for String {
@@ -637,7 +651,7 @@ macro_rules! impl_shared_std_traits {
             }
         }
 
-        //=====================================================
+        //-----------------------------------------------------
         // Misc.
 
         impl std::fmt::Debug for $rope {
@@ -660,11 +674,11 @@ macro_rules! impl_shared_std_traits {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
                 // `std::hash::Hasher` only guarantees the same hash output for
                 // exactly the same calls to `Hasher::write()`.  Just submitting
-                // the same data in the same order isn't enough--it also has to
-                // be split the same between calls.  So we go to some effort here
-                // to ensure that we always submit the text data in the same
-                // fixed-size blocks, even if those blocks don't align with chunk
-                // boundaries at all.
+                // the same data in the same order isn't enough--it also has
+                // to be split the same between calls.  So we go to some effort
+                // here to ensure that we always submit the text data in the
+                // same fixed-size blocks, even if those blocks don't align with
+                // chunk boundaries at all.
                 //
                 // The naive approach is to always copy to a fixed-size buffer
                 // and submit the buffer whenever it fills up.  We conceptually
@@ -714,4 +728,4 @@ macro_rules! impl_shared_std_traits {
     };
 }
 
-pub(crate) use {impl_shared_methods, impl_shared_std_traits};
+pub(crate) use impl_shared_methods;

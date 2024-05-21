@@ -247,40 +247,6 @@ impl Rope {
     }
 
     //---------------------------------------------------------
-    // Methods shared between Rope and RopeSlice.
-
-    crate::shared_impl::impl_shared_methods!();
-
-    //---------------------------------------------------------
-    // Utility methods needed for `impl_shared_methods!()`.
-
-    #[inline(always)]
-    fn get_root(&self) -> &Node {
-        &self.root
-    }
-
-    #[inline(always)]
-    fn get_root_info(&self) -> &TextInfo {
-        &self.root_info
-    }
-
-    #[inline(always)]
-    fn get_full_info(&self) -> Option<&TextInfo> {
-        if self.owned_slice_byte_range[0] == 0
-            && self.owned_slice_byte_range[1] == self.root_info.bytes
-        {
-            Some(&self.root_info)
-        } else {
-            None
-        }
-    }
-
-    #[inline(always)]
-    fn get_byte_range(&self) -> [usize; 2] {
-        self.owned_slice_byte_range
-    }
-
-    //---------------------------------------------------------
     // Misc. internal methods.
 
     /// Iteratively replaces the root node with its child if it only has
@@ -366,15 +332,47 @@ impl Rope {
 
         return (true, iter_count);
     }
+
+    //---------------------------------------------------------
+    // Utility methods needed for `impl_shared_methods!()`.
+
+    #[inline(always)]
+    fn get_root(&self) -> &Node {
+        &self.root
+    }
+
+    #[inline(always)]
+    fn get_root_info(&self) -> &TextInfo {
+        &self.root_info
+    }
+
+    #[inline(always)]
+    fn get_full_info(&self) -> Option<&TextInfo> {
+        if self.owned_slice_byte_range[0] == 0
+            && self.owned_slice_byte_range[1] == self.root_info.bytes
+        {
+            Some(&self.root_info)
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    fn get_byte_range(&self) -> [usize; 2] {
+        self.owned_slice_byte_range
+    }
 }
+
+//=============================================================
+// Impls shared between Rope and RopeSlice.
+
+crate::shared_impl::impl_shared_methods!(Rope);
 
 //==============================================================
 // Stdlib trait impls.
 //
 // Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
 // that need to distinguish between Rope and RopeSlice.
-
-crate::shared_impl::impl_shared_std_traits!(Rope);
 
 impl std::default::Default for Rope {
     #[inline]
