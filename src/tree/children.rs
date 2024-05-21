@@ -492,7 +492,6 @@ mod inner {
         fmt,
         mem::{self, MaybeUninit},
         ptr,
-        sync::Arc,
     };
 
     #[inline(always)]
@@ -910,6 +909,8 @@ mod inner {
             // Some sanity checks for debug builds.
             #[cfg(debug_assertions)]
             {
+                use std::sync::Arc;
+
                 for (a, b) in Iterator::zip(
                     clone_array.info[..clone_array.len()].iter(),
                     self.info[..self.len()].iter(),
@@ -951,6 +952,8 @@ mod inner {
 
     #[cfg(test)]
     mod tests {
+        use std::sync::Arc;
+
         use super::*;
         use crate::tree::Text;
 

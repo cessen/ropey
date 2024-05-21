@@ -9,7 +9,7 @@ use crate::{str_utils, Error::*, Result};
 ))]
 use crate::LineType;
 
-use super::{Children, Text, TextInfo, MAX_CHILDREN, MIN_CHILDREN, MIN_TEXT_SIZE};
+use super::{Children, Text, TextInfo, MAX_CHILDREN, MAX_TEXT_SIZE, MIN_CHILDREN, MIN_TEXT_SIZE};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Node {
@@ -124,14 +124,14 @@ impl Node {
         // than recomputing from scratch.  This will be a bit delicate,
         // because it requires being aware of crlf splits.
 
+        debug_assert!(text.len() <= (MAX_TEXT_SIZE - 4));
+
         match *self {
             Node::Leaf(ref mut leaf_text) => {
+                debug_assert!(byte_idx <= leaf_text.len());
+
                 if !leaf_text.is_char_boundary(byte_idx) {
                     return Err(NonCharBoundary);
-                }
-
-                if byte_idx > leaf_text.len() {
-                    return Err(OutOfBounds);
                 }
 
                 let leaf_text = Arc::make_mut(leaf_text);
@@ -198,14 +198,16 @@ impl Node {
         // than recomputing from scratch.  This will be a bit delicate,
         // because it requires being aware of crlf splits.
 
+        debug_assert!(byte_idx_range[0] <= byte_idx_range[1]);
+
         match *self {
             Node::Leaf(ref mut leaf_text) => {
                 debug_assert!(byte_idx_range[0] > 0 || byte_idx_range[1] < leaf_text.len());
+
                 if byte_idx_range
                     .iter()
                     .any(|&i| !leaf_text.is_char_boundary(i))
                 {
-                    // Not a char boundary, so early-out.
                     return Err(NonCharBoundary);
                 }
 
