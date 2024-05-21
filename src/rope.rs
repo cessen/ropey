@@ -73,85 +73,21 @@ impl Rope {
     ///
     /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     /// - If `byte_idx` is not on a char boundary.
+    #[inline]
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
-        assert!(
-            byte_idx <= self.len_bytes(),
-            "`byte_idx` ({}) is out of bounds (Rope length: {}).",
-            byte_idx,
-            self.len_bytes(),
-        );
-
-        if text.is_empty() {
-            return;
+        match self.try_insert(byte_idx, text) {
+            Ok(_) => {}
+            Err(OutOfBounds) => panic!(
+                "Attempted to insert out of bounds: `byte_idx` is {} but rope length is {}.",
+                byte_idx,
+                self.len_bytes()
+            ),
+            Err(NonCharBoundary) => panic!(
+                "Attempted to insert at a non-char-boundary: `byte_idx` is {}.",
+                byte_idx
+            ),
+            Err(e) => e.panic_with_msg(),
         }
-
-        if self.owned_slice_byte_range[0] != 0
-            || self.owned_slice_byte_range[1] != self.root_info.bytes
-        {
-            // Not actually sure what we want to do here.  We can either
-            // disallow editing of owned slices, or we could trim the sides
-            // first.
-            todo!();
-        }
-
-        // We have two cases here:
-        //
-        // 1. The insertion text is small enough to fit in a single node.
-        // 2. The insertion text is larger than a single node can hold.
-        //
-        // Case #1 is easy to handle: it's just a standard insertion.  However,
-        // case #2 needs more careful handling.  We handle case #2 by splitting
-        // the insertion text into node-sized chunks and repeatedly inserting
-        // them.
-        //
-        // In practice, both cases are rolled into one here, where case #1 is
-        // just a special case that naturally falls out of the handling of
-        // case #2.
-        let mut text = text;
-        while !text.is_empty() {
-            // Split a chunk off from the end of the text.
-            // We do this from the end instead of the front so that the repeated
-            // insertions can keep re-using the same insertion point.
-            //
-            // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than just
-            // `MAX_TEXT_SIZE` to guarantee that nodes can split into node-sized
-            // chunks even in the face of multi-byte chars that may prevent
-            // splits at certain byte indices.  This is a subtle issue that in
-            // practice only very rarely manifest, but causes panics when it
-            // does.  Please do not remove that `- 4`!
-            let split_idx = crate::find_char_boundary_r(
-                text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
-                text.as_bytes(),
-            );
-            let ins_text = &text[split_idx..];
-            text = &text[..split_idx];
-
-            // Do the insertion.
-            let (new_root_info, residual) = self
-                .root
-                .insert_at_byte_idx(byte_idx, ins_text, self.root_info)
-                .unwrap_or_else(|()| {
-                    panic!("`byte_idx` ({}) is not at a char boundary.", byte_idx)
-                });
-            self.root_info = new_root_info;
-
-            // Handle root split.
-            if let Some((right_info, right_node)) = residual {
-                let mut left_node = Node::Internal(Arc::new(Children::new()));
-                std::mem::swap(&mut left_node, &mut self.root);
-
-                let children = self.root.children_mut();
-                children.push((self.root_info, left_node));
-                children.push((right_info, right_node));
-                self.root_info = children.combined_text_info();
-            }
-
-            // Do a rebalancing step.
-            self.root.partial_rebalance();
-            self.pull_up_singular_nodes();
-        }
-
-        self.owned_slice_byte_range[1] = self.root_info.bytes;
     }
 
     #[inline]
@@ -184,68 +120,15 @@ impl Rope {
     /// - If the start of the range is greater than the end.
     /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
     /// - If the range ends are not on char boundaries.
-    #[inline(always)]
+    #[inline]
     pub fn remove<R>(&mut self, byte_range: R)
     where
         R: RangeBounds<usize>,
     {
-        // Inner function to avoid code duplication on code gen due to the
-        // generic type of `byte_range`.
-        fn inner(rope: &mut Rope, start: Bound<&usize>, end: Bound<&usize>) {
-            if rope.owned_slice_byte_range[0] != 0
-                || rope.owned_slice_byte_range[1] != rope.root_info.bytes
-            {
-                // Not actually sure what we want to do here.  We can either
-                // disallow editing of owned slices, or we could trim the sides
-                // first.
-                todo!();
-            }
-
-            let start_idx = start_bound_to_num(start).unwrap_or(0);
-            let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len_bytes());
-
-            assert!(
-                start_idx <= end_idx,
-                "Invalid byte range: start ({}) is greater than end ({}).",
-                start_idx,
-                end_idx,
-            );
-            assert!(
-                end_idx <= rope.len_bytes(),
-                "Byte range ([{}, {}]) is out of bounds (Rope length: {}).",
-                start_idx,
-                end_idx,
-                rope.len_bytes(),
-            );
-
-            // Special case: if we're removing everything, just replace with a
-            // fresh new rope.  This is to ensure the invariant that an empty
-            // rope is always composed of a single empty leaf, which is not
-            // ensured by the general removal code.
-            if start_idx == 0 && end_idx == rope.len_bytes() {
-                *rope = Rope::new();
-                return;
-            }
-
-            let new_info = rope
-                .root
-                .remove_byte_range([start_idx, end_idx], rope.root_info)
-                .unwrap_or_else(|()| {
-                    panic!(
-                        "Byte range [{}, {}] isn't on char boundaries.",
-                        start_idx, end_idx
-                    )
-                });
-            rope.root_info = new_info;
-
-            // Do a rebalancing step.
-            rope.root.partial_rebalance();
-            rope.pull_up_singular_nodes();
-
-            rope.owned_slice_byte_range[1] = rope.root_info.bytes;
+        match self.try_remove(byte_range) {
+            Ok(_) => {}
+            Err(e) => e.panic_with_msg(),
         }
-
-        inner(self, byte_range.start_bound(), byte_range.end_bound());
     }
 
     //---------------------------------------------------------
@@ -385,8 +268,154 @@ impl Rope {
     }
 }
 
+//=============================================================
+// Non-panicking versions.
+
 /// Non-panicking versions of some of `Rope`'s methods.
 impl Rope {
+    pub fn try_insert(&mut self, byte_idx: usize, text: &str) -> Result<()> {
+        // TODO: this probably isn't really what we want to do for owned slices.
+        // Better would be to convert it to a proper rope by trimming the ends
+        // first.
+        if self.owned_slice_byte_range[0] != 0
+            || self.owned_slice_byte_range[1] != self.root_info.bytes
+        {
+            return Err(CannotEditOwnedSlice);
+        }
+
+        if byte_idx > self.len_bytes() {
+            return Err(OutOfBounds);
+        }
+
+        // The `Node` insertion method already checks if the byte index is
+        // a non-char boundary and returns the appropriate error, but that
+        // method never gets called if the text is empty.  So we need to check
+        // that here.  This is a bit pedantic, because inserting nothing at a
+        // non-char-boundary doesn't really mean anything.  But the behavior is
+        // consistent this way, and might help catch bugs in client code.
+        if text.is_empty() && !self.is_char_boundary(byte_idx) {
+            return Err(NonCharBoundary);
+        }
+
+        // We have two cases here:
+        //
+        // 1. The insertion text is small enough to fit in a single node.
+        // 2. The insertion text is larger than a single node can hold.
+        //
+        // Case #1 is easy to handle: it's just a standard insertion.  However,
+        // case #2 needs more careful handling.  We handle case #2 by splitting
+        // the insertion text into node-sized chunks and repeatedly inserting
+        // them.
+        //
+        // In practice, both cases are rolled into one here, where case #1 is
+        // just a special case that naturally falls out of the handling of
+        // case #2.
+        let mut text = text;
+        while !text.is_empty() {
+            // Split a chunk off from the end of the text.
+            // We do this from the end instead of the front so that the repeated
+            // insertions can keep re-using the same insertion point.
+            //
+            // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than just
+            // `MAX_TEXT_SIZE` to guarantee that nodes can split into node-sized
+            // chunks even in the face of multi-byte chars that may prevent
+            // splits at certain byte indices.  This is a subtle issue that in
+            // practice only very rarely manifest, but causes panics when it
+            // does.  Please do not remove that `- 4`!
+            let split_idx = crate::find_char_boundary_r(
+                text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
+                text.as_bytes(),
+            );
+            let ins_text = &text[split_idx..];
+            text = &text[..split_idx];
+
+            // Do the insertion.
+            let (new_root_info, residual) =
+                self.root
+                    .insert_at_byte_idx(byte_idx, ins_text, self.root_info)?;
+            self.root_info = new_root_info;
+
+            // Handle root split.
+            if let Some((right_info, right_node)) = residual {
+                let mut left_node = Node::Internal(Arc::new(Children::new()));
+                std::mem::swap(&mut left_node, &mut self.root);
+
+                let children = self.root.children_mut();
+                children.push((self.root_info, left_node));
+                children.push((right_info, right_node));
+                self.root_info = children.combined_text_info();
+            }
+
+            // Do a rebalancing step.
+            self.root.partial_rebalance();
+            self.pull_up_singular_nodes();
+        }
+
+        self.owned_slice_byte_range[1] = self.root_info.bytes;
+
+        Ok(())
+    }
+
+    #[inline]
+    pub fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> Result<()> {
+        let mut buf = [0u8; 4];
+        self.try_insert(byte_idx, ch.encode_utf8(&mut buf))
+    }
+
+    #[inline(always)]
+    pub fn try_remove<R>(&mut self, byte_range: R) -> Result<()>
+    where
+        R: RangeBounds<usize>,
+    {
+        // Inner function to avoid code duplication on code gen due to the
+        // generic type of `byte_range`.
+        fn inner(rope: &mut Rope, start: Bound<&usize>, end: Bound<&usize>) -> Result<()> {
+            // TODO: this probably isn't really what we want to do for owned
+            // slices. Better would be to convert it to a proper rope by
+            // trimming the ends first.
+            if rope.owned_slice_byte_range[0] != 0
+                || rope.owned_slice_byte_range[1] != rope.root_info.bytes
+            {
+                return Err(CannotEditOwnedSlice);
+            }
+
+            let start_idx = start_bound_to_num(start).unwrap_or(0);
+            let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len_bytes());
+
+            if start_idx > end_idx {
+                return Err(InvalidRange);
+            }
+
+            if end_idx > rope.len_bytes() {
+                return Err(OutOfBounds);
+            }
+
+            // Special case: if we're removing everything, just replace with a
+            // fresh new rope.  This is to ensure the invariant that an empty
+            // rope is always composed of a single empty leaf, which is not
+            // ensured by the general removal code.
+            if start_idx == 0 && end_idx == rope.len_bytes() {
+                *rope = Rope::new();
+                return Ok(());
+            }
+
+            let new_info = rope
+                .root
+                .remove_byte_range([start_idx, end_idx], rope.root_info)?;
+            rope.root_info = new_info;
+
+            // Do a rebalancing step.
+            rope.root.partial_rebalance();
+            rope.pull_up_singular_nodes();
+
+            rope.owned_slice_byte_range[1] = rope.root_info.bytes;
+
+            Ok(())
+        }
+
+        inner(self, byte_range.start_bound(), byte_range.end_bound())
+    }
+
     #[inline(always)]
     pub fn try_slice<'a, R>(&'a self, byte_range: R) -> Result<RopeSlice<'a>>
     where
@@ -599,6 +628,21 @@ mod tests {
 
     #[test]
     fn insert_04() {
+        let mut r = Rope::from_str(TEXT);
+        r.insert(3, "");
+
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn insert_05() {
         let mut r = Rope::new();
         r.insert(0, "He");
         r.insert(2, "l");
@@ -615,7 +659,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_05() {
+    fn insert_06() {
         let mut r = Rope::new();
         r.insert(0, "こんいちは、みんなさん！");
         r.insert(21, "zopter");
@@ -625,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_06() {
+    fn insert_07() {
         let mut r = Rope::new();
         r.insert(0, "こ");
         r.insert(3, "ん");
@@ -647,9 +691,34 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn insert_07() {
+    fn insert_08() {
         let mut r = Rope::from_str(TEXT);
+        // Out of bounds.
         r.insert(128, "A");
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_09() {
+        let mut r = Rope::from_str(TEXT);
+        // Out of bounds.
+        r.insert(128, "");
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_10() {
+        let mut r = Rope::from_str(TEXT);
+        // Non-char boundary.
+        r.insert(126, "A");
+    }
+
+    #[test]
+    #[should_panic]
+    fn insert_11() {
+        let mut r = Rope::from_str(TEXT);
+        // Non-char boundary.
+        r.insert(126, "");
     }
 
     #[test]
@@ -697,6 +766,54 @@ mod tests {
         rope.remove(42..42);
 
         assert_eq!(rope, TEXT);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_06() {
+        let mut rope = Rope::from_str(TEXT);
+        // Out of bounds.
+        rope.remove(42..128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_07() {
+        let mut rope = Rope::from_str(TEXT);
+        // Out of bounds.
+        rope.remove(128..128);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_08() {
+        let mut rope = Rope::from_str(TEXT);
+        // Non-char boundary.
+        rope.remove(42..126);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_09() {
+        let mut rope = Rope::from_str(TEXT);
+        // Non-char boundary.
+        rope.remove(126..127);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_10() {
+        let mut rope = Rope::from_str(TEXT);
+        // Non-char boundary.
+        rope.remove(126..126);
+    }
+
+    #[test]
+    #[should_panic]
+    fn remove_11() {
+        let mut rope = Rope::from_str(TEXT);
+        // Invalid range.
+        rope.remove(42..21);
     }
 
     #[cfg(feature = "metric_chars")]

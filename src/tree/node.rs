@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use crate::str_utils;
+use crate::{str_utils, Error::*, Result};
+
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_cr_lf",
@@ -109,19 +110,16 @@ impl Node {
     /// split was caused returns the right side of the split (the left remaining
     /// as the current node) and its text info.
     ///
-    /// On non-panicing failure, returns Err(()).  This happens if and only if
-    /// `byte_idx` is not on a char boundary.
+    /// On failure, returns `Err(Error)`.
     ///
-    /// Panics:
-    /// - If `byte_idx` is out of bounds.
-    /// - If `text` is too large to handle.  Anything less than or equal to
-    ///   `MAX_TEXT_SIZE - 4` is guaranteed to be okay.
+    /// Panics only if `text` is too large to handle.  Anything less than or
+    /// equal to `MAX_TEXT_SIZE - 4` is guaranteed to be okay.
     pub fn insert_at_byte_idx(
         &mut self,
         byte_idx: usize,
         text: &str,
         node_info: TextInfo,
-    ) -> Result<(TextInfo, Option<(TextInfo, Node)>), ()> {
+    ) -> Result<(TextInfo, Option<(TextInfo, Node)>)> {
         // TODO: use `node_info` to do an update of the node info rather
         // than recomputing from scratch.  This will be a bit delicate,
         // because it requires being aware of crlf splits.
@@ -129,8 +127,11 @@ impl Node {
         match *self {
             Node::Leaf(ref mut leaf_text) => {
                 if !leaf_text.is_char_boundary(byte_idx) {
-                    // Not a char boundary, so early-out.
-                    return Err(());
+                    return Err(NonCharBoundary);
+                }
+
+                if byte_idx > leaf_text.len() {
+                    return Err(OutOfBounds);
                 }
 
                 let leaf_text = Arc::make_mut(leaf_text);
@@ -192,7 +193,7 @@ impl Node {
         &mut self,
         byte_idx_range: [usize; 2],
         _node_info: TextInfo,
-    ) -> Result<TextInfo, ()> {
+    ) -> Result<TextInfo> {
         // TODO: use `node_info` to do an update of the node info rather
         // than recomputing from scratch.  This will be a bit delicate,
         // because it requires being aware of crlf splits.
@@ -205,7 +206,7 @@ impl Node {
                     .any(|&i| !leaf_text.is_char_boundary(i))
                 {
                     // Not a char boundary, so early-out.
-                    return Err(());
+                    return Err(NonCharBoundary);
                 }
 
                 let leaf_text = Arc::make_mut(leaf_text);

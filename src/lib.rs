@@ -46,6 +46,7 @@ pub enum Error {
     NonCharBoundary,
     OutOfBounds,
     InvalidRange,
+    CannotEditOwnedSlice,
 }
 
 impl Error {
@@ -54,6 +55,9 @@ impl Error {
             Error::NonCharBoundary => panic!("Index is a non-char boundary."),
             Error::OutOfBounds => panic!("Index out of bounds."),
             Error::InvalidRange => panic!("Invalid index range: end < start."),
+            Error::CannotEditOwnedSlice => {
+                panic!("Editing of owned slices is not permitted.")
+            }
         }
     }
 }
