@@ -75,6 +75,7 @@ impl<'a> Chunks<'a> {
         (chunks, byte_offset.max(byte_range[0]).min(byte_range[1]))
     }
 
+    #[inline(always)]
     fn current_chunk(&self) -> Option<&'a str> {
         if self.current_byte_idx >= self.byte_range[1] {
             return None;
@@ -113,26 +114,30 @@ impl<'a> Chunks<'a> {
 
         // Progress the stack backwards.
         if self.node_stack.len() > 1 {
-            // Pop the leaf.
-            self.node_stack.pop();
+            // Start at the node above the leaf.
+            let mut stack_idx = self.node_stack.len() - 2;
 
             // Find the deepest node that's not at its start already.
-            while self.node_stack.last().unwrap().1 == 0 {
-                debug_assert!(self.node_stack.len() > 1);
-                self.node_stack.pop();
+            while self.node_stack[stack_idx].1 == 0 {
+                debug_assert!(stack_idx > 0);
+                stack_idx -= 1;
             }
 
             // Refill the stack starting from that node.
-            self.node_stack.last_mut().unwrap().1 -= 1;
-            while self.node_stack.last().unwrap().0.is_internal() {
-                let child_i = self.node_stack.last().unwrap().1;
-                let node = &self.node_stack.last().unwrap().0.children().nodes()[child_i];
+            self.node_stack[stack_idx].1 -= 1;
+            while self.node_stack[stack_idx].0.is_internal() {
+                let child_i = self.node_stack[stack_idx].1;
+                let node = &self.node_stack[stack_idx].0.children().nodes()[child_i];
                 let position = match *node {
                     Node::Leaf(_) => 0,
                     Node::Internal(ref children) => children.len() - 1,
                 };
-                self.node_stack.push((node, position));
+
+                stack_idx += 1;
+                self.node_stack[stack_idx] = (node, position);
             }
+
+            debug_assert!(stack_idx == self.node_stack.len() - 1);
         }
 
         self.current_byte_idx -= self.node_stack.last().unwrap().0.leaf_text().len();
@@ -164,24 +169,26 @@ impl<'a> Iterator for Chunks<'a> {
 
         // Progress the stack.
         if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
-            // Pop the leaf.
-            self.node_stack.pop();
+            // Start at the node above the leaf.
+            let mut stack_idx = self.node_stack.len() - 2;
 
             // Find the deepest node that's not at its end already.
-            while self.node_stack.last().unwrap().1
-                >= (self.node_stack.last().unwrap().0.child_count() - 1)
-            {
-                debug_assert!(self.node_stack.len() > 1);
-                self.node_stack.pop();
+            while self.node_stack[stack_idx].1 >= (self.node_stack[stack_idx].0.child_count() - 1) {
+                debug_assert!(stack_idx > 0);
+                stack_idx -= 1;
             }
 
             // Refill the stack starting from that node.
-            self.node_stack.last_mut().unwrap().1 += 1;
-            while self.node_stack.last().unwrap().0.is_internal() {
-                let child_i = self.node_stack.last().unwrap().1;
-                let node = &self.node_stack.last().unwrap().0.children().nodes()[child_i];
-                self.node_stack.push((node, 0));
+            self.node_stack[stack_idx].1 += 1;
+            while self.node_stack[stack_idx].0.is_internal() {
+                let child_i = self.node_stack[stack_idx].1;
+                let node = &self.node_stack[stack_idx].0.children().nodes()[child_i];
+
+                stack_idx += 1;
+                self.node_stack[stack_idx] = (node, 0);
             }
+
+            debug_assert!(stack_idx == self.node_stack.len() - 1);
         }
 
         // Finally, return the chunk text.
