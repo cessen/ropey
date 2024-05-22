@@ -205,7 +205,7 @@ impl Rope {
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
     #[doc(hidden)]
     pub fn assert_accurate_text_info(&self) {
-        self.root.assert_accurate_text_info();
+        assert!(self.root_info == self.root.assert_accurate_text_info());
     }
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
@@ -581,6 +581,27 @@ mod tests {
                               a fine day, isn't it?🐸  Aren't you glad \
                               we're alive?🐸  こんにちは、みんなさん！";
 
+    /// Note: ensures that the chunks as given become individual leaf nodes in
+    /// the rope.
+    fn make_rope_and_text_from_chunks(chunks: &[&str]) -> (Rope, String) {
+        let rope = {
+            let mut rb = RopeBuilder::new();
+            for chunk in chunks {
+                rb._append_chunk_as_leaf(chunk);
+            }
+            rb.finish()
+        };
+        let text = {
+            let mut text = String::new();
+            for chunk in chunks {
+                text.push_str(chunk);
+            }
+            text
+        };
+
+        (rope, text)
+    }
+
     #[test]
     fn insert_01() {
         let mut r = Rope::from_str(TEXT);
@@ -719,6 +740,42 @@ mod tests {
         let mut r = Rope::from_str(TEXT);
         // Non-char boundary.
         r.insert(126, "");
+    }
+
+    #[test]
+    fn insert_12() {
+        let (r, _) = make_rope_and_text_from_chunks(&["\r", "\n\r", "\n\r", "\n"]);
+
+        {
+            let mut r = r.clone();
+            r.insert(1, "\r");
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            r.insert(1, "\n");
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            r.insert(3, "\r");
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            r.insert(3, "\n");
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            r.insert(0, "\n");
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            r.insert(r.len_bytes(), "\r");
+            r.assert_accurate_text_info();
+        }
     }
 
     #[test]

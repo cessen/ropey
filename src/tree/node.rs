@@ -120,10 +120,6 @@ impl Node {
         text: &str,
         node_info: TextInfo,
     ) -> Result<(TextInfo, Option<(TextInfo, Node)>)> {
-        // TODO: use `node_info` to do an update of the node info rather
-        // than recomputing from scratch.  This will be a bit delicate,
-        // because it requires being aware of crlf splits.
-
         debug_assert!(text.len() <= (MAX_TEXT_SIZE - 4));
 
         match *self {
@@ -172,8 +168,14 @@ impl Node {
                 // Handle the residual node if there is one and return.
                 if let Some((r_info, r_node)) = residual {
                     if children.len() < MAX_CHILDREN {
+                        let new_node_info = node_info.edit_sub_info(
+                            info,
+                            l_info.concat(r_info),
+                            children.info().get(child_i.wrapping_sub(1)),
+                            children.info().get(child_i + 1),
+                        );
                         children.insert(child_i + 1, (r_info, r_node));
-                        Ok((children.combined_text_info(), None))
+                        Ok((new_node_info, None))
                     } else {
                         let r = children.insert_split(child_i + 1, (r_info, r_node));
                         let r_info = r.combined_text_info();
@@ -183,7 +185,13 @@ impl Node {
                         ))
                     }
                 } else {
-                    Ok((children.combined_text_info(), None))
+                    let new_node_info = node_info.edit_sub_info(
+                        info,
+                        l_info,
+                        children.info().get(child_i.wrapping_sub(1)),
+                        children.info().get(child_i + 1),
+                    );
+                    Ok((new_node_info, None))
                 }
             }
         }
