@@ -93,7 +93,7 @@ impl Children {
         match (node1, node2) {
             (&mut Node::Leaf(ref mut text1), &mut Node::Leaf(ref mut text2)) => {
                 let text1 = Arc::make_mut(text1);
-                text1.append_text(text2);
+                text1.append_str(text2.text());
             }
 
             (&mut Node::Internal(ref mut children1), &mut Node::Internal(ref mut children2)) => {

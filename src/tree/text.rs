@@ -184,14 +184,6 @@ impl Text {
         right
     }
 
-    /// Appends the contents of another `Text` to the end of this one.
-    ///
-    /// Panics if there isn't enough free space to accommodate the append.
-    #[inline(always)]
-    pub fn append_text(&mut self, other: &Self) {
-        self.append_str(other.text());
-    }
-
     /// Equidistributes text data between `self` and `other`.  This behaves
     /// as if the text of `other` is appended to the end of `self`, and the
     /// result is then split between the two, with `other` being the right
@@ -765,15 +757,6 @@ mod tests {
     fn split_03() {
         let mut leaf = Text::from_str("人");
         let _ = leaf.split(1);
-    }
-
-    #[test]
-    fn append_text_01() {
-        let mut leaf_1 = Text::from_str("Hello ");
-        let leaf_2 = Text::from_str("world!");
-        leaf_1.append_text(&leaf_2);
-
-        assert_eq!("Hello world!", leaf_1);
     }
 
     #[test]
