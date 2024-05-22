@@ -34,6 +34,8 @@ str_indices = { version = "0.4", default-features = false }
 rand = "0.8"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
+fnv = "1"
+fxhash = "0.2"
 
 #-----------------------------------------
 
@@ -47,4 +49,16 @@ harness = false
 
 [[bench]]
 name = "remove"
+harness = false
+
+[[bench]]
+name = "queries"
+harness = false
+
+[[bench]]
+name = "iterators"
+harness = false
+
+[[bench]]
+name = "hash"
 harness = false

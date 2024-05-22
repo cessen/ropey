@@ -18,42 +18,42 @@ fn large_string() -> String {
 
 //----
 
-// fn insert_char(c: &mut Criterion) {
-//     let text = large_string();
+fn insert_char(c: &mut Criterion) {
+    let text = large_string();
 
-//     let mut group = c.benchmark_group("insert_char");
+    let mut group = c.benchmark_group("insert_char");
 
-//     group.bench_function("random", |bench| {
-//         let mut rope = Rope::from_str(&text);
-//         bench.iter(|| {
-//             let len = rope.len_bytes();
-//             rope.insert_char(random::<usize>() % len, 'a')
-//         })
-//     });
+    group.bench_function("random", |bench| {
+        let mut rope = Rope::from_str(&text);
+        bench.iter(|| {
+            let len = rope.len_bytes();
+            rope.insert_char(random::<usize>() % len, 'a')
+        })
+    });
 
-//     group.bench_function("start", |bench| {
-//         let mut rope = Rope::from_str(&text);
-//         bench.iter(|| {
-//             rope.insert_char(0, 'a');
-//         })
-//     });
+    group.bench_function("start", |bench| {
+        let mut rope = Rope::from_str(&text);
+        bench.iter(|| {
+            rope.insert_char(0, 'a');
+        })
+    });
 
-//     group.bench_function("middle", |bench| {
-//         let mut rope = Rope::from_str(&text);
-//         bench.iter(|| {
-//             let len = rope.len_bytes();
-//             rope.insert_char(len / 2, 'a');
-//         })
-//     });
+    group.bench_function("middle", |bench| {
+        let mut rope = Rope::from_str(&text);
+        bench.iter(|| {
+            let len = rope.len_bytes();
+            rope.insert_char(len / 2, 'a');
+        })
+    });
 
-//     group.bench_function("end", |bench| {
-//         let mut rope = Rope::from_str(&text);
-//         bench.iter(|| {
-//             let len = rope.len_bytes();
-//             rope.insert_char(len, 'a');
-//         })
-//     });
-// }
+    group.bench_function("end", |bench| {
+        let mut rope = Rope::from_str(&text);
+        bench.iter(|| {
+            let len = rope.len_bytes();
+            rope.insert_char(len, 'a');
+        })
+    });
+}
 
 fn insert_small(c: &mut Criterion) {
     let text = large_string();
@@ -193,7 +193,7 @@ fn insert_after_clone(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    // insert_char,
+    insert_char,
     insert_small,
     insert_medium,
     insert_large,
