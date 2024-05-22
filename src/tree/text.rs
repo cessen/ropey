@@ -115,24 +115,12 @@ impl Text {
     //---------------------------------------------------------
     // Modify.
 
-    /// Inserts the given text at the given byte index.
-    ///
-    /// Panics if there isn't enough free space or if the byte index
-    /// isn't on a valid char boundary.
-    #[inline(always)]
-    pub fn insert_str(&mut self, byte_idx: usize, text: &str) {
-        self.0.insert(byte_idx, text);
-    }
-
     /// Inserts the given text at the given byte index, and computes an
     /// updated TextInfo for the text at the same time.
     ///
-    /// This is preferable when TextInfo is already available, because
-    /// the update can be done much more efficiently than doing a full
-    /// recompute of the info.
-    ///
     /// Panics if there isn't enough free space or if the byte index
     /// isn't on a valid char boundary.
+    #[must_use]
     pub fn insert_str_and_update_info(
         &mut self,
         byte_idx: usize,
@@ -151,6 +139,25 @@ impl Text {
         new_info
     }
 
+    /// Removes the text in the given right-exclusive byte range, and computes
+    /// an updated TextInfo for the resulting text at the same time..
+    ///
+    /// Panics if the range isn't valid or doesn't lie on valid char
+    /// boundaries.
+    #[must_use]
+    pub fn remove_range_and_update_info(
+        &mut self,
+        byte_idx_range: [usize; 2],
+        current_info: TextInfo,
+    ) -> TextInfo {
+        // Update text info based on the upcoming removal.
+        let new_info = current_info.str_remove(self.text(), byte_idx_range);
+
+        self.0.remove(byte_idx_range);
+
+        new_info
+    }
+
     /// Appends `text` to the end.
     ///
     /// Panics if there isn't enough free space.
@@ -159,13 +166,12 @@ impl Text {
         self.0.insert(self.len(), text);
     }
 
-    /// Removes the text in the given right-exclusive byte range.
+    /// Prepends `text` to the start.
     ///
-    /// Panics if the range isn't valid or doesn't lie on valid char
-    /// boundaries.
+    /// Panics if there isn't enough free space.
     #[inline(always)]
-    pub fn remove(&mut self, byte_idx_range: [usize; 2]) {
-        self.0.remove(byte_idx_range);
+    pub fn prepend_str(&mut self, text: &str) {
+        self.0.insert(0, text);
     }
 
     /// Splits the leaf into two leaves, at the given byte offset.
@@ -693,37 +699,45 @@ mod tests {
     }
 
     #[test]
-    fn insert_str_01() {
+    fn insert_str_and_update_info_01() {
         let mut leaf = Text::new();
-        leaf.insert_str(0, "o ");
+
+        let info = leaf.insert_str_and_update_info(0, "o ", leaf.text_info());
         assert_eq!(leaf, "o ");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("o "));
-        leaf.insert_str(0, "He");
+        assert_eq!(info, TextInfo::from_str("o "));
+
+        let info = leaf.insert_str_and_update_info(0, "He", leaf.text_info());
         assert_eq!(leaf, "Heo ");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("Heo "));
-        leaf.insert_str(2, "ll");
+        assert_eq!(info, TextInfo::from_str("Heo "));
+
+        let info = leaf.insert_str_and_update_info(2, "ll", leaf.text_info());
         assert_eq!(leaf, "Hello ");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("Hello "));
-        leaf.insert_str(6, "world!");
+        assert_eq!(info, TextInfo::from_str("Hello "));
+
+        let info = leaf.insert_str_and_update_info(6, "world!", leaf.text_info());
         assert_eq!(leaf, "Hello world!");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("Hello world!"));
+        assert_eq!(info, TextInfo::from_str("Hello world!"));
     }
 
     #[test]
-    fn remove_01() {
+    fn remove_range_and_update_info_01() {
         let mut leaf = Text::from_str("Hello world!");
-        leaf.remove([4, 6]);
+
+        let info = leaf.remove_range_and_update_info([4, 6], leaf.text_info());
         assert_eq!(leaf, "Hellworld!");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("Hellworld!"));
-        leaf.remove([0, 3]);
+        assert_eq!(info, TextInfo::from_str("Hellworld!"));
+
+        let info = leaf.remove_range_and_update_info([0, 3], leaf.text_info());
         assert_eq!(leaf, "lworld!");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("lworld!"));
-        leaf.remove([4, 7]);
+        assert_eq!(info, TextInfo::from_str("lworld!"));
+
+        let info = leaf.remove_range_and_update_info([4, 7], leaf.text_info());
         assert_eq!(leaf, "lwor");
-        assert_eq!(leaf.text_info(), TextInfo::from_str("lwor"));
-        leaf.remove([0, 4]);
+        assert_eq!(info, TextInfo::from_str("lwor"));
+
+        let info = leaf.remove_range_and_update_info([0, 4], leaf.text_info());
         assert_eq!(leaf, "");
-        assert_eq!(leaf.text_info(), TextInfo::from_str(""));
+        assert_eq!(info, TextInfo::from_str(""));
     }
 
     #[test]

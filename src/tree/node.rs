@@ -145,7 +145,7 @@ impl Node {
                     let text_split_idx =
                         crate::find_char_boundary_l(leaf_text.free_capacity(), text.as_bytes());
                     leaf_text.append_str(&text[..text_split_idx]);
-                    right_text.insert_str(0, &text[text_split_idx..]);
+                    right_text.prepend_str(&text[text_split_idx..]);
                     leaf_text.distribute(&mut right_text);
                     Ok((
                         leaf_text.text_info(),
@@ -204,12 +204,8 @@ impl Node {
     pub fn remove_byte_range(
         &mut self,
         byte_idx_range: [usize; 2],
-        _node_info: TextInfo,
+        node_info: TextInfo,
     ) -> Result<TextInfo> {
-        // TODO: use `node_info` to do an update of the node info rather
-        // than recomputing from scratch.  This will be a bit delicate,
-        // because it requires being aware of crlf splits.
-
         debug_assert!(byte_idx_range[0] <= byte_idx_range[1]);
 
         match *self {
@@ -224,9 +220,10 @@ impl Node {
                 }
 
                 let leaf_text = Arc::make_mut(leaf_text);
-                leaf_text.remove(byte_idx_range);
+                let new_node_info =
+                    leaf_text.remove_range_and_update_info(byte_idx_range, node_info);
 
-                Ok(leaf_text.text_info())
+                Ok(new_node_info)
             }
             Node::Internal(ref mut children) => {
                 let children = Arc::make_mut(children);
@@ -251,12 +248,26 @@ impl Node {
                 // Simple case: the removal is entirely within a single child.
                 if start_child_i == end_child_i {
                     if start_byte_idx == 0 && end_byte_idx == start_info.bytes {
+                        let new_node_info = node_info.edit_sub_info(
+                            children.info()[start_child_i],
+                            TextInfo::new(),
+                            children.info().get(start_child_i.wrapping_sub(1)),
+                            children.info().get(start_child_i + 1),
+                        );
                         children.remove(start_child_i);
+                        Ok(new_node_info)
                     } else {
-                        let new_info = children.nodes_mut()[start_child_i]
+                        let new_child_info = children.nodes_mut()[start_child_i]
                             .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
-                        children.info_mut()[start_child_i] = new_info;
+                        let new_node_info = node_info.edit_sub_info(
+                            children.info()[start_child_i],
+                            new_child_info,
+                            children.info().get(start_child_i.wrapping_sub(1)),
+                            children.info().get(start_child_i + 1),
+                        );
+                        children.info_mut()[start_child_i] = new_child_info;
                         children.update_unbalance_flag(start_child_i);
+                        Ok(new_node_info)
                     }
                 }
                 // More complex case: the removal spans multiple children.
@@ -294,9 +305,9 @@ impl Node {
                     if removal_start < removal_end {
                         children.remove_multiple([removal_start, removal_end]);
                     }
-                }
 
-                Ok(children.combined_text_info())
+                    Ok(children.combined_text_info())
+                }
             }
         }
     }

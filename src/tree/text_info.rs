@@ -422,6 +422,69 @@ impl TextInfo {
 
         new_info
     }
+
+    #[must_use]
+    pub(crate) fn str_remove(self, text: &str, byte_idx_range: [usize; 2]) -> TextInfo {
+        // This function only works correctly when these preconditions are met.
+        // It will give errorneous results otherwise.
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        debug_assert!(!self.split_crlf_compensation_done);
+
+        // For terseness.
+        let [start, end] = byte_idx_range;
+
+        if start == end {
+            return self;
+        }
+        if start == 0 && end == text.len() {
+            return TextInfo::new();
+        }
+
+        // Easy case.
+        if (end - start) >= (text.len() / 2) {
+            let left = TextInfo::from_str(&text[..start]);
+            let right = TextInfo::from_str(&text[end..]);
+            return left.concat(right);
+        }
+
+        // Silence unused mut warnings when the relevant features are disabled.
+        #[allow(unused_mut)]
+        let mut new_info = self - TextInfo::from_str(&text[byte_idx_range[0]..byte_idx_range[1]]);
+
+        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        {
+            let start_cr = start > 0 && byte_is_cr(text, start - 1);
+            let start_lf = byte_is_lf(text, start);
+            let end_cr = byte_is_cr(text, end - 1);
+            let end_lf = end < text.len() && byte_is_lf(text, end);
+
+            let crlf_split_compensation_1 = (start_cr && start_lf) as usize;
+            let crlf_split_compensation_2 = (end_cr && end_lf) as usize;
+            let crlf_merge_compensation = (start_cr && end_lf) as usize;
+
+            #[cfg(feature = "metric_lines_cr_lf")]
+            {
+                new_info.line_breaks_cr_lf += crlf_split_compensation_1;
+                new_info.line_breaks_cr_lf += crlf_split_compensation_2;
+                new_info.line_breaks_cr_lf -= crlf_merge_compensation;
+            }
+            #[cfg(feature = "metric_lines_unicode")]
+            {
+                new_info.line_breaks_unicode += crlf_split_compensation_1;
+                new_info.line_breaks_unicode += crlf_split_compensation_2;
+                new_info.line_breaks_unicode -= crlf_merge_compensation;
+            }
+
+            if start == 0 {
+                new_info.starts_with_lf = end_lf;
+            }
+            if end == text.len() {
+                new_info.ends_with_cr = start_cr;
+            }
+        }
+
+        new_info
+    }
 }
 
 impl Add for TextInfo {
