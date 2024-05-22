@@ -38,7 +38,7 @@ pub enum LineType {
     All,
 }
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[non_exhaustive]
