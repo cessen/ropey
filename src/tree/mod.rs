@@ -9,7 +9,7 @@ pub use text_info::TextInfo;
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 16;
     pub(crate) const MIN_CHILDREN: usize = 7;
-    pub(crate) const MAX_TEXT_SIZE: usize = 2048;
+    pub(crate) const MAX_TEXT_SIZE: usize = 1024;
     pub(crate) const MIN_TEXT_SIZE: usize = (MAX_TEXT_SIZE / 2) - (MAX_TEXT_SIZE / 32);
 }
 #[cfg(any(test, feature = "internal_dev_small_chunks"))]

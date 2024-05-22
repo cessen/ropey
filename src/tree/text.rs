@@ -48,6 +48,7 @@ impl Text {
         self.0.free_capacity()
     }
 
+    #[inline(always)]
     pub fn text_info(&self) -> TextInfo {
         TextInfo::from_str(self.0.text())
     }
@@ -68,21 +69,25 @@ impl Text {
     // Metric conversions.
 
     #[cfg(feature = "metric_chars")]
+    #[inline(always)]
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         chars::from_byte_idx(self.text(), byte_idx)
     }
 
     #[cfg(feature = "metric_chars")]
+    #[inline(always)]
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
         chars::to_byte_idx(self.text(), char_idx)
     }
 
     #[cfg(feature = "metric_utf16")]
+    #[inline(always)]
     pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
         utf16::from_byte_idx(self.text(), byte_idx)
     }
 
     #[cfg(feature = "metric_utf16")]
+    #[inline(always)]
     pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
         utf16::to_byte_idx(self.text(), utf16_idx)
     }
@@ -92,6 +97,7 @@ impl Text {
         feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
+    #[inline(always)]
     pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
         lines::from_byte_idx(self.text(), byte_idx, line_type)
     }
@@ -101,6 +107,7 @@ impl Text {
         feature = "metric_lines_cr_lf",
         feature = "metric_lines_unicode"
     ))]
+    #[inline(always)]
     pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
         lines::to_byte_idx(self.text(), line_idx, line_type)
     }
@@ -112,6 +119,7 @@ impl Text {
     ///
     /// Panics if there isn't enough free space or if the byte index
     /// isn't on a valid char boundary.
+    #[inline(always)]
     pub fn insert_str(&mut self, byte_idx: usize, text: &str) {
         self.0.insert(byte_idx, text);
     }
@@ -155,6 +163,7 @@ impl Text {
     ///
     /// Panics if the range isn't valid or doesn't lie on valid char
     /// boundaries.
+    #[inline(always)]
     pub fn remove(&mut self, byte_idx_range: [usize; 2]) {
         self.0.remove(byte_idx_range);
     }
@@ -172,6 +181,7 @@ impl Text {
     /// Appends the contents of another `Text` to the end of this one.
     ///
     /// Panics if there isn't enough free space to accommodate the append.
+    #[inline(always)]
     pub fn append_text(&mut self, other: &Self) {
         self.append_str(other.text());
     }
@@ -219,34 +229,35 @@ impl Text {
 impl std::cmp::Eq for Text {}
 
 impl std::cmp::PartialEq<Text> for Text {
+    #[inline(always)]
     fn eq(&self, other: &Text) -> bool {
         self.text() == other.text()
     }
 }
 
 impl std::cmp::PartialEq<str> for Text {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &str) -> bool {
         self.text() == other
     }
 }
 
 impl std::cmp::PartialEq<&str> for Text {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &&str) -> bool {
         self == *other
     }
 }
 
 impl std::cmp::PartialEq<Text> for str {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &Text) -> bool {
         other == self
     }
 }
 
 impl std::cmp::PartialEq<Text> for &str {
-    #[inline]
+    #[inline(always)]
     fn eq(&self, other: &Text) -> bool {
         other == self
     }
@@ -283,7 +294,6 @@ mod inner {
             }
         }
 
-        #[inline(always)]
         pub fn from_str(text: &str) -> Self {
             assert!(text.len() <= MAX_TEXT_SIZE);
 

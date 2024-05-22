@@ -614,7 +614,6 @@ mod inner {
         /// Pushes an item onto the end of the array.
         ///
         /// Increases length by one.  Panics if already full.
-        #[inline(always)]
         pub fn push(&mut self, item: (TextInfo, Node)) {
             assert!(self.len() < MAX_CHILDREN);
             self.info[self.len()] = MaybeUninit::new(item.0);
@@ -627,7 +626,6 @@ mod inner {
         /// Pops an item off the end of the array and returns it.
         ///
         /// Decreases length by one.  Panics if already empty.
-        #[inline(always)]
         pub fn pop(&mut self) -> (TextInfo, Node) {
             assert!(self.len() > 0);
             self.len -= 1;
@@ -646,7 +644,6 @@ mod inner {
         ///
         /// Increases length by one.  Panics if already full.  Preserves ordering
         /// of the other items.
-        #[inline(always)]
         pub fn insert(&mut self, idx: usize, item: (TextInfo, Node)) {
             assert!(idx <= self.len());
             assert!(self.len() < MAX_CHILDREN);
@@ -680,7 +677,6 @@ mod inner {
         /// Removes the item at the given index from the the array.
         ///
         /// Decreases length by one.  Preserves ordering of the other items.
-        #[inline(always)]
         pub fn remove(&mut self, idx: usize) -> (TextInfo, Node) {
             assert!(idx < self.len());
 
@@ -720,7 +716,6 @@ mod inner {
         /// Removes a range of items from `self`.
         ///
         /// Panics if the range is out of bounds.
-        #[inline(always)]
         pub fn remove_range(&mut self, range: [usize; 2]) {
             assert!(range[0] <= range[1]);
             assert!(range[1] <= self.len());
@@ -768,7 +763,6 @@ mod inner {
         ///
         /// Panics if there isn't enough room to insert, or if the insert index
         /// or from-range are out of bounds.
-        #[inline(always)]
         pub fn steal_range_from(
             &mut self,
             to_idx: usize,

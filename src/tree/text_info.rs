@@ -67,7 +67,6 @@ impl TextInfo {
     /// The returned `TextInfo` is identical to what `TextInfo::from_str("")`
     /// would return, but is constructed more efficiently since this can skip
     /// all of the text scan function calls.
-    #[inline(always)]
     pub(crate) fn new() -> TextInfo {
         TextInfo {
             bytes: 0,
@@ -102,7 +101,6 @@ impl TextInfo {
     ///
     /// The correct uses for this are very narrow.  Strongly prefer `new()`
     /// unless you really know what you're doing.
-    #[inline(always)]
     pub(crate) fn new_adjusted() -> TextInfo {
         TextInfo {
             bytes: 0,
@@ -133,7 +131,6 @@ impl TextInfo {
         }
     }
 
-    #[inline]
     pub(crate) fn from_str(text: &str) -> TextInfo {
         #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
         let char_count = chars::count(text);
@@ -233,7 +230,6 @@ impl TextInfo {
     /// Note: this does *not* update the starts/ends_with CRLF tags.  They are
     /// left alone.
     #[must_use]
-    #[inline(always)]
     pub(crate) fn adjusted_by_next_is_lf(self, next_is_lf: bool) -> TextInfo {
         // To silence unused parameter warnings when the relevant features are
         // disabled.
@@ -273,7 +269,6 @@ impl TextInfo {
     /// This properly accounts for split CRLF line breaks, and computes
     /// the starts/ends_with CRLF tags appropriately.
     #[must_use]
-    #[inline(always)]
     pub(crate) fn concat(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
@@ -301,7 +296,6 @@ impl TextInfo {
         }
     }
 
-    #[inline(always)]
     pub(crate) fn edit_sub_info(
         mut self,
         sub_old: TextInfo,
@@ -374,7 +368,6 @@ impl TextInfo {
     }
 
     #[must_use]
-    #[inline(always)]
     pub(crate) fn str_insert(
         self,
         text: &str,
@@ -442,7 +435,7 @@ impl Add for TextInfo {
     //
     // If you want to combine two TextInfo's as if their text were
     // concatenated, see `concat()`.
-    #[inline]
+    #[inline(always)]
     fn add(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             bytes: self.bytes + rhs.bytes,
@@ -468,7 +461,7 @@ impl Add for TextInfo {
 }
 
 impl AddAssign for TextInfo {
-    #[inline]
+    #[inline(always)]
     fn add_assign(&mut self, other: TextInfo) {
         *self = *self + other;
     }
@@ -482,7 +475,7 @@ impl Sub for TextInfo {
     //
     // Because of that, using this correctly typically requires special
     // handling.  Beware.
-    #[inline]
+    #[inline(always)]
     fn sub(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
             bytes: self.bytes - rhs.bytes,
@@ -508,7 +501,7 @@ impl Sub for TextInfo {
 }
 
 impl SubAssign for TextInfo {
-    #[inline]
+    #[inline(always)]
     fn sub_assign(&mut self, other: TextInfo) {
         *self = *self - other;
     }

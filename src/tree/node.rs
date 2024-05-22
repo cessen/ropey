@@ -74,10 +74,12 @@ impl Node {
         }
     }
 
+    #[inline(always)]
     pub fn child_count(&self) -> usize {
         self.children().len()
     }
 
+    #[inline(always)]
     pub fn children(&self) -> &Children {
         match *self {
             Node::Internal(ref children) => children,
@@ -85,6 +87,7 @@ impl Node {
         }
     }
 
+    #[inline(always)]
     pub fn children_mut(&mut self) -> &mut Children {
         match *self {
             Node::Internal(ref mut children) => Arc::make_mut(children),
@@ -92,6 +95,7 @@ impl Node {
         }
     }
 
+    #[inline(always)]
     pub fn leaf_text(&self) -> &Text {
         match *self {
             Node::Leaf(ref text) => text,
@@ -341,7 +345,6 @@ impl Node {
     ///   have split-CRLF compensation applied.
     /// - `metric_subtractor`: a simple function that subtracts the relevant
     ///   metric in a TextInfo from a usize.
-    #[inline(always)]
     fn get_text_at_metric<F1, F2>(
         &self,
         metric_idx: usize,

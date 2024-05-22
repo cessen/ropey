@@ -357,7 +357,6 @@ mod lines {
         /// Note: unlike the other iterator constructors, this one takes
         /// `at_line_idx` relative to the slice defined by `byte_range`, not
         /// relative to the whole contents of `node`.
-        #[inline(always)]
         pub(crate) fn new(
             node: &'a Node,
             node_info: &'a TextInfo,

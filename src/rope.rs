@@ -77,23 +77,12 @@ impl Rope {
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
         match self.try_insert(byte_idx, text) {
             Ok(_) => {}
-            Err(OutOfBounds) => panic!(
-                "Attempted to insert out of bounds: `byte_idx` is {} but rope length is {}.",
-                byte_idx,
-                self.len_bytes()
-            ),
-            Err(NonCharBoundary) => panic!(
-                "Attempted to insert at a non-char-boundary: `byte_idx` is {}.",
-                byte_idx
-            ),
             Err(e) => e.panic_with_msg(),
         }
     }
 
     #[inline]
     pub fn insert_char(&mut self, byte_idx: usize, ch: char) {
-        assert!(byte_idx <= self.len_bytes());
-
         let mut buf = [0u8; 4];
         self.insert(byte_idx, ch.encode_utf8(&mut buf));
     }
@@ -134,7 +123,7 @@ impl Rope {
     //---------------------------------------------------------
     // Slicing.
 
-    #[inline(always)]
+    #[inline]
     pub fn slice<'a, R>(&'a self, byte_range: R) -> RopeSlice<'a>
     where
         R: RangeBounds<usize>,
@@ -362,7 +351,7 @@ impl Rope {
         self.try_insert(byte_idx, ch.encode_utf8(&mut buf))
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn try_remove<R>(&mut self, byte_range: R) -> Result<()>
     where
         R: RangeBounds<usize>,
@@ -416,7 +405,7 @@ impl Rope {
         inner(self, byte_range.start_bound(), byte_range.end_bound())
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn try_slice<'a, R>(&'a self, byte_range: R) -> Result<RopeSlice<'a>>
     where
         R: RangeBounds<usize>,

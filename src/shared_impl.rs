@@ -14,11 +14,13 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Queries.
 
+        #[inline(always)]
         pub fn len_bytes(&self) -> usize {
             self.get_byte_range()[1] - self.get_byte_range()[0]
         }
 
         #[cfg(feature = "metric_chars")]
+        #[inline]
         pub fn len_chars(&self) -> usize {
             if let Some(info) = self.get_full_info() {
                 info.chars
@@ -30,6 +32,7 @@ macro_rules! shared_main_impl_methods {
         }
 
         #[cfg(feature = "metric_utf16")]
+        #[inline]
         pub fn len_utf16(&self) -> usize {
             if let Some(info) = self.get_full_info() {
                 info.utf16
@@ -45,6 +48,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_cr_lf",
             feature = "metric_lines_unicode"
         ))]
+        #[inline]
         pub fn len_lines(&self, line_type: LineType) -> usize {
             if let Some(info) = self.get_full_info() {
                 info.line_breaks(line_type) + 1
@@ -58,6 +62,7 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        #[inline]
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
             assert!(byte_idx <= self.len_bytes());
 
@@ -120,6 +125,7 @@ macro_rules! shared_main_impl_methods {
         }
 
         #[cfg(feature = "metric_chars")]
+        #[inline]
         pub fn char_to_byte(&self, char_idx: usize) -> usize {
             assert!(char_idx <= self.len_chars());
             if self.get_full_info().is_some() {
@@ -143,6 +149,7 @@ macro_rules! shared_main_impl_methods {
         }
 
         #[cfg(feature = "metric_utf16")]
+        #[inline]
         pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
             assert!(utf16_idx <= self.len_utf16());
             if self.get_full_info().is_some() {
@@ -181,6 +188,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_cr_lf",
             feature = "metric_lines_unicode"
         ))]
+        #[inline]
         pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
             assert!(line_idx <= self.len_lines(line_type));
             if self.get_full_info().is_some() {
@@ -196,6 +204,7 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Iterators.
 
+        #[inline]
         pub fn bytes(&self) -> Bytes<'_> {
             Bytes::new(
                 &self.get_root(),
@@ -204,6 +213,7 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        #[inline]
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
             Bytes::new(
                 self.get_root(),
@@ -212,6 +222,7 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        #[inline]
         pub fn chars(&self) -> Chars<'_> {
             Chars::new(
                 self.get_root(),
@@ -220,6 +231,7 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        #[inline]
         pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
             Chars::new(
                 self.get_root(),
@@ -233,6 +245,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_cr_lf",
             feature = "metric_lines_unicode"
         ))]
+        #[inline]
         pub fn lines(&self, line_type: LineType) -> Lines<'_> {
             Lines::new(
                 self.get_root(),
@@ -248,6 +261,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_cr_lf",
             feature = "metric_lines_unicode"
         ))]
+        #[inline]
         pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<'_> {
             Lines::new(
                 self.get_root(),
@@ -258,6 +272,7 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        #[inline]
         pub fn chunks(&self) -> Chunks<'_> {
             Chunks::new(
                 self.get_root(),
@@ -267,6 +282,7 @@ macro_rules! shared_main_impl_methods {
             .0
         }
 
+        #[inline]
         pub fn chunks_at(&self, byte_idx: usize) -> Chunks<'_> {
             Chunks::new(
                 &self.get_root(),
