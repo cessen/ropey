@@ -3,7 +3,7 @@ mod node;
 mod text;
 mod text_info;
 
-pub use text_info::TextInfo;
+pub(crate) use text_info::TextInfo;
 
 #[cfg(not(any(test, feature = "internal_dev_small_chunks")))]
 mod constants {

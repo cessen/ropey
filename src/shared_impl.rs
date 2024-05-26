@@ -98,7 +98,7 @@ macro_rules! shared_main_impl_methods {
         }
 
         #[inline(always)]
-        pub fn chunk(&self, byte_idx: usize) -> (&str, TextInfo) {
+        pub fn chunk(&self, byte_idx: usize) -> (&str, usize) {
             self.get_chunk(byte_idx).unwrap()
         }
 
@@ -407,38 +407,29 @@ macro_rules! shared_no_panic_impl_methods {
             Some(self.slice(start_byte..end_byte))
         }
 
-        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&str, TextInfo)> {
+        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&str, usize)> {
             if byte_idx > self.len_bytes() {
                 return None;
             }
 
-            let (chunk, start_info) = self
+            let (chunk, start_byte) = self
                 .get_root()
-                .get_text_at_byte(self.get_byte_range()[0] + byte_idx);
+                .get_text_at_byte_fast(self.get_byte_range()[0] + byte_idx);
 
             if self.get_full_info().is_some() {
                 // Simple case: we have a full rope, so no adjustments are
                 // needed.
-                Some((chunk.text(), start_info))
+                Some((chunk.text(), start_byte))
             } else {
                 // Trim chunk.
-                let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_info.bytes);
-                let back_trim_idx = (self.get_byte_range()[1] - start_info.bytes).min(chunk.len());
+                let front_trim_idx = self.get_byte_range()[0].saturating_sub(start_byte);
+                let back_trim_idx = (self.get_byte_range()[1] - start_byte).min(chunk.len());
                 let trimmed_chunk = &chunk.text()[front_trim_idx..back_trim_idx];
 
                 // Compute left-side text info.
-                let start_info = {
-                    let new_start_info = start_info
-                        + TextInfo::from_str(&chunk.text()[..front_trim_idx])
-                            .adjusted_by_next_is_lf(crate::str_utils::byte_is_lf(
-                                chunk.text(),
-                                front_trim_idx,
-                            ));
-                    let start_info = self.get_root().text_info_at_byte(self.get_byte_range()[0]);
-                    new_start_info - start_info
-                };
+                let local_start_byte = start_byte.saturating_sub(self.get_byte_range()[0]);
 
-                Some((trimmed_chunk, start_info))
+                Some((trimmed_chunk, local_start_byte))
             }
         }
     };

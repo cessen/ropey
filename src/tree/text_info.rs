@@ -26,7 +26,7 @@ use crate::LineType;
 use crate::str_utils::{byte_is_cr, byte_is_lf, ends_with_cr, starts_with_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct TextInfo {
+pub(crate) struct TextInfo {
     pub bytes: usize,
 
     #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]

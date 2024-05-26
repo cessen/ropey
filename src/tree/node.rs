@@ -466,15 +466,6 @@ impl Node {
     //---------------------------------------------------------
     // Misc.
 
-    pub fn text_info_at_byte(&self, byte_idx: usize) -> TextInfo {
-        let (text, left_info) = self.get_text_at_byte(byte_idx);
-
-        let internal_byte_idx = byte_idx - left_info.bytes;
-        left_info
-            + TextInfo::from_str(&text.text()[..internal_byte_idx])
-                .adjusted_by_next_is_lf(str_utils::byte_is_lf(text.text(), internal_byte_idx))
-    }
-
     pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
         let (text, offset) = self.get_text_at_byte_fast(byte_idx);
         text.is_char_boundary(byte_idx - offset)

@@ -1019,43 +1019,19 @@ mod tests {
     fn test_chunk(s: RopeSlice, text: &str) {
         let mut current_byte = 0;
         let mut seen_bytes = 0;
-        let mut prev_info = crate::TextInfo::new();
+        let mut prev_byte = 0;
         for i in 0..s.len_bytes() {
-            let (chunk, info) = s.chunk(i);
+            let (chunk, start_byte) = s.chunk(i);
 
-            if info != prev_info || i == 0 {
+            if start_byte != prev_byte || i == 0 {
                 current_byte = seen_bytes;
                 seen_bytes += chunk.len();
 
-                prev_info = info;
+                prev_byte = start_byte;
             }
 
-            assert_eq!(info.bytes, current_byte);
+            assert_eq!(start_byte, current_byte);
             assert_eq!(chunk, &text[current_byte..seen_bytes]);
-
-            #[cfg(feature = "metric_chars")]
-            assert_eq!(info.chars, chars::from_byte_idx(text, current_byte));
-
-            #[cfg(feature = "metric_utf16")]
-            assert_eq!(info.utf16, utf16::from_byte_idx(text, current_byte));
-
-            #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(
-                info.line_breaks_lf,
-                str_utils::lines::from_byte_idx(text, current_byte, LineType::LF)
-            );
-
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(
-                info.line_breaks_cr_lf,
-                str_utils::lines::from_byte_idx(text, current_byte, LineType::CRLF)
-            );
-
-            #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(
-                info.line_breaks_unicode,
-                str_utils::lines::from_byte_idx(text, current_byte, LineType::All)
-            );
         }
 
         assert_eq!(seen_bytes, text.len());

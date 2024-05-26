@@ -354,7 +354,10 @@ impl<'a> Iterator for Chars<'a> {
     feature = "metric_lines_unicode"
 ))]
 mod lines {
-    use crate::{tree::Node, LineType, RopeSlice, TextInfo};
+    use crate::{
+        tree::{Node, TextInfo},
+        LineType, RopeSlice,
+    };
 
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
@@ -726,7 +729,7 @@ mod tests {
         let r = Rope::from_str(TEXT);
 
         for i in 0..TEXT.len() {
-            let mut current_byte = r.chunk(i).1.bytes;
+            let mut current_byte = r.chunk(i).1;
 
             for chunk1 in r.chunks_at(i) {
                 let chunk2 = r.chunk(current_byte).0;
@@ -746,7 +749,7 @@ mod tests {
         let text = &TEXT[5..124];
 
         for i in 0..text.len() {
-            let mut current_byte = s.chunk(i).1.bytes;
+            let mut current_byte = s.chunk(i).1;
 
             for chunk1 in s.chunks_at(i) {
                 let chunk2 = s.chunk(current_byte).0;
