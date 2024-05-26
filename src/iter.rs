@@ -96,6 +96,13 @@ impl<'a> Chunks<'a> {
         Some(trimmed_chunk)
     }
 
+    /// Returns the byte offset of the current chunk from the start of the text.
+    pub fn byte_offset(&self) -> usize {
+        self.current_byte_idx
+            .saturating_sub(self.byte_range[0])
+            .min(self.byte_range[1] - self.byte_range[0])
+    }
+
     /// Advances the iterator backward and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
@@ -535,12 +542,16 @@ mod tests {
         let mut stack = Vec::new();
 
         // Forward.
+        let mut byte_offset = 0;
         while let Some(chunk) = chunks.next() {
             assert_eq!(&text[..chunk.len()], chunk);
+            assert_eq!(chunks.byte_offset(), byte_offset);
             stack.push(chunk);
+            byte_offset += chunk.len();
             text = &text[chunk.len()..];
         }
         assert_eq!("", text);
+        assert_eq!(chunks.byte_offset(), TEXT.len());
 
         // Backward.
         while let Some(chunk) = chunks.prev() {
@@ -581,8 +592,11 @@ mod tests {
         let r = Rope::from_str("");
 
         let mut chunks = r.chunks();
+        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.next());
+        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.prev());
+        assert_eq!(chunks.byte_offset(), 0);
     }
 
     #[test]
@@ -620,13 +634,21 @@ mod tests {
 
         let mut chunks = s.chunks();
 
+        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(Some("rld!"), chunks.next());
+        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(Some("Hello "), chunks.next());
+        assert_eq!(chunks.byte_offset(), 4);
         assert_eq!(Some("world!"), chunks.next());
+        assert_eq!(chunks.byte_offset(), 10);
         assert_eq!(Some("Hello "), chunks.next());
+        assert_eq!(chunks.byte_offset(), 16);
         assert_eq!(Some("world!"), chunks.next());
+        assert_eq!(chunks.byte_offset(), 22);
         assert_eq!(Some("Hell"), chunks.next());
+        assert_eq!(chunks.byte_offset(), 28);
         assert_eq!(None, chunks.next());
+        assert_eq!(chunks.byte_offset(), 32);
 
         assert_eq!(Some("Hell"), chunks.prev());
         assert_eq!(Some("world!"), chunks.prev());
@@ -643,8 +665,11 @@ mod tests {
         let s = r.slice(14..14);
 
         let mut chunks = s.chunks();
+        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.next());
+        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.prev());
+        assert_eq!(chunks.byte_offset(), 0);
     }
 
     #[test]
