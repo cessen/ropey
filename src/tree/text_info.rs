@@ -101,6 +101,13 @@ impl TextInfo {
     ///
     /// The correct uses for this are very narrow.  Strongly prefer `new()`
     /// unless you really know what you're doing.
+    #[cfg(any(
+        feature = "metric_chars",
+        feature = "metric_utf16",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
     pub(crate) fn new_adjusted() -> TextInfo {
         TextInfo {
             bytes: 0,
@@ -229,6 +236,7 @@ impl TextInfo {
     ///
     /// Note: this does *not* update the starts/ends_with CRLF tags.  They are
     /// left alone.
+    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
     #[must_use]
     pub(crate) fn adjusted_by_next_is_lf(self, next_is_lf: bool) -> TextInfo {
         // To silence unused parameter warnings when the relevant features are

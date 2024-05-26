@@ -316,6 +316,13 @@ impl Children {
     ///
     /// The returned TextInfo has already had split-CRLF compensation
     /// applied.
+    #[cfg(any(
+        feature = "metric_chars",
+        feature = "metric_utf16",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
     #[inline(always)]
     pub fn search_by<F>(&self, pred: F) -> (usize, TextInfo)
     where
@@ -383,6 +390,13 @@ impl Children {
     ///
     /// The returned TextInfo has already had split-CRLF compensation
     /// applied.
+    #[cfg(any(
+        feature = "metric_chars",
+        feature = "metric_utf16",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|end| byte_idx < end.bytes);
 

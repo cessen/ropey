@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use crate::{str_utils, Error::*, Result};
+use crate::{Error::*, Result};
+
+#[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+use crate::str_utils;
 
 #[cfg(any(
     feature = "metric_lines_lf",
@@ -356,6 +359,13 @@ impl Node {
     ///   have split-CRLF compensation applied.
     /// - `metric_subtractor`: a simple function that subtracts the relevant
     ///   metric in a TextInfo from a usize.
+    #[cfg(any(
+        feature = "metric_chars",
+        feature = "metric_utf16",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
     fn get_text_at_metric<F1, F2>(
         &self,
         metric_idx: usize,
@@ -388,6 +398,13 @@ impl Node {
     /// Returns the `Text` that contains the given byte.
     ///
     /// See `get_text_at_metric()` for further documentation.
+    #[cfg(any(
+        feature = "metric_chars",
+        feature = "metric_utf16",
+        feature = "metric_lines_lf",
+        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_unicode"
+    ))]
     pub fn get_text_at_byte(&self, byte_idx: usize) -> (&Text, TextInfo) {
         self.get_text_at_metric(
             byte_idx,
