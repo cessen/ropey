@@ -78,10 +78,13 @@ macro_rules! shared_main_impl_methods {
             self.get_byte(byte_idx).unwrap()
         }
 
-        #[cfg(feature = "metric_chars")]
-        #[inline(always)]
-        pub fn char(&self, char_idx: usize) -> char {
-            self.get_char(char_idx).unwrap()
+        #[inline]
+        pub fn char(&self, byte_idx: usize) -> char {
+            match self.try_char(byte_idx) {
+                Ok(ch) => ch,
+                Err(NonCharBoundary) => panic!("Attempt to get a char at a non-char boundary."),
+                Err(e) => e.panic_with_msg(),
+            }
         }
 
         #[cfg(any(
@@ -94,18 +97,9 @@ macro_rules! shared_main_impl_methods {
             self.get_line(line_idx, line_type).unwrap()
         }
 
-        #[inline]
-        pub fn char_at_byte(&self, byte_idx: usize) -> char {
-            match self.try_char_at_byte(byte_idx) {
-                Ok(ch) => ch,
-                Err(NonCharBoundary) => panic!("Attempt to get a char at a non-char boundary."),
-                Err(e) => e.panic_with_msg(),
-            }
-        }
-
         #[inline(always)]
-        pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, TextInfo) {
-            self.get_chunk_at_byte(byte_idx).unwrap()
+        pub fn chunk(&self, byte_idx: usize) -> (&str, TextInfo) {
+            self.get_chunk(byte_idx).unwrap()
         }
 
         //-----------------------------------------------------
@@ -379,15 +373,22 @@ macro_rules! shared_no_panic_impl_methods {
             Some(text.text().as_bytes()[byte_idx - offset])
         }
 
-        #[cfg(feature = "metric_chars")]
-        pub fn get_char(&self, char_idx: usize) -> Option<char> {
-            if char_idx >= self.len_chars() {
-                return None;
+        pub fn try_char(&self, byte_idx: usize) -> Result<char> {
+            if byte_idx >= self.len_bytes() {
+                return Err(OutOfBounds);
             }
 
-            let byte_idx = self.char_to_byte(char_idx);
+            let byte_idx = byte_idx + self.get_byte_range()[0];
+            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+            let local_idx = byte_idx - offset;
 
-            Some(self.char_at_byte(byte_idx))
+            if !text.text().is_char_boundary(local_idx) {
+                return Err(NonCharBoundary);
+            }
+
+            // TODO: something more efficient than constructing a temporary
+            // iterator.
+            Ok(text.text()[(byte_idx - offset)..].chars().next().unwrap())
         }
 
         #[cfg(any(
@@ -406,25 +407,7 @@ macro_rules! shared_no_panic_impl_methods {
             Some(self.slice(start_byte..end_byte))
         }
 
-        pub fn try_char_at_byte(&self, byte_idx: usize) -> Result<char> {
-            if byte_idx >= self.len_bytes() {
-                return Err(OutOfBounds);
-            }
-
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-            let local_idx = byte_idx - offset;
-
-            if !text.text().is_char_boundary(local_idx) {
-                return Err(NonCharBoundary);
-            }
-
-            // TODO: something more efficient than constructing a temporary
-            // iterator.
-            Ok(text.text()[(byte_idx - offset)..].chars().next().unwrap())
-        }
-
-        pub fn get_chunk_at_byte(&self, byte_idx: usize) -> Option<(&str, TextInfo)> {
+        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&str, TextInfo)> {
             if byte_idx > self.len_bytes() {
                 return None;
             }

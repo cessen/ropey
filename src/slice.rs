@@ -903,7 +903,6 @@ mod tests {
         s.byte(0);
     }
 
-    #[cfg(feature = "metric_chars")]
     #[test]
     fn char_01() {
         let r = Rope::from_str(TEXT);
@@ -916,56 +915,23 @@ mod tests {
         assert_eq!(s.char(0), 't');
         assert_eq!(s.char(10), ' ');
         assert_eq!(s.char(18), 'n');
-        assert_eq!(s.char(65), 'な');
+        assert_eq!(s.char(81), 'な');
     }
 
-    #[cfg(feature = "metric_chars")]
     #[test]
     #[should_panic]
     fn char_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
-        s.char(66);
+        s.char(s.len_bytes());
     }
 
-    #[cfg(feature = "metric_chars")]
     #[test]
     #[should_panic]
     fn char_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(43..43);
         s.char(0);
-    }
-
-    #[test]
-    fn char_at_byte_01() {
-        let r = Rope::from_str(TEXT);
-        let s = r.slice(34..118);
-
-        // t's \
-        // a fine day, isn't it?  Aren't you glad \
-        // we're alive?  こんにちは、みんな
-
-        assert_eq!(s.char_at_byte(0), 't');
-        assert_eq!(s.char_at_byte(10), ' ');
-        assert_eq!(s.char_at_byte(18), 'n');
-        assert_eq!(s.char_at_byte(81), 'な');
-    }
-
-    #[test]
-    #[should_panic]
-    fn char_at_byte_02() {
-        let r = Rope::from_str(TEXT);
-        let s = r.slice(34..118);
-        s.char_at_byte(s.len_bytes());
-    }
-
-    #[test]
-    #[should_panic]
-    fn char_at_byte_03() {
-        let r = Rope::from_str(TEXT);
-        let s = r.slice(43..43);
-        s.char_at_byte(0);
     }
 
     #[cfg(feature = "metric_lines_cr_lf")]
@@ -1050,12 +1016,12 @@ mod tests {
         assert_eq!(s.line(5, LineType::CRLF).len_lines(LineType::CRLF), 1);
     }
 
-    fn test_chunk_at_byte(s: RopeSlice, text: &str) {
+    fn test_chunk(s: RopeSlice, text: &str) {
         let mut current_byte = 0;
         let mut seen_bytes = 0;
         let mut prev_info = crate::TextInfo::new();
         for i in 0..s.len_bytes() {
-            let (chunk, info) = s.chunk_at_byte(i);
+            let (chunk, info) = s.chunk(i);
 
             if info != prev_info || i == 0 {
                 current_byte = seen_bytes;
@@ -1096,18 +1062,18 @@ mod tests {
     }
 
     #[test]
-    fn chunk_at_byte_01() {
+    fn chunk_01() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..112);
         let text = &TEXT_LINES[34..112];
         // "'s a fine day, isn't it?\nAren't you glad \
         //  we're alive?\nこんにちは、みん"
 
-        test_chunk_at_byte(s, text);
+        test_chunk(s, text);
     }
 
     #[test]
-    fn chunk_at_byte_02() {
+    fn chunk_02() {
         // Make sure splitting CRLF pairs works properly.
 
         let (r, text) = make_rope_and_text_from_chunks(&[
@@ -1119,7 +1085,7 @@ mod tests {
         ]);
 
         for si in 0..=r.len_bytes() {
-            test_chunk_at_byte(r.slice(si..), &text[si..]);
+            test_chunk(r.slice(si..), &text[si..]);
         }
     }
 

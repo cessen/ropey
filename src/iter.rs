@@ -726,10 +726,10 @@ mod tests {
         let r = Rope::from_str(TEXT);
 
         for i in 0..TEXT.len() {
-            let mut current_byte = r.chunk_at_byte(i).1.bytes;
+            let mut current_byte = r.chunk(i).1.bytes;
 
             for chunk1 in r.chunks_at(i) {
-                let chunk2 = r.chunk_at_byte(current_byte).0;
+                let chunk2 = r.chunk(current_byte).0;
                 assert_eq!(chunk2, chunk1);
                 current_byte += chunk2.len();
             }
@@ -746,10 +746,10 @@ mod tests {
         let text = &TEXT[5..124];
 
         for i in 0..text.len() {
-            let mut current_byte = s.chunk_at_byte(i).1.bytes;
+            let mut current_byte = s.chunk(i).1.bytes;
 
             for chunk1 in s.chunks_at(i) {
-                let chunk2 = s.chunk_at_byte(current_byte).0;
+                let chunk2 = s.chunk(current_byte).0;
                 assert_eq!(chunk2, chunk1);
                 current_byte += chunk2.len();
             }
