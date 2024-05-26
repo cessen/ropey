@@ -904,7 +904,7 @@ mod tests {
     }
 
     #[test]
-    fn char_01() {
+    fn char_at_byte_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
 
@@ -912,26 +912,26 @@ mod tests {
         // a fine day, isn't it?  Aren't you glad \
         // we're alive?  こんにちは、みんな
 
-        assert_eq!(s.char(0), 't');
-        assert_eq!(s.char(10), ' ');
-        assert_eq!(s.char(18), 'n');
-        assert_eq!(s.char(81), 'な');
+        assert_eq!(s.char_at_byte(0), 't');
+        assert_eq!(s.char_at_byte(10), ' ');
+        assert_eq!(s.char_at_byte(18), 'n');
+        assert_eq!(s.char_at_byte(81), 'な');
     }
 
     #[test]
     #[should_panic]
-    fn char_02() {
+    fn char_at_byte_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
-        s.char(s.len_bytes());
+        s.char_at_byte(s.len_bytes());
     }
 
     #[test]
     #[should_panic]
-    fn char_03() {
+    fn char_at_byte_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(43..43);
-        s.char(0);
+        s.char_at_byte(0);
     }
 
     #[cfg(feature = "metric_lines_cr_lf")]

@@ -79,8 +79,8 @@ macro_rules! shared_main_impl_methods {
         }
 
         #[inline]
-        pub fn char(&self, byte_idx: usize) -> char {
-            match self.try_char(byte_idx) {
+        pub fn char_at_byte(&self, byte_idx: usize) -> char {
+            match self.try_char_at_byte(byte_idx) {
                 Ok(ch) => ch,
                 Err(NonCharBoundary) => panic!("Attempt to get a char at a non-char boundary."),
                 Err(e) => e.panic_with_msg(),
@@ -373,7 +373,7 @@ macro_rules! shared_no_panic_impl_methods {
             Some(text.text().as_bytes()[byte_idx - offset])
         }
 
-        pub fn try_char(&self, byte_idx: usize) -> Result<char> {
+        pub fn try_char_at_byte(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len_bytes() {
                 return Err(OutOfBounds);
             }
