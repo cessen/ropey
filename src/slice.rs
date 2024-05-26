@@ -219,27 +219,10 @@ impl<'a> From<RopeSlice<'a>> for std::borrow::Cow<'a, str> {
 mod tests {
     use std::hash::{Hash, Hasher};
 
-    #[cfg(feature = "metric_chars")]
-    use str_indices::chars;
-
-    #[cfg(feature = "metric_utf16")]
-    use str_indices::utf16;
-
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
+    #[cfg(any(feature = "metric_lines_lf", feature = "metric_lines_cr_lf",))]
     use crate::LineType;
 
     use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
-
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
-        feature = "metric_lines_unicode"
-    ))]
-    use crate::str_utils;
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
