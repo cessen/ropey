@@ -20,11 +20,11 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
 - [ ] Non-panicking versions of various functions.
 - [ ] Iterators:
   - [ ] `reversed()` method.
-  - [ ] Non-line:
-    - [ ] `Chunks`
+  - [x] Non-line:
+    - [x] `Chunks`
       - [x] Forward.
       - [x] Bidirectional.
-      - [ ] TextInfo querying.
+      - [x] Offset querying.
     - [x] `Bytes`
       - [x] Forward.
       - [x] Bidirectional.
