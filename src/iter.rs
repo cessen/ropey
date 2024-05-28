@@ -5,9 +5,20 @@ use crate::tree::Node;
 #[derive(Debug, Clone)]
 pub struct Chunks<'a> {
     node_stack: Vec<(&'a Node, usize)>, // (node ref, index of current child)
+
+    // The byte range within the root node that is considered part of this
+    // iterator's contents.
     byte_range: [usize; 2],
+
+    // The offset within the root node (*not* `byte_range`) that of the current
+    // un-trimmed chunk.
     current_byte_idx: usize,
+
+    // An indicator that we are at the start of the iterator, before* the first
+    // *chunk.  This is needed to distinguish e.g. `current_byte_idx == 0` from
+    // *meaning we're on the first chunk vs before it.
     at_start_sentinel: bool,
+
     is_reversed: bool,
 }
 
