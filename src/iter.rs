@@ -135,7 +135,7 @@ impl<'a> Chunks<'a> {
     }
 
     fn current_chunk(&self) -> Option<&'a str> {
-        if self.current_byte_idx >= self.byte_range[1] {
+        if self.at_start_sentinel || self.current_byte_idx >= self.byte_range[1] {
             return None;
         }
 
@@ -254,6 +254,40 @@ impl<'a> Iterator for Chunks<'a> {
     fn next(&mut self) -> Option<&'a str> {
         Chunks::next(self)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // For the `Chunks` iterator we only provide a minimum, since we don't
+        // have enough information to provide a guaranteed maximum.  The minimum
+        // we provide is a conservative fudged approximation of the number of
+        // chunks it would take to store all the bytes remaining in the iterator
+        // if all the chunks were absolutely fully packed with data.
+
+        use crate::tree::MAX_TEXT_SIZE;
+
+        let byte_idx = self
+            .current_byte_idx
+            .max(self.byte_range[0])
+            .min(self.byte_range[1]);
+
+        let byte_len = if self.is_reversed {
+            byte_idx - self.byte_range[0]
+        } else {
+            // The `fudge` is to account for the fact that the next yielded
+            // chunk is *after* the current one.  If we wanted to be exact we
+            // would instead use the size of the current chunk, but that's not
+            // really worth the performance hit for something that's just an
+            // estimate anyway.
+            let fudge = if self.at_start_sentinel {
+                0
+            } else {
+                MAX_TEXT_SIZE
+            };
+            self.byte_range[1].saturating_sub(byte_idx + fudge)
+        };
+
+        let min = (byte_len + MAX_TEXT_SIZE - 1) / MAX_TEXT_SIZE;
+        (min, None)
+    }
 }
 
 //=============================================================
@@ -262,6 +296,7 @@ impl<'a> Iterator for Chunks<'a> {
 pub struct Bytes<'a> {
     chunks: Chunks<'a>,
     current_chunk: &'a [u8],
+    chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
     is_reversed: bool,
 }
@@ -312,6 +347,7 @@ impl<'a> Bytes<'a> {
         Bytes {
             chunks: chunks,
             current_chunk: first_chunk.as_bytes(),
+            chunk_byte_idx: byte_start,
             byte_idx_in_chunk: at_byte_idx - byte_start,
             is_reversed: false,
         }
@@ -319,6 +355,7 @@ impl<'a> Bytes<'a> {
 
     fn next_impl(&mut self) -> Option<u8> {
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            self.chunk_byte_idx += self.current_chunk.len();
             if let Some(chunk) = self.chunks.next() {
                 self.current_chunk = chunk.as_bytes();
                 self.byte_idx_in_chunk = 0;
@@ -338,6 +375,7 @@ impl<'a> Bytes<'a> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
                 self.current_chunk = chunk.as_bytes();
+                self.chunk_byte_idx -= chunk.len();
                 self.byte_idx_in_chunk = chunk.len();
             } else {
                 return None;
@@ -359,7 +397,19 @@ impl<'a> Iterator for Bytes<'a> {
     fn next(&mut self) -> Option<u8> {
         Bytes::next(self)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
+        let len = if self.is_reversed {
+            byte_idx - self.chunks.byte_range[0]
+        } else {
+            self.chunks.byte_range[1] - byte_idx
+        };
+        (len, Some(len))
+    }
 }
+
+impl<'a> ExactSizeIterator for Bytes<'a> {}
 
 //=============================================================
 
@@ -367,6 +417,7 @@ impl<'a> Iterator for Bytes<'a> {
 pub struct Chars<'a> {
     chunks: Chunks<'a>,
     current_chunk: &'a str,
+    chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
     is_reversed: bool,
 }
@@ -419,6 +470,7 @@ impl<'a> Chars<'a> {
         Chars {
             chunks: chunks,
             current_chunk: first_chunk,
+            chunk_byte_idx: byte_start,
             byte_idx_in_chunk: at_byte_idx - byte_start,
             is_reversed: false,
         }
@@ -426,6 +478,7 @@ impl<'a> Chars<'a> {
 
     fn next_impl(&mut self) -> Option<char> {
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            self.chunk_byte_idx += self.current_chunk.len();
             if let Some(chunk) = self.chunks.next() {
                 self.current_chunk = chunk;
                 self.byte_idx_in_chunk = 0;
@@ -451,6 +504,7 @@ impl<'a> Chars<'a> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
                 self.current_chunk = chunk;
+                self.chunk_byte_idx -= chunk.len();
                 self.byte_idx_in_chunk = chunk.len();
             } else {
                 return None;
@@ -480,6 +534,29 @@ impl<'a> Iterator for Chars<'a> {
     #[inline(always)]
     fn next(&mut self) -> Option<char> {
         Chars::next(self)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // We give a min/max based on the smallest and largest possible code
+        // points in UTF8.  Smallest is 1 byte, largest is 4 bytes.
+        //
+        // Note: if the `metric_chars` feature is enabled, we could go to the
+        // trouble of computing the exact length in chars.  However, that would
+        // involve some complications that probably aren't worth it.  And in any
+        // case it would make this behave differently depending on that feature,
+        // and this iterator isn't actually supposed to have anything to do with
+        // that feature.
+
+        let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
+        let byte_len = if self.is_reversed {
+            byte_idx - self.chunks.byte_range[0]
+        } else {
+            self.chunks.byte_range[1] - byte_idx
+        };
+
+        let min = (byte_len + 3) / 4;
+        let max = byte_len;
+        (min, Some(max))
     }
 }
 
@@ -654,6 +731,16 @@ mod lines {
         #[inline(always)]
         fn next(&mut self) -> Option<RopeSlice<'a>> {
             Lines::next(self)
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            let len = if self.is_reversed {
+                self.current_line_idx - self.line_range[0]
+            } else {
+                (self.line_range[1] - self.current_line_idx).saturating_sub(1)
+                    + (self.at_start_sentinel as usize)
+            };
+            (len, Some(len))
         }
     }
 }
@@ -941,6 +1028,30 @@ mod tests {
         assert_eq!(None, chunks.next());
     }
 
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn chunks_iter_size_hint_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+
+        let mut chunks = s.chunks();
+
+        // Forward.
+        assert!(chunks.clone().count() >= chunks.size_hint().0);
+        while let Some(_) = chunks.next() {
+            assert!(chunks.clone().count() >= chunks.size_hint().0);
+        }
+        assert_eq!(0, chunks.size_hint().0);
+
+        // Backward.
+        chunks = chunks.reversed();
+        assert!(chunks.clone().count() >= chunks.size_hint().0);
+        while let Some(_) = chunks.next() {
+            assert!(chunks.clone().count() >= chunks.size_hint().0);
+        }
+        assert_eq!(0, chunks.size_hint().0);
+    }
+
     // NOTE: when you add support for starting iterators at specific indices,
     // ensure that the Bytes iterator can be created with a starting index that
     // splits a char.
@@ -1024,6 +1135,30 @@ mod tests {
 
         let mut bytes = s.bytes_at(text.len());
         assert_eq!(None, bytes.next());
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn bytes_iter_size_hint_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+
+        let mut bytes = s.bytes();
+
+        // Forward.
+        assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+        while let Some(_) = bytes.next() {
+            assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+        }
+        assert_eq!(0, bytes.size_hint().0);
+
+        // Backward.
+        bytes = bytes.reversed();
+        assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+        while let Some(_) = bytes.next() {
+            assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+        }
+        assert_eq!(0, bytes.size_hint().0);
     }
 
     fn test_chars_against_text(mut chars: Chars, text: &str) {
@@ -1111,6 +1246,36 @@ mod tests {
 
         let mut chars = s.chars_at(text.len());
         assert_eq!(None, chars.next());
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn chars_iter_size_hint_01() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+
+        let mut chars = s.chars();
+
+        // Forward.
+        assert!(chars.clone().count() >= chars.size_hint().0);
+        assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+        while let Some(_) = chars.next() {
+            assert!(chars.clone().count() >= chars.size_hint().0);
+            assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+        }
+        assert_eq!(0, chars.size_hint().0);
+        assert_eq!(0, chars.size_hint().1.unwrap());
+
+        // Backward.
+        chars = chars.reversed();
+        assert!(chars.clone().count() >= chars.size_hint().0);
+        assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+        while let Some(_) = chars.next() {
+            assert!(chars.clone().count() >= chars.size_hint().0);
+            assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+        }
+        assert_eq!(0, chars.size_hint().0);
+        assert_eq!(0, chars.size_hint().1.unwrap());
     }
 
     #[cfg(feature = "metric_lines_cr_lf")]
@@ -1351,7 +1516,6 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn lines_12() {
         let text = lines_text();
-        dbg!(text.len());
         let r = Rope::from_str(&text);
         let s = r.slice(34..2031);
 
@@ -1598,191 +1762,35 @@ mod tests {
         assert_eq!(None, lines.next());
     }
 
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_exact_size_iter_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..301);
+    #[cfg(feature = "metric_lines_cr_lf")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_iter_size_hint_01() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        let s = r.slice(34..2031);
 
-    //     let mut line_count = s.len_lines();
-    //     let mut lines = s.lines();
+        let mut lines = s.lines(LineType::CRLF);
+        let mut line_count = lines.clone().count();
 
-    //     assert_eq!(line_count, lines.len());
+        // Forward.
+        assert_eq!(line_count, lines.size_hint().0);
+        while let Some(_) = lines.next() {
+            line_count -= 1;
+            assert_eq!(line_count, lines.size_hint().0);
+        }
+        assert_eq!(line_count, 0);
+        assert_eq!(line_count, lines.size_hint().0);
 
-    //     while let Some(_) = lines.next() {
-    //         line_count -= 1;
-    //         assert_eq!(line_count, lines.len());
-    //     }
-
-    //     assert_eq!(lines.len(), 0);
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     assert_eq!(lines.len(), 0);
-    //     assert_eq!(line_count, 0);
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_exact_size_iter_02() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..301);
-
-    //     for i in 0..=s.len_lines() {
-    //         let lines = s.lines_at(i);
-    //         assert_eq!(s.len_lines() - i, lines.len());
-    //     }
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_exact_size_iter_03() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..301);
-
-    //     let mut line_count = 0;
-    //     let mut lines = s.lines_at(s.len_lines());
-
-    //     assert_eq!(line_count, lines.len());
-
-    //     while lines.prev().is_some() {
-    //         line_count += 1;
-    //         assert_eq!(line_count, lines.len());
-    //     }
-
-    //     assert_eq!(lines.len(), s.len_lines());
-    //     lines.prev();
-    //     lines.prev();
-    //     lines.prev();
-    //     lines.prev();
-    //     lines.prev();
-    //     lines.prev();
-    //     lines.prev();
-    //     assert_eq!(lines.len(), s.len_lines());
-    //     assert_eq!(line_count, s.len_lines());
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_exact_size_iter_04() {
-    //     // Make sure splitting CRLF pairs at the end works properly.
-    //     let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
-    //     for i in 0..r.len_chars() {
-    //         let s = r.slice(..i);
-    //         let lines = s.lines();
-    //         if cfg!(any(feature = "cr_lines", feature = "unicode_lines")) {
-    //             assert_eq!(lines.len(), 1 + ((i + 1) / 2));
-    //         } else {
-    //             assert_eq!(lines.len(), 1 + (i / 2));
-    //         }
-    //         assert_eq!(lines.len(), lines.count());
-    //     }
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_reverse_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let mut itr = r.lines();
-    //     let mut stack = Vec::new();
-
-    //     for _ in 0..8 {
-    //         stack.push(itr.next().unwrap());
-    //     }
-    //     itr.reverse();
-    //     for _ in 0..8 {
-    //         assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
-    //     }
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_reverse_02() {
-    //     let r = Rope::from_str(TEXT);
-    //     let mut itr = r.lines_at(r.len_lines() / 3);
-    //     let mut stack = Vec::new();
-
-    //     for _ in 0..8 {
-    //         stack.push(itr.next().unwrap());
-    //     }
-    //     itr.reverse();
-    //     for _ in 0..8 {
-    //         assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
-    //     }
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_reverse_03() {
-    //     let r = Rope::from_str(TEXT);
-    //     let mut itr = r.lines_at(r.len_lines() / 3);
-    //     let mut stack = Vec::new();
-
-    //     itr.reverse();
-    //     for _ in 0..8 {
-    //         stack.push(itr.next().unwrap());
-    //     }
-    //     itr.reverse();
-    //     for _ in 0..8 {
-    //         assert_eq!(stack.pop().unwrap(), itr.next().unwrap());
-    //     }
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_reverse_04() {
-    //     let mut itr = Lines::from_str("a\n", 1);
-
-    //     assert_eq!(Some("a\n".into()), itr.next());
-    //     assert_eq!(Some("".into()), itr.next());
-    //     assert_eq!(None, itr.next());
-    //     itr.reverse();
-    //     assert_eq!(Some("".into()), itr.next());
-    //     assert_eq!(Some("a\n".into()), itr.next());
-    //     assert_eq!(None, itr.next());
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_reverse_exact_size_iter_01() {
-    //     let r = Rope::from_str(TEXT);
-    //     let s = r.slice(34..301);
-
-    //     let mut lines = s.lines_at(4);
-    //     lines.reverse();
-    //     let mut line_count = 4;
-
-    //     assert_eq!(4, lines.len());
-
-    //     while let Some(_) = lines.next() {
-    //         line_count -= 1;
-    //         assert_eq!(line_count, lines.len());
-    //     }
-
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     lines.next();
-    //     assert_eq!(lines.len(), 0);
-    //     assert_eq!(line_count, 0);
-    // }
-
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_reverse_exact_size_iter_02() {
-    //     // Make sure splitting CRLF pairs at the end works properly.
-    //     let r = Rope::from_str("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");
-    //     for i in 0..r.len_chars() {
-    //         let s = r.slice(..i);
-    //         let lines = s.lines_at((i + 1) / 2).reversed();
-    //         assert_eq!(lines.len(), lines.count());
-    //     }
-    // }
+        // Backward.
+        lines = lines.reversed();
+        line_count = lines.clone().count();
+        assert_eq!(line_count, lines.size_hint().0);
+        while let Some(_) = lines.next() {
+            line_count -= 1;
+            assert_eq!(line_count, lines.size_hint().0);
+        }
+        assert_eq!(line_count, 0);
+        assert_eq!(line_count, lines.size_hint().0);
+    }
 }
