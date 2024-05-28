@@ -53,6 +53,7 @@ impl<'a> Chunks<'a> {
     /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
     /// of the iterator without changing its position in the stream.
     #[inline(always)]
+    #[must_use]
     pub fn reversed(mut self) -> Chunks<'a> {
         self.is_reversed = !self.is_reversed;
         self
@@ -332,6 +333,7 @@ impl<'a> Bytes<'a> {
     /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
     /// of the iterator without changing its position in the stream.
     #[inline(always)]
+    #[must_use]
     pub fn reversed(mut self) -> Bytes<'a> {
         self.is_reversed = !self.is_reversed;
         self
@@ -453,6 +455,7 @@ impl<'a> Chars<'a> {
     /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
     /// of the iterator without changing its position in the stream.
     #[inline(always)]
+    #[must_use]
     pub fn reversed(mut self) -> Chars<'a> {
         self.is_reversed = !self.is_reversed;
         self
@@ -616,6 +619,7 @@ mod lines {
         /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
         /// of the iterator without changing its position in the stream.
         #[inline(always)]
+        #[must_use]
         pub fn reversed(mut self) -> Lines<'a> {
             self.is_reversed = !self.is_reversed;
             self
