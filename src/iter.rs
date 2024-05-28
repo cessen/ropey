@@ -8,15 +8,16 @@ pub struct Chunks<'a> {
     byte_range: [usize; 2],
     current_byte_idx: usize,
     at_start_sentinel: bool,
-    reversed: bool,
+    is_reversed: bool,
 }
 
 impl<'a> Chunks<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
     pub fn next(&mut self) -> Option<&'a str> {
-        if self.reversed {
+        if self.is_reversed {
             self.prev_impl()
         } else {
             self.next_impl()
@@ -26,19 +27,13 @@ impl<'a> Chunks<'a> {
     /// Advances the iterator backward and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
     pub fn prev(&mut self) -> Option<&'a str> {
-        if self.reversed {
+        if self.is_reversed {
             self.next_impl()
         } else {
             self.prev_impl()
         }
-    }
-
-    /// Returns the byte offset of the current chunk from the start of the text.
-    pub fn byte_offset(&self) -> usize {
-        self.current_byte_idx
-            .saturating_sub(self.byte_range[0])
-            .min(self.byte_range[1] - self.byte_range[0])
     }
 
     /// Reverses the direction of iteration.
@@ -46,9 +41,18 @@ impl<'a> Chunks<'a> {
     /// NOTE: this is distinct from the standard library's `rev()` method for
     /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
     /// of the iterator without changing its position in the stream.
+    #[inline(always)]
     pub fn reversed(mut self) -> Chunks<'a> {
-        self.reversed = !self.reversed;
+        self.is_reversed = !self.is_reversed;
         self
+    }
+
+    /// Returns the byte offset of the current chunk from the start of the text.
+    #[inline]
+    pub fn byte_offset(&self) -> usize {
+        self.current_byte_idx
+            .saturating_sub(self.byte_range[0])
+            .min(self.byte_range[1] - self.byte_range[0])
     }
 
     //---------------------------------------------------------
@@ -70,7 +74,7 @@ impl<'a> Chunks<'a> {
                     byte_range: [0, 0],
                     current_byte_idx: 0,
                     at_start_sentinel: true,
-                    reversed: false,
+                    is_reversed: false,
                 },
                 0,
             );
@@ -81,7 +85,7 @@ impl<'a> Chunks<'a> {
             byte_range: byte_range,
             current_byte_idx: 0,
             at_start_sentinel: false,
-            reversed: false,
+            is_reversed: false,
         };
 
         // Find the chunk the contains `at_byte_idx` and set that as the current
@@ -119,7 +123,6 @@ impl<'a> Chunks<'a> {
         (chunks, byte_offset.max(byte_range[0]).min(byte_range[1]))
     }
 
-    #[inline(always)]
     fn current_chunk(&self) -> Option<&'a str> {
         if self.current_byte_idx >= self.byte_range[1] {
             return None;
@@ -236,6 +239,7 @@ impl<'a> Iterator for Chunks<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
     fn next(&mut self) -> Option<&'a str> {
         Chunks::next(self)
     }
@@ -248,9 +252,47 @@ pub struct Bytes<'a> {
     chunks: Chunks<'a>,
     current_chunk: &'a [u8],
     byte_idx_in_chunk: usize,
+    is_reversed: bool,
 }
 
 impl<'a> Bytes<'a> {
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
+    pub fn next(&mut self) -> Option<u8> {
+        if self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
+    }
+
+    /// Advances the iterator backward and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
+    pub fn prev(&mut self) -> Option<u8> {
+        if self.is_reversed {
+            self.next_impl()
+        } else {
+            self.prev_impl()
+        }
+    }
+
+    /// Reverses the direction of iteration.
+    ///
+    /// NOTE: this is distinct from the standard library's `rev()` method for
+    /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
+    /// of the iterator without changing its position in the stream.
+    #[inline(always)]
+    pub fn reversed(mut self) -> Bytes<'a> {
+        self.is_reversed = !self.is_reversed;
+        self
+    }
+
+    //---------------------------------------------------------
+
     #[inline(always)]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Bytes {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
@@ -260,11 +302,28 @@ impl<'a> Bytes<'a> {
             chunks: chunks,
             current_chunk: first_chunk.as_bytes(),
             byte_idx_in_chunk: at_byte_idx - byte_start,
+            is_reversed: false,
         }
     }
 
-    #[inline]
-    pub fn prev(&mut self) -> Option<u8> {
+    fn next_impl(&mut self) -> Option<u8> {
+        while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            if let Some(chunk) = self.chunks.next() {
+                self.current_chunk = chunk.as_bytes();
+                self.byte_idx_in_chunk = 0;
+            } else {
+                self.current_chunk = &[];
+                self.byte_idx_in_chunk = 0;
+                return None;
+            }
+        }
+
+        let byte = self.current_chunk[self.byte_idx_in_chunk];
+        self.byte_idx_in_chunk += 1;
+        Some(byte)
+    }
+
+    fn prev_impl(&mut self) -> Option<u8> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
                 self.current_chunk = chunk.as_bytes();
@@ -285,22 +344,9 @@ impl<'a> Iterator for Bytes<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline]
+    #[inline(always)]
     fn next(&mut self) -> Option<u8> {
-        while self.byte_idx_in_chunk >= self.current_chunk.len() {
-            if let Some(chunk) = self.chunks.next() {
-                self.current_chunk = chunk.as_bytes();
-                self.byte_idx_in_chunk = 0;
-            } else {
-                self.current_chunk = &[];
-                self.byte_idx_in_chunk = 0;
-                return None;
-            }
-        }
-
-        let byte = self.current_chunk[self.byte_idx_in_chunk];
-        self.byte_idx_in_chunk += 1;
-        Some(byte)
+        Bytes::next(self)
     }
 }
 
@@ -311,9 +357,47 @@ pub struct Chars<'a> {
     chunks: Chunks<'a>,
     current_chunk: &'a str,
     byte_idx_in_chunk: usize,
+    is_reversed: bool,
 }
 
 impl<'a> Chars<'a> {
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
+    pub fn next(&mut self) -> Option<char> {
+        if self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
+    }
+
+    /// Advances the iterator backward and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline(always)]
+    pub fn prev(&mut self) -> Option<char> {
+        if self.is_reversed {
+            self.next_impl()
+        } else {
+            self.prev_impl()
+        }
+    }
+
+    /// Reverses the direction of iteration.
+    ///
+    /// NOTE: this is distinct from the standard library's `rev()` method for
+    /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
+    /// of the iterator without changing its position in the stream.
+    #[inline(always)]
+    pub fn reversed(mut self) -> Chars<'a> {
+        self.is_reversed = !self.is_reversed;
+        self
+    }
+
+    //---------------------------------------------------------
+
     #[inline(always)]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Chars {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
@@ -325,11 +409,34 @@ impl<'a> Chars<'a> {
             chunks: chunks,
             current_chunk: first_chunk,
             byte_idx_in_chunk: at_byte_idx - byte_start,
+            is_reversed: false,
         }
     }
 
-    #[inline]
-    pub fn prev(&mut self) -> Option<char> {
+    fn next_impl(&mut self) -> Option<char> {
+        while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            if let Some(chunk) = self.chunks.next() {
+                self.current_chunk = chunk;
+                self.byte_idx_in_chunk = 0;
+            } else {
+                self.current_chunk = "";
+                self.byte_idx_in_chunk = 0;
+                return None;
+            }
+        }
+
+        // TODO: do this in a more efficient way than constructing a temporary
+        // iterator and then also redundantly recomputing its utf8 length which
+        // the internals of that temporary iterator clearly already know.
+        let char = self.current_chunk[self.byte_idx_in_chunk..]
+            .chars()
+            .next()
+            .unwrap();
+        self.byte_idx_in_chunk += char.len_utf8();
+        Some(char)
+    }
+
+    fn prev_impl(&mut self) -> Option<char> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
                 self.current_chunk = chunk;
@@ -359,28 +466,9 @@ impl<'a> Iterator for Chars<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline]
+    #[inline(always)]
     fn next(&mut self) -> Option<char> {
-        while self.byte_idx_in_chunk >= self.current_chunk.len() {
-            if let Some(chunk) = self.chunks.next() {
-                self.current_chunk = chunk;
-                self.byte_idx_in_chunk = 0;
-            } else {
-                self.current_chunk = "";
-                self.byte_idx_in_chunk = 0;
-                return None;
-            }
-        }
-
-        // TODO: do this in a more efficient way than constructing a temporary
-        // iterator and then also redundantly recomputing its utf8 length which
-        // the internals of that temporary iterator clearly already know.
-        let char = self.current_chunk[self.byte_idx_in_chunk..]
-            .chars()
-            .next()
-            .unwrap();
-        self.byte_idx_in_chunk += char.len_utf8();
-        Some(char)
+        Chars::next(self)
     }
 }
 
@@ -406,9 +494,47 @@ mod lines {
         line_type: LineType,
         current_line_idx: usize,
         at_start_sentinel: bool,
+        is_reversed: bool,
     }
 
     impl<'a> Lines<'a> {
+        /// Advances the iterator forward and returns the next value.
+        ///
+        /// Runs in amortized O(1) time and worst-case O(log N) time.
+        #[inline(always)]
+        pub fn next(&mut self) -> Option<RopeSlice<'a>> {
+            if self.is_reversed {
+                self.prev_impl()
+            } else {
+                self.next_impl()
+            }
+        }
+
+        /// Advances the iterator backward and returns the previous value.
+        ///
+        /// Runs in amortized O(1) time and worst-case O(log N) time.
+        #[inline(always)]
+        pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
+            if self.is_reversed {
+                self.next_impl()
+            } else {
+                self.prev_impl()
+            }
+        }
+
+        /// Reverses the direction of iteration.
+        ///
+        /// NOTE: this is distinct from the standard library's `rev()` method for
+        /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
+        /// of the iterator without changing its position in the stream.
+        #[inline(always)]
+        pub fn reversed(mut self) -> Lines<'a> {
+            self.is_reversed = !self.is_reversed;
+            self
+        }
+
+        //-----------------------------------------------------
+
         /// Note: unlike the other iterator constructors, this one takes
         /// `at_line_idx` relative to the slice defined by `byte_range`, not
         /// relative to the whole contents of `node`.
@@ -441,6 +567,7 @@ mod lines {
                 line_type: line_type,
                 current_line_idx: start_line + at_line_idx.saturating_sub(1),
                 at_start_sentinel: at_line_idx == 0,
+                is_reversed: false,
             }
         }
 
@@ -482,8 +609,21 @@ mod lines {
             ))
         }
 
-        #[inline]
-        pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
+        fn next_impl(&mut self) -> Option<RopeSlice<'a>> {
+            if self.current_line_idx >= self.line_range[1] {
+                return None;
+            }
+
+            if !self.at_start_sentinel {
+                self.current_line_idx += 1;
+            } else {
+                self.at_start_sentinel = false;
+            }
+
+            self.current_line()
+        }
+
+        fn prev_impl(&mut self) -> Option<RopeSlice<'a>> {
             if self.current_line_idx <= self.line_range[0] {
                 self.at_start_sentinel = true;
                 return None;
@@ -500,19 +640,9 @@ mod lines {
         /// Advances the iterator forward and returns the next value.
         ///
         /// Runs in amortized O(1) time and worst-case O(log N) time.
-        #[inline]
+        #[inline(always)]
         fn next(&mut self) -> Option<RopeSlice<'a>> {
-            if self.current_line_idx >= self.line_range[1] {
-                return None;
-            }
-
-            if !self.at_start_sentinel {
-                self.current_line_idx += 1;
-            } else {
-                self.at_start_sentinel = false;
-            }
-
-            self.current_line()
+            Lines::next(self)
         }
     }
 }

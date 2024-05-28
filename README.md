@@ -1,6 +1,6 @@
 # Ropey 2
 
-This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anything even remotely serious.  This is pre-alpha.
+This is the WIP next major version of Ropey.  DO NOT USE THIS for anything even remotely serious.  This is pre-alpha.
 
 ## TODO
 
@@ -19,7 +19,7 @@ This is the (very) WIP next major version of Ropey.  DO NOT USE THIS for anythin
   - [x] Lines <-> bytes
 - [ ] Non-panicking versions of various functions.
 - [ ] Iterators:
-  - [ ] `reversed()` method.
+  - [x] `reversed()` method.
   - [x] Non-line:
     - [x] `Chunks`
       - [x] Forward.
