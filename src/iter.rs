@@ -8,9 +8,51 @@ pub struct Chunks<'a> {
     byte_range: [usize; 2],
     current_byte_idx: usize,
     at_start_sentinel: bool,
+    reversed: bool,
 }
 
 impl<'a> Chunks<'a> {
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    pub fn next(&mut self) -> Option<&'a str> {
+        if self.reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
+    }
+
+    /// Advances the iterator backward and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    pub fn prev(&mut self) -> Option<&'a str> {
+        if self.reversed {
+            self.next_impl()
+        } else {
+            self.prev_impl()
+        }
+    }
+
+    /// Returns the byte offset of the current chunk from the start of the text.
+    pub fn byte_offset(&self) -> usize {
+        self.current_byte_idx
+            .saturating_sub(self.byte_range[0])
+            .min(self.byte_range[1] - self.byte_range[0])
+    }
+
+    /// Reverses the direction of iteration.
+    ///
+    /// NOTE: this is distinct from the standard library's `rev()` method for
+    /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
+    /// of the iterator without changing its position in the stream.
+    pub fn reversed(mut self) -> Chunks<'a> {
+        self.reversed = !self.reversed;
+        self
+    }
+
+    //---------------------------------------------------------
+
     /// Returns the Chunks iterator as well as the actual start byte of the
     /// first chunk, from the start of Node's contents.
     ///
@@ -28,6 +70,7 @@ impl<'a> Chunks<'a> {
                     byte_range: [0, 0],
                     current_byte_idx: 0,
                     at_start_sentinel: true,
+                    reversed: false,
                 },
                 0,
             );
@@ -38,6 +81,7 @@ impl<'a> Chunks<'a> {
             byte_range: byte_range,
             current_byte_idx: 0,
             at_start_sentinel: false,
+            reversed: false,
         };
 
         // Find the chunk the contains `at_byte_idx` and set that as the current
@@ -96,17 +140,49 @@ impl<'a> Chunks<'a> {
         Some(trimmed_chunk)
     }
 
-    /// Returns the byte offset of the current chunk from the start of the text.
-    pub fn byte_offset(&self) -> usize {
-        self.current_byte_idx
-            .saturating_sub(self.byte_range[0])
-            .min(self.byte_range[1] - self.byte_range[0])
+    fn next_impl(&mut self) -> Option<&'a str> {
+        // Already at the end, or it's an empty rope.
+        if self.current_byte_idx >= self.byte_range[1] || self.node_stack.is_empty() {
+            return None;
+        }
+
+        // Just starting.
+        if self.at_start_sentinel {
+            self.at_start_sentinel = false;
+            return self.current_chunk();
+        }
+
+        self.current_byte_idx += self.node_stack.last().unwrap().0.leaf_text().len();
+
+        // Progress the stack.
+        if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
+            // Start at the node above the leaf.
+            let mut stack_idx = self.node_stack.len() - 2;
+
+            // Find the deepest node that's not at its end already.
+            while self.node_stack[stack_idx].1 >= (self.node_stack[stack_idx].0.child_count() - 1) {
+                debug_assert!(stack_idx > 0);
+                stack_idx -= 1;
+            }
+
+            // Refill the stack starting from that node.
+            self.node_stack[stack_idx].1 += 1;
+            while self.node_stack[stack_idx].0.is_internal() {
+                let child_i = self.node_stack[stack_idx].1;
+                let node = &self.node_stack[stack_idx].0.children().nodes()[child_i];
+
+                stack_idx += 1;
+                self.node_stack[stack_idx] = (node, 0);
+            }
+
+            debug_assert!(stack_idx == self.node_stack.len() - 1);
+        }
+
+        // Finally, return the chunk text.
+        self.current_chunk()
     }
 
-    /// Advances the iterator backward and returns the previous value.
-    ///
-    /// Runs in amortized O(1) time and worst-case O(log N) time.
-    pub fn prev(&mut self) -> Option<&'a str> {
+    fn prev_impl(&mut self) -> Option<&'a str> {
         // Already at the start, or it's an empty rope.
         if self.current_byte_idx <= self.byte_range[0] || self.node_stack.is_empty() {
             self.at_start_sentinel = true;
@@ -161,45 +237,7 @@ impl<'a> Iterator for Chunks<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     fn next(&mut self) -> Option<&'a str> {
-        // Already at the end, or it's an empty rope.
-        if self.current_byte_idx >= self.byte_range[1] || self.node_stack.is_empty() {
-            return None;
-        }
-
-        // Just starting.
-        if self.at_start_sentinel {
-            self.at_start_sentinel = false;
-            return self.current_chunk();
-        }
-
-        self.current_byte_idx += self.node_stack.last().unwrap().0.leaf_text().len();
-
-        // Progress the stack.
-        if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
-            // Start at the node above the leaf.
-            let mut stack_idx = self.node_stack.len() - 2;
-
-            // Find the deepest node that's not at its end already.
-            while self.node_stack[stack_idx].1 >= (self.node_stack[stack_idx].0.child_count() - 1) {
-                debug_assert!(stack_idx > 0);
-                stack_idx -= 1;
-            }
-
-            // Refill the stack starting from that node.
-            self.node_stack[stack_idx].1 += 1;
-            while self.node_stack[stack_idx].0.is_internal() {
-                let child_i = self.node_stack[stack_idx].1;
-                let node = &self.node_stack[stack_idx].0.children().nodes()[child_i];
-
-                stack_idx += 1;
-                self.node_stack[stack_idx] = (node, 0);
-            }
-
-            debug_assert!(stack_idx == self.node_stack.len() - 1);
-        }
-
-        // Finally, return the chunk text.
-        self.current_chunk()
+        Chunks::next(self)
     }
 }
 
