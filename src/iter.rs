@@ -1107,6 +1107,30 @@ mod tests {
 
     #[test]
     fn bytes_iter_03() {
+        let text = "abc";
+        let r = Rope::from_str(text);
+        let text = text.as_bytes();
+
+        let mut bytes = r.bytes();
+
+        assert_eq!(Some(text[0]), bytes.next());
+        assert_eq!(None, bytes.prev());
+
+        assert_eq!(Some(text[0]), bytes.next());
+        assert_eq!(Some(text[1]), bytes.next());
+        assert_eq!(Some(text[0]), bytes.prev());
+
+        assert_eq!(Some(text[1]), bytes.next());
+        assert_eq!(Some(text[2]), bytes.next());
+        assert_eq!(Some(text[1]), bytes.prev());
+
+        assert_eq!(Some(text[2]), bytes.next());
+        assert_eq!(None, bytes.next());
+        assert_eq!(Some(text[2]), bytes.prev());
+    }
+
+    #[test]
+    fn bytes_iter_04() {
         let r = Rope::from_str("");
 
         assert_eq!(None, r.bytes().next());
@@ -1212,6 +1236,29 @@ mod tests {
 
     #[test]
     fn chars_iter_03() {
+        let text = "abc";
+        let r = Rope::from_str(text);
+
+        let mut chars = r.chars();
+
+        assert_eq!(Some('a'), chars.next());
+        assert_eq!(None, chars.prev());
+
+        assert_eq!(Some('a'), chars.next());
+        assert_eq!(Some('b'), chars.next());
+        assert_eq!(Some('a'), chars.prev());
+
+        assert_eq!(Some('b'), chars.next());
+        assert_eq!(Some('c'), chars.next());
+        assert_eq!(Some('b'), chars.prev());
+
+        assert_eq!(Some('c'), chars.next());
+        assert_eq!(None, chars.next());
+        assert_eq!(Some('c'), chars.prev());
+    }
+
+    #[test]
+    fn chars_iter_04() {
         let r = Rope::from_str("");
 
         assert_eq!(None, r.chars().next());
