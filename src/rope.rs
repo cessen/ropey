@@ -115,7 +115,9 @@ impl Rope {
         }
     }
 
-    /// Creates a `Rope` with the contents of `text`.
+    /// Creates a `Rope` from a string slice.
+    ///
+    /// Runs in O(N) time.
     #[inline]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
@@ -268,6 +270,24 @@ impl Rope {
         }
     }
 
+    /// Inserts a single char `ch` at byte index `byte_idx`.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// let mut rope = Rope::from_str("Hello orld!");
+    /// rope.insert_char(6, 'w');
+    ///
+    /// assert_eq!("Hello world!", rope);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    /// - If `byte_idx` is not on a char boundary.
     #[inline]
     pub fn insert_char(&mut self, byte_idx: usize, ch: char) {
         let mut buf = [0u8; 4];
@@ -310,6 +330,27 @@ impl Rope {
     //---------------------------------------------------------
     // Slicing.
 
+    /// Gets an immutable slice of the `Rope`.
+    ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ropey::Rope;
+    /// let rope = Rope::from_str("Hello world!");
+    /// let slice = rope.slice(..5);
+    ///
+    /// assert_eq!("Hello", slice);
+    /// ```
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// - If the start of the range is greater than the end.
+    /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
+    /// - If the range ends are not on char boundaries.
     #[inline]
     pub fn slice<'a, R>(&'a self, byte_range: R) -> RopeSlice<'a>
     where

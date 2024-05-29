@@ -83,6 +83,17 @@ impl<'a> RopeSlice<'a> {
     //-------------------------------------------------
     // Slicing.
 
+    /// Gets an immutable slice of the `RopeSlice`.
+    ///
+    /// Uses range syntax, e.g. `2..7`, `2..`, etc.
+    ///
+    /// Runs in O(log N) time.
+    ///
+    /// # Panics
+    ///
+    /// - If the start of the range is greater than the end.
+    /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
+    /// - If the range ends are not on char boundaries.
     #[inline(always)]
     pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'a>
     where
@@ -94,6 +105,32 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    /// Creates a cheap,  non-editable `Rope` from the `RopeSlice`.
+    ///
+    /// The resulting `Rope` is guaranteed to not take up any additional data
+    /// itself beyond some tiny book keeping, instead referencing the original
+    /// data.  The difference between this and the `RopeSlice` it was created
+    /// from is that it co-owns the data with the original `Rope` just like a
+    /// `Rope` clone would, and thus can be passed around freely (e.g. across
+    /// thread boundaries).
+    ///
+    /// This is distinct from using `Into<Rope>` on a `RopeSlice`, which edits
+    /// the resulting `Rope`'s data to trim it to the range of the slice, which
+    /// is both more expensive and results in space overhead compared to this
+    /// method.  However, a `Rope` from `Into<Rope>` will be a normal editable
+    /// `Rope`, whereas `Rope`s produced from this method are read-only.
+    ///
+    /// NOTE: although the `Rope` from this won't take up any additional data,
+    /// as long as this `Rope` still exists edits to the original `Rope` will
+    /// cause data usage to grow the same way it does with normal `Rope` clones.
+    ///
+    /// Runs in O(1) time and takes O(1) space at intitial creation.
+    ///
+    /// # Panics
+    ///
+    /// This method does not panic itself.  However, if edits are attempted
+    /// on the resulting `Rope` with the panicking variants `insert()` and
+    /// `remove()`, they will panic.
     #[inline]
     pub fn to_owned_slice(&self) -> Rope {
         Rope {
