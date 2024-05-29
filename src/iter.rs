@@ -27,6 +27,7 @@ impl<'a> Chunks<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&'a str> {
         if self.is_reversed {
             self.prev_impl()
@@ -308,6 +309,7 @@ impl<'a> Bytes<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<u8> {
         if self.is_reversed {
             self.prev_impl()
@@ -449,6 +451,7 @@ impl<'a> Chars<'a> {
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<char> {
         if self.is_reversed {
             self.prev_impl()
@@ -638,6 +641,7 @@ mod lines {
         ///
         /// Runs in amortized O(1) time and worst-case O(log N) time.
         #[inline(always)]
+        #[allow(clippy::should_implement_trait)]
         pub fn next(&mut self) -> Option<RopeSlice<'a>> {
             if self.is_reversed {
                 self.prev_impl()

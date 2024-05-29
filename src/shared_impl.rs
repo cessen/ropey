@@ -563,7 +563,6 @@ macro_rules! shared_std_impls {
         }
 
         impl std::cmp::Ord for $rope {
-            #[allow(clippy::op_ref)] // Erroneously thinks with can directly use a slice.
             fn cmp(&self, other: &$rope) -> std::cmp::Ordering {
                 let mut chunk_itr_1 = self.chunks();
                 let mut chunk_itr_2 = other.chunks();

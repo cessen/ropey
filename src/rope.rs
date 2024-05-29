@@ -119,6 +119,7 @@ impl Rope {
     ///
     /// Runs in O(N) time.
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
     }
@@ -352,7 +353,7 @@ impl Rope {
     /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
     /// - If the range ends are not on char boundaries.
     #[inline]
-    pub fn slice<'a, R>(&'a self, byte_range: R) -> RopeSlice<'a>
+    pub fn slice<R>(&self, byte_range: R) -> RopeSlice
     where
         R: RangeBounds<usize>,
     {
@@ -634,14 +635,14 @@ impl Rope {
     }
 
     #[inline]
-    pub fn try_slice<'a, R>(&'a self, byte_range: R) -> Result<RopeSlice<'a>>
+    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice>
     where
         R: RangeBounds<usize>,
     {
         let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
         let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
 
-        fn inner<'a>(rope: &'a Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice<'a>> {
+        fn inner(rope: &Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice> {
             if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
                 return Err(NonCharBoundary);
             }
