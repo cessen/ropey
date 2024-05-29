@@ -1,4 +1,4 @@
-// use std::io;
+use std::io;
 // use std::iter::FromIterator;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
@@ -120,6 +120,123 @@ impl Rope {
     #[inline]
     pub fn from_str(text: &str) -> Self {
         RopeBuilder::new().build_at_once(text)
+    }
+
+    //-----------------------------------------------------------------------
+    // Convenience I/O methods.
+
+    /// Creates a `Rope` from the output of a reader.
+    ///
+    /// This is a convenience function, and provides *no specific guarantees*
+    /// about performance or internal implementation aside from the runtime
+    /// complexity listed below.
+    ///
+    /// When more precise control over IO behavior, buffering, etc. is desired,
+    /// you should handle IO yourself and use [`RopeBuilder`] to build the
+    /// `Rope`.
+    ///
+    /// Runs in O(N) time.
+    ///
+    /// # Errors
+    ///
+    /// - If the reader returns an error, `from_reader` stops and returns
+    ///   that error.
+    /// - If non-utf8 data is encountered, an IO error with kind
+    ///   `InvalidData` is returned.
+    ///
+    /// Note: some data from the reader is likely consumed even if there is
+    /// an error.
+    #[allow(unused_mut)]
+    pub fn from_reader<T: io::Read>(mut reader: T) -> io::Result<Self> {
+        const BUFFER_SIZE: usize = crate::tree::MAX_TEXT_SIZE * 4;
+        let mut builder = RopeBuilder::new();
+        let mut buffer = vec![0u8; BUFFER_SIZE];
+        let mut fill_idx = 0; // How much `buffer` is currently filled with valid data
+        loop {
+            match reader.read(&mut buffer[fill_idx..]) {
+                Ok(read_count) => {
+                    fill_idx += read_count;
+
+                    // Determine how much of the buffer is valid utf8.
+                    let valid_count = match std::str::from_utf8(&buffer[..fill_idx]) {
+                        Ok(_) => fill_idx,
+                        Err(e) => e.valid_up_to(),
+                    };
+
+                    // Append the valid part of the buffer to the rope.
+                    if valid_count > 0 {
+                        // The unsafe block here is reinterpreting the bytes as
+                        // utf8.  This is safe because the bytes being
+                        // reinterpreted have already been validated as utf8
+                        // just above.
+                        builder.append(unsafe {
+                            std::str::from_utf8_unchecked(&buffer[..valid_count])
+                        });
+                    }
+
+                    // Shift the un-read part of the buffer to the beginning.
+                    if valid_count < fill_idx {
+                        buffer.copy_within(valid_count..fill_idx, 0);
+                    }
+                    fill_idx -= valid_count;
+
+                    if fill_idx == BUFFER_SIZE {
+                        // Buffer is full and none of it could be consumed.  Utf8
+                        // codepoints don't get that large, so it's clearly not
+                        // valid text.
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "stream did not contain valid UTF-8",
+                        ));
+                    }
+
+                    // If we're done reading
+                    if read_count == 0 {
+                        if fill_idx > 0 {
+                            // We couldn't consume all data.
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "stream contained invalid UTF-8",
+                            ));
+                        } else {
+                            return Ok(builder.finish());
+                        }
+                    }
+                }
+
+                Err(e) => {
+                    // Read error
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    /// Writes the contents of the `Rope` to a writer.
+    ///
+    /// This is a convenience function, and provides *no specific guarantees*
+    /// about performance or internal implementation aside from the runtime
+    /// complexity listed below.
+    ///
+    /// When more precise control over IO behavior, buffering, etc. is
+    /// desired, you should handle IO yourself and use the [`Chunks`]
+    /// iterator to iterate through the `Rope`'s contents.
+    ///
+    /// Runs in O(N) time.
+    ///
+    /// # Errors
+    ///
+    /// - If the writer returns an error, `write_to` stops and returns that
+    ///   error.
+    ///
+    /// Note: some data may have been written even if an error is returned.
+    #[allow(unused_mut)]
+    pub fn write_to<T: io::Write>(&self, mut writer: T) -> io::Result<()> {
+        for chunk in self.chunks() {
+            writer.write_all(chunk.as_bytes())?;
+        }
+
+        Ok(())
     }
 
     //-----------------------------------------------------------------------
