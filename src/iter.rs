@@ -347,14 +347,20 @@ impl<'a> Bytes<'a> {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
         let first_chunk = chunks.next().unwrap_or("");
 
-        Bytes {
+        let mut bytes = Bytes {
             chunks: chunks,
             current_chunk: first_chunk.as_bytes(),
             chunk_byte_idx: byte_start,
             byte_idx_in_chunk: at_byte_idx - byte_start,
-            at_start_sentinel: at_byte_idx == byte_range[0],
+            at_start_sentinel: false,
             is_reversed: false,
-        }
+        };
+
+        // The above code puts us at the specified byte, but we want to be just
+        // before it so that `next()` yields it.
+        bytes.prev_impl();
+
+        bytes
     }
 
     fn next_impl(&mut self) -> Option<u8> {
@@ -482,14 +488,20 @@ impl<'a> Chars<'a> {
 
         assert!(first_chunk.is_char_boundary(at_byte_idx - byte_start));
 
-        Chars {
+        let mut chars = Chars {
             chunks: chunks,
             current_chunk: first_chunk,
             chunk_byte_idx: byte_start,
             byte_idx_in_chunk: at_byte_idx - byte_start,
-            at_start_sentinel: at_byte_idx == byte_range[0],
+            at_start_sentinel: false,
             is_reversed: false,
-        }
+        };
+
+        // The above code puts us at the char of the specified byte, but we want
+        // to be one char before it so that `next()` yields it.
+        chars.prev_impl();
+
+        chars
     }
 
     fn next_impl(&mut self) -> Option<char> {
