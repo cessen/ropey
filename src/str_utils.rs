@@ -33,7 +33,7 @@ pub(crate) fn byte_is_cr(text: &str, byte_idx: usize) -> bool {
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 pub(crate) mod lines {
@@ -44,8 +44,8 @@ pub(crate) mod lines {
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => str_indices::lines_lf::from_byte_idx(text, byte_idx),
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => str_indices::lines_crlf::from_byte_idx(text, byte_idx),
+            #[cfg(feature = "metric_lines_lf_cr")]
+            LineType::LF_CR => str_indices::lines_crlf::from_byte_idx(text, byte_idx),
             #[cfg(feature = "metric_lines_unicode")]
             LineType::All => str_indices::lines::from_byte_idx(text, byte_idx),
         }
@@ -56,8 +56,8 @@ pub(crate) mod lines {
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => str_indices::lines_lf::to_byte_idx(text, byte_idx),
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => str_indices::lines_crlf::to_byte_idx(text, byte_idx),
+            #[cfg(feature = "metric_lines_lf_cr")]
+            LineType::LF_CR => str_indices::lines_crlf::to_byte_idx(text, byte_idx),
             #[cfg(feature = "metric_lines_unicode")]
             LineType::All => str_indices::lines::to_byte_idx(text, byte_idx),
         }
@@ -69,8 +69,8 @@ pub(crate) mod lines {
         match line_type {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => str_indices::lines_lf::count_breaks(text),
-            #[cfg(feature = "metric_lines_cr_lf")]
-            LineType::CRLF => str_indices::lines_crlf::count_breaks(text),
+            #[cfg(feature = "metric_lines_lf_cr")]
+            LineType::LF_CR => str_indices::lines_crlf::count_breaks(text),
             #[cfg(feature = "metric_lines_unicode")]
             LineType::All => str_indices::lines::count_breaks(text),
         }

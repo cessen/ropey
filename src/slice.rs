@@ -11,7 +11,7 @@ use crate::{
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use crate::{iter::Lines, LineType};
@@ -219,7 +219,7 @@ impl<'a> From<RopeSlice<'a>> for std::borrow::Cow<'a, str> {
 mod tests {
     use std::hash::{Hash, Hasher};
 
-    #[cfg(any(feature = "metric_lines_lf", feature = "metric_lines_cr_lf",))]
+    #[cfg(any(feature = "metric_lines_lf", feature = "metric_lines_lf_cr",))]
     use crate::LineType;
 
     use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
@@ -305,26 +305,26 @@ mod tests {
         assert_eq!(s.len_chars(), 0);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn len_lines_01() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..97);
-        assert_eq!(s.len_lines(LineType::CRLF), 3);
+        assert_eq!(s.len_lines(LineType::LF_CR), 3);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn len_lines_02() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
-        assert_eq!(s.len_lines(LineType::CRLF), 1);
+        assert_eq!(s.len_lines(LineType::LF_CR), 1);
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
     #[test]
     fn len_lines_03() {
-        // Make sure splitting CRLF pairs at the end works properly.
+        // Make sure splitting LF_CR pairs at the end works properly.
         let r = {
             let mut rb = RopeBuilder::new();
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
@@ -335,18 +335,18 @@ mod tests {
             rb.finish()
         };
         for i in 0..=r.len_bytes() {
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(r.slice(..i).len_lines(LineType::CRLF), 1 + ((i + 1) / 2));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(r.slice(..i).len_lines(LineType::LF_CR), 1 + ((i + 1) / 2));
 
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(r.slice(..i).len_lines(LineType::LF), 1 + (i / 2));
         }
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
     #[test]
     fn len_lines_04() {
-        // Make sure splitting CRLF pairs at the start works properly.
+        // Make sure splitting LF_CR pairs at the start works properly.
         let r = {
             let mut rb = RopeBuilder::new();
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
@@ -357,8 +357,8 @@ mod tests {
             rb.finish()
         };
         for i in 0..=r.len_bytes() {
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(r.slice(i..).len_lines(LineType::CRLF), 16 - (i / 2));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(r.slice(i..).len_lines(LineType::LF_CR), 16 - (i / 2));
 
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(r.slice(i..).len_lines(LineType::LF), 16 - (i / 2));
@@ -554,7 +554,7 @@ mod tests {
         s.byte_to_utf16(137);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn byte_to_line_01() {
         let r = Rope::from_str(TEXT_LINES);
@@ -566,51 +566,51 @@ mod tests {
             s,
         );
 
-        assert_eq!(0, s.byte_to_line(0, LineType::CRLF));
-        assert_eq!(0, s.byte_to_line(1, LineType::CRLF));
+        assert_eq!(0, s.byte_to_line(0, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line(1, LineType::LF_CR));
 
-        assert_eq!(0, s.byte_to_line(24, LineType::CRLF));
-        assert_eq!(1, s.byte_to_line(25, LineType::CRLF));
-        assert_eq!(1, s.byte_to_line(26, LineType::CRLF));
+        assert_eq!(0, s.byte_to_line(24, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line(25, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line(26, LineType::LF_CR));
 
-        assert_eq!(1, s.byte_to_line(53, LineType::CRLF));
-        assert_eq!(2, s.byte_to_line(54, LineType::CRLF));
-        assert_eq!(2, s.byte_to_line(57, LineType::CRLF));
+        assert_eq!(1, s.byte_to_line(53, LineType::LF_CR));
+        assert_eq!(2, s.byte_to_line(54, LineType::LF_CR));
+        assert_eq!(2, s.byte_to_line(57, LineType::LF_CR));
 
-        assert_eq!(2, s.byte_to_line(78, LineType::CRLF));
+        assert_eq!(2, s.byte_to_line(78, LineType::LF_CR));
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn byte_to_line_02() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(50..50);
-        assert_eq!(0, s.byte_to_line(0, LineType::CRLF));
+        assert_eq!(0, s.byte_to_line(0, LineType::LF_CR));
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn byte_to_line_03() {
         let r = Rope::from_str("Hi there\nstranger!");
         let s = r.slice(0..9);
-        assert_eq!(0, s.byte_to_line(0, LineType::CRLF));
-        assert_eq!(0, s.byte_to_line(8, LineType::CRLF));
-        assert_eq!(1, s.byte_to_line(9, LineType::CRLF));
+        assert_eq!(0, s.byte_to_line(0, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line(8, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line(9, LineType::LF_CR));
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
     fn byte_to_line_04() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..112);
-        s.byte_to_line(79, LineType::CRLF);
+        s.byte_to_line(79, LineType::LF_CR);
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
     #[test]
     fn byte_to_line_05() {
-        // Make sure splitting CRLF pairs at the end works properly.
+        // Make sure splitting LF_CR pairs at the end works properly.
         let r = {
             let mut rb = RopeBuilder::new();
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
@@ -623,15 +623,15 @@ mod tests {
         for si in 0..=r.len_bytes() {
             let s = r.slice(..si);
             for i in 0..s.len_bytes() {
-                #[cfg(feature = "metric_lines_cr_lf")]
-                assert_eq!(s.byte_to_line(i, LineType::CRLF), i / 2);
+                #[cfg(feature = "metric_lines_lf_cr")]
+                assert_eq!(s.byte_to_line(i, LineType::LF_CR), i / 2);
 
                 #[cfg(feature = "metric_lines_lf")]
                 assert_eq!(s.byte_to_line(i, LineType::LF), i / 2);
             }
 
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(s.byte_to_line(si, LineType::CRLF), (si + 1) / 2);
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(s.byte_to_line(si, LineType::LF_CR), (si + 1) / 2);
 
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(s.byte_to_line(si, LineType::LF), si / 2);
@@ -656,7 +656,7 @@ mod tests {
         assert_eq!(36, s.char_to_byte(14));
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_to_byte_01() {
         let r = Rope::from_str(TEXT_LINES);
@@ -668,46 +668,46 @@ mod tests {
             s,
         );
 
-        assert_eq!(0, s.line_to_byte(0, LineType::CRLF));
-        assert_eq!(25, s.line_to_byte(1, LineType::CRLF));
-        assert_eq!(54, s.line_to_byte(2, LineType::CRLF));
-        assert_eq!(78, s.line_to_byte(3, LineType::CRLF));
+        assert_eq!(0, s.line_to_byte(0, LineType::LF_CR));
+        assert_eq!(25, s.line_to_byte(1, LineType::LF_CR));
+        assert_eq!(54, s.line_to_byte(2, LineType::LF_CR));
+        assert_eq!(78, s.line_to_byte(3, LineType::LF_CR));
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_to_byte_02() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
 
-        assert_eq!(0, s.line_to_byte(0, LineType::CRLF));
-        assert_eq!(0, s.line_to_byte(1, LineType::CRLF));
+        assert_eq!(0, s.line_to_byte(0, LineType::LF_CR));
+        assert_eq!(0, s.line_to_byte(1, LineType::LF_CR));
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
     fn line_to_byte_03() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
 
-        s.line_to_byte(4, LineType::CRLF);
+        s.line_to_byte(4, LineType::LF_CR);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
     fn line_to_byte_04() {
         let r = Rope::from_str("\n\n\n\n");
         let s = r.slice(1..3);
 
-        s.line_to_byte(4, LineType::CRLF);
+        s.line_to_byte(4, LineType::LF_CR);
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_lf"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
     #[test]
     fn line_to_byte_05() {
-        // Make sure splitting CRLF pairs at the end works properly.
+        // Make sure splitting LF_CR pairs at the end works properly.
         let r = {
             let mut rb = RopeBuilder::new();
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
@@ -718,18 +718,18 @@ mod tests {
             rb.finish()
         };
 
-        #[cfg(feature = "metric_lines_cr_lf")]
+        #[cfg(feature = "metric_lines_lf_cr")]
         for si in 0..=r.len_bytes() {
             let s = r.slice(..si);
-            for li in 0..(s.len_lines(LineType::CRLF) - 1) {
-                assert_eq!(s.line_to_byte(li, LineType::CRLF), li * 2);
+            for li in 0..(s.len_lines(LineType::LF_CR) - 1) {
+                assert_eq!(s.line_to_byte(li, LineType::LF_CR), li * 2);
             }
             assert_eq!(
-                s.line_to_byte(s.len_lines(LineType::CRLF) - 1, LineType::CRLF),
+                s.line_to_byte(s.len_lines(LineType::LF_CR) - 1, LineType::LF_CR),
                 si,
             );
             assert_eq!(
-                s.line_to_byte(s.len_lines(LineType::CRLF), LineType::CRLF),
+                s.line_to_byte(s.len_lines(LineType::LF_CR), LineType::LF_CR),
                 si,
             );
         }
@@ -917,7 +917,7 @@ mod tests {
         s.char_at_byte(0);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_01() {
         let r = Rope::from_str(TEXT_LINES);
@@ -925,78 +925,78 @@ mod tests {
         // "'s a fine day, isn't it?\nAren't you glad \
         //  we're alive?\nこんにちは、みん"
 
-        let l0 = s.line(0, LineType::CRLF);
+        let l0 = s.line(0, LineType::LF_CR);
         assert_eq!(l0, "'s a fine day, isn't it?\n");
         assert_eq!(l0.len_bytes(), 25);
-        assert_eq!(l0.len_lines(LineType::CRLF), 2);
+        assert_eq!(l0.len_lines(LineType::LF_CR), 2);
 
-        let l1 = s.line(1, LineType::CRLF);
+        let l1 = s.line(1, LineType::LF_CR);
         assert_eq!(l1, "Aren't you glad we're alive?\n");
         assert_eq!(l1.len_bytes(), 29);
-        assert_eq!(l1.len_lines(LineType::CRLF), 2);
+        assert_eq!(l1.len_lines(LineType::LF_CR), 2);
 
-        let l2 = s.line(2, LineType::CRLF);
+        let l2 = s.line(2, LineType::LF_CR);
         assert_eq!(l2, "こんにちは、みん");
         assert_eq!(l2.len_bytes(), 24);
-        assert_eq!(l2.len_lines(LineType::CRLF), 1);
+        assert_eq!(l2.len_lines(LineType::LF_CR), 1);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_02() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..59);
         // "'s a fine day, isn't it?\n"
 
-        assert_eq!(s.line(0, LineType::CRLF), "'s a fine day, isn't it?\n");
-        assert_eq!(s.line(1, LineType::CRLF), "");
+        assert_eq!(s.line(0, LineType::LF_CR), "'s a fine day, isn't it?\n");
+        assert_eq!(s.line(1, LineType::LF_CR), "");
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_03() {
         let r = Rope::from_str("Hi\nHi\nHi\nHi\nHi\nHi\n");
         let s = r.slice(1..17);
 
-        assert_eq!(s.line(0, LineType::CRLF), "i\n");
-        assert_eq!(s.line(1, LineType::CRLF), "Hi\n");
-        assert_eq!(s.line(2, LineType::CRLF), "Hi\n");
-        assert_eq!(s.line(3, LineType::CRLF), "Hi\n");
-        assert_eq!(s.line(4, LineType::CRLF), "Hi\n");
-        assert_eq!(s.line(5, LineType::CRLF), "Hi");
+        assert_eq!(s.line(0, LineType::LF_CR), "i\n");
+        assert_eq!(s.line(1, LineType::LF_CR), "Hi\n");
+        assert_eq!(s.line(2, LineType::LF_CR), "Hi\n");
+        assert_eq!(s.line(3, LineType::LF_CR), "Hi\n");
+        assert_eq!(s.line(4, LineType::LF_CR), "Hi\n");
+        assert_eq!(s.line(5, LineType::LF_CR), "Hi");
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_04() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
 
-        assert_eq!(s.line(0, LineType::CRLF), "");
+        assert_eq!(s.line(0, LineType::LF_CR), "");
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
     fn line_05() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
-        s.line(3, LineType::CRLF);
+        s.line(3, LineType::LF_CR);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     fn line_06() {
         let r = Rope::from_str("1\n2\n3\n4\n5\n6\n7\n8");
         let s = r.slice(1..11);
         // "\n2\n3\n4\n5\n6"
 
-        assert_eq!(s.line(0, LineType::CRLF).len_lines(LineType::CRLF), 2);
-        assert_eq!(s.line(1, LineType::CRLF).len_lines(LineType::CRLF), 2);
-        assert_eq!(s.line(2, LineType::CRLF).len_lines(LineType::CRLF), 2);
-        assert_eq!(s.line(3, LineType::CRLF).len_lines(LineType::CRLF), 2);
-        assert_eq!(s.line(4, LineType::CRLF).len_lines(LineType::CRLF), 2);
-        assert_eq!(s.line(5, LineType::CRLF).len_lines(LineType::CRLF), 1);
+        assert_eq!(s.line(0, LineType::LF_CR).len_lines(LineType::LF_CR), 2);
+        assert_eq!(s.line(1, LineType::LF_CR).len_lines(LineType::LF_CR), 2);
+        assert_eq!(s.line(2, LineType::LF_CR).len_lines(LineType::LF_CR), 2);
+        assert_eq!(s.line(3, LineType::LF_CR).len_lines(LineType::LF_CR), 2);
+        assert_eq!(s.line(4, LineType::LF_CR).len_lines(LineType::LF_CR), 2);
+        assert_eq!(s.line(5, LineType::LF_CR).len_lines(LineType::LF_CR), 1);
     }
 
     fn test_chunk(s: RopeSlice, text: &str) {
@@ -1033,7 +1033,7 @@ mod tests {
 
     #[test]
     fn chunk_02() {
-        // Make sure splitting CRLF pairs works properly.
+        // Make sure splitting LF_CR pairs works properly.
 
         let (r, text) = make_rope_and_text_from_chunks(&[
             "\r\n\r\n\r\n",

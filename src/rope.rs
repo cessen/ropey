@@ -16,11 +16,82 @@ use crate::{
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use crate::{iter::Lines, LineType};
 
+/// A utf8 text rope.
+///
+/// The time complexity of nearly all edit and query operations on `Rope` are
+/// worst-case `O(log N)` in the length of the rope.  `Rope` is designed to work
+/// efficiently even for huge (in the gigabytes) and pathological (all on one
+/// line) texts.
+///
+/// # Editing Operations
+///
+/// The editing operations on `Rope` are insertion and removal of text.  For
+/// example:
+///
+/// ```
+/// # use ropey::Rope;
+/// #
+/// let mut rope = Rope::from_str("Hello みんなさん!");
+/// rope.remove(6..21);
+/// rope.insert(6, "world");
+///
+/// assert_eq!(rope, "Hello world!");
+/// ```
+///
+/// # Query Operations
+///
+/// `Rope` provides a rich set of efficient query functions, including querying
+/// rope length in bytes/`char`s/lines, fetching individual `char`s or lines,
+/// and converting between byte/`char`/line indices.
+///
+#[cfg_attr(
+    feature = "metric_lines_lf_cr",
+    doc = r##"
+For example, to find the starting byte index of a given line:
+
+```
+# use ropey::Rope;
+use ropey::LineType::LF_CR;
+
+let rope = Rope::from_str("Hello みんなさん!\nHow are you?\nThis text has multiple lines!");
+
+assert_eq!(rope.line_to_byte(0, LF_CR), 0);
+assert_eq!(rope.line_to_byte(1, LF_CR), 23);
+assert_eq!(rope.line_to_byte(2, LF_CR), 36);
+```
+
+# Slicing
+
+You can take immutable slices of a `Rope` using `slice()`:
+
+```
+# use ropey::Rope;
+#
+let mut rope = Rope::from_str("Hello みんなさん!");
+let middle = rope.slice(3..12);
+
+assert_eq!(middle, "lo みん");
+```
+"##
+)]
+///
+/// # Cloning
+///
+/// Cloning `Rope`s is extremely cheap, running in `O(1)` time and taking a
+/// small constant amount of memory for the new clone, regardless of text size.
+/// This is accomplished by data sharing between `Rope` clones.  The memory
+/// used by clones only grows incrementally as the their contents diverge due
+/// to edits.  All of this is thread safe, so clones can be sent freely
+/// between threads.
+///
+/// The primary intended use-case for this feature is to allow asynchronous
+/// processing of `Rope`s.  For example, saving a large document to disk in a
+/// separate thread while the user continues to perform edits.
 #[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Node,
@@ -557,7 +628,7 @@ mod tests {
     // 124 bytes, 100 chars, 4 lines
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     const TEXT_LINES: &str = "Hello there!  How're you doing?\nIt's \
@@ -953,7 +1024,7 @@ mod tests {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -976,8 +1047,8 @@ mod tests {
         for [b, l] in byte_to_line_idxs.iter().copied() {
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(l, r.byte_to_line(b, LineType::LF));
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(l, r.byte_to_line(b, LineType::CRLF));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(l, r.byte_to_line(b, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
             assert_eq!(l, r.byte_to_line(b, LineType::All));
         }
@@ -985,7 +1056,7 @@ mod tests {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -994,8 +1065,8 @@ mod tests {
 
         #[cfg(feature = "metric_lines_lf")]
         assert_eq!(0, r.byte_to_line(0, LineType::LF));
-        #[cfg(feature = "metric_lines_cr_lf")]
-        assert_eq!(0, r.byte_to_line(0, LineType::CRLF));
+        #[cfg(feature = "metric_lines_lf_cr")]
+        assert_eq!(0, r.byte_to_line(0, LineType::LF_CR));
         #[cfg(feature = "metric_lines_unicode")]
         assert_eq!(0, r.byte_to_line(0, LineType::All));
     }
@@ -1008,12 +1079,12 @@ mod tests {
         r.byte_to_line(125, LineType::LF);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
     fn byte_to_line_04() {
         let r = Rope::from_str(TEXT_LINES);
-        r.byte_to_line(125, LineType::CRLF);
+        r.byte_to_line(125, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_lines_unicode")]
@@ -1026,7 +1097,7 @@ mod tests {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -1036,8 +1107,8 @@ mod tests {
         for [b, l] in byte_to_line_idxs.iter().copied() {
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(b, r.line_to_byte(l, LineType::LF));
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(b, r.line_to_byte(l, LineType::CRLF));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(b, r.line_to_byte(l, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
             assert_eq!(b, r.line_to_byte(l, LineType::All));
         }
@@ -1045,7 +1116,7 @@ mod tests {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -1056,10 +1127,10 @@ mod tests {
             assert_eq!(0, r.line_to_byte(0, LineType::LF));
             assert_eq!(0, r.line_to_byte(1, LineType::LF));
         }
-        #[cfg(feature = "metric_lines_cr_lf")]
+        #[cfg(feature = "metric_lines_lf_cr")]
         {
-            assert_eq!(0, r.line_to_byte(0, LineType::CRLF));
-            assert_eq!(0, r.line_to_byte(1, LineType::CRLF));
+            assert_eq!(0, r.line_to_byte(0, LineType::LF_CR));
+            assert_eq!(0, r.line_to_byte(1, LineType::LF_CR));
         }
         #[cfg(feature = "metric_lines_unicode")]
         {
@@ -1076,12 +1147,12 @@ mod tests {
         r.line_to_byte(5, LineType::LF);
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
     fn line_to_byte_04() {
         let r = Rope::from_str(TEXT_LINES);
-        r.line_to_byte(5, LineType::CRLF);
+        r.line_to_byte(5, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_lines_unicode")]

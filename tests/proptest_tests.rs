@@ -7,7 +7,7 @@ use ropey::Rope;
 #[cfg(feature = "metric_lines_lf")]
 use str_indices::lines_lf;
 
-#[cfg(feature = "metric_lines_cr_lf")]
+#[cfg(feature = "metric_lines_lf_cr")]
 use str_indices::lines_crlf;
 
 #[cfg(feature = "metric_lines_unicode")]
@@ -15,7 +15,7 @@ use str_indices::lines;
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use ropey::LineType;
@@ -59,10 +59,10 @@ fn assert_metrics_eq(rope: &Rope, text: &str) {
         );
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     {
         assert_eq!(
-            rope.len_lines(LineType::CRLF),
+            rope.len_lines(LineType::LF_CR),
             str_indices::lines_crlf::count_breaks(text) + 1
         );
     }
@@ -90,7 +90,7 @@ proptest::proptest! {
         rope.assert_invariants();
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
     #[test]
     fn pt_from_str_crlf(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}){0,200}") {
         let rope = Rope::from_str(text);
@@ -115,7 +115,7 @@ proptest::proptest! {
         rope.assert_invariants();
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
     #[test]
     fn pt_insert_crlf(cr_or_lf: bool, idx: usize, ref start_text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}){0,200}") {
         let mut rope = Rope::from_str(start_text);
@@ -151,7 +151,7 @@ proptest::proptest! {
         rope.assert_invariants();
     }
 
-    #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
     #[test]
     fn pt_remove_crlf(cr_or_lf: bool, idx: usize, ref start_text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}){0,200}") {
         let mut rope = Rope::from_str(start_text);
@@ -173,7 +173,7 @@ proptest::proptest! {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -183,8 +183,8 @@ proptest::proptest! {
         for i in 0..=text.len() {
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(lines_lf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::LF));
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(lines_crlf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::CRLF));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(lines_crlf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
             assert_eq!(lines::from_byte_idx(text, i), rope.byte_to_line(i, LineType::All));
         }
@@ -192,7 +192,7 @@ proptest::proptest! {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -206,11 +206,11 @@ proptest::proptest! {
                 assert_eq!(lines_lf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::LF));
             }
         }
-        #[cfg(feature = "metric_lines_cr_lf")]
+        #[cfg(feature = "metric_lines_lf_cr")]
         {
             let line_count = lines_crlf::count_breaks(text) + 1;
             for i in 0..=line_count {
-                assert_eq!(lines_crlf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::CRLF));
+                assert_eq!(lines_crlf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::LF_CR));
             }
         }
         #[cfg(feature = "metric_lines_unicode")]

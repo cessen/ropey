@@ -45,7 +45,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         #[inline]
@@ -89,7 +89,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         #[inline(always)]
@@ -156,7 +156,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         #[inline]
@@ -179,7 +179,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         #[inline]
@@ -236,7 +236,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         #[inline]
@@ -252,7 +252,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         #[inline]
@@ -315,7 +315,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         fn _byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
@@ -327,7 +327,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         fn _line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
@@ -345,7 +345,7 @@ macro_rules! shared_main_impl_methods {
         /// be split.
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         pub(crate) fn _is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
@@ -393,7 +393,7 @@ macro_rules! shared_no_panic_impl_methods {
 
         #[cfg(any(
             feature = "metric_lines_lf",
-            feature = "metric_lines_cr_lf",
+            feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
         pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice> {

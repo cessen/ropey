@@ -4,7 +4,7 @@ use super::{node::Node, text_info::TextInfo, MAX_CHILDREN, MAX_TEXT_SIZE};
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use crate::LineType;
@@ -320,7 +320,7 @@ impl Children {
         feature = "metric_chars",
         feature = "metric_utf16",
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
@@ -346,7 +346,7 @@ impl Children {
             idx += 1;
         }
 
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
@@ -394,7 +394,7 @@ impl Children {
         feature = "metric_chars",
         feature = "metric_utf16",
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     pub fn search_byte_idx(&self, byte_idx: usize) -> (usize, TextInfo) {
@@ -404,7 +404,7 @@ impl Children {
             byte_idx <= (accum.bytes + self.info()[idx].bytes),
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
@@ -425,7 +425,7 @@ impl Children {
             char_idx <= (accum.chars + self.info()[idx].chars),
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
@@ -446,7 +446,7 @@ impl Children {
             utf16_idx <= (accum.utf16 + self.info()[idx].utf16),
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
@@ -465,7 +465,7 @@ impl Children {
     /// applied.
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     pub fn search_line_break_idx(
@@ -487,7 +487,7 @@ impl Children {
             },
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)

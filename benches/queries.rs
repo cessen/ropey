@@ -8,7 +8,7 @@ use ropey::Rope;
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use ropey::LineType;
@@ -64,26 +64,26 @@ fn index_convert(c: &mut Criterion) {
         })
     });
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("byte_to_line_cr_lf", |bench| {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_bytes();
         bench.iter(|| {
-            rope.byte_to_line(random::<usize>() % (len + 1), LineType::CRLF);
+            rope.byte_to_line(random::<usize>() % (len + 1), LineType::LF_CR);
         })
     });
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("line_cr_lf_to_byte", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_lines(LineType::CRLF);
+        let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line_to_byte(random::<usize>() % (len + 1), LineType::CRLF);
+            rope.line_to_byte(random::<usize>() % (len + 1), LineType::LF_CR);
         })
     });
 
     #[cfg(feature = "metric_lines_unicode")]
-    group.bench_function("byte_to_line_unicode", |bench| {
+    group.bench_function("byte_to_line_all", |bench| {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_bytes();
         bench.iter(|| {
@@ -92,9 +92,9 @@ fn index_convert(c: &mut Criterion) {
     });
 
     #[cfg(feature = "metric_lines_unicode")]
-    group.bench_function("line_unicode_to_byte", |bench| {
+    group.bench_function("line_all_to_byte", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_lines(LineType::CRLF);
+        let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
             rope.line_to_byte(random::<usize>() % (len + 1), LineType::All);
         })
@@ -130,12 +130,12 @@ fn get(c: &mut Criterion) {
         })
     });
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("line_cr_lf", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_lines(LineType::CRLF);
+        let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line(random::<usize>() % len, LineType::CRLF);
+            rope.line(random::<usize>() % len, LineType::LF_CR);
         })
     });
 

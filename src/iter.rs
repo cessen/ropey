@@ -612,7 +612,7 @@ impl<'a> Iterator for Chars<'a> {
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 mod lines {
@@ -796,7 +796,7 @@ mod lines {
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 pub use lines::Lines;
@@ -809,7 +809,7 @@ mod tests {
 
     use crate::{rope_builder::RopeBuilder, Rope};
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     use crate::LineType;
 
     // 127 bytes, 103 chars, 1 line
@@ -817,7 +817,7 @@ mod tests {
                         a fine day, isn't it?  Aren't you glad \
                         we're alive?  こんにちは、みんなさん！";
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     fn lines_text() -> String {
         let mut text = String::new();
         text.push_str("\r\n");
@@ -1374,13 +1374,13 @@ mod tests {
         assert_eq!(0, chars.size_hint().1.unwrap());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_01() {
         let r = Rope::from_str("hi\nyo\nbye");
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
 
         assert_eq!("hi\n", lines.next().unwrap());
         assert_eq!(None, lines.prev());
@@ -1395,7 +1395,7 @@ mod tests {
         assert_eq!("bye", lines.prev().unwrap());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_02() {
@@ -1403,21 +1403,21 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(2, r.lines(LineType::CRLF).count());
-        assert_eq!(2, s.lines(LineType::CRLF).count());
+        assert_eq!(2, r.lines(LineType::LF_CR).count());
+        assert_eq!(2, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_03() {
@@ -1425,23 +1425,23 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(3, r.lines(LineType::CRLF).count());
-        assert_eq!(3, s.lines(LineType::CRLF).count());
+        assert_eq!(3, r.lines(LineType::LF_CR).count());
+        assert_eq!(3, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_04() {
@@ -1450,22 +1450,22 @@ mod tests {
         let s1 = r.slice(..25);
         let s2 = r.slice(..26);
 
-        assert_eq!(2, s1.lines(LineType::CRLF).count());
-        assert_eq!(3, s2.lines(LineType::CRLF).count());
+        assert_eq!(2, s1.lines(LineType::LF_CR).count());
+        assert_eq!(3, s2.lines(LineType::LF_CR).count());
 
-        let mut lines = s1.lines(LineType::CRLF);
+        let mut lines = s1.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s2.lines(LineType::CRLF);
+        let mut lines = s2.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_05() {
@@ -1473,19 +1473,19 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(1, r.lines(LineType::CRLF).count());
-        assert_eq!(1, s.lines(LineType::CRLF).count());
+        assert_eq!(1, r.lines(LineType::LF_CR).count());
+        assert_eq!(1, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_06() {
@@ -1493,19 +1493,19 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(1, r.lines(LineType::CRLF).count());
-        assert_eq!(1, s.lines(LineType::CRLF).count());
+        assert_eq!(1, r.lines(LineType::LF_CR).count());
+        assert_eq!(1, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("a", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("a", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_07() {
@@ -1513,21 +1513,21 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(2, r.lines(LineType::CRLF).count());
-        assert_eq!(2, s.lines(LineType::CRLF).count());
+        assert_eq!(2, r.lines(LineType::LF_CR).count());
+        assert_eq!(2, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
         assert_eq!("b", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
         assert_eq!("b", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_08() {
@@ -1535,21 +1535,21 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(2, r.lines(LineType::CRLF).count());
-        assert_eq!(2, s.lines(LineType::CRLF).count());
+        assert_eq!(2, r.lines(LineType::LF_CR).count());
+        assert_eq!(2, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_09() {
@@ -1557,36 +1557,36 @@ mod tests {
         let r = Rope::from_str(text);
         let s = r.slice(..);
 
-        assert_eq!(3, r.lines(LineType::CRLF).count());
-        assert_eq!(3, s.lines(LineType::CRLF).count());
+        assert_eq!(3, r.lines(LineType::LF_CR).count());
+        assert_eq!(3, s.lines(LineType::LF_CR).count());
 
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
         assert_eq!("b\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
         assert_eq!("b\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_10() {
         let text = lines_text();
         let r = Rope::from_str(&text);
 
-        let mut itr = r.lines(LineType::CRLF);
+        let mut itr = r.lines(LineType::LF_CR);
 
         assert_eq!(None, itr.prev());
         assert_eq!(None, itr.prev());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_11() {
@@ -1594,7 +1594,7 @@ mod tests {
         let r = Rope::from_str(&text);
 
         let mut lines = Vec::new();
-        let mut itr = r.lines(LineType::CRLF);
+        let mut itr = r.lines(LineType::LF_CR);
 
         while let Some(line) = itr.next() {
             lines.push(line);
@@ -1607,7 +1607,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_12() {
@@ -1616,7 +1616,7 @@ mod tests {
         let s = r.slice(34..2031);
 
         let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::CRLF);
+        let mut itr = s.lines(LineType::LF_CR);
 
         while let Some(line) = itr.next() {
             lines.push(line);
@@ -1629,7 +1629,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_13() {
@@ -1638,7 +1638,7 @@ mod tests {
         let s = r.slice(..);
 
         let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::CRLF);
+        let mut itr = s.lines(LineType::LF_CR);
 
         while let Some(text) = itr.next() {
             lines.push(text);
@@ -1651,7 +1651,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_14() {
@@ -1660,7 +1660,7 @@ mod tests {
         let s = r.slice(..);
 
         let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::CRLF);
+        let mut itr = s.lines(LineType::LF_CR);
 
         while let Some(text) = itr.next() {
             lines.push(text);
@@ -1673,7 +1673,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_15() {
@@ -1682,7 +1682,7 @@ mod tests {
         let s = r.slice(..);
 
         let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::CRLF);
+        let mut itr = s.lines(LineType::LF_CR);
 
         while let Some(text) = itr.next() {
             lines.push(text);
@@ -1695,7 +1695,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_16() {
@@ -1704,7 +1704,7 @@ mod tests {
         let s = r.slice(..);
 
         let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::CRLF);
+        let mut itr = s.lines(LineType::LF_CR);
 
         while let Some(text) = itr.next() {
             lines.push(text);
@@ -1717,7 +1717,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_17() {
@@ -1726,7 +1726,7 @@ mod tests {
         let s = r.slice(..);
 
         let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::CRLF);
+        let mut itr = s.lines(LineType::LF_CR);
 
         while let Some(text) = itr.next() {
             lines.push(text);
@@ -1739,7 +1739,7 @@ mod tests {
         assert!(lines.is_empty());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_18() {
@@ -1747,11 +1747,11 @@ mod tests {
         let r = Rope::from_str(&text);
         let s = r.slice(..);
 
-        assert_eq!(34, r.lines(LineType::CRLF).count());
-        assert_eq!(34, s.lines(LineType::CRLF).count());
+        assert_eq!(34, r.lines(LineType::LF_CR).count());
+        assert_eq!(34, s.lines(LineType::LF_CR).count());
 
         // Rope
-        let mut lines = r.lines(LineType::CRLF);
+        let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("\r\n", lines.next().unwrap());
         for _ in 0..16 {
             assert_eq!(
@@ -1769,7 +1769,7 @@ mod tests {
         assert!(lines.next().is_none());
 
         // Slice
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         assert_eq!("\r\n", lines.next().unwrap());
         for _ in 0..16 {
             assert_eq!(
@@ -1791,7 +1791,7 @@ mod tests {
     // #[cfg_attr(miri, ignore)]
     // fn lines_19() {
     //     let r = Rope::from_str("a\nb\nc\nd\ne\nf\ng\nh\n");
-    //     for (line, c) in r.lines(LineType::CRLF).zip('a'..='h') {
+    //     for (line, c) in r.lines(LineType::LF_CR).zip('a'..='h') {
     //         assert_eq!(line, format!("{c}\n"))
     //     }
     //     for (line, c) in r
@@ -1803,29 +1803,29 @@ mod tests {
     //     }
 
     //     let r = Rope::from_str("ab\nc\nd\ne\nf\ng\nh\n");
-    //     for (line, c) in r.slice(1..).lines(LineType::CRLF).zip('b'..='h') {
+    //     for (line, c) in r.slice(1..).lines(LineType::LF_CR).zip('b'..='h') {
     //         assert_eq!(line, format!("{c}\n"))
     //     }
     // }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_at_01() {
         let text = lines_text();
         let r = Rope::from_str(&text);
 
-        for i in 0..r.len_lines(LineType::CRLF) {
-            let line = r.line(i, LineType::CRLF);
-            let mut lines = r.lines_at(i, LineType::CRLF);
+        for i in 0..r.len_lines(LineType::LF_CR) {
+            let line = r.line(i, LineType::LF_CR);
+            let mut lines = r.lines_at(i, LineType::LF_CR);
             assert_eq!(Some(line), lines.next());
         }
 
-        let mut lines = r.lines_at(r.len_lines(LineType::CRLF), LineType::CRLF);
+        let mut lines = r.lines_at(r.len_lines(LineType::LF_CR), LineType::LF_CR);
         assert_eq!(None, lines.next());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_at_02() {
@@ -1833,17 +1833,17 @@ mod tests {
         let r = Rope::from_str(&text);
         let s = r.slice(34..2031);
 
-        for i in 0..s.len_lines(LineType::CRLF) {
-            let line = s.line(i, LineType::CRLF);
-            let mut lines = s.lines_at(i, LineType::CRLF);
+        for i in 0..s.len_lines(LineType::LF_CR) {
+            let line = s.line(i, LineType::LF_CR);
+            let mut lines = s.lines_at(i, LineType::LF_CR);
             assert_eq!(Some(line), lines.next());
         }
 
-        let mut lines = s.lines_at(s.len_lines(LineType::CRLF), LineType::CRLF);
+        let mut lines = s.lines_at(s.len_lines(LineType::LF_CR), LineType::LF_CR);
         assert_eq!(None, lines.next());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_at_03() {
@@ -1851,14 +1851,14 @@ mod tests {
         let r = Rope::from_str(&text);
         let s = r.slice(34..34);
 
-        let mut lines = s.lines_at(0, LineType::CRLF);
+        let mut lines = s.lines_at(0, LineType::LF_CR);
         assert_eq!("", lines.next().unwrap());
 
-        let mut lines = s.lines_at(1, LineType::CRLF);
+        let mut lines = s.lines_at(1, LineType::LF_CR);
         assert_eq!(None, lines.next());
     }
 
-    #[cfg(feature = "metric_lines_cr_lf")]
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_iter_size_hint_01() {
@@ -1866,7 +1866,7 @@ mod tests {
         let r = Rope::from_str(&text);
         let s = r.slice(34..2031);
 
-        let mut lines = s.lines(LineType::CRLF);
+        let mut lines = s.lines(LineType::LF_CR);
         let mut line_count = lines.clone().count();
 
         // Forward.

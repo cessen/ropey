@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use crate::{Error::*, Result};
 
-#[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+#[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
 use crate::str_utils;
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use crate::LineType;
@@ -363,7 +363,7 @@ impl Node {
         feature = "metric_chars",
         feature = "metric_utf16",
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     fn get_text_at_metric<F1, F2>(
@@ -402,7 +402,7 @@ impl Node {
         feature = "metric_chars",
         feature = "metric_utf16",
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     pub fn get_text_at_byte(&self, byte_idx: usize) -> (&Text, TextInfo) {
@@ -465,7 +465,7 @@ impl Node {
     /// See `get_text_at_metric()` for further documentation.
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     pub fn get_text_at_line_break(
@@ -496,7 +496,7 @@ impl Node {
     /// return if a CRLF pair would be split.
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     pub(crate) fn is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
@@ -507,7 +507,7 @@ impl Node {
             #[cfg(feature = "metric_lines_lf")]
             LineType::LF => false,
 
-            #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             _ => {
                 let (text, start_info) = self.get_text_at_byte(byte_idx);
                 let idx = byte_idx - start_info.bytes;

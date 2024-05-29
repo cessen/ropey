@@ -8,7 +8,7 @@ use str_indices::utf16;
 
 #[cfg(any(
     feature = "metric_lines_lf",
-    feature = "metric_lines_cr_lf",
+    feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
 use crate::{str_utils::lines, LineType};
@@ -94,7 +94,7 @@ impl Text {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
@@ -104,7 +104,7 @@ impl Text {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
@@ -633,7 +633,7 @@ mod tests {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -655,8 +655,8 @@ mod tests {
         for (j, [lf, crlf]) in line_idxs.iter().copied().enumerate() {
             #[cfg(feature = "metric_lines_lf")]
             assert_eq!(lf, text.byte_to_line(j, LineType::LF));
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(crlf, text.byte_to_line(j, LineType::CRLF));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(crlf, text.byte_to_line(j, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
             assert_eq!(crlf, text.byte_to_line(j, LineType::All));
         }
@@ -664,7 +664,7 @@ mod tests {
 
     #[cfg(any(
         feature = "metric_lines_lf",
-        feature = "metric_lines_cr_lf",
+        feature = "metric_lines_lf_cr",
         feature = "metric_lines_unicode"
     ))]
     #[test]
@@ -673,7 +673,7 @@ mod tests {
 
         #[cfg(feature = "metric_lines_lf")]
         let line_lf_byte_idxs = [0, 2, 4, 5, 8];
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         let line_crlf_byte_idxs = [0, 2, 4, 5, 6, 8];
 
         #[cfg(feature = "metric_lines_lf")]
@@ -681,10 +681,10 @@ mod tests {
             assert_eq!(byte_idx, text.line_to_byte(l, LineType::LF));
         }
 
-        #[cfg(any(feature = "metric_lines_cr_lf", feature = "metric_lines_unicode"))]
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         for (l, byte_idx) in line_crlf_byte_idxs.iter().copied().enumerate() {
-            #[cfg(feature = "metric_lines_cr_lf")]
-            assert_eq!(byte_idx, text.line_to_byte(l, LineType::CRLF));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(byte_idx, text.line_to_byte(l, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
             assert_eq!(byte_idx, text.line_to_byte(l, LineType::All));
         }

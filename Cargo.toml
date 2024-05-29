@@ -13,11 +13,11 @@ categories = ["text-processing", "data-structures"]
 exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
 
 [features]
-default = ["metric_lines_cr_lf", "simd"]
+default = ["metric_lines_lf_cr", "simd"]
 metric_chars = []
 metric_utf16 = []
 metric_lines_lf = []
-metric_lines_cr_lf = []
+metric_lines_lf_cr = []
 metric_lines_unicode = []
 simd = ["str_indices/simd"]
 
