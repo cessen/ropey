@@ -299,6 +299,7 @@ pub struct Bytes<'a> {
     current_chunk: &'a [u8],
     chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
+    at_start_sentinel: bool,
     is_reversed: bool,
 }
 
@@ -351,11 +352,18 @@ impl<'a> Bytes<'a> {
             current_chunk: first_chunk.as_bytes(),
             chunk_byte_idx: byte_start,
             byte_idx_in_chunk: at_byte_idx - byte_start,
+            at_start_sentinel: at_byte_idx == byte_range[0],
             is_reversed: false,
         }
     }
 
     fn next_impl(&mut self) -> Option<u8> {
+        if self.at_start_sentinel {
+            self.at_start_sentinel = false;
+        } else {
+            self.byte_idx_in_chunk += 1;
+        }
+
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
             self.chunk_byte_idx += self.current_chunk.len();
             if let Some(chunk) = self.chunks.next() {
@@ -369,7 +377,6 @@ impl<'a> Bytes<'a> {
         }
 
         let byte = self.current_chunk[self.byte_idx_in_chunk];
-        self.byte_idx_in_chunk += 1;
         Some(byte)
     }
 
@@ -380,6 +387,9 @@ impl<'a> Bytes<'a> {
                 self.chunk_byte_idx -= chunk.len();
                 self.byte_idx_in_chunk = chunk.len();
             } else {
+                self.current_chunk = &[];
+                self.byte_idx_in_chunk = 0;
+                self.at_start_sentinel = true;
                 return None;
             }
         }
@@ -405,7 +415,8 @@ impl<'a> Iterator for Bytes<'a> {
         let len = if self.is_reversed {
             byte_idx - self.chunks.byte_range[0]
         } else {
-            self.chunks.byte_range[1] - byte_idx
+            self.chunks.byte_range[1]
+                .saturating_sub(byte_idx + 1 - (self.at_start_sentinel as usize))
         };
         (len, Some(len))
     }
