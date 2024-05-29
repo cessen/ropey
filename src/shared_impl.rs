@@ -14,11 +14,17 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Queries.
 
+        /// Total number of bytes in the text.
+        ///
+        /// Runs in O(1) time.
         #[inline(always)]
         pub fn len_bytes(&self) -> usize {
             self.get_byte_range()[1] - self.get_byte_range()[0]
         }
 
+        /// Total number of `char`s in the text.
+        ///
+        /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(feature = "metric_chars")]
         #[inline]
         pub fn len_chars(&self) -> usize {
@@ -31,6 +37,10 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Total number of utf16 code units that would be in the text if it
+        /// were encoded as utf16.
+        ///
+        /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(feature = "metric_utf16")]
         #[inline]
         pub fn len_utf16(&self) -> usize {
@@ -43,6 +53,9 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Total number of lines in the text, according to the passed line type.
+        ///
+        /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -62,6 +75,13 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns whether `byte_idx` is a `char` boundary.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline]
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
             assert!(byte_idx <= self.len_bytes());
@@ -73,11 +93,27 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Fetching.
 
+        /// Returns the byte at `byte_idx`.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >=
+        /// len_bytes()`).
         #[inline(always)]
         pub fn byte(&self, byte_idx: usize) -> u8 {
             self.get_byte(byte_idx).unwrap()
         }
 
+        /// Returns the `char` at `byte_idx`.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// - If `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
+        /// - If `byte_idx` is not a char boundary.
         #[inline]
         pub fn char_at_byte(&self, byte_idx: usize) -> char {
             match self.try_char_at_byte(byte_idx) {
@@ -87,6 +123,15 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns the line at `line_idx`, according to the given line type.
+        ///
+        /// Note: lines are zero-indexed.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -97,6 +142,18 @@ macro_rules! shared_main_impl_methods {
             self.get_line(line_idx, line_type).unwrap()
         }
 
+        /// Returns the chunk containing the byte at `byte_idx`.
+        ///
+        /// Also returns the byte index of the beginning of the chunk.
+        ///
+        /// Note: for convenience, a one-past-the-end `byte_idx` returns the last
+        /// chunk of the `RopeSlice`.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline(always)]
         pub fn chunk(&self, byte_idx: usize) -> (&str, usize) {
             self.get_chunk(byte_idx).unwrap()
@@ -105,6 +162,20 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Metric conversions.
 
+        /// Returns the char index of the given byte.
+        ///
+        /// Notes:
+        ///
+        /// - If the byte is in the middle of a multi-byte char, returns the
+        ///   index of the char that the byte belongs to.
+        /// - `byte_idx` can be one-past-the-end, which will return
+        ///   one-past-the-end char index.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[cfg(feature = "metric_chars")]
         #[inline]
         pub fn byte_to_char(&self, byte_idx: usize) -> usize {
@@ -118,6 +189,18 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns the byte index of the given char.
+        ///
+        /// Notes:
+        ///
+        /// - `char_idx` can be one-past-the-end, which will return
+        ///   one-past-the-end byte index.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
         #[cfg(feature = "metric_chars")]
         #[inline]
         pub fn char_to_byte(&self, char_idx: usize) -> usize {
@@ -130,6 +213,21 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns the utf16 code unit index of the given byte.
+        ///
+        /// Ropey stores text internally as utf8, but sometimes it is necessary
+        /// to interact with external APIs that still use utf16.  This function is
+        /// primarily intended for such situations, and is otherwise not very
+        /// useful.
+        ///
+        /// Note: if the byte is not on a char boundary, this returns the utf16
+        /// code unit index corresponding to the char that the byte belongs to.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[cfg(feature = "metric_utf16")]
         #[inline]
         pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
@@ -142,6 +240,22 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns the byte index of the given utf16 code unit.
+        ///
+        /// Ropey stores text internally as utf8, but sometimes it is necessary
+        /// to interact with external APIs that still use utf16.  This function is
+        /// primarily intended for such situations, and is otherwise not very
+        /// useful.
+        ///
+        /// Note: if the utf16 code unit is in the middle of a char, returns the
+        /// byte index of the char that it belongs to.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `utf16_cu_idx` is out of bounds
+        /// (i.e. `utf16_idx > len_utf16()`).
         #[cfg(feature = "metric_utf16")]
         #[inline]
         pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
@@ -154,6 +268,21 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns the line index of the line that the given byte belongs to.
+        ///
+        /// Notes:
+        ///
+        /// - Counts lines according to the passed line type.
+        /// - Lines are zero-indexed.  This is functionally equivalent to
+        ///   counting the line endings before the specified byte.
+        /// - `byte_idx` can be one-past-the-end, which will return the
+        ///   last line index.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -177,6 +306,20 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
+        /// Returns the byte index of the start of the given line.
+        ///
+        /// Notes:
+        ///
+        /// - Counts lines according to the passed line type.
+        /// - Lines are zero-indexed.
+        /// - `line_idx` can be one-past-the-end, which will return
+        ///   one-past-the-end byte index.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -198,6 +341,9 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Iterators.
 
+        /// Creates an iterator over the bytes of the `Rope`.
+        ///
+        /// Runs in O(log N) time.
         #[inline]
         pub fn bytes(&self) -> Bytes<'_> {
             Bytes::new(
@@ -207,6 +353,17 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Creates an iterator over the bytes of the `Rope`, starting at byte
+        /// `byte_idx`.
+        ///
+        /// If `byte_idx == len_bytes()` then an iterator at the end of the
+        /// `Rope` is created (i.e. `next()` will return `None`).
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline]
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
             Bytes::new(
@@ -216,6 +373,9 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Creates an iterator over the chars of the `Rope`.
+        ///
+        /// Runs in O(log N) time.
         #[inline]
         pub fn chars(&self) -> Chars<'_> {
             Chars::new(
@@ -225,6 +385,18 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Creates an iterator over the chars of the `Rope`, starting at the char
+        /// at `byte_idx`.
+        ///
+        /// If `byte_idx == len_bytes()` then an iterator at the end of the
+        /// `Rope` is created (i.e. `next()` will return `None`).
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// - If `byte_idx` is not a char boundary.
         #[inline]
         pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
             Chars::new(
@@ -234,6 +406,12 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Creates an iterator over the lines of the `Rope`.
+        ///
+        /// Note: the iterator will iterate over lines according to the passed
+        /// line type.
+        ///
+        /// Runs in O(log N) time.
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -250,6 +428,20 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Creates an iterator over the lines of the `Rope`, starting at line
+        /// `line_idx`.
+        ///
+        /// Notes:
+        /// - The iterator will iterate over lines according to the passed
+        ///   line type.
+        /// - If `line_idx == len_lines()` then an iterator at the end of the
+        ///   `Rope` is created (i.e. `next()` will return `None`).
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -266,6 +458,9 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Creates an iterator over the chunks of the `Rope`.
+        ///
+        /// Runs in O(log N) time.
         #[inline]
         pub fn chunks(&self) -> Chunks<'_> {
             Chunks::new(
@@ -276,6 +471,20 @@ macro_rules! shared_main_impl_methods {
             .0
         }
 
+        /// Creates an iterator over the chunks of the `Rope`, with the iterator
+        /// starting at the chunk containing `byte_idx`.
+        ///
+        /// Also returns the byte index of the beginning of the first chunk to
+        /// be yielded.
+        ///
+        /// If `byte_idx == len_bytes()` an iterator at the end of the `Rope`
+        /// (yielding `None` on a call to `next()`) is created.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline]
         pub fn chunks_at(&self, byte_idx: usize) -> Chunks<'_> {
             Chunks::new(
