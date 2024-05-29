@@ -307,7 +307,7 @@ impl<'a> Bytes<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     pub fn next(&mut self) -> Option<u8> {
         if self.is_reversed {
             self.prev_impl()
@@ -319,7 +319,7 @@ impl<'a> Bytes<'a> {
     /// Advances the iterator backward and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     pub fn prev(&mut self) -> Option<u8> {
         if self.is_reversed {
             self.next_impl()
@@ -342,7 +342,7 @@ impl<'a> Bytes<'a> {
 
     //---------------------------------------------------------
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Bytes {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
         let first_chunk = chunks.next().unwrap_or("");
@@ -363,6 +363,7 @@ impl<'a> Bytes<'a> {
         bytes
     }
 
+    #[inline(always)]
     fn next_impl(&mut self) -> Option<u8> {
         if self.at_start_sentinel {
             self.at_start_sentinel = false;
@@ -386,6 +387,7 @@ impl<'a> Bytes<'a> {
         Some(byte)
     }
 
+    #[inline(always)]
     fn prev_impl(&mut self) -> Option<u8> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
@@ -446,7 +448,7 @@ impl<'a> Chars<'a> {
     /// Advances the iterator forward and returns the next value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     pub fn next(&mut self) -> Option<char> {
         if self.is_reversed {
             self.prev_impl()
@@ -458,7 +460,7 @@ impl<'a> Chars<'a> {
     /// Advances the iterator backward and returns the previous value.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     pub fn prev(&mut self) -> Option<char> {
         if self.is_reversed {
             self.next_impl()
@@ -481,7 +483,7 @@ impl<'a> Chars<'a> {
 
     //---------------------------------------------------------
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Chars {
         let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
         let first_chunk = chunks.next().unwrap_or("");
@@ -504,6 +506,7 @@ impl<'a> Chars<'a> {
         chars
     }
 
+    #[inline(always)]
     fn next_impl(&mut self) -> Option<char> {
         if self.at_start_sentinel {
             self.at_start_sentinel = false;
@@ -535,6 +538,7 @@ impl<'a> Chars<'a> {
         Some(char)
     }
 
+    #[inline(always)]
     fn prev_impl(&mut self) -> Option<char> {
         while self.byte_idx_in_chunk == 0 {
             if let Some(chunk) = self.chunks.prev() {
