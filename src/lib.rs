@@ -2,9 +2,9 @@
 //! texts and memory-incoherent edits with ease.
 //!
 //! Like Rust's built-in string types, Ropey stores text in utf8 and (with a
-//! handful of exceptions) uses byte indices into that encoding to specify
-//! positions in the text.  Invalid utf8 creation, such as by inserting into the
-//! middle of a multi-byte `char`, is enforced at run time.
+//! handful of exceptions) uses byte indices to specify positions in the text.
+//! Invalid utf8 creation, such as by inserting into the middle of a multi-byte
+//! `char`, is enforced at run time.
 //!
 //! The library is made up of four main components:
 //!
@@ -134,8 +134,8 @@ loading of non-utf8 text files.
 //! - `"Hello\nworld\n"` has 3 lines: `"Hello\n"`, `"world\n"`, and `""`.
 //!
 //! Importantly, **this departs from Rust's standard library**, which follows
-//! the Unix convention of treating `\n` as a line *ending* rather than a line
-//! *break*.  The reason for Ropey's departure from this is not to favor one
+//! the Unix convention of treating `\n` as a line *ending* rather than
+//! a line *break*.  The reason for Ropey's departure is not to favor one
 //! convention over the other, but rather is to avoid being opinionated: the
 //! Unix convention is not universal, and it is easier to implement the Unix
 //! convention on top of Ropey's behavior than the other way around.  Client
