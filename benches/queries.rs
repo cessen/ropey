@@ -148,20 +148,20 @@ fn get(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("chunk_at_byte", |bench| {
+    group.bench_function("chunk", |bench| {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_bytes();
         bench.iter(|| {
-            rope.chunk_at_byte(random::<usize>() % (len + 1));
+            rope.chunk(random::<usize>() % (len + 1));
         })
     });
 
-    group.bench_function("chunk_at_byte_slice", |bench| {
+    group.bench_function("chunk_slice", |bench| {
         let rope = Rope::from_str(&large_string());
         let slice = rope.slice(324..(rope.len_bytes() - 213));
         let len = slice.len_bytes();
         bench.iter(|| {
-            slice.chunk_at_byte(random::<usize>() % (len + 1));
+            slice.chunk(random::<usize>() % (len + 1));
         })
     });
 }
