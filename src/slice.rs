@@ -105,14 +105,15 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Creates a cheap,  non-editable `Rope` from the `RopeSlice`.
+    /// Creates a cheap, non-editable `Rope` from the `RopeSlice`.
     ///
-    /// The resulting `Rope` is guaranteed to not take up any additional data
-    /// itself beyond some tiny book keeping, instead referencing the original
-    /// data.  The difference between this and the `RopeSlice` it was created
-    /// from is that it co-owns the data with the original `Rope` just like a
-    /// `Rope` clone would, and thus can be passed around freely (e.g. across
-    /// thread boundaries).
+    /// The resulting `Rope` is guaranteed to not take up any additional
+    /// space itself beyond a small constant size, instead referencing the
+    /// original data.  The difference between this and a `RopeSlice` is that
+    /// this co-owns the data with the original `Rope` just like a `Rope`
+    /// clone would, and thus can be passed around freely (e.g. across thread
+    /// boundaries).  Additionally, its existence doesn't prevent the original
+    /// `Rope` from being edited.
     ///
     /// This is distinct from using `Into<Rope>` on a `RopeSlice`, which edits
     /// the resulting `Rope`'s data to trim it to the range of the slice, which
@@ -120,11 +121,12 @@ impl<'a> RopeSlice<'a> {
     /// method.  However, a `Rope` from `Into<Rope>` will be a normal editable
     /// `Rope`, whereas `Rope`s produced from this method are read-only.
     ///
-    /// NOTE: although the `Rope` from this won't take up any additional data,
-    /// as long as this `Rope` still exists edits to the original `Rope` will
-    /// cause data usage to grow the same way it does with normal `Rope` clones.
+    /// **You probably don't need to use this method.**  Stick with normal
+    /// `RopeSlice`s when you can.  This method only exists for weird corner
+    /// cases.
     ///
-    /// Runs in O(1) time and takes O(1) space at intitial creation.
+    /// Runs in O(1) time.  Space usage is constant unless the original `Rope`
+    /// is edited, causing the otherwise shared contents to diverge.
     ///
     /// # Panics
     ///
