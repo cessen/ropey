@@ -8,8 +8,9 @@ use crate::tree::{Children, Node, Text, MAX_CHILDREN, MAX_TEXT_SIZE, MIN_CHILDRE
 /// This is used to efficiently build ropes from sequences of text
 /// chunks.  It is useful for creating ropes from:
 ///
-/// - ...large text files, without pre-loading their entire contents into
-///   memory.
+/// - ...large text files, without pre-loading their entire contents into memory
+///   (but see [`from_reader()`](crate::Rope::from_reader) for a convenience
+///   function that does this for casual use cases).
 /// - ...streaming data sources.
 /// - ...non-utf8 text data, doing the encoding conversion incrementally
 ///   as you go.
