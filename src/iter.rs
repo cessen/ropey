@@ -432,6 +432,7 @@ pub struct Chars<'a> {
     current_chunk: &'a str,
     chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
+    at_start_sentinel: bool,
     is_reversed: bool,
 }
 
@@ -486,11 +487,21 @@ impl<'a> Chars<'a> {
             current_chunk: first_chunk,
             chunk_byte_idx: byte_start,
             byte_idx_in_chunk: at_byte_idx - byte_start,
+            at_start_sentinel: at_byte_idx == byte_range[0],
             is_reversed: false,
         }
     }
 
     fn next_impl(&mut self) -> Option<char> {
+        if self.at_start_sentinel {
+            self.at_start_sentinel = false;
+        } else {
+            self.byte_idx_in_chunk += 1;
+            while !self.current_chunk.is_char_boundary(self.byte_idx_in_chunk) {
+                self.byte_idx_in_chunk += 1;
+            }
+        }
+
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
             self.chunk_byte_idx += self.current_chunk.len();
             if let Some(chunk) = self.chunks.next() {
@@ -504,13 +515,11 @@ impl<'a> Chars<'a> {
         }
 
         // TODO: do this in a more efficient way than constructing a temporary
-        // iterator and then also redundantly recomputing its utf8 length which
-        // the internals of that temporary iterator clearly already know.
+        // iterator.
         let char = self.current_chunk[self.byte_idx_in_chunk..]
             .chars()
             .next()
             .unwrap();
-        self.byte_idx_in_chunk += char.len_utf8();
         Some(char)
     }
 
@@ -521,6 +530,9 @@ impl<'a> Chars<'a> {
                 self.chunk_byte_idx -= chunk.len();
                 self.byte_idx_in_chunk = chunk.len();
             } else {
+                self.current_chunk = "";
+                self.byte_idx_in_chunk = 0;
+                self.at_start_sentinel = true;
                 return None;
             }
         }
@@ -529,6 +541,7 @@ impl<'a> Chars<'a> {
         while !self.current_chunk.is_char_boundary(self.byte_idx_in_chunk) {
             self.byte_idx_in_chunk -= 1;
         }
+
         // TODO: do this in a more efficient way than constructing a temporary
         // iterator.
         let char = self.current_chunk[self.byte_idx_in_chunk..]
@@ -565,7 +578,12 @@ impl<'a> Iterator for Chars<'a> {
         let byte_len = if self.is_reversed {
             byte_idx - self.chunks.byte_range[0]
         } else {
-            self.chunks.byte_range[1] - byte_idx
+            // The use of 4 here is to be conservative, since that's the size of
+            // the largest possible UTF8 code point.  We could instead be exact
+            // and find the actual size of the next code point, but given that
+            // this is just an estimate anyway it doesn't seem worth it.
+            self.chunks.byte_range[1]
+                .saturating_sub(byte_idx + 4 - (self.at_start_sentinel as usize * 4))
         };
 
         let min = (byte_len + 3) / 4;
