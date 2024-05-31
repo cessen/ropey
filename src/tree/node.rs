@@ -146,7 +146,7 @@ impl Node {
                     // Not enough room to insert.  Need to split into two nodes.
                     let mut right_text = leaf_text.split(byte_idx);
                     let text_split_idx =
-                        crate::find_char_boundary_l(leaf_text.free_capacity(), text.as_bytes());
+                        crate::floor_char_boundary(leaf_text.free_capacity(), text.as_bytes());
                     leaf_text.append_str(&text[..text_split_idx]);
                     right_text.prepend_str(&text[text_split_idx..]);
                     leaf_text.distribute(&mut right_text);

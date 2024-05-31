@@ -73,7 +73,7 @@ impl RopeBuilder {
         while !chunk.is_empty() {
             if self.buffer.is_empty() && chunk.len() >= MAX_TEXT_SIZE {
                 // Process text data directly, skipping the buffer.
-                let split_idx = crate::find_char_boundary_l(MAX_TEXT_SIZE, chunk.as_bytes());
+                let split_idx = crate::floor_char_boundary(MAX_TEXT_SIZE, chunk.as_bytes());
                 self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&chunk[..split_idx]))));
                 chunk = &chunk[split_idx..];
             }
@@ -89,7 +89,7 @@ impl RopeBuilder {
             } else {
                 // Append to the buffer.
                 let target_len = MAX_TEXT_SIZE - self.buffer.len();
-                let split_idx = crate::find_char_boundary_l(target_len, chunk.as_bytes());
+                let split_idx = crate::floor_char_boundary(target_len, chunk.as_bytes());
                 self.buffer.push_str(&chunk[..split_idx]);
                 chunk = &chunk[split_idx..];
             }
@@ -148,7 +148,7 @@ impl RopeBuilder {
         let mut text = text;
 
         while !text.is_empty() {
-            let split_idx = crate::find_char_boundary_l(MAX_TEXT_SIZE, text.as_bytes());
+            let split_idx = crate::floor_char_boundary(MAX_TEXT_SIZE, text.as_bytes());
             self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&text[..split_idx]))));
             text = &text[split_idx..];
         }

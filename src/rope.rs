@@ -540,7 +540,7 @@ impl Rope {
             // splits at certain byte indices.  This is a subtle issue that in
             // practice only very rarely manifest, but causes panics when it
             // does.  Please do not remove that `- 4`!
-            let split_idx = crate::find_char_boundary_r(
+            let split_idx = crate::ceil_char_boundary(
                 text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
                 text.as_bytes(),
             );

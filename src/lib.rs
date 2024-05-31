@@ -256,13 +256,13 @@ pub(crate) fn is_char_boundary(byte_idx: usize, text: &[u8]) -> bool {
     (text[byte_idx] as i8) >= -0x40
 }
 
-/// Finds the closest byte index <= `byte_idx` that is a char boundary.
+/// Returns the closest byte index <= `byte_idx` that is a char boundary.
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
 ///
 /// Note for convenience, if `byte_idx > text.len()`, this simply returns
 /// `text.len()`.
-pub(crate) fn find_char_boundary_l(mut byte_idx: usize, text: &[u8]) -> usize {
+pub(crate) fn floor_char_boundary(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }
@@ -278,13 +278,13 @@ pub(crate) fn find_char_boundary_l(mut byte_idx: usize, text: &[u8]) -> usize {
     byte_idx
 }
 
-/// Finds the closest byte index >= `byte_idx` that is a char boundary.
+/// Returns the closest byte index >= `byte_idx` that is a char boundary.
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
 ///
 /// Note for convenience, if `byte_idx > text.len()`, this simply returns
 /// `text.len()`.
-pub(crate) fn find_char_boundary_r(mut byte_idx: usize, text: &[u8]) -> usize {
+pub(crate) fn ceil_char_boundary(mut byte_idx: usize, text: &[u8]) -> usize {
     if byte_idx >= text.len() {
         return text.len();
     }
