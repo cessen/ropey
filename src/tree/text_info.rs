@@ -311,7 +311,7 @@ impl TextInfo {
         sub_left: Option<&TextInfo>,
         sub_right: Option<&TextInfo>,
     ) -> TextInfo {
-        // Silce unused parameter warning when relevant features are disabled.
+        // Silence unused parameter warning when relevant features are disabled.
         let _ = (sub_left, sub_right);
 
         // This method only works correctly when all the TextInfo's involved
@@ -333,46 +333,54 @@ impl TextInfo {
         self += sub_new;
 
         #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        {
-            let mut crlf_compensation: isize = 0;
+        if let Some(left) = sub_left {
+            if left.ends_with_cr && sub_old.starts_with_lf && !sub_new.starts_with_lf {
+                self.increment_crlf_relevant_counts();
+            } else if left.ends_with_cr && !sub_old.starts_with_lf && sub_new.starts_with_lf {
+                self.decrement_crlf_relevant_counts();
+            }
+        } else {
+            self.starts_with_lf = sub_new.starts_with_lf;
+        }
 
-            if let Some(left) = sub_left {
-                if left.ends_with_cr {
-                    if sub_old.starts_with_lf && !sub_new.starts_with_lf {
-                        crlf_compensation += 1;
-                    } else if !sub_old.starts_with_lf && sub_new.starts_with_lf {
-                        crlf_compensation -= 1;
-                    }
-                }
-            } else {
-                self.starts_with_lf = sub_new.starts_with_lf;
+        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
+        if let Some(right) = sub_right {
+            if right.starts_with_lf && sub_old.ends_with_cr && !sub_new.ends_with_cr {
+                self.increment_crlf_relevant_counts();
+            } else if right.starts_with_lf && !sub_old.ends_with_cr && sub_new.ends_with_cr {
+                self.decrement_crlf_relevant_counts();
             }
-
-            if let Some(right) = sub_right {
-                if right.starts_with_lf {
-                    if sub_old.ends_with_cr && !sub_new.ends_with_cr {
-                        crlf_compensation += 1;
-                    } else if !sub_old.ends_with_cr && sub_new.ends_with_cr {
-                        crlf_compensation -= 1;
-                    }
-                }
-            } else {
-                self.ends_with_cr = sub_new.ends_with_cr;
-            }
-
-            #[cfg(feature = "metric_lines_lf_cr")]
-            {
-                self.line_breaks_cr_lf =
-                    (self.line_breaks_cr_lf as isize + crlf_compensation) as usize;
-            }
-            #[cfg(feature = "metric_lines_unicode")]
-            {
-                self.line_breaks_unicode =
-                    (self.line_breaks_unicode as isize + crlf_compensation) as usize;
-            }
+        } else {
+            self.ends_with_cr = sub_new.ends_with_cr;
         }
 
         self
+    }
+
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
+    #[inline(always)]
+    fn increment_crlf_relevant_counts(&mut self) {
+        #[cfg(feature = "metric_lines_lf_cr")]
+        {
+            self.line_breaks_cr_lf += 1;
+        }
+        #[cfg(feature = "metric_lines_unicode")]
+        {
+            self.line_breaks_unicode += 1;
+        }
+    }
+
+    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
+    #[inline(always)]
+    fn decrement_crlf_relevant_counts(&mut self) {
+        #[cfg(feature = "metric_lines_lf_cr")]
+        {
+            self.line_breaks_cr_lf -= 1;
+        }
+        #[cfg(feature = "metric_lines_unicode")]
+        {
+            self.line_breaks_unicode -= 1;
+        }
     }
 
     #[must_use]
