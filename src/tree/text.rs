@@ -332,7 +332,10 @@ mod inner {
             // SAFETY: We know the index is within the initialized part of
             // the buffer because of the guard clause above.
             let byte = unsafe { self.buffer[byte_idx].assume_init() };
-            (byte & 0xC0) != 0x80
+
+            // Trick from rust stdlib.  Equivalent to:
+            // `byte < 128 || byte >= 192`
+            (byte as i8) >= -0x40
         }
 
         /// Returns the text of the buffer as a string slice.

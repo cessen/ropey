@@ -249,9 +249,14 @@ impl Error {
 //=============================================================
 // Utilities.
 
-/// Starting from `byte_idx`, scans left to find the first byte index that is a
-/// char boundary.  Note that this is inclusive of `byte_idx` (if it is already
-/// a char boundary, `byte_idx` is returned).
+#[inline(always)]
+pub(crate) fn is_char_boundary(byte_idx: usize, text: &[u8]) -> bool {
+    // Trick from rust stdlib.  Equivalent to:
+    // `text[byte_idx] < 128 || text[byte_idx] >= 192`
+    (text[byte_idx] as i8) >= -0x40
+}
+
+/// Finds the closest byte index <= `byte_idx` that is a char boundary.
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
 ///
@@ -262,16 +267,18 @@ pub(crate) fn find_char_boundary_l(mut byte_idx: usize, text: &[u8]) -> usize {
         return text.len();
     }
 
-    while (text[byte_idx] >> 6) == 0b10 && byte_idx > 0 {
+    // The redundant `< text.len()` bounds check is for code gen.  For some
+    // reason the compiler (at time of writing) can't infer that `>= text.len()`
+    // is impossible from the if clause above without this, and that in turn
+    // results in needlessly bloated code gen.
+    while byte_idx > 0 && byte_idx < text.len() && !is_char_boundary(byte_idx, text) {
         byte_idx -= 1;
     }
 
     byte_idx
 }
 
-/// Starting from `byte_idx`, scans right to find the first byte index that is a
-/// char boundary.  Note that this is inclusive of `byte_idx` (if it is already
-/// a char boundary, `byte_idx` is returned).
+/// Finds the closest byte index >= `byte_idx` that is a char boundary.
 ///
 /// Precondition: `text` must be a well-formed utf8 string.
 ///
@@ -282,7 +289,7 @@ pub(crate) fn find_char_boundary_r(mut byte_idx: usize, text: &[u8]) -> usize {
         return text.len();
     }
 
-    while (text[byte_idx] >> 6) == 0b10 {
+    while byte_idx < text.len() && !is_char_boundary(byte_idx, text) {
         byte_idx += 1;
     }
 
