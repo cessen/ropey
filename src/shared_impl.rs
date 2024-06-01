@@ -90,6 +90,44 @@ macro_rules! shared_main_impl_methods {
             self.get_root().is_char_boundary(byte_idx)
         }
 
+        /// Returns the byte index of the closest char boundary less than or
+        /// equal to `byte_idx`.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        #[inline]
+        pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
+            assert!(byte_idx <= self.len_bytes());
+
+            let byte_idx = byte_idx + self.get_byte_range()[0];
+            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+
+            let floor = text.floor_char_boundary(byte_idx - offset) + offset;
+            floor - self.get_byte_range()[0]
+        }
+
+        /// Returns the byte index of the closest char boundary greater than or
+        /// equal to `byte_idx`.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        #[inline]
+        pub fn ceil_char_boundary(&self, byte_idx: usize) -> usize {
+            assert!(byte_idx <= self.len_bytes());
+
+            let byte_idx = byte_idx + self.get_byte_range()[0];
+            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+
+            let floor = text.ceil_char_boundary(byte_idx - offset) + offset;
+            floor - self.get_byte_range()[0]
+        }
+
         //-----------------------------------------------------
         // Fetching.
 

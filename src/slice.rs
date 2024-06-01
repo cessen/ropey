@@ -274,7 +274,6 @@ mod tests {
                               we're alive?\nこんにちは、みんなさん！";
 
     // 143 bytes, 107 chars, 111 utf16 code units, 1 line
-    #[cfg(feature = "metric_utf16")]
     const TEXT_EMOJI: &str = "Hello there!🐸  How're you doing?🐸  It's \
                               a fine day, isn't it?🐸  Aren't you glad \
                               we're alive?🐸  こんにちは、みんなさん！";
@@ -455,6 +454,52 @@ mod tests {
         for i in 0..s.len_bytes() {
             assert_eq!(t.is_char_boundary(i), s.is_char_boundary(i));
         }
+    }
+
+    #[test]
+    fn floor_char_boundary_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(3..137);
+
+        assert_eq!(0, s.floor_char_boundary(0));
+        assert_eq!(1, s.floor_char_boundary(1));
+        assert_eq!(2, s.floor_char_boundary(2));
+
+        assert_eq!(9, s.floor_char_boundary(9));
+        assert_eq!(9, s.floor_char_boundary(10));
+        assert_eq!(9, s.floor_char_boundary(11));
+        assert_eq!(9, s.floor_char_boundary(12));
+        assert_eq!(13, s.floor_char_boundary(13));
+
+        assert_eq!(104, s.floor_char_boundary(104));
+        assert_eq!(104, s.floor_char_boundary(105));
+        assert_eq!(104, s.floor_char_boundary(106));
+        assert_eq!(107, s.floor_char_boundary(107));
+
+        assert_eq!(134, s.floor_char_boundary(134));
+    }
+
+    #[test]
+    fn ceil_char_boundary_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(3..137);
+
+        assert_eq!(0, s.ceil_char_boundary(0));
+        assert_eq!(1, s.floor_char_boundary(1));
+        assert_eq!(2, s.floor_char_boundary(2));
+
+        assert_eq!(9, s.ceil_char_boundary(9));
+        assert_eq!(13, s.ceil_char_boundary(10));
+        assert_eq!(13, s.ceil_char_boundary(11));
+        assert_eq!(13, s.ceil_char_boundary(12));
+        assert_eq!(13, s.ceil_char_boundary(13));
+
+        assert_eq!(104, s.ceil_char_boundary(104));
+        assert_eq!(107, s.ceil_char_boundary(105));
+        assert_eq!(107, s.ceil_char_boundary(106));
+        assert_eq!(107, s.ceil_char_boundary(107));
+
+        assert_eq!(134, s.ceil_char_boundary(134));
     }
 
     #[cfg(feature = "metric_chars")]
