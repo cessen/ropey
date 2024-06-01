@@ -142,75 +142,6 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
-    /// Trims a single trailing line break off the end if there is one.
-    ///
-    /// Note: a CRLF pair is always treated as a single unit and trimmed
-    /// together, even with `LineType::LF` where CR on its own is not trimmed.
-    ///
-    /// Runs in O(log N) time.
-    #[cfg(any(
-        feature = "metric_lines_lf",
-        feature = "metric_lines_lf_cr",
-        feature = "metric_lines_unicode"
-    ))]
-    pub fn trim_line_break(self, line_type: LineType) -> RopeSlice<'a> {
-        // Silence unused parameter warning with certain feature configurations.
-        let _ = line_type;
-
-        if self.len_bytes() == 0 {
-            return self;
-        }
-
-        let last_byte = self.byte(self.len_bytes() - 1);
-
-        // First handle LF and CRLF since that's the most typical case, and also
-        // because it's the same for all line types.
-        if last_byte == 0x0A {
-            let split_idx = if self.len_bytes() > 1 && self.byte(self.len_bytes() - 2) == 0x0D {
-                self.len_bytes() - 2
-            } else {
-                self.len_bytes() - 1
-            };
-            return self.slice(..split_idx);
-        }
-
-        // That was the only case for `LineType::LF`, so early out if that's the
-        // line type.
-        #[cfg(feature = "metric_lines_lf")]
-        if line_type == LineType::LF {
-            return self;
-        }
-
-        // Next we handle CR on its own.
-        if last_byte == 0x0D {
-            return self.slice(..(self.len_bytes() - 1));
-        }
-
-        // That was the last case for `LineType::LF_CR`, so early out if that's
-        // the line type.
-        #[cfg(feature = "metric_lines_lf_cr")]
-        if line_type == LineType::LF_CR {
-            return self;
-        }
-
-        // Last char and its byte index.
-        let last_char_byte_idx = self.floor_char_boundary(self.len_bytes() - 1);
-        let last_char = self.char_at_byte(last_char_byte_idx);
-
-        // Handle the remaining unicode cases.
-        match last_char as u32 {
-            0x000B | // VT (Vertical Tab)
-            0x000C | // FF (Form Feed)
-            0x0085 | // NEL (Next Line)
-            0x2028 | // Line Separator
-            0x2029   // Paragraph Separator
-            => self.slice(..last_char_byte_idx),
-
-            // No trailing line break, so just return as-is.
-            _ => self
-        }
-    }
-
     //---------------------------------------------------------
     // Methods shared between Rope and RopeSlice.
 
@@ -1158,61 +1089,42 @@ mod tests {
 
     #[cfg(feature = "metric_lines_lf")]
     #[test]
-    fn trim_line_break_lf_01() {
+    fn trailing_line_break_idx_lf_01() {
+        use LineType::LF;
         let r = Rope::from_str("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n\n");
-        let s = r.slice(..);
 
-        let s1 = s.trim_line_break(LineType::LF);
-        let s2 = s1.trim_line_break(LineType::LF);
-        let s3 = s2.trim_line_break(LineType::LF);
-
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n", s1);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r", s2);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r", s3);
+        assert_eq!(Some(18), r.slice(..19).trailing_line_break_idx(LF));
+        assert_eq!(Some(16), r.slice(..18).trailing_line_break_idx(LF));
+        assert_eq!(None, r.slice(..16).trailing_line_break_idx(LF));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    fn trim_line_break_lf_cr_01() {
+    fn trailing_line_break_idx_lf_cr_01() {
+        use LineType::LF_CR;
         let r = Rope::from_str("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n\n");
-        let s = r.slice(..);
 
-        let s1 = s.trim_line_break(LineType::LF_CR);
-        let s2 = s1.trim_line_break(LineType::LF_CR);
-        let s3 = s2.trim_line_break(LineType::LF_CR);
-        let s4 = s3.trim_line_break(LineType::LF_CR);
-
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n", s1);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r", s2);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}", s3);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}", s4);
+        assert_eq!(Some(18), r.slice(..19).trailing_line_break_idx(LF_CR));
+        assert_eq!(Some(16), r.slice(..18).trailing_line_break_idx(LF_CR));
+        assert_eq!(Some(15), r.slice(..16).trailing_line_break_idx(LF_CR));
+        assert_eq!(None, r.slice(..15).trailing_line_break_idx(LF_CR));
     }
 
     #[cfg(feature = "metric_lines_unicode")]
     #[test]
-    fn trim_line_break_unicode_01() {
+    fn trailing_line_break_idx_unicode_01() {
+        use LineType::All;
         let r = Rope::from_str("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n\n");
-        let s = r.slice(..);
 
-        let s1 = s.trim_line_break(LineType::All);
-        let s2 = s1.trim_line_break(LineType::All);
-        let s3 = s2.trim_line_break(LineType::All);
-        let s4 = s3.trim_line_break(LineType::All);
-        let s5 = s4.trim_line_break(LineType::All);
-        let s6 = s5.trim_line_break(LineType::All);
-        let s7 = s6.trim_line_break(LineType::All);
-        let s8 = s7.trim_line_break(LineType::All);
-        let s9 = s8.trim_line_break(LineType::All);
-
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n", s1);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r", s2);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}", s3);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}\u{0C}", s4);
-        assert_eq!("Hello\u{2029}\u{2028}\u{85}", s5);
-        assert_eq!("Hello\u{2029}\u{2028}", s6);
-        assert_eq!("Hello\u{2029}", s7);
-        assert_eq!("Hello", s8);
-        assert_eq!("Hello", s9);
+        assert_eq!(Some(18), r.slice(..19).trailing_line_break_idx(All));
+        assert_eq!(Some(16), r.slice(..18).trailing_line_break_idx(All));
+        assert_eq!(Some(15), r.slice(..16).trailing_line_break_idx(All));
+        assert_eq!(Some(14), r.slice(..15).trailing_line_break_idx(All));
+        assert_eq!(Some(13), r.slice(..14).trailing_line_break_idx(All));
+        assert_eq!(Some(11), r.slice(..13).trailing_line_break_idx(All));
+        assert_eq!(Some(8), r.slice(..11).trailing_line_break_idx(All));
+        assert_eq!(Some(5), r.slice(..8).trailing_line_break_idx(All));
+        assert_eq!(None, r.slice(..5).trailing_line_break_idx(All));
     }
 
     fn test_chunk(s: RopeSlice, text: &str) {

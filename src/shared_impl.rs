@@ -128,6 +128,75 @@ macro_rules! shared_main_impl_methods {
             floor - self.get_byte_range()[0]
         }
 
+        /// If there is a trailing line break, returns its byte index.  Otherwise
+        /// returns `None`.
+        ///
+        /// Note: a CRLF pair is always treated as a single unit, and thus this
+        /// function will return the index of the CR in such cases, even with
+        /// `LineType::LF` where CR is not on its own recognized as a line break.
+        ///
+        /// Runs in O(log N) time.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        ))]
+        pub fn trailing_line_break_idx(&self, line_type: LineType) -> Option<usize> {
+            // Silence unused parameter warning with certain feature configurations.
+            let _ = line_type;
+
+            if self.len_bytes() == 0 {
+                return None;
+            }
+
+            let last_byte = self.byte(self.len_bytes() - 1);
+
+            // First handle LF and CRLF since that's the most typical case, and also
+            // because it's the same for all line types.
+            if last_byte == 0x0A {
+                return if self.len_bytes() > 1 && self.byte(self.len_bytes() - 2) == 0x0D {
+                    Some(self.len_bytes() - 2)
+                } else {
+                    Some(self.len_bytes() - 1)
+                };
+            }
+
+            // That was the only case for `LineType::LF`, so early out if that's the
+            // line type.
+            #[cfg(feature = "metric_lines_lf")]
+            if line_type == LineType::LF {
+                return None;
+            }
+
+            // Next we handle CR on its own.
+            if last_byte == 0x0D {
+                return Some(self.len_bytes() - 1);
+            }
+
+            // That was the last case for `LineType::LF_CR`, so early out if that's
+            // the line type.
+            #[cfg(feature = "metric_lines_lf_cr")]
+            if line_type == LineType::LF_CR {
+                return None;
+            }
+
+            // Last char and its byte index.
+            let last_char_byte_idx = self.floor_char_boundary(self.len_bytes() - 1);
+            let last_char = self.char_at_byte(last_char_byte_idx);
+
+            // Handle the remaining unicode cases.
+            match last_char as u32 {
+                0x000B | // VT (Vertical Tab)
+                0x000C | // FF (Form Feed)
+                0x0085 | // NEL (Next Line)
+                0x2028 | // Line Separator
+                0x2029   // Paragraph Separator
+                => Some(last_char_byte_idx),
+
+                _ => None
+            }
+        }
+
         //-----------------------------------------------------
         // Fetching.
 
