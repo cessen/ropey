@@ -146,6 +146,8 @@ impl<'a> RopeSlice<'a> {
     ///
     /// Note: a CRLF pair is always treated as a single unit and trimmed
     /// together, even with `LineType::LF` where CR on its own is not trimmed.
+    ///
+    /// Runs in O(log N) time.
     #[cfg(any(
         feature = "metric_lines_lf",
         feature = "metric_lines_lf_cr",
