@@ -14,11 +14,20 @@ use ropey::Rope;
 use ropey::LineType;
 
 const TEXT_SMALL: &str = include_str!("small.txt");
+const TEXT_SMALL_MULTIBYTE: &str = include_str!("small_multibyte.txt");
 
 fn large_string() -> String {
     let mut text = String::new();
     for _ in 0..1000 {
         text.push_str(TEXT_SMALL);
+    }
+    text
+}
+
+fn large_string_multibyte() -> String {
+    let mut text = String::new();
+    for _ in 0..1000 {
+        text.push_str(TEXT_SMALL_MULTIBYTE);
     }
     text
 }
@@ -101,6 +110,64 @@ fn index_convert(c: &mut Criterion) {
     });
 }
 
+fn index_query(c: &mut Criterion) {
+    let mut group = c.benchmark_group("index_query");
+
+    group.bench_function("is_char_boundary", |bench| {
+        let rope = Rope::from_str(&large_string_multibyte());
+        let len = rope.len_bytes();
+        bench.iter(|| {
+            rope.is_char_boundary(random::<usize>() % (len + 1));
+        })
+    });
+
+    group.bench_function("floor_char_boundary", |bench| {
+        let rope = Rope::from_str(&large_string_multibyte());
+        let len = rope.len_bytes();
+        bench.iter(|| {
+            rope.floor_char_boundary(random::<usize>() % (len + 1));
+        })
+    });
+
+    group.bench_function("ceil_char_boundary", |bench| {
+        let rope = Rope::from_str(&large_string_multibyte());
+        let len = rope.len_bytes();
+        bench.iter(|| {
+            rope.ceil_char_boundary(random::<usize>() % (len + 1));
+        })
+    });
+
+    #[cfg(feature = "metric_lines_lf")]
+    group.bench_function("trailing_line_break_idx_lf", |bench| {
+        let mut text = large_string();
+        text.push_str("\n");
+        let rope = Rope::from_str(&text);
+        bench.iter(|| {
+            rope.trailing_line_break_idx(LineType::LF);
+        })
+    });
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    group.bench_function("trailing_line_break_idx_lf_cr", |bench| {
+        let mut text = large_string();
+        text.push_str("\r\n");
+        let rope = Rope::from_str(&text);
+        bench.iter(|| {
+            rope.trailing_line_break_idx(LineType::LF_CR);
+        })
+    });
+
+    #[cfg(feature = "metric_lines_unicode")]
+    group.bench_function("trailing_line_break_idx_unicode", |bench| {
+        let mut text = large_string();
+        text.push_str("\u{2028}");
+        let rope = Rope::from_str(&text);
+        bench.iter(|| {
+            rope.trailing_line_break_idx(LineType::All);
+        })
+    });
+}
+
 fn get(c: &mut Criterion) {
     let mut group = c.benchmark_group("get");
 
@@ -140,7 +207,7 @@ fn get(c: &mut Criterion) {
     });
 
     #[cfg(feature = "metric_lines_unicode")]
-    group.bench_function("line_lf", |bench| {
+    group.bench_function("line_unicode", |bench| {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::All);
         bench.iter(|| {
@@ -227,5 +294,5 @@ fn slice(c: &mut Criterion) {
 
 //----
 
-criterion_group!(benches, index_convert, get, slice,);
+criterion_group!(benches, index_convert, index_query, get, slice,);
 criterion_main!(benches);
