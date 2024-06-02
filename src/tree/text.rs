@@ -65,16 +65,6 @@ impl Text {
         self.0.is_char_boundary(byte_idx)
     }
 
-    #[inline(always)]
-    pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
-        crate::floor_char_boundary(byte_idx, self.0.text().as_bytes())
-    }
-
-    #[inline(always)]
-    pub fn ceil_char_boundary(&self, byte_idx: usize) -> usize {
-        crate::ceil_char_boundary(byte_idx, self.0.text().as_bytes())
-    }
-
     //---------------------------------------------------------
     // Metric conversions.
 

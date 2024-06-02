@@ -251,6 +251,10 @@ impl Error {
 
 #[inline(always)]
 pub(crate) fn is_char_boundary(byte_idx: usize, text: &[u8]) -> bool {
+    if byte_idx == text.len() {
+        return true;
+    }
+
     // Trick from rust stdlib.  Equivalent to:
     // `text[byte_idx] < 128 || text[byte_idx] >= 192`
     (text[byte_idx] as i8) >= -0x40

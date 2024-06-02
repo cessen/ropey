@@ -483,11 +483,6 @@ impl Node {
     //---------------------------------------------------------
     // Misc.
 
-    pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-        let (text, offset) = self.get_text_at_byte_fast(byte_idx);
-        text.is_char_boundary(byte_idx - offset)
-    }
-
     /// Returns whether splitting at `byte_idx` would split a CRLF pair, if such
     /// a split would be relevant to the line-counting metrics of `line_type`.
     ///

@@ -86,8 +86,8 @@ macro_rules! shared_main_impl_methods {
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
             assert!(byte_idx <= self.len_bytes());
 
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            self.get_root().is_char_boundary(byte_idx)
+            let (text, offset) = self.chunk(byte_idx);
+            crate::is_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// Returns the byte index of the closest char boundary less than or
@@ -102,11 +102,8 @@ macro_rules! shared_main_impl_methods {
         pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
             assert!(byte_idx <= self.len_bytes());
 
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-
-            let floor = text.floor_char_boundary(byte_idx - offset) + offset;
-            floor - self.get_byte_range()[0]
+            let (text, offset) = self.chunk(byte_idx);
+            offset + crate::floor_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// Returns the byte index of the closest char boundary greater than or
@@ -121,11 +118,8 @@ macro_rules! shared_main_impl_methods {
         pub fn ceil_char_boundary(&self, byte_idx: usize) -> usize {
             assert!(byte_idx <= self.len_bytes());
 
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-
-            let floor = text.ceil_char_boundary(byte_idx - offset) + offset;
-            floor - self.get_byte_range()[0]
+            let (text, offset) = self.chunk(byte_idx);
+            offset + crate::ceil_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// If there is a trailing line break, returns its byte index.
@@ -700,10 +694,8 @@ macro_rules! shared_no_panic_impl_methods {
                 return None;
             }
 
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
-
-            Some(text.text().as_bytes()[byte_idx - offset])
+            let (text, offset) = self.chunk(byte_idx);
+            Some(text.as_bytes()[byte_idx - offset])
         }
 
         pub fn try_char_at_byte(&self, byte_idx: usize) -> Result<char> {
@@ -711,17 +703,16 @@ macro_rules! shared_no_panic_impl_methods {
                 return Err(OutOfBounds);
             }
 
-            let byte_idx = byte_idx + self.get_byte_range()[0];
-            let (text, offset) = self.get_root().get_text_at_byte_fast(byte_idx);
+            let (text, offset) = self.chunk(byte_idx);
             let local_idx = byte_idx - offset;
 
-            if !text.text().is_char_boundary(local_idx) {
+            if !crate::is_char_boundary(local_idx, text.as_bytes()) {
                 return Err(NonCharBoundary);
             }
 
             // TODO: something more efficient than constructing a temporary
             // iterator.
-            Ok(text.text()[(byte_idx - offset)..].chars().next().unwrap())
+            Ok(text[(byte_idx - offset)..].chars().next().unwrap())
         }
 
         #[cfg(any(
