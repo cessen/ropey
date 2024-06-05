@@ -65,7 +65,7 @@
 //! the direction of the iterator in-place, without changing its position in
 //! the text.
 
-use crate::tree::Node;
+use crate::{tree::Node, ChunkCursor};
 
 //=============================================================
 
@@ -94,21 +94,8 @@ use crate::tree::Node;
 /// with line breaks, they may split graphemes like CRLF, etc.
 #[derive(Debug, Clone)]
 pub struct Chunks<'a> {
-    node_stack: Vec<(&'a Node, usize)>, // (node ref, index of current child)
-
-    // The byte range within the root node that is considered part of this
-    // iterator's contents.
-    byte_range: [usize; 2],
-
-    // The offset within the root node (*not* `byte_range`) that of the current
-    // un-trimmed chunk.
-    current_byte_idx: usize,
-
-    // An indicator that we are at the start of the iterator, before* the first
-    // *chunk.  This is needed to distinguish e.g. `current_byte_idx == 0` from
-    // *meaning we're on the first chunk vs before it.
-    at_start_sentinel: bool,
-
+    cursor: ChunkCursor<'a>,
+    at_end: bool,
     is_reversed: bool,
 }
 
@@ -150,14 +137,6 @@ impl<'a> Chunks<'a> {
         self
     }
 
-    /// Returns the byte offset of the current chunk from the start of the text.
-    #[inline]
-    pub fn byte_offset(&self) -> usize {
-        self.current_byte_idx
-            .saturating_sub(self.byte_range[0])
-            .min(self.byte_range[1] - self.byte_range[0])
-    }
-
     //---------------------------------------------------------
 
     /// Returns the Chunks iterator as well as the actual start byte of the
@@ -167,172 +146,46 @@ impl<'a> Chunks<'a> {
     /// In particular, `at_byte_idx` is NOT relative to `byte_range`, it is an
     /// offset from the start of the full contents of `node`.
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> (Chunks, usize) {
-        debug_assert!(byte_range[0] <= at_byte_idx && at_byte_idx <= byte_range[1]);
+        let cursor = ChunkCursor::new(node, byte_range, at_byte_idx);
+        let byte_offset = byte_range[0] + cursor.byte_offset();
 
-        // Special case: if it's an empty rope, don't store anything.
-        if byte_range[0] == byte_range[1] || node.is_empty() {
-            return (
-                Chunks {
-                    node_stack: vec![],
-                    byte_range: [0, 0],
-                    current_byte_idx: 0,
-                    at_start_sentinel: true,
-                    is_reversed: false,
-                },
-                0,
-            );
-        }
-
-        let mut chunks = Chunks {
-            node_stack: vec![],
-            byte_range: byte_range,
-            current_byte_idx: 0,
-            at_start_sentinel: false,
+        let chunks = Chunks {
+            cursor: cursor,
+            at_end: at_byte_idx == byte_range[1],
             is_reversed: false,
         };
 
-        // Find the chunk the contains `at_byte_idx` and set that as the current
-        // chunk of the iterator.
-        let mut current_node = node;
-        let mut local_byte_idx = at_byte_idx;
-        loop {
-            match *current_node {
-                Node::Leaf(ref text) => {
-                    if at_byte_idx >= byte_range[1] {
-                        chunks.current_byte_idx += text.len();
-                    }
-                    chunks.node_stack.push((current_node, 0));
-                    break;
-                }
-
-                Node::Internal(ref children) => {
-                    let (child_i, acc_byte_idx) = children.search_byte_idx_only(local_byte_idx);
-
-                    chunks.current_byte_idx += acc_byte_idx;
-                    local_byte_idx -= acc_byte_idx;
-
-                    chunks.node_stack.push((current_node, child_i));
-                    current_node = &children.nodes()[child_i];
-                }
-            }
-        }
-
-        let byte_offset = chunks.current_byte_idx;
-
-        // Take one step back so that `.next()` will return the chunk that
-        // we found.
-        chunks.prev();
-
-        (chunks, byte_offset.max(byte_range[0]).min(byte_range[1]))
-    }
-
-    fn current_chunk(&self) -> Option<&'a str> {
-        if self.at_start_sentinel || self.current_byte_idx >= self.byte_range[1] {
-            return None;
-        }
-
-        let text = self.node_stack.last().unwrap().0.leaf_text();
-        let trimmed_chunk = {
-            let mut chunk = text.text();
-            if (self.current_byte_idx + chunk.len()) > self.byte_range[1] {
-                chunk = &chunk[..(self.byte_range[1] - self.current_byte_idx)];
-            }
-            if self.current_byte_idx < self.byte_range[0] {
-                chunk = &chunk[(self.byte_range[0] - self.current_byte_idx)..];
-            }
-            chunk
-        };
-
-        Some(trimmed_chunk)
+        (chunks, byte_offset)
     }
 
     fn next_impl(&mut self) -> Option<&'a str> {
-        // Already at the end, or it's an empty rope.
-        if self.current_byte_idx >= self.byte_range[1] || self.node_stack.is_empty() {
-            return None;
-        }
+        loop {
+            if self.at_end {
+                return None;
+            } else {
+                let chunk = self.cursor.chunk();
+                self.at_end = !self.cursor.next();
 
-        // Just starting.
-        if self.at_start_sentinel {
-            self.at_start_sentinel = false;
-            return self.current_chunk();
-        }
-
-        self.current_byte_idx += self.node_stack.last().unwrap().0.leaf_text().len();
-
-        // Progress the stack.
-        if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
-            // Start at the node above the leaf.
-            let mut stack_idx = self.node_stack.len() - 2;
-
-            // Find the deepest node that's not at its end already.
-            while self.node_stack[stack_idx].1 >= (self.node_stack[stack_idx].0.child_count() - 1) {
-                debug_assert!(stack_idx > 0);
-                stack_idx -= 1;
+                if !chunk.is_empty() {
+                    return Some(chunk);
+                }
             }
-
-            // Refill the stack starting from that node.
-            self.node_stack[stack_idx].1 += 1;
-            while self.node_stack[stack_idx].0.is_internal() {
-                let child_i = self.node_stack[stack_idx].1;
-                let node = &self.node_stack[stack_idx].0.children().nodes()[child_i];
-
-                stack_idx += 1;
-                self.node_stack[stack_idx] = (node, 0);
-            }
-
-            debug_assert!(stack_idx == self.node_stack.len() - 1);
         }
-
-        // Finally, return the chunk text.
-        self.current_chunk()
     }
 
     fn prev_impl(&mut self) -> Option<&'a str> {
-        // Already at the start, or it's an empty rope.
-        if self.current_byte_idx <= self.byte_range[0] || self.node_stack.is_empty() {
-            self.at_start_sentinel = true;
-            return None;
-        }
-
-        // Just getting started at the end.
-        if self.current_byte_idx >= self.byte_range[1] {
-            self.current_byte_idx -= self.node_stack.last().unwrap().0.leaf_text().len();
-            return self.current_chunk();
-        }
-
-        // Progress the stack backwards.
-        if self.node_stack.len() > 1 {
-            // Start at the node above the leaf.
-            let mut stack_idx = self.node_stack.len() - 2;
-
-            // Find the deepest node that's not at its start already.
-            while self.node_stack[stack_idx].1 == 0 {
-                debug_assert!(stack_idx > 0);
-                stack_idx -= 1;
+        loop {
+            if self.at_end {
+                self.at_end = false;
+            } else if !self.cursor.prev() {
+                return None;
             }
 
-            // Refill the stack starting from that node.
-            self.node_stack[stack_idx].1 -= 1;
-            while self.node_stack[stack_idx].0.is_internal() {
-                let child_i = self.node_stack[stack_idx].1;
-                let node = &self.node_stack[stack_idx].0.children().nodes()[child_i];
-                let position = match *node {
-                    Node::Leaf(_) => 0,
-                    Node::Internal(ref children) => children.len() - 1,
-                };
-
-                stack_idx += 1;
-                self.node_stack[stack_idx] = (node, position);
+            let chunk = self.cursor.chunk();
+            if !chunk.is_empty() {
+                return Some(chunk);
             }
-
-            debug_assert!(stack_idx == self.node_stack.len() - 1);
         }
-
-        self.current_byte_idx -= self.node_stack.last().unwrap().0.leaf_text().len();
-
-        // Finally, return the chunk text.
-        self.current_chunk()
     }
 }
 
@@ -356,25 +209,18 @@ impl<'a> Iterator for Chunks<'a> {
 
         use crate::tree::MAX_TEXT_SIZE;
 
-        let byte_idx = self
-            .current_byte_idx
-            .max(self.byte_range[0])
-            .min(self.byte_range[1]);
-
         let byte_len = if self.is_reversed {
-            byte_idx - self.byte_range[0]
+            if self.at_end {
+                self.cursor.byte_offset() + self.cursor.chunk().len()
+            } else {
+                self.cursor.byte_offset()
+            }
         } else {
-            // The `fudge` is to account for the fact that the next yielded
-            // chunk is *after* the current one.  If we wanted to be exact we
-            // would instead use the size of the current chunk, but that's not
-            // really worth the performance hit for something that's just an
-            // estimate anyway.
-            let fudge = if self.at_start_sentinel {
+            if self.at_end {
                 0
             } else {
-                MAX_TEXT_SIZE
-            };
-            self.byte_range[1].saturating_sub(byte_idx + fudge)
+                self.cursor.byte_offset_from_end()
+            }
         };
 
         let min = (byte_len + MAX_TEXT_SIZE - 1) / MAX_TEXT_SIZE;
@@ -512,14 +358,15 @@ impl<'a> Iterator for Bytes<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
-        let len = if self.is_reversed {
-            byte_idx - self.chunks.byte_range[0]
-        } else {
-            self.chunks.byte_range[1]
-                .saturating_sub(byte_idx + 1 - (self.at_start_sentinel as usize))
-        };
-        (len, Some(len))
+        todo!()
+        // let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
+        // let len = if self.is_reversed {
+        //     byte_idx - self.chunks.byte_range[0]
+        // } else {
+        //     self.chunks.byte_range[1]
+        //         .saturating_sub(byte_idx + 1 - (self.at_start_sentinel as usize))
+        // };
+        // (len, Some(len))
     }
 }
 
@@ -675,31 +522,32 @@ impl<'a> Iterator for Chars<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        // We give a min/max based on the smallest and largest possible code
-        // points in UTF8.  Smallest is 1 byte, largest is 4 bytes.
-        //
-        // Note: if the `metric_chars` feature is enabled, we could go to the
-        // trouble of computing the exact length in chars.  However, that would
-        // involve some complications that probably aren't worth it.  And in any
-        // case it would make this behave differently depending on that feature,
-        // and this iterator isn't actually supposed to have anything to do with
-        // that feature.
+        todo!()
+        // // We give a min/max based on the smallest and largest possible code
+        // // points in UTF8.  Smallest is 1 byte, largest is 4 bytes.
+        // //
+        // // Note: if the `metric_chars` feature is enabled, we could go to the
+        // // trouble of computing the exact length in chars.  However, that would
+        // // involve some complications that probably aren't worth it.  And in any
+        // // case it would make this behave differently depending on that feature,
+        // // and this iterator isn't actually supposed to have anything to do with
+        // // that feature.
 
-        let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
-        let byte_len = if self.is_reversed {
-            byte_idx - self.chunks.byte_range[0]
-        } else {
-            // The use of 4 here is to be conservative, since that's the size of
-            // the largest possible UTF8 code point.  We could instead be exact
-            // and find the actual size of the next code point, but given that
-            // this is just an estimate anyway it doesn't seem worth it.
-            self.chunks.byte_range[1]
-                .saturating_sub(byte_idx + 4 - (self.at_start_sentinel as usize * 4))
-        };
+        // let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
+        // let byte_len = if self.is_reversed {
+        //     byte_idx - self.chunks.byte_range[0]
+        // } else {
+        //     // The use of 4 here is to be conservative, since that's the size of
+        //     // the largest possible UTF8 code point.  We could instead be exact
+        //     // and find the actual size of the next code point, but given that
+        //     // this is just an estimate anyway it doesn't seem worth it.
+        //     self.chunks.byte_range[1]
+        //         .saturating_sub(byte_idx + 4 - (self.at_start_sentinel as usize * 4))
+        // };
 
-        let min = (byte_len + 3) / 4;
-        let max = byte_len;
-        (min, Some(max))
+        // let min = (byte_len + 3) / 4;
+        // let max = byte_len;
+        // (min, Some(max))
     }
 }
 
@@ -965,16 +813,12 @@ mod tests {
         let mut stack = Vec::new();
 
         // Forward.
-        let mut byte_offset = 0;
         while let Some(chunk) = chunks.next() {
             assert_eq!(&text[..chunk.len()], chunk);
-            assert_eq!(chunks.byte_offset(), byte_offset);
             stack.push(chunk);
-            byte_offset += chunk.len();
             text = &text[chunk.len()..];
         }
         assert_eq!("", text);
-        assert_eq!(chunks.byte_offset(), TEXT.len());
 
         // Backward.
         while let Some(chunk) = chunks.prev() {
@@ -1015,11 +859,8 @@ mod tests {
         let r = Rope::from_str("");
 
         let mut chunks = r.chunks();
-        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.next());
-        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.prev());
-        assert_eq!(chunks.byte_offset(), 0);
     }
 
     #[test]
@@ -1057,21 +898,13 @@ mod tests {
 
         let mut chunks = s.chunks();
 
-        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(Some("rld!"), chunks.next());
-        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(Some("Hello "), chunks.next());
-        assert_eq!(chunks.byte_offset(), 4);
         assert_eq!(Some("world!"), chunks.next());
-        assert_eq!(chunks.byte_offset(), 10);
         assert_eq!(Some("Hello "), chunks.next());
-        assert_eq!(chunks.byte_offset(), 16);
         assert_eq!(Some("world!"), chunks.next());
-        assert_eq!(chunks.byte_offset(), 22);
         assert_eq!(Some("Hell"), chunks.next());
-        assert_eq!(chunks.byte_offset(), 28);
         assert_eq!(None, chunks.next());
-        assert_eq!(chunks.byte_offset(), 32);
 
         assert_eq!(Some("Hell"), chunks.prev());
         assert_eq!(Some("world!"), chunks.prev());
@@ -1088,11 +921,8 @@ mod tests {
         let s = r.slice(14..14);
 
         let mut chunks = s.chunks();
-        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.next());
-        assert_eq!(chunks.byte_offset(), 0);
         assert_eq!(None, chunks.prev());
-        assert_eq!(chunks.byte_offset(), 0);
     }
 
     #[test]
@@ -1101,13 +931,12 @@ mod tests {
         let mut chunks = r.chunks();
 
         assert_eq!(Some("A"), chunks.next());
-        assert_eq!(None, chunks.prev());
-
-        assert_eq!(Some("A"), chunks.next());
         assert_eq!(None, chunks.next());
         assert_eq!(Some("A"), chunks.prev());
         assert_eq!(None, chunks.prev());
 
+        assert_eq!(Some("A"), chunks.next());
+        assert_eq!(Some("A"), chunks.prev());
         assert_eq!(Some("A"), chunks.next());
     }
 
@@ -1118,29 +947,31 @@ mod tests {
         let mut chunks = r.chunks();
 
         assert_eq!(Some("ABC"), chunks.next());
+        assert_eq!(Some("ABC"), chunks.prev());
         assert_eq!(None, chunks.prev());
 
         assert_eq!(Some("ABC"), chunks.next());
         assert_eq!(Some("DEF"), chunks.next());
-        assert_eq!(Some("ABC"), chunks.prev());
+        assert_eq!(Some("DEF"), chunks.prev());
 
         assert_eq!(Some("DEF"), chunks.next());
         assert_eq!(Some("GHI"), chunks.next());
         assert_eq!(Some("JKL"), chunks.next());
-        assert_eq!(Some("GHI"), chunks.prev());
+        assert_eq!(Some("JKL"), chunks.prev());
 
         assert_eq!(Some("JKL"), chunks.next());
         assert_eq!(Some("MNO"), chunks.next());
         assert_eq!(Some("PQR"), chunks.next());
         assert_eq!(Some("STU"), chunks.next());
         assert_eq!(Some("VWX"), chunks.next());
-        assert_eq!(Some("STU"), chunks.prev());
+        assert_eq!(Some("VWX"), chunks.prev());
 
         assert_eq!(Some("VWX"), chunks.next());
         assert_eq!(Some("YZ"), chunks.next());
         assert_eq!(None, chunks.next());
         assert_eq!(Some("YZ"), chunks.prev());
 
+        assert_eq!(Some("YZ"), chunks.next());
         assert_eq!(None, chunks.next());
     }
 
@@ -1204,6 +1035,8 @@ mod tests {
             assert!(chunks.clone().count() >= chunks.size_hint().0);
         }
         assert_eq!(0, chunks.size_hint().0);
+
+        panic!();
     }
 
     // NOTE: when you add support for starting iterators at specific indices,

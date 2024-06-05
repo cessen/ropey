@@ -137,12 +137,18 @@ impl<'a> ChunkCursor<'a> {
         trimmed_chunk
     }
 
-    /// Returns the byte offset of the current chunk from the start of the text.
+    /// Returns the byte offset from the start of the text to the start of the current chunk.
     #[inline]
     pub fn byte_offset(&self) -> usize {
         self.current_byte_idx
+            .min(self.byte_range[1])
             .saturating_sub(self.byte_range[0])
-            .min(self.byte_range[1] - self.byte_range[0])
+    }
+
+    /// Returns the byte offset from the start of the current chunk to the end of the text.
+    #[inline]
+    pub fn byte_offset_from_end(&self) -> usize {
+        self.byte_range[1].saturating_sub(self.current_byte_idx.max(self.byte_range[0]))
     }
 
     //---------------------------------------------------------
