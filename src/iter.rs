@@ -233,7 +233,7 @@ impl<'a> Iterator for Chunks<'a> {
 /// An iterator over a `Rope`'s bytes.
 #[derive(Debug, Clone)]
 pub struct Bytes<'a> {
-    chunks: Chunks<'a>,
+    cursor: ChunkCursor<'a>,
     current_chunk: &'a [u8],
     chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
@@ -283,14 +283,15 @@ impl<'a> Bytes<'a> {
 
     #[inline]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Bytes {
-        let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
-        let first_chunk = chunks.next().unwrap_or("");
+        let cursor = ChunkCursor::new(node, byte_range, at_byte_idx);
+        let chunk = cursor.chunk();
+        let byte_offset = cursor.byte_offset();
 
         let mut bytes = Bytes {
-            chunks: chunks,
-            current_chunk: first_chunk.as_bytes(),
-            chunk_byte_idx: byte_start,
-            byte_idx_in_chunk: at_byte_idx - byte_start,
+            cursor: cursor,
+            current_chunk: chunk.as_bytes(),
+            chunk_byte_idx: byte_offset,
+            byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_start_sentinel: false,
             is_reversed: false,
         };
@@ -311,13 +312,11 @@ impl<'a> Bytes<'a> {
         }
 
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
-            self.chunk_byte_idx += self.current_chunk.len();
-            if let Some(chunk) = self.chunks.next() {
-                self.current_chunk = chunk.as_bytes();
-                self.byte_idx_in_chunk = 0;
+            if self.cursor.next() {
+                self.chunk_byte_idx += self.current_chunk.len();
+                self.byte_idx_in_chunk -= self.current_chunk.len();
+                self.current_chunk = self.cursor.chunk().as_bytes();
             } else {
-                self.current_chunk = &[];
-                self.byte_idx_in_chunk = 0;
                 return None;
             }
         }
@@ -329,13 +328,11 @@ impl<'a> Bytes<'a> {
     #[inline(always)]
     fn prev_impl(&mut self) -> Option<u8> {
         while self.byte_idx_in_chunk == 0 {
-            if let Some(chunk) = self.chunks.prev() {
-                self.current_chunk = chunk.as_bytes();
-                self.chunk_byte_idx -= chunk.len();
-                self.byte_idx_in_chunk = chunk.len();
+            if self.cursor.prev() {
+                self.current_chunk = self.cursor.chunk().as_bytes();
+                self.chunk_byte_idx -= self.current_chunk.len();
+                self.byte_idx_in_chunk += self.current_chunk.len();
             } else {
-                self.current_chunk = &[];
-                self.byte_idx_in_chunk = 0;
                 self.at_start_sentinel = true;
                 return None;
             }
@@ -358,15 +355,15 @@ impl<'a> Iterator for Bytes<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        todo!()
-        // let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
-        // let len = if self.is_reversed {
-        //     byte_idx - self.chunks.byte_range[0]
-        // } else {
-        //     self.chunks.byte_range[1]
-        //         .saturating_sub(byte_idx + 1 - (self.at_start_sentinel as usize))
-        // };
-        // (len, Some(len))
+        let byte_len = if self.is_reversed {
+            self.cursor.byte_offset() + self.byte_idx_in_chunk
+        } else {
+            (self.cursor.byte_offset_from_end() - self.byte_idx_in_chunk
+                + (self.at_start_sentinel as usize))
+                .saturating_sub(1)
+        };
+
+        (byte_len, Some(byte_len))
     }
 }
 
@@ -1159,6 +1156,7 @@ mod tests {
         // Forward.
         assert_eq!(bytes.clone().count(), bytes.size_hint().0);
         while let Some(_) = bytes.next() {
+            dbg!((bytes.clone().count(), bytes.size_hint().0));
             assert_eq!(bytes.clone().count(), bytes.size_hint().0);
         }
         assert_eq!(0, bytes.size_hint().0);
