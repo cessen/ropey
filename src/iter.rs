@@ -552,14 +552,13 @@ mod lines {
         line_range: [usize; 2],
         line_type: LineType,
         current_line_idx: usize,
-        at_start_sentinel: bool,
         is_reversed: bool,
     }
 
     impl<'a> Lines<'a> {
         /// Advances the iterator forward and returns the next value.
         ///
-        /// Runs in amortized O(1) time and worst-case O(log N) time.
+        /// Runs in O(log N) time.
         #[inline(always)]
         #[allow(clippy::should_implement_trait)]
         pub fn next(&mut self) -> Option<RopeSlice<'a>> {
@@ -572,7 +571,7 @@ mod lines {
 
         /// Advances the iterator backward and returns the previous value.
         ///
-        /// Runs in amortized O(1) time and worst-case O(log N) time.
+        /// Runs in O(log N) time.
         #[inline(always)]
         pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
             if self.is_reversed {
@@ -626,14 +625,13 @@ mod lines {
                 byte_range: byte_range,
                 line_range: [start_line, end_line],
                 line_type: line_type,
-                current_line_idx: start_line + at_line_idx.saturating_sub(1),
-                at_start_sentinel: at_line_idx == 0,
+                current_line_idx: start_line + at_line_idx,
                 is_reversed: false,
             }
         }
 
         fn current_line(&self) -> Option<RopeSlice<'a>> {
-            if self.at_start_sentinel || self.current_line_idx >= self.line_range[1] {
+            if self.current_line_idx >= self.line_range[1] {
                 return None;
             }
 
@@ -675,18 +673,13 @@ mod lines {
                 return None;
             }
 
-            if !self.at_start_sentinel {
-                self.current_line_idx += 1;
-            } else {
-                self.at_start_sentinel = false;
-            }
-
-            self.current_line()
+            let line = self.current_line();
+            self.current_line_idx += 1;
+            line
         }
 
         fn prev_impl(&mut self) -> Option<RopeSlice<'a>> {
             if self.current_line_idx <= self.line_range[0] {
-                self.at_start_sentinel = true;
                 return None;
             }
 
@@ -700,7 +693,7 @@ mod lines {
 
         /// Advances the iterator forward and returns the next value.
         ///
-        /// Runs in amortized O(1) time and worst-case O(log N) time.
+        /// Runs in O(log N) time.
         #[inline(always)]
         fn next(&mut self) -> Option<RopeSlice<'a>> {
             Lines::next(self)
@@ -710,8 +703,7 @@ mod lines {
             let len = if self.is_reversed {
                 self.current_line_idx - self.line_range[0]
             } else {
-                (self.line_range[1] - self.current_line_idx).saturating_sub(1)
-                    + (self.at_start_sentinel as usize)
+                self.line_range[1] - self.current_line_idx
             };
             (len, Some(len))
         }
@@ -1292,11 +1284,12 @@ mod tests {
         let mut lines = r.lines(LineType::LF_CR);
 
         assert_eq!("hi\n", lines.next().unwrap());
+        assert_eq!("hi\n", lines.prev().unwrap());
         assert_eq!(None, lines.prev());
 
         assert_eq!("hi\n", lines.next().unwrap());
         assert_eq!("yo\n", lines.next().unwrap());
-        assert_eq!("hi\n", lines.prev().unwrap());
+        assert_eq!("yo\n", lines.prev().unwrap());
 
         assert_eq!("yo\n", lines.next().unwrap());
         assert_eq!("bye", lines.next().unwrap());
