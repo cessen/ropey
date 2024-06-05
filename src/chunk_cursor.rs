@@ -5,10 +5,10 @@ pub struct ChunkCursor<'a> {
     node_stack: Vec<(&'a Node, usize)>, // (node ref, index of current child)
 
     // The byte range within the root node that is considered part of this
-    // iterator's contents.
+    // cursor's contents.
     byte_range: [usize; 2],
 
-    // The offset within the root node (*not* `byte_range`) that of the current
+    // The offset within the root node (*not* `byte_range`) of the current
     // un-trimmed chunk.
     current_byte_idx: usize,
 }
