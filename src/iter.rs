@@ -83,7 +83,7 @@ use crate::{tree::Node, ChunkCursor};
 ///   incrementally as you go.
 /// - Writing custom iterators over a rope's text data.
 ///
-/// There are precisely two guarantee about the yielded chunks:
+/// There are precisely two guarantees about the yielded chunks:
 ///
 /// - All non-empty chunks are yielded.
 /// - And they are yielded in order.
