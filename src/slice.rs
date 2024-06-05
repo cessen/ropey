@@ -5,6 +5,7 @@ use crate::{
     iter::{Bytes, Chars, Chunks},
     start_bound_to_num,
     tree::{Node, TextInfo},
+    ChunkCursor,
     Error::*,
     Result, Rope,
 };

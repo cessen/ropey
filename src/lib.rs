@@ -173,6 +173,7 @@ use std::ops::Bound;
 
 mod shared_impl;
 
+mod chunk_cursor;
 mod rope;
 mod rope_builder;
 mod slice;
@@ -181,6 +182,7 @@ mod tree;
 
 pub mod iter;
 
+pub use chunk_cursor::ChunkCursor;
 pub use rope::Rope;
 pub use rope_builder::RopeBuilder;
 pub use slice::RopeSlice;

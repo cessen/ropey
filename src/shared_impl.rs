@@ -613,6 +613,40 @@ macro_rules! shared_main_impl_methods {
             .0
         }
 
+        /// Creates a cursor for navigating the chunks of the text, starting on
+        /// the first chunk.
+        ///
+        /// Runs in O(log N) time.
+        #[inline]
+        pub fn chunk_cursor(&self) -> ChunkCursor<'_> {
+            ChunkCursor::new(
+                self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0],
+            )
+        }
+
+        /// Creates a cursor for navigating the chunks of the text, with the
+        /// cursor starting at the chunk containing `byte_idx`.
+        ///
+        /// For convenience, `byte_idx == len_bytes()` is accepted, and puts the
+        /// cursor on the last chunk.  Note that for non-zero-length texts this
+        /// is redundant with `byte_idx == len_bytes() - 1`.
+        ///
+        /// Runs in O(log N) time.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        #[inline]
+        pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<'_> {
+            ChunkCursor::new(
+                &self.get_root(),
+                self.get_byte_range(),
+                self.get_byte_range()[0] + byte_idx,
+            )
+        }
+
         //-----------------------------------------------------
         // Internal utility methods.
 

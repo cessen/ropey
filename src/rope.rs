@@ -9,6 +9,7 @@ use crate::{
     slice::RopeSlice,
     start_bound_to_num,
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
+    ChunkCursor,
     Error::*,
     Result,
 };
