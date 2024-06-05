@@ -374,7 +374,7 @@ impl<'a> ExactSizeIterator for Bytes<'a> {}
 /// An iterator over a `Rope`'s `char`s.
 #[derive(Debug, Clone)]
 pub struct Chars<'a> {
-    chunks: Chunks<'a>,
+    cursor: ChunkCursor<'a>,
     current_chunk: &'a str,
     chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
@@ -424,16 +424,17 @@ impl<'a> Chars<'a> {
 
     #[inline]
     pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Chars {
-        let (mut chunks, byte_start) = Chunks::new(node, byte_range, at_byte_idx);
-        let first_chunk = chunks.next().unwrap_or("");
+        let cursor = ChunkCursor::new(node, byte_range, at_byte_idx);
+        let chunk = cursor.chunk();
+        let byte_offset = cursor.byte_offset();
 
-        assert!(first_chunk.is_char_boundary(at_byte_idx - byte_start));
+        assert!(chunk.is_char_boundary(at_byte_idx - byte_range[0] - byte_offset));
 
         let mut chars = Chars {
-            chunks: chunks,
-            current_chunk: first_chunk,
-            chunk_byte_idx: byte_start,
-            byte_idx_in_chunk: at_byte_idx - byte_start,
+            cursor: cursor,
+            current_chunk: chunk,
+            chunk_byte_idx: byte_offset,
+            byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_start_sentinel: false,
             is_reversed: false,
         };
@@ -450,20 +451,18 @@ impl<'a> Chars<'a> {
         if self.at_start_sentinel {
             self.at_start_sentinel = false;
         } else {
-            self.byte_idx_in_chunk += 1;
-            while !self.current_chunk.is_char_boundary(self.byte_idx_in_chunk) {
-                self.byte_idx_in_chunk += 1;
-            }
+            self.byte_idx_in_chunk = crate::ceil_char_boundary(
+                self.byte_idx_in_chunk + 1,
+                self.current_chunk.as_bytes(),
+            );
         }
 
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
-            self.chunk_byte_idx += self.current_chunk.len();
-            if let Some(chunk) = self.chunks.next() {
-                self.current_chunk = chunk;
-                self.byte_idx_in_chunk = 0;
+            if self.cursor.next() {
+                self.chunk_byte_idx += self.current_chunk.len();
+                self.byte_idx_in_chunk -= self.current_chunk.len();
+                self.current_chunk = self.cursor.chunk();
             } else {
-                self.current_chunk = "";
-                self.byte_idx_in_chunk = 0;
                 return None;
             }
         }
@@ -480,22 +479,18 @@ impl<'a> Chars<'a> {
     #[inline(always)]
     fn prev_impl(&mut self) -> Option<char> {
         while self.byte_idx_in_chunk == 0 {
-            if let Some(chunk) = self.chunks.prev() {
-                self.current_chunk = chunk;
-                self.chunk_byte_idx -= chunk.len();
-                self.byte_idx_in_chunk = chunk.len();
+            if self.cursor.prev() {
+                self.current_chunk = self.cursor.chunk();
+                self.chunk_byte_idx -= self.current_chunk.len();
+                self.byte_idx_in_chunk += self.current_chunk.len();
             } else {
-                self.current_chunk = "";
-                self.byte_idx_in_chunk = 0;
                 self.at_start_sentinel = true;
                 return None;
             }
         }
 
-        self.byte_idx_in_chunk -= 1;
-        while !self.current_chunk.is_char_boundary(self.byte_idx_in_chunk) {
-            self.byte_idx_in_chunk -= 1;
-        }
+        self.byte_idx_in_chunk =
+            crate::floor_char_boundary(self.byte_idx_in_chunk - 1, self.current_chunk.as_bytes());
 
         // TODO: do this in a more efficient way than constructing a temporary
         // iterator.
@@ -519,32 +514,31 @@ impl<'a> Iterator for Chars<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        todo!()
-        // // We give a min/max based on the smallest and largest possible code
-        // // points in UTF8.  Smallest is 1 byte, largest is 4 bytes.
-        // //
-        // // Note: if the `metric_chars` feature is enabled, we could go to the
-        // // trouble of computing the exact length in chars.  However, that would
-        // // involve some complications that probably aren't worth it.  And in any
-        // // case it would make this behave differently depending on that feature,
-        // // and this iterator isn't actually supposed to have anything to do with
-        // // that feature.
+        // We give a min/max based on the smallest and largest possible code
+        // points in UTF8.  Smallest is 1 byte, largest is 4 bytes.
+        //
+        // Note: if the `metric_chars` feature is enabled, we could go to the
+        // trouble of computing the exact length in chars.  However, that would
+        // involve some complications that probably aren't worth it.  And in any
+        // case it would make this behave differently depending on that feature,
+        // and this iterator isn't actually supposed to have anything to do with
+        // that feature.
 
-        // let byte_idx = self.chunk_byte_idx + self.byte_idx_in_chunk;
-        // let byte_len = if self.is_reversed {
-        //     byte_idx - self.chunks.byte_range[0]
-        // } else {
-        //     // The use of 4 here is to be conservative, since that's the size of
-        //     // the largest possible UTF8 code point.  We could instead be exact
-        //     // and find the actual size of the next code point, but given that
-        //     // this is just an estimate anyway it doesn't seem worth it.
-        //     self.chunks.byte_range[1]
-        //         .saturating_sub(byte_idx + 4 - (self.at_start_sentinel as usize * 4))
-        // };
+        let byte_len = if self.is_reversed {
+            self.cursor.byte_offset() + self.byte_idx_in_chunk
+        } else {
+            // The use of 4 here is to be conservative, since that's the size of
+            // the largest possible UTF8 code point.  We could instead be exact
+            // and find the actual size of the next code point, but given that
+            // this is just an estimate anyway it doesn't seem worth it.
+            (self.cursor.byte_offset_from_end() - self.byte_idx_in_chunk
+                + (self.at_start_sentinel as usize * 4))
+                .saturating_sub(4)
+        };
 
-        // let min = (byte_len + 3) / 4;
-        // let max = byte_len;
-        // (min, Some(max))
+        let min = (byte_len + 3) / 4;
+        let max = byte_len;
+        (min, Some(max))
     }
 }
 
@@ -1156,7 +1150,6 @@ mod tests {
         // Forward.
         assert_eq!(bytes.clone().count(), bytes.size_hint().0);
         while let Some(_) = bytes.next() {
-            dbg!((bytes.clone().count(), bytes.size_hint().0));
             assert_eq!(bytes.clone().count(), bytes.size_hint().0);
         }
         assert_eq!(0, bytes.size_hint().0);
