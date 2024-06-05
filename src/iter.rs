@@ -8,29 +8,28 @@
 //!
 //! # Reverse iteration
 //!
-//! All iterators in Ropey can move both forwards and backwards over its
+//! All iterators in Ropey can move both forwards and backwards over their
 //! contents.  This can be accomplished via the `next()` and `prev()` methods on
 //! each iterator, or by using the `reversed()` method to change the iterator's
 //! direction.
 //!
-//! Conceptually, an iterator in Ropey is always positioned *on* the element it
-//! most recently yielded, and returns an element when it jumps onto it via the
-//! `next()` or `prev()` methods.
+//! Conceptually, an iterator in Ropey is always positioned *between* the
+//! elements it iterates over, much like a text cursor, and returns an element
+//! when it jumps over it via the `next()` or `prev()` methods.
 //!
 //! For example, given the text `"abc"` and a `Chars` iterator starting at the
 //! beginning of the text, you would get the following sequence of states and
-//! return values by repeatedly calling `next()` (the vertical bar/hat represents
+//! return values by repeatedly calling `next()` (the vertical bar represents
 //! the position of the iterator):
 //!
 //! 0. `|abc`
-//! 1. `âbc` -> `Some('a')`
-//! 2. `ab̂c` -> `Some('b')`
-//! 3. `abĉ` -> `Some('c')`
+//! 1. `a|bc` -> `Some('a')`
+//! 2. `ab|c` -> `Some('b')`
+//! 3. `abc|` -> `Some('c')`
 //! 4. `abc|` -> `None`
 //!
 //! The `prev()` method operates identically, except moving in the opposite
-//! direction.  And `reverse()` simply swaps the behavior of `prev()` and
-//! `next()`.
+//! direction.
 //!
 //! # Creating iterators at any position
 //!
@@ -39,9 +38,8 @@
 //! methods of `Rope` and `RopeSlice`.
 //!
 //! When an iterator is created this way, it is positioned such that a call to
-//! `next()` will return the specified element.  (One potentially weird effect
-//! of the "on item" model of these iterators is that a `prev()` call will then
-//! return the item *two items* before the specified element.)
+//! `next()` will return the indicated element, and a call to `prev()` will
+//! return the element just before that.
 //!
 //! Importantly, iterators created this way still have access to the entire
 //! contents of the `Rope`/`RopeSlice` they were created from&mdash;the
@@ -53,8 +51,8 @@
 //! # A possible point of confusion
 //!
 //! The Rust standard library has an iterator trait `DoubleEndedIterator` with
-//! a method `rev()`.  While the *name* is very similar to Ropey's `reversed()`
-//! method, its behavior is very different.
+//! a method `rev()`.  While this method's *name* is very similar to Ropey's
+//! `reversed()` method, its behavior is very different.
 //!
 //! `DoubleEndedIterator` actually provides two iterators: one starting at each
 //! end of the collection, moving in opposite directions towards each other.
@@ -62,8 +60,7 @@
 //! direction of iteration but also its current position in the collection.
 //!
 //! The `reversed()` method on Ropey's iterators, on the other hand, reverses
-//! the direction of the iterator in-place, without changing its position in
-//! the text.
+//! the direction of the iterator without changing its position in the text.
 
 use crate::{tree::Node, ChunkCursor};
 
