@@ -147,7 +147,7 @@ impl<'a> ChunkCursor<'a> {
 
     //---------------------------------------------------------
 
-    /// Returns a chunks cursor with the current chunk being the one that
+    /// Returns a chunk cursor with its current chunk being the one that
     /// contains the byte at `at_byte_idx`.
     ///
     /// Note that all parameters are relative to the entire contents of `node`.
@@ -165,7 +165,7 @@ impl<'a> ChunkCursor<'a> {
             };
         }
 
-        let mut chunks = ChunkCursor {
+        let mut cursor = ChunkCursor {
             node_stack: vec![],
             byte_range: byte_range,
             current_byte_idx: 0,
@@ -177,27 +177,24 @@ impl<'a> ChunkCursor<'a> {
         let mut local_byte_idx = at_byte_idx;
         loop {
             match *current_node {
-                Node::Leaf(ref text) => {
-                    if at_byte_idx >= byte_range[1] {
-                        chunks.current_byte_idx += text.len();
-                    }
-                    chunks.node_stack.push((current_node, 0));
+                Node::Leaf(_) => {
+                    cursor.node_stack.push((current_node, 0));
                     break;
                 }
 
                 Node::Internal(ref children) => {
                     let (child_i, acc_byte_idx) = children.search_byte_idx_only(local_byte_idx);
 
-                    chunks.current_byte_idx += acc_byte_idx;
+                    cursor.current_byte_idx += acc_byte_idx;
                     local_byte_idx -= acc_byte_idx;
 
-                    chunks.node_stack.push((current_node, child_i));
+                    cursor.node_stack.push((current_node, child_i));
                     current_node = &children.nodes()[child_i];
                 }
             }
         }
 
-        chunks
+        cursor
     }
 }
 
@@ -432,5 +429,45 @@ mod tests {
         assert_eq!(false, cursor.prev());
         assert_eq!(cursor.byte_offset(), 0);
         assert_eq!("", cursor.chunk());
+    }
+
+    #[test]
+    fn chunk_cursor_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..=TEXT.len() {
+            let cursor = r.chunk_cursor_at(i);
+            let chunk = cursor.chunk();
+            let byte_offset = cursor.byte_offset();
+
+            assert!(i >= byte_offset && i <= (byte_offset + chunk.len()));
+            assert_eq!(&TEXT[byte_offset..(byte_offset + chunk.len())], chunk);
+        }
+
+        let cursor_1 = r.chunk_cursor_at(TEXT.len() - 1);
+        let cursor_2 = r.chunk_cursor_at(TEXT.len());
+        assert_eq!(cursor_1.byte_offset(), cursor_2.byte_offset());
+        assert_eq!(cursor_1.chunk(), cursor_2.chunk());
+    }
+
+    #[test]
+    fn chunk_cursor_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+        let text = &TEXT[5..124];
+
+        for i in 0..=text.len() {
+            let cursor = s.chunk_cursor_at(i);
+            let chunk = cursor.chunk();
+            let byte_offset = cursor.byte_offset();
+
+            assert!(i >= byte_offset && i <= (byte_offset + chunk.len()));
+            assert_eq!(&text[byte_offset..(byte_offset + chunk.len())], chunk);
+        }
+
+        let cursor_1 = s.chunk_cursor_at(text.len() - 1);
+        let cursor_2 = s.chunk_cursor_at(text.len());
+        assert_eq!(cursor_1.byte_offset(), cursor_2.byte_offset());
+        assert_eq!(cursor_1.chunk(), cursor_2.chunk());
     }
 }
