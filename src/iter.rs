@@ -371,7 +371,7 @@ pub struct Chars<'a> {
     current_chunk: &'a str,
     chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
-    at_start_sentinel: bool,
+    at_end: bool,
     is_reversed: bool,
 }
 
@@ -423,41 +423,20 @@ impl<'a> Chars<'a> {
 
         assert!(chunk.is_char_boundary(at_byte_idx - byte_range[0] - byte_offset));
 
-        let mut chars = Chars {
+        Chars {
             cursor: cursor,
             current_chunk: chunk,
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
-            at_start_sentinel: false,
+            at_end: at_byte_idx == byte_range[1],
             is_reversed: false,
-        };
-
-        // The above code puts us at the char of the specified byte, but we want
-        // to be one char before it so that `next()` yields it.
-        chars.prev_impl();
-
-        chars
+        }
     }
 
     #[inline(always)]
     fn next_impl(&mut self) -> Option<char> {
-        if self.at_start_sentinel {
-            self.at_start_sentinel = false;
-        } else {
-            self.byte_idx_in_chunk = crate::ceil_char_boundary(
-                self.byte_idx_in_chunk + 1,
-                self.current_chunk.as_bytes(),
-            );
-        }
-
-        while self.byte_idx_in_chunk >= self.current_chunk.len() {
-            if self.cursor.next() {
-                self.chunk_byte_idx += self.current_chunk.len();
-                self.byte_idx_in_chunk -= self.current_chunk.len();
-                self.current_chunk = self.cursor.chunk();
-            } else {
-                return None;
-            }
+        if self.at_end {
+            return None;
         }
 
         // TODO: do this in a more efficient way than constructing a temporary
@@ -466,6 +445,21 @@ impl<'a> Chars<'a> {
             .chars()
             .next()
             .unwrap();
+
+        self.byte_idx_in_chunk =
+            crate::ceil_char_boundary(self.byte_idx_in_chunk + 1, self.current_chunk.as_bytes());
+
+        while self.byte_idx_in_chunk >= self.current_chunk.len() {
+            if self.cursor.next() {
+                self.chunk_byte_idx += self.current_chunk.len();
+                self.byte_idx_in_chunk -= self.current_chunk.len();
+                self.current_chunk = self.cursor.chunk();
+            } else {
+                self.at_end = true;
+                break;
+            }
+        }
+
         Some(char)
     }
 
@@ -477,14 +471,13 @@ impl<'a> Chars<'a> {
                 self.chunk_byte_idx -= self.current_chunk.len();
                 self.byte_idx_in_chunk += self.current_chunk.len();
             } else {
-                self.at_start_sentinel = true;
                 return None;
             }
         }
 
+        self.at_end = false;
         self.byte_idx_in_chunk =
             crate::floor_char_boundary(self.byte_idx_in_chunk - 1, self.current_chunk.as_bytes());
-
         // TODO: do this in a more efficient way than constructing a temporary
         // iterator.
         let char = self.current_chunk[self.byte_idx_in_chunk..]
@@ -520,13 +513,7 @@ impl<'a> Iterator for Chars<'a> {
         let byte_len = if self.is_reversed {
             self.cursor.byte_offset() + self.byte_idx_in_chunk
         } else {
-            // The use of 4 here is to be conservative, since that's the size of
-            // the largest possible UTF8 code point.  We could instead be exact
-            // and find the actual size of the next code point, but given that
-            // this is just an estimate anyway it doesn't seem worth it.
-            (self.cursor.byte_offset_from_end() - self.byte_idx_in_chunk
-                + (self.at_start_sentinel as usize * 4))
-                .saturating_sub(4)
+            self.cursor.byte_offset_from_end() - self.byte_idx_in_chunk
         };
 
         let min = (byte_len + 3) / 4;
@@ -1208,15 +1195,16 @@ mod tests {
         let mut chars = r.chars();
 
         assert_eq!(Some('a'), chars.next());
+        assert_eq!(Some('a'), chars.prev());
         assert_eq!(None, chars.prev());
 
         assert_eq!(Some('a'), chars.next());
         assert_eq!(Some('b'), chars.next());
-        assert_eq!(Some('a'), chars.prev());
+        assert_eq!(Some('b'), chars.prev());
 
         assert_eq!(Some('b'), chars.next());
         assert_eq!(Some('c'), chars.next());
-        assert_eq!(Some('b'), chars.prev());
+        assert_eq!(Some('c'), chars.prev());
 
         assert_eq!(Some('c'), chars.next());
         assert_eq!(None, chars.next());
