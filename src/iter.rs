@@ -237,7 +237,7 @@ pub struct Bytes<'a> {
     current_chunk: &'a [u8],
     chunk_byte_idx: usize, // Byte index of the start of the current chunk.
     byte_idx_in_chunk: usize,
-    at_start_sentinel: bool,
+    at_end: bool,
     is_reversed: bool,
 }
 
@@ -287,41 +287,36 @@ impl<'a> Bytes<'a> {
         let chunk = cursor.chunk();
         let byte_offset = cursor.byte_offset();
 
-        let mut bytes = Bytes {
+        Bytes {
             cursor: cursor,
             current_chunk: chunk.as_bytes(),
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
-            at_start_sentinel: false,
+            at_end: at_byte_idx == byte_range[1],
             is_reversed: false,
-        };
-
-        // The above code puts us at the specified byte, but we want to be just
-        // before it so that `next()` yields it.
-        bytes.prev_impl();
-
-        bytes
+        }
     }
 
     #[inline(always)]
     fn next_impl(&mut self) -> Option<u8> {
-        if self.at_start_sentinel {
-            self.at_start_sentinel = false;
-        } else {
-            self.byte_idx_in_chunk += 1;
+        if self.at_end {
+            return None;
         }
 
+        let byte = self.current_chunk[self.byte_idx_in_chunk];
+
+        self.byte_idx_in_chunk += 1;
         while self.byte_idx_in_chunk >= self.current_chunk.len() {
             if self.cursor.next() {
                 self.chunk_byte_idx += self.current_chunk.len();
                 self.byte_idx_in_chunk -= self.current_chunk.len();
                 self.current_chunk = self.cursor.chunk().as_bytes();
             } else {
-                return None;
+                self.at_end = true;
+                break;
             }
         }
 
-        let byte = self.current_chunk[self.byte_idx_in_chunk];
         Some(byte)
     }
 
@@ -333,11 +328,11 @@ impl<'a> Bytes<'a> {
                 self.chunk_byte_idx -= self.current_chunk.len();
                 self.byte_idx_in_chunk += self.current_chunk.len();
             } else {
-                self.at_start_sentinel = true;
                 return None;
             }
         }
 
+        self.at_end = false;
         self.byte_idx_in_chunk -= 1;
         Some(self.current_chunk[self.byte_idx_in_chunk])
     }
@@ -358,9 +353,7 @@ impl<'a> Iterator for Bytes<'a> {
         let byte_len = if self.is_reversed {
             self.cursor.byte_offset() + self.byte_idx_in_chunk
         } else {
-            (self.cursor.byte_offset_from_end() - self.byte_idx_in_chunk
-                + (self.at_start_sentinel as usize))
-                .saturating_sub(1)
+            self.cursor.byte_offset_from_end() - self.byte_idx_in_chunk
         };
 
         (byte_len, Some(byte_len))
@@ -1086,15 +1079,16 @@ mod tests {
         let mut bytes = r.bytes();
 
         assert_eq!(Some(text[0]), bytes.next());
+        assert_eq!(Some(text[0]), bytes.prev());
         assert_eq!(None, bytes.prev());
 
         assert_eq!(Some(text[0]), bytes.next());
         assert_eq!(Some(text[1]), bytes.next());
-        assert_eq!(Some(text[0]), bytes.prev());
+        assert_eq!(Some(text[1]), bytes.prev());
 
         assert_eq!(Some(text[1]), bytes.next());
         assert_eq!(Some(text[2]), bytes.next());
-        assert_eq!(Some(text[1]), bytes.prev());
+        assert_eq!(Some(text[2]), bytes.prev());
 
         assert_eq!(Some(text[2]), bytes.next());
         assert_eq!(None, bytes.next());
