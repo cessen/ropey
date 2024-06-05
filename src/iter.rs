@@ -1026,8 +1026,6 @@ mod tests {
             assert!(chunks.clone().count() >= chunks.size_hint().0);
         }
         assert_eq!(0, chunks.size_hint().0);
-
-        panic!();
     }
 
     // NOTE: when you add support for starting iterators at specific indices,
