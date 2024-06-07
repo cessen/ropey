@@ -647,6 +647,16 @@ macro_rules! shared_main_impl_methods {
             )
         }
 
+        /// Returns the text as a string slice if it's contiguous in memory.
+        pub fn as_str(&self) -> Option<&str> {
+            match self.get_root() {
+                Node::Leaf(text) => {
+                    Some(&text.text()[self.get_byte_range()[0]..self.get_byte_range()[1]])
+                }
+                Node::Internal(_) => None,
+            }
+        }
+
         //-----------------------------------------------------
         // Internal utility methods.
 
