@@ -93,7 +93,7 @@ impl<'a> RopeSlice<'a> {
     /// # Panics
     ///
     /// - If the start of the range is greater than the end.
-    /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
+    /// - If the end of the range is out of bounds (i.e. `end > len()`).
     /// - If the range ends are not on char boundaries.
     #[inline(always)]
     pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'a>
@@ -186,7 +186,7 @@ impl<'a> RopeSlice<'a> {
         R: RangeBounds<usize>,
     {
         let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len());
 
         fn inner<'a>(
             slice: &RopeSlice<'a>,
@@ -199,7 +199,7 @@ impl<'a> RopeSlice<'a> {
             if start_idx > end_idx {
                 return Err(InvalidRange);
             }
-            if end_idx > slice.len_bytes() {
+            if end_idx > slice.len() {
                 return Err(OutOfBounds);
             }
 
@@ -346,17 +346,17 @@ mod tests {
     }
 
     #[test]
-    fn len_bytes_01() {
+    fn len_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(7..97);
-        assert_eq!(s.len_bytes(), 90);
+        assert_eq!(s.len(), 90);
     }
 
     #[test]
-    fn len_bytes_02() {
+    fn len_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(43..43);
-        assert_eq!(s.len_bytes(), 0);
+        assert_eq!(s.len(), 0);
     }
 
     #[cfg(feature = "metric_chars")]
@@ -404,7 +404,7 @@ mod tests {
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
-        for i in 0..=r.len_bytes() {
+        for i in 0..=r.len() {
             #[cfg(feature = "metric_lines_lf_cr")]
             assert_eq!(r.slice(..i).len_lines(LineType::LF_CR), 1 + ((i + 1) / 2));
 
@@ -426,7 +426,7 @@ mod tests {
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
-        for i in 0..=r.len_bytes() {
+        for i in 0..=r.len() {
             #[cfg(feature = "metric_lines_lf_cr")]
             assert_eq!(r.slice(i..).len_lines(LineType::LF_CR), 16 - (i / 2));
 
@@ -483,7 +483,7 @@ mod tests {
 
         let s = r.slice(7..103);
         let t = &TEXT[7..103];
-        for i in 0..s.len_bytes() {
+        for i in 0..s.len() {
             assert_eq!(t.is_char_boundary(i), s.is_char_boundary(i));
         }
     }
@@ -736,9 +736,9 @@ mod tests {
             rb._append_chunk_as_leaf("\r\n\r\n\r\n");
             rb.finish()
         };
-        for si in 0..=r.len_bytes() {
+        for si in 0..=r.len() {
             let s = r.slice(..si);
-            for i in 0..s.len_bytes() {
+            for i in 0..s.len() {
                 #[cfg(feature = "metric_lines_lf_cr")]
                 assert_eq!(s.byte_to_line(i, LineType::LF_CR), i / 2);
 
@@ -835,7 +835,7 @@ mod tests {
         };
 
         #[cfg(feature = "metric_lines_lf_cr")]
-        for si in 0..=r.len_bytes() {
+        for si in 0..=r.len() {
             let s = r.slice(..si);
             for li in 0..(s.len_lines(LineType::LF_CR) - 1) {
                 assert_eq!(s.line_to_byte(li, LineType::LF_CR), li * 2);
@@ -851,7 +851,7 @@ mod tests {
         }
 
         #[cfg(feature = "metric_lines_lf")]
-        for si in 0..=r.len_bytes() {
+        for si in 0..=r.len() {
             let s = r.slice(..si);
             for li in 0..(s.len_lines(LineType::LF) - 1) {
                 assert_eq!(s.line_to_byte(li, LineType::LF), li * 2);
@@ -981,9 +981,9 @@ mod tests {
         assert_eq!(s.byte(10), b' ');
 
         // UTF-8 encoding of 'な'.
-        assert_eq!(s.byte(s.len_bytes() - 3), 0xE3);
-        assert_eq!(s.byte(s.len_bytes() - 2), 0x81);
-        assert_eq!(s.byte(s.len_bytes() - 1), 0xAA);
+        assert_eq!(s.byte(s.len() - 3), 0xE3);
+        assert_eq!(s.byte(s.len() - 2), 0x81);
+        assert_eq!(s.byte(s.len() - 1), 0xAA);
     }
 
     #[test]
@@ -991,7 +991,7 @@ mod tests {
     fn byte_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
-        s.byte(s.len_bytes());
+        s.byte(s.len());
     }
 
     #[test]
@@ -1022,7 +1022,7 @@ mod tests {
     fn char_at_byte_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
-        s.char_at_byte(s.len_bytes());
+        s.char_at_byte(s.len());
     }
 
     #[test]
@@ -1043,17 +1043,17 @@ mod tests {
 
         let l0 = s.line(0, LineType::LF_CR);
         assert_eq!(l0, "'s a fine day, isn't it?\n");
-        assert_eq!(l0.len_bytes(), 25);
+        assert_eq!(l0.len(), 25);
         assert_eq!(l0.len_lines(LineType::LF_CR), 2);
 
         let l1 = s.line(1, LineType::LF_CR);
         assert_eq!(l1, "Aren't you glad we're alive?\n");
-        assert_eq!(l1.len_bytes(), 29);
+        assert_eq!(l1.len(), 29);
         assert_eq!(l1.len_lines(LineType::LF_CR), 2);
 
         let l2 = s.line(2, LineType::LF_CR);
         assert_eq!(l2, "こんにちは、みん");
-        assert_eq!(l2.len_bytes(), 24);
+        assert_eq!(l2.len(), 24);
         assert_eq!(l2.len_lines(LineType::LF_CR), 1);
     }
 
@@ -1159,7 +1159,7 @@ mod tests {
         let mut current_byte = 0;
         let mut seen_bytes = 0;
         let mut prev_byte = 0;
-        for i in 0..s.len_bytes() {
+        for i in 0..s.len() {
             let (chunk, start_byte) = s.chunk(i);
 
             if start_byte != prev_byte || i == 0 {
@@ -1199,7 +1199,7 @@ mod tests {
             "\r\n\r\n\r\n",
         ]);
 
-        for si in 0..=r.len_bytes() {
+        for si in 0..=r.len() {
             test_chunk(r.slice(si..), &text[si..]);
         }
     }

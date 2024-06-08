@@ -26,7 +26,7 @@ fn insert_char(c: &mut Criterion) {
     group.bench_function("random", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert_char(random::<usize>() % len, 'a')
         })
     });
@@ -41,7 +41,7 @@ fn insert_char(c: &mut Criterion) {
     group.bench_function("middle", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert_char(len / 2, 'a');
         })
     });
@@ -49,7 +49,7 @@ fn insert_char(c: &mut Criterion) {
     group.bench_function("end", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert_char(len, 'a');
         })
     });
@@ -63,7 +63,7 @@ fn insert_small(c: &mut Criterion) {
     group.bench_function("random", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(random::<usize>() % len, "a");
         })
     });
@@ -78,7 +78,7 @@ fn insert_small(c: &mut Criterion) {
     group.bench_function("middle", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(len / 2, "a");
         })
     });
@@ -86,7 +86,7 @@ fn insert_small(c: &mut Criterion) {
     group.bench_function("end", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(len, "a");
         })
     });
@@ -100,7 +100,7 @@ fn insert_medium(c: &mut Criterion) {
     group.bench_function("random", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(random::<usize>() % len, "This is some text.");
         })
     });
@@ -115,7 +115,7 @@ fn insert_medium(c: &mut Criterion) {
     group.bench_function("middle", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(len / 2, "This is some text.");
         })
     });
@@ -123,7 +123,7 @@ fn insert_medium(c: &mut Criterion) {
     group.bench_function("end", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(len, "This is some text.");
         })
     });
@@ -139,7 +139,7 @@ fn insert_large(c: &mut Criterion) {
     group.bench_function("random", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(random::<usize>() % len, INSERT_TEXT);
         })
     });
@@ -154,7 +154,7 @@ fn insert_large(c: &mut Criterion) {
     group.bench_function("middle", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(len / 2, INSERT_TEXT);
         })
     });
@@ -162,7 +162,7 @@ fn insert_large(c: &mut Criterion) {
     group.bench_function("end", |bench| {
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             rope.insert(len, INSERT_TEXT);
         })
     });
@@ -182,7 +182,7 @@ fn insert_after_clone(c: &mut Criterion) {
                 i = 0;
                 rope_clone = rope.clone();
             }
-            let len = rope_clone.len_bytes();
+            let len = rope_clone.len();
             rope_clone.insert(random::<usize>() % len, "a");
             i += 1;
         })

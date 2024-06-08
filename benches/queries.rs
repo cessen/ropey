@@ -40,7 +40,7 @@ fn index_convert(c: &mut Criterion) {
     #[cfg(feature = "metric_chars")]
     group.bench_function("byte_to_char", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.byte_to_char(random::<usize>() % (len + 1));
         })
@@ -58,7 +58,7 @@ fn index_convert(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_lf")]
     group.bench_function("byte_to_line_lf", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.byte_to_line(random::<usize>() % (len + 1), LineType::LF);
         })
@@ -76,7 +76,7 @@ fn index_convert(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("byte_to_line_cr_lf", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.byte_to_line(random::<usize>() % (len + 1), LineType::LF_CR);
         })
@@ -94,7 +94,7 @@ fn index_convert(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("byte_to_line_all", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.byte_to_line(random::<usize>() % (len + 1), LineType::All);
         })
@@ -115,7 +115,7 @@ fn index_query(c: &mut Criterion) {
 
     group.bench_function("is_char_boundary", |bench| {
         let rope = Rope::from_str(&large_string_multibyte());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.is_char_boundary(random::<usize>() % (len + 1));
         })
@@ -123,7 +123,7 @@ fn index_query(c: &mut Criterion) {
 
     group.bench_function("floor_char_boundary", |bench| {
         let rope = Rope::from_str(&large_string_multibyte());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.floor_char_boundary(random::<usize>() % (len + 1));
         })
@@ -131,7 +131,7 @@ fn index_query(c: &mut Criterion) {
 
     group.bench_function("ceil_char_boundary", |bench| {
         let rope = Rope::from_str(&large_string_multibyte());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.ceil_char_boundary(random::<usize>() % (len + 1));
         })
@@ -173,7 +173,7 @@ fn get(c: &mut Criterion) {
 
     group.bench_function("byte", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.byte(random::<usize>() % len);
         })
@@ -217,7 +217,7 @@ fn get(c: &mut Criterion) {
 
     group.bench_function("chunk", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             rope.chunk(random::<usize>() % (len + 1));
         })
@@ -225,8 +225,8 @@ fn get(c: &mut Criterion) {
 
     group.bench_function("chunk_slice", |bench| {
         let rope = Rope::from_str(&large_string());
-        let slice = rope.slice(324..(rope.len_bytes() - 213));
-        let len = slice.len_bytes();
+        let slice = rope.slice(324..(rope.len() - 213));
+        let len = slice.len();
         bench.iter(|| {
             slice.chunk(random::<usize>() % (len + 1));
         })
@@ -238,7 +238,7 @@ fn slice(c: &mut Criterion) {
 
     group.bench_function("slice", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             let mut start = random::<usize>() % (len + 1);
             let mut end = random::<usize>() % (len + 1);
@@ -251,7 +251,7 @@ fn slice(c: &mut Criterion) {
 
     group.bench_function("slice_small", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             let mut start = random::<usize>() % (len + 1);
             if start > (len - 65) {
@@ -264,7 +264,7 @@ fn slice(c: &mut Criterion) {
 
     group.bench_function("slice_from_small_rope", |bench| {
         let rope = Rope::from_str(TEXT_SMALL);
-        let len = rope.len_bytes();
+        let len = rope.len();
         bench.iter(|| {
             let mut start = random::<usize>() % (len + 1);
             let mut end = random::<usize>() % (len + 1);
@@ -284,7 +284,7 @@ fn slice(c: &mut Criterion) {
 
     group.bench_function("slice_whole_slice", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_bytes();
+        let len = rope.len();
         let slice = rope.slice(1..len - 1);
         bench.iter(|| {
             slice.slice(..);

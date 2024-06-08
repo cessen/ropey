@@ -262,7 +262,7 @@ impl Rope {
     ///
     /// # Panics
     ///
-    /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
     /// - If `byte_idx` is not on a char boundary.
     #[inline]
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
@@ -288,7 +288,7 @@ impl Rope {
     ///
     /// # Panics
     ///
-    /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+    /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
     /// - If `byte_idx` is not on a char boundary.
     #[inline]
     pub fn insert_char(&mut self, byte_idx: usize, ch: char) {
@@ -316,7 +316,7 @@ impl Rope {
     /// # Panics
     ///
     /// - If the start of the range is greater than the end.
-    /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
+    /// - If the end of the range is out of bounds (i.e. `end > len()`).
     /// - If the range ends are not on char boundaries.
     #[inline]
     pub fn remove<R>(&mut self, byte_range: R)
@@ -351,7 +351,7 @@ impl Rope {
     /// # Panics
     ///
     /// - If the start of the range is greater than the end.
-    /// - If the end of the range is out of bounds (i.e. `end > len_bytes()`).
+    /// - If the end of the range is out of bounds (i.e. `end > len()`).
     /// - If the range ends are not on char boundaries.
     #[inline]
     pub fn slice<R>(&self, byte_range: R) -> RopeSlice
@@ -502,7 +502,7 @@ impl Rope {
             return Err(CannotEditOwnedSlice);
         }
 
-        if byte_idx > self.len_bytes() {
+        if byte_idx > self.len() {
             return Err(OutOfBounds);
         }
 
@@ -599,13 +599,13 @@ impl Rope {
             }
 
             let start_idx = start_bound_to_num(start).unwrap_or(0);
-            let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len_bytes());
+            let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len());
 
             if start_idx > end_idx {
                 return Err(InvalidRange);
             }
 
-            if end_idx > rope.len_bytes() {
+            if end_idx > rope.len() {
                 return Err(OutOfBounds);
             }
 
@@ -613,7 +613,7 @@ impl Rope {
             // fresh new rope.  This is to ensure the invariant that an empty
             // rope is always composed of a single empty leaf, which is not
             // ensured by the general removal code.
-            if start_idx == 0 && end_idx == rope.len_bytes() {
+            if start_idx == 0 && end_idx == rope.len() {
                 *rope = Rope::new();
                 return Ok(());
             }
@@ -641,7 +641,7 @@ impl Rope {
         R: RangeBounds<usize>,
     {
         let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
-        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len_bytes());
+        let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len());
 
         fn inner(rope: &Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice> {
             if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
@@ -650,7 +650,7 @@ impl Rope {
             if start_idx > end_idx {
                 return Err(InvalidRange);
             }
-            if end_idx > rope.len_bytes() {
+            if end_idx > rope.len() {
                 return Err(OutOfBounds);
             }
 
@@ -992,7 +992,7 @@ mod tests {
         }
         {
             let mut r = r.clone();
-            r.insert(r.len_bytes(), "\r");
+            r.insert(r.len(), "\r");
             r.assert_accurate_text_info();
         }
     }

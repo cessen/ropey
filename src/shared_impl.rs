@@ -17,15 +17,15 @@ macro_rules! shared_main_impl_methods {
         //-----------------------------------------------------
         // Queries.
 
-        /// Total number of bytes in the text.
+        /// Length of the text in bytes.
         ///
         /// Runs in O(1) time.
         #[inline(always)]
-        pub fn len_bytes(&self) -> usize {
+        pub fn len(&self) -> usize {
             self.get_byte_range()[1] - self.get_byte_range()[0]
         }
 
-        /// Total number of `char`s in the text.
+        /// Length of the text in `char`s.
         ///
         /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(feature = "metric_chars")]
@@ -84,10 +84,10 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-            assert!(byte_idx <= self.len_bytes());
+            assert!(byte_idx <= self.len());
 
             let (text, offset) = self.chunk(byte_idx);
             crate::is_char_boundary(byte_idx - offset, text.as_bytes())
@@ -100,10 +100,10 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
         pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len_bytes());
+            assert!(byte_idx <= self.len());
 
             let (text, offset) = self.chunk(byte_idx);
             offset + crate::floor_char_boundary(byte_idx - offset, text.as_bytes())
@@ -116,10 +116,10 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
         pub fn ceil_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len_bytes());
+            assert!(byte_idx <= self.len());
 
             let (text, offset) = self.chunk(byte_idx);
             offset + crate::ceil_char_boundary(byte_idx - offset, text.as_bytes())
@@ -144,7 +144,7 @@ macro_rules! shared_main_impl_methods {
             // configurations.
             let _ = line_type;
 
-            if self.len_bytes() == 0 {
+            if self.len() == 0 {
                 return None;
             }
 
@@ -152,26 +152,26 @@ macro_rules! shared_main_impl_methods {
             // there is a single case when checking for CRLF where we might need
             // to fetch a second chunk, which is handled further below.  But
             // otherwise, we do everything with this one chunk.
-            let last_chunk = self.chunk(self.len_bytes() - 1).0.as_bytes();
+            let last_chunk = self.chunk(self.len() - 1).0.as_bytes();
             let last_byte = last_chunk[last_chunk.len() - 1];
 
             // First handle LF and CRLF since that's the most typical case, and
             // also because it's the same for all line types.
             if last_byte == 0x0A {
-                if self.len_bytes() > 1 {
+                if self.len() > 1 {
                     let second_to_last_byte = if last_chunk.len() > 1 {
                         last_chunk[last_chunk.len() - 2]
                     } else {
                         // We need to fetch another chunk just for this one case.
-                        self.byte(self.len_bytes() - 2)
+                        self.byte(self.len() - 2)
                     };
 
                     if second_to_last_byte == 0x0D {
-                        return Some(self.len_bytes() - 2);
+                        return Some(self.len() - 2);
                     }
                 }
 
-                return Some(self.len_bytes() - 1);
+                return Some(self.len() - 1);
             }
 
             // That was the only case for `LineType::LF`, so early out if that's
@@ -183,7 +183,7 @@ macro_rules! shared_main_impl_methods {
 
             // Next we handle CR on its own.
             if last_byte == 0x0D {
-                return Some(self.len_bytes() - 1);
+                return Some(self.len() - 1);
             }
 
             // That was the last case for `LineType::LF_CR`, so early out if
@@ -221,7 +221,7 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >=
-        /// len_bytes()`).
+        /// len()`).
         #[inline(always)]
         pub fn byte(&self, byte_idx: usize) -> u8 {
             self.get_byte(byte_idx).unwrap()
@@ -233,7 +233,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// - If `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
+        /// - If `byte_idx` is out of bounds (i.e. `byte_idx >= len()`).
         /// - If `byte_idx` is not a char boundary.
         #[inline]
         pub fn char_at_byte(&self, byte_idx: usize) -> char {
@@ -274,7 +274,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline(always)]
         pub fn chunk(&self, byte_idx: usize) -> (&$rlt str, usize) {
             self.get_chunk(byte_idx).unwrap()
@@ -296,11 +296,11 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(feature = "metric_chars")]
         #[inline]
         pub fn byte_to_char(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len_bytes());
+            assert!(byte_idx <= self.len());
 
             if self.get_full_info().is_some() {
                 self._byte_to_char(byte_idx)
@@ -348,11 +348,11 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(feature = "metric_utf16")]
         #[inline]
         pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len_bytes());
+            assert!(byte_idx <= self.len());
             if self.get_full_info().is_some() {
                 self._byte_to_utf16(byte_idx)
             } else {
@@ -403,7 +403,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -411,7 +411,7 @@ macro_rules! shared_main_impl_methods {
         ))]
         #[inline]
         pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
-            assert!(byte_idx <= self.len_bytes());
+            assert!(byte_idx <= self.len());
             if self.get_full_info().is_some() {
                 self._byte_to_line(byte_idx, line_type)
             } else {
@@ -455,7 +455,7 @@ macro_rules! shared_main_impl_methods {
                 let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
                 self._line_to_byte(line_start_idx + line_idx, line_type)
                     .saturating_sub(self.get_byte_range()[0])
-                    .min(self.len_bytes())
+                    .min(self.len())
             }
         }
 
@@ -477,14 +477,14 @@ macro_rules! shared_main_impl_methods {
         /// Creates an iterator over the bytes of the `Rope`, starting at byte
         /// `byte_idx`.
         ///
-        /// If `byte_idx == len_bytes()` then an iterator at the end of the
+        /// If `byte_idx == len()` then an iterator at the end of the
         /// `Rope` is created (i.e. `next()` will return `None`).
         ///
         /// Runs in O(log N) time.
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<$rlt> {
             Bytes::new(
@@ -509,14 +509,14 @@ macro_rules! shared_main_impl_methods {
         /// Creates an iterator over the chars of the `Rope`, starting at the char
         /// at `byte_idx`.
         ///
-        /// If `byte_idx == len_bytes()` then an iterator at the end of the
+        /// If `byte_idx == len()` then an iterator at the end of the
         /// `Rope` is created (i.e. `next()` will return `None`).
         ///
         /// Runs in O(log N) time.
         ///
         /// # Panics
         ///
-        /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         /// - If `byte_idx` is not a char boundary.
         #[inline]
         pub fn chars_at(&self, byte_idx: usize) -> Chars<$rlt> {
@@ -598,14 +598,14 @@ macro_rules! shared_main_impl_methods {
         /// Also returns the byte index of the beginning of the first chunk to
         /// be yielded.
         ///
-        /// If `byte_idx == len_bytes()` an iterator at the end of the `Rope`
+        /// If `byte_idx == len()` an iterator at the end of the `Rope`
         /// (yielding `None` on a call to `next()`) is created.
         ///
         /// Runs in O(log N) time.
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
         pub fn chunks_at(&self, byte_idx: usize) -> Chunks<$rlt> {
             Chunks::new(
@@ -632,15 +632,15 @@ macro_rules! shared_main_impl_methods {
         /// Creates a cursor for navigating the chunks of the text, with the
         /// cursor starting at the chunk containing `byte_idx`.
         ///
-        /// For convenience, `byte_idx == len_bytes()` is accepted, and puts the
+        /// For convenience, `byte_idx == len()` is accepted, and puts the
         /// cursor on the last chunk.  Note that for non-zero-length texts this
-        /// is redundant with `byte_idx == len_bytes() - 1`.
+        /// is redundant with `byte_idx == len() - 1`.
         ///
         /// Runs in O(log N) time.
         ///
         /// # Panics
         ///
-        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
+        /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
         pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<$rlt> {
             ChunkCursor::new(
@@ -740,7 +740,7 @@ macro_rules! shared_no_panic_impl_methods {
         // Fetching.
 
         pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
-            if byte_idx >= self.len_bytes() {
+            if byte_idx >= self.len() {
                 return None;
             }
 
@@ -749,7 +749,7 @@ macro_rules! shared_no_panic_impl_methods {
         }
 
         pub fn try_char_at_byte(&self, byte_idx: usize) -> Result<char> {
-            if byte_idx >= self.len_bytes() {
+            if byte_idx >= self.len() {
                 return Err(OutOfBounds);
             }
 
@@ -782,7 +782,7 @@ macro_rules! shared_no_panic_impl_methods {
         }
 
         pub fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
-            if byte_idx > self.len_bytes() {
+            if byte_idx > self.len() {
                 return None;
             }
 
@@ -821,7 +821,7 @@ macro_rules! shared_std_impls {
 
         impl std::cmp::PartialEq<$rope> for $rope {
             fn eq(&self, other: &$rope) -> bool {
-                if self.len_bytes() != other.len_bytes() {
+                if self.len() != other.len() {
                     return false;
                 }
 
@@ -869,7 +869,7 @@ macro_rules! shared_std_impls {
         impl std::cmp::PartialEq<&str> for $rope {
             #[inline]
             fn eq(&self, other: &&str) -> bool {
-                if self.len_bytes() != other.len() {
+                if self.len() != other.len() {
                     return false;
                 }
                 let other = other.as_bytes();
@@ -979,7 +979,7 @@ macro_rules! shared_std_impls {
                     }
                 }
 
-                self.len_bytes().cmp(&other.len_bytes())
+                self.len().cmp(&other.len())
             }
         }
 
@@ -1002,7 +1002,7 @@ macro_rules! shared_std_impls {
         impl<'a> From<&'a $rope> for String {
             #[inline]
             fn from(r: &'a $rope) -> Self {
-                let mut s = String::with_capacity(r.len_bytes());
+                let mut s = String::with_capacity(r.len());
                 s.extend(r.chunks());
                 s
             }

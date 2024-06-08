@@ -39,7 +39,7 @@ fn string_remove(text: &mut String, byte_start: usize, byte_end: usize) {
 }
 
 fn assert_metrics_eq(rope: &Rope, text: &str) {
-    assert_eq!(rope.len_bytes(), text.len());
+    assert_eq!(rope.len(), text.len());
 
     #[cfg(feature = "metric_chars")]
     {

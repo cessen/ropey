@@ -28,7 +28,7 @@ fn iter_prev(c: &mut Criterion) {
 
     group.bench_function("bytes", |bench| {
         let r = Rope::from_str(&large_string());
-        let itr_src = r.bytes_at(r.len_bytes());
+        let itr_src = r.bytes_at(r.len());
         let mut itr = itr_src.clone();
         bench.iter(|| {
             if itr.prev().is_none() {
@@ -39,7 +39,7 @@ fn iter_prev(c: &mut Criterion) {
 
     group.bench_function("chars", |bench| {
         let r = Rope::from_str(&large_string());
-        let itr_src = r.chars_at(r.len_bytes());
+        let itr_src = r.chars_at(r.len());
         let mut itr = itr_src.clone();
         bench.iter(|| {
             if itr.prev().is_none() {
@@ -86,7 +86,7 @@ fn iter_prev(c: &mut Criterion) {
 
     group.bench_function("chunks", |bench| {
         let r = Rope::from_str(&large_string());
-        let itr_src = r.chunks_at(r.len_bytes());
+        let itr_src = r.chunks_at(r.len());
         let mut itr = itr_src.clone();
         bench.iter(|| {
             if itr.prev().is_none() {
@@ -205,7 +205,7 @@ fn iter_create_at(c: &mut Criterion) {
 
     group.bench_function("bytes", |bench| {
         let r = Rope::from_str(&large_string());
-        let len = r.len_bytes();
+        let len = r.len();
         let mut i = 0;
         bench.iter(|| {
             r.bytes_at(i % (len + 1));
@@ -215,7 +215,7 @@ fn iter_create_at(c: &mut Criterion) {
 
     group.bench_function("chars", |bench| {
         let r = Rope::from_str(&large_string());
-        let len = r.len_bytes();
+        let len = r.len();
         let mut i = 0;
         bench.iter(|| {
             r.chars_at(i % (len + 1));
@@ -258,7 +258,7 @@ fn iter_create_at(c: &mut Criterion) {
 
     group.bench_function("chunks", |bench| {
         let r = Rope::from_str(&large_string());
-        let len = r.len_bytes();
+        let len = r.len();
         let mut i = 0;
         bench.iter(|| {
             r.chunks_at(i % (len + 1));

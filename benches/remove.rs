@@ -35,12 +35,12 @@ fn remove_small(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = random::<usize>() % (len + 1);
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -50,12 +50,12 @@ fn remove_small(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = 0;
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -65,12 +65,12 @@ fn remove_small(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = len / 2;
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -80,12 +80,12 @@ fn remove_small(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let end = len;
             let start = end - (1).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -101,12 +101,12 @@ fn remove_medium(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = random::<usize>() % (len + 1);
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -116,12 +116,12 @@ fn remove_medium(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = 0;
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -131,12 +131,12 @@ fn remove_medium(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = len / 2;
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -146,12 +146,12 @@ fn remove_medium(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let end = len;
             let start = end - (15).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == text.len() / 2 {
+            if rope.len() == text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -168,12 +168,12 @@ fn remove_large(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = random::<usize>() % (len + 1);
             let end = (start + removal_len).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == 0 {
+            if rope.len() == 0 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -183,12 +183,12 @@ fn remove_large(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = 0;
             let end = (start + removal_len).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == 0 {
+            if rope.len() == 0 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -198,12 +198,12 @@ fn remove_large(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let start = len / 2;
             let end = (start + removal_len).min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == 0 {
+            if rope.len() == 0 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -213,12 +213,12 @@ fn remove_large(c: &mut Criterion) {
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
-            let len = rope.len_bytes();
+            let len = rope.len();
             let end = len;
             let start = end - removal_len.min(len);
             rope.remove(start..end);
 
-            if rope.len_bytes() == 0 {
+            if rope.len() == 0 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -237,7 +237,7 @@ fn remove_initial_after_clone(c: &mut Criterion) {
                 i = 0;
                 rope_clone = rope.clone();
             }
-            let len = rope_clone.len_bytes();
+            let len = rope_clone.len();
             let start = random::<usize>() % (len + 1);
             let end = (start + 1).min(len);
             rope_clone.remove(start..end);
