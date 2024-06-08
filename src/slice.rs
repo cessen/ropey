@@ -146,7 +146,7 @@ impl<'a> RopeSlice<'a> {
     //---------------------------------------------------------
     // Methods shared between Rope and RopeSlice.
 
-    crate::shared_impl::shared_main_impl_methods!();
+    crate::shared_impl::shared_main_impl_methods!('a);
 
     //---------------------------------------------------------
     // Utility methods needed by the shared impl macros in
@@ -217,7 +217,7 @@ impl<'a> RopeSlice<'a> {
     }
 
     // Methods shared between Rope and RopeSlice.
-    crate::shared_impl::shared_no_panic_impl_methods!();
+    crate::shared_impl::shared_no_panic_impl_methods!('a);
 }
 
 //=============================================================
@@ -316,6 +316,33 @@ mod tests {
             s1.slice(2..24)
         };
         _ = s;
+    }
+
+    #[test]
+    fn iterator_of_tmp_slice() {
+        // This is a compile-time test, to make sure that lifetimes work as
+        // expected when making iterators from slices, where the iterators live
+        // longer than those slices.  The lifetime of such an iterator should
+        // depend on the original rope, not the slice it was created from.
+        let r = Rope::from_str(TEXT);
+        let iterators = {
+            let s1 = r.slice(4..32);
+            (
+                s1.bytes(),
+                s1.bytes_at(1),
+                s1.chars(),
+                s1.chars_at(1),
+                #[cfg(feature = "metric_lines_lf_cr")]
+                s1.lines(LineType::LF_CR),
+                #[cfg(feature = "metric_lines_lf_cr")]
+                s1.lines_at(1, LineType::LF_CR),
+                s1.chunks(),
+                s1.chunks_at(1),
+                s1.chunk_cursor(),
+                s1.chunk_cursor_at(1),
+            )
+        };
+        _ = iterators;
     }
 
     #[test]

@@ -10,7 +10,10 @@
 //!   considered part of the actual text.
 
 macro_rules! shared_main_impl_methods {
-    () => {
+    // `$rlt` is the Rope lifetime, and is used any time something like a slice
+    // or iterator is returned so that they're bound to the lifetime of the
+    // original Rope.
+    ($rlt:lifetime) => {
         //-----------------------------------------------------
         // Queries.
 
@@ -256,7 +259,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         #[inline(always)]
-        pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice {
+        pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice<$rlt> {
             self.get_line(line_idx, line_type).unwrap()
         }
 
@@ -273,7 +276,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline(always)]
-        pub fn chunk(&self, byte_idx: usize) -> (&str, usize) {
+        pub fn chunk(&self, byte_idx: usize) -> (&$rlt str, usize) {
             self.get_chunk(byte_idx).unwrap()
         }
 
@@ -463,7 +466,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Runs in O(log N) time.
         #[inline]
-        pub fn bytes(&self) -> Bytes<'_> {
+        pub fn bytes(&self) -> Bytes<$rlt> {
             Bytes::new(
                 &self.get_root(),
                 self.get_byte_range(),
@@ -483,7 +486,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline]
-        pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
+        pub fn bytes_at(&self, byte_idx: usize) -> Bytes<$rlt> {
             Bytes::new(
                 self.get_root(),
                 self.get_byte_range(),
@@ -495,7 +498,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Runs in O(log N) time.
         #[inline]
-        pub fn chars(&self) -> Chars<'_> {
+        pub fn chars(&self) -> Chars<$rlt> {
             Chars::new(
                 self.get_root(),
                 self.get_byte_range(),
@@ -516,7 +519,7 @@ macro_rules! shared_main_impl_methods {
         /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         /// - If `byte_idx` is not a char boundary.
         #[inline]
-        pub fn chars_at(&self, byte_idx: usize) -> Chars<'_> {
+        pub fn chars_at(&self, byte_idx: usize) -> Chars<$rlt> {
             Chars::new(
                 self.get_root(),
                 self.get_byte_range(),
@@ -536,7 +539,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         #[inline]
-        pub fn lines(&self, line_type: LineType) -> Lines<'_> {
+        pub fn lines(&self, line_type: LineType) -> Lines<$rlt> {
             Lines::new(
                 self.get_root(),
                 self.get_root_info(),
@@ -566,7 +569,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         #[inline]
-        pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<'_> {
+        pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<$rlt> {
             Lines::new(
                 self.get_root(),
                 self.get_root_info(),
@@ -580,7 +583,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Runs in O(log N) time.
         #[inline]
-        pub fn chunks(&self) -> Chunks<'_> {
+        pub fn chunks(&self) -> Chunks<$rlt> {
             Chunks::new(
                 self.get_root(),
                 self.get_byte_range(),
@@ -604,7 +607,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline]
-        pub fn chunks_at(&self, byte_idx: usize) -> Chunks<'_> {
+        pub fn chunks_at(&self, byte_idx: usize) -> Chunks<$rlt> {
             Chunks::new(
                 &self.get_root(),
                 self.get_byte_range(),
@@ -618,7 +621,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Runs in O(log N) time.
         #[inline]
-        pub fn chunk_cursor(&self) -> ChunkCursor<'_> {
+        pub fn chunk_cursor(&self) -> ChunkCursor<$rlt> {
             ChunkCursor::new(
                 self.get_root(),
                 self.get_byte_range(),
@@ -639,7 +642,7 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
         #[inline]
-        pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<'_> {
+        pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<$rlt> {
             ChunkCursor::new(
                 &self.get_root(),
                 self.get_byte_range(),
@@ -648,7 +651,7 @@ macro_rules! shared_main_impl_methods {
         }
 
         /// Returns the text as a string slice if it's contiguous in memory.
-        pub fn as_str(&self) -> Option<&str> {
+        pub fn as_str(&self) -> Option<&$rlt str> {
             match self.get_root() {
                 Node::Leaf(text) => {
                     Some(&text.text()[self.get_byte_range()[0]..self.get_byte_range()[1]])
@@ -729,7 +732,10 @@ macro_rules! shared_main_impl_methods {
 // Non-panicking.
 
 macro_rules! shared_no_panic_impl_methods {
-    () => {
+    // `$rlt` is the Rope lifetime, and is used any time something like a slice
+    // or iterator is returned so that they're bound to the lifetime of the
+    // original Rope.
+    ($rlt:lifetime) => {
         //-----------------------------------------------------
         // Fetching.
 
@@ -764,7 +770,7 @@ macro_rules! shared_no_panic_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice> {
+        pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
             if line_idx >= self.len_lines(line_type) {
                 return None;
             }
@@ -775,7 +781,7 @@ macro_rules! shared_no_panic_impl_methods {
             Some(self.slice(start_byte..end_byte))
         }
 
-        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&str, usize)> {
+        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
             if byte_idx > self.len_bytes() {
                 return None;
             }

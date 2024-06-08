@@ -367,7 +367,7 @@ impl Rope {
     //---------------------------------------------------------
     // Methods shared between Rope and RopeSlice.
 
-    crate::shared_impl::shared_main_impl_methods!();
+    crate::shared_impl::shared_main_impl_methods!('_);
 
     //---------------------------------------------------------
     // Misc. internal methods.
@@ -668,7 +668,7 @@ impl Rope {
     }
 
     // Methods shared between Rope and RopeSlice.
-    crate::shared_impl::shared_no_panic_impl_methods!();
+    crate::shared_impl::shared_no_panic_impl_methods!('_);
 }
 
 //==============================================================
