@@ -532,6 +532,21 @@ mod lines {
         LineType, RopeSlice,
     };
 
+    #[derive(Debug, Clone)]
+    struct StackItem<'a> {
+        node: &'a Node,
+        node_info: &'a TextInfo,
+
+        /// The start line of this node relative to the root.
+        start_line: usize,
+
+        /// For internal nodes, the current child corresponding to the current
+        /// line.
+        /// For leaf nodes, the current byte position corresponding to the
+        /// current line.
+        current_pos: usize,
+    }
+
     /// An iterator over a `Rope`'s lines.
     ///
     /// Notes:
@@ -543,8 +558,9 @@ mod lines {
     /// is returned as an empty slice.
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
-        node: &'a Node,
-        node_info: &'a TextInfo,
+        // TODO: use the stack to do line traversal more efficiently.
+        stack: Vec<StackItem<'a>>,
+
         byte_range: [usize; 2],
         line_range: [usize; 2],
         line_type: LineType,
@@ -617,8 +633,12 @@ mod lines {
             assert!(start_line + at_line_idx <= end_line);
 
             Lines {
-                node: node,
-                node_info: node_info,
+                stack: vec![StackItem {
+                    node: node,
+                    node_info: node_info,
+                    start_line: 0,
+                    current_pos: 0,
+                }],
                 byte_range: byte_range,
                 line_range: [start_line, end_line],
                 line_type: line_type,
@@ -633,7 +653,7 @@ mod lines {
             }
 
             let start_byte = {
-                let (text, start_info) = self
+                let (text, start_info) = self.stack[0]
                     .node
                     .get_text_at_line_break(self.current_line_idx, self.line_type);
 
@@ -644,7 +664,7 @@ mod lines {
                     )
             };
             let end_byte = {
-                let (text, start_info) = self
+                let (text, start_info) = self.stack[0]
                     .node
                     .get_text_at_line_break(self.current_line_idx + 1, self.line_type);
 
@@ -656,8 +676,8 @@ mod lines {
             };
 
             Some(RopeSlice::new(
-                self.node,
-                self.node_info,
+                self.stack[0].node,
+                self.stack[0].node_info,
                 [
                     start_byte.max(self.byte_range[0]),
                     end_byte.min(self.byte_range[1]),
