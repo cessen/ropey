@@ -62,7 +62,10 @@
 //! The `reversed()` method on Ropey's iterators, on the other hand, reverses
 //! the direction of the iterator without changing its position in the text.
 
-use crate::{tree::Node, ChunkCursor};
+use crate::{
+    tree::{Node, TextInfo},
+    ChunkCursor,
+};
 
 //=============================================================
 
@@ -142,8 +145,13 @@ impl<'a> Chunks<'a> {
     /// Note that all parameters are relative to the entire contents of `node`.
     /// In particular, `at_byte_idx` is NOT relative to `byte_range`, it is an
     /// offset from the start of the full contents of `node`.
-    pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> (Chunks, usize) {
-        let cursor = ChunkCursor::new(node, byte_range, at_byte_idx);
+    pub(crate) fn new(
+        node: &'a Node,
+        node_info: &'a TextInfo,
+        byte_range: [usize; 2],
+        at_byte_idx: usize,
+    ) -> (Self, usize) {
+        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
         let byte_offset = byte_range[0] + cursor.byte_offset();
 
         let chunks = Chunks {
@@ -279,8 +287,13 @@ impl<'a> Bytes<'a> {
     //---------------------------------------------------------
 
     #[inline]
-    pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Bytes {
-        let cursor = ChunkCursor::new(node, byte_range, at_byte_idx);
+    pub(crate) fn new(
+        node: &'a Node,
+        node_info: &'a TextInfo,
+        byte_range: [usize; 2],
+        at_byte_idx: usize,
+    ) -> Self {
+        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
         let chunk = cursor.chunk();
         let byte_offset = cursor.byte_offset();
 
@@ -413,8 +426,13 @@ impl<'a> Chars<'a> {
     //---------------------------------------------------------
 
     #[inline]
-    pub(crate) fn new(node: &Node, byte_range: [usize; 2], at_byte_idx: usize) -> Chars {
-        let cursor = ChunkCursor::new(node, byte_range, at_byte_idx);
+    pub(crate) fn new(
+        node: &'a Node,
+        node_info: &'a TextInfo,
+        byte_range: [usize; 2],
+        at_byte_idx: usize,
+    ) -> Self {
+        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
         let chunk = cursor.chunk();
         let byte_offset = cursor.byte_offset();
 
@@ -617,7 +635,7 @@ mod lines {
             byte_range: [usize; 2],
             at_line_idx: usize,
             line_type: LineType,
-        ) -> Lines<'a> {
+        ) -> Self {
             let start_line = {
                 let (text, info) = node.get_text_at_byte(byte_range[0]);
                 info.line_breaks(line_type)

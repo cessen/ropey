@@ -469,6 +469,7 @@ macro_rules! shared_main_impl_methods {
         pub fn bytes(&self) -> Bytes<$rlt> {
             Bytes::new(
                 &self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )
@@ -489,6 +490,7 @@ macro_rules! shared_main_impl_methods {
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<$rlt> {
             Bytes::new(
                 self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
             )
@@ -501,6 +503,7 @@ macro_rules! shared_main_impl_methods {
         pub fn chars(&self) -> Chars<$rlt> {
             Chars::new(
                 self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )
@@ -522,6 +525,7 @@ macro_rules! shared_main_impl_methods {
         pub fn chars_at(&self, byte_idx: usize) -> Chars<$rlt> {
             Chars::new(
                 self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
             )
@@ -586,6 +590,7 @@ macro_rules! shared_main_impl_methods {
         pub fn chunks(&self) -> Chunks<$rlt> {
             Chunks::new(
                 self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )
@@ -609,7 +614,8 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chunks_at(&self, byte_idx: usize) -> Chunks<$rlt> {
             Chunks::new(
-                &self.get_root(),
+                self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
             )
@@ -624,6 +630,7 @@ macro_rules! shared_main_impl_methods {
         pub fn chunk_cursor(&self) -> ChunkCursor<$rlt> {
             ChunkCursor::new(
                 self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
             )
@@ -644,7 +651,8 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<$rlt> {
             ChunkCursor::new(
-                &self.get_root(),
+                self.get_root(),
+                self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
             )
