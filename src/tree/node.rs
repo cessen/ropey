@@ -146,7 +146,7 @@ impl Node {
                     Ok((new_info, None))
                 } else {
                     // Not enough room to insert.  Need to split into two nodes.
-                    let mut right_text = leaf_text.insert_split(byte_idx, text);
+                    let right_text = leaf_text.insert_split(byte_idx, text);
                     Ok((
                         leaf_text.text_info(),
                         Some((right_text.text_info(), Node::Leaf(Arc::new(right_text)))),

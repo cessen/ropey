@@ -161,8 +161,8 @@ proptest::proptest! {
         let mut rope = Rope::from_str(start_text);
         let mut text = String::from(start_text);
 
-        let tmp1 = closest_char_boundary(TEXT, idx1 % (start_text.len() + 1));
-        let tmp2 = closest_char_boundary(TEXT, idx2 % (start_text.len() + 1));
+        let tmp1 = closest_char_boundary(start_text, idx1 % (start_text.len() + 1));
+        let tmp2 = closest_char_boundary(start_text, idx2 % (start_text.len() + 1));
 
         let idx_left = tmp1.min(tmp2);
         let idx_right = tmp1.max(tmp2);

@@ -144,10 +144,6 @@ pub(crate) mod lines {
             _ => None,
         }
     }
-
-    pub(crate) fn ends_with_line_break(text: &str, line_type: LineType) -> bool {
-        trailing_line_break_idx(text, line_type).is_some()
-    }
 }
 
 //=============================================================
