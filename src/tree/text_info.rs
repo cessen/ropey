@@ -486,12 +486,7 @@ mod tests {
 
     #[test]
     fn concat_01() {
-        let test_texts = [
-            "Hello world!",
-            "\nHello\nworld!\n",
-            "\r\nHello\r\nworld!\r\n",
-            "\r\n\r\n\r\n\r\n\r\n\r\n",
-        ];
+        let test_texts = ["Hello world!", "\nHello\nworld!\n"];
 
         for text in test_texts {
             for split in 0..(text.len() + 1) {

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::{Error::*, Result};
 
-#[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
 use crate::str_utils;
 
 #[cfg(any(
@@ -112,6 +111,8 @@ impl Node {
     /// efficiency so that the info can be used for a cheaper update rather than
     /// being recomputed from scratch.
     ///
+    /// - `bias_left`: if true, takes the left node when `byte_idx` hits a
+    /// node boundary.  If false, takes the right node.
     ///
     /// On success, returns the new text info for the current node, and if a
     /// split was caused returns the right side of the split (the left remaining
@@ -125,6 +126,7 @@ impl Node {
         &mut self,
         byte_idx: usize,
         text: &str,
+        bias_left: bool,
         node_info: TextInfo,
     ) -> Result<(TextInfo, Option<(TextInfo, Node)>)> {
         debug_assert!(text.len() <= (MAX_TEXT_SIZE - 4));
@@ -144,12 +146,7 @@ impl Node {
                     Ok((new_info, None))
                 } else {
                     // Not enough room to insert.  Need to split into two nodes.
-                    let mut right_text = leaf_text.split(byte_idx);
-                    let text_split_idx =
-                        crate::floor_char_boundary(leaf_text.free_capacity(), text.as_bytes());
-                    leaf_text.append_str(&text[..text_split_idx]);
-                    right_text.prepend_str(&text[text_split_idx..]);
-                    leaf_text.distribute(&mut right_text);
+                    let mut right_text = leaf_text.insert_split(byte_idx, text);
                     Ok((
                         leaf_text.text_info(),
                         Some((right_text.text_info(), Node::Leaf(Arc::new(right_text)))),
@@ -160,13 +157,14 @@ impl Node {
                 let children = Arc::make_mut(children);
 
                 // Find the child we care about.
-                let (child_i, acc_byte_idx) = children.search_byte_idx_only(byte_idx);
+                let (child_i, acc_byte_idx) = children.search_byte_idx_only(byte_idx, bias_left);
                 let info = children.info()[child_i];
 
                 // Recurse into the child.
                 let (l_info, residual) = children.nodes_mut()[child_i].insert_at_byte_idx(
                     byte_idx - acc_byte_idx,
                     text,
+                    bias_left,
                     info,
                 )?;
                 children.info_mut()[child_i] = l_info;
@@ -234,9 +232,9 @@ impl Node {
                 // Find the start and end children of the range, and
                 // their left-side byte indices within this node.
                 let (start_child_i, start_child_left_byte_idx) =
-                    children.search_byte_idx_only(byte_idx_range[0]);
+                    children.search_byte_idx_only(byte_idx_range[0], false);
                 let (end_child_i, end_child_left_byte_idx) =
-                    children.search_byte_idx_only(byte_idx_range[1]);
+                    children.search_byte_idx_only(byte_idx_range[1], false);
 
                 // Text info of the the start and end children.
                 let start_info = children.info()[start_child_i];
@@ -428,7 +426,7 @@ impl Node {
                     return (text, byte_idx - idx);
                 }
                 Node::Internal(ref children) => {
-                    let (child_i, byte_idx_offset) = children.search_byte_idx_only(idx);
+                    let (child_i, byte_idx_offset) = children.search_byte_idx_only(idx, false);
                     node = &children.nodes()[child_i];
                     idx -= byte_idx_offset;
                 }

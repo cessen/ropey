@@ -391,50 +391,6 @@ mod tests {
         assert_eq!(s.len_lines(LineType::LF_CR), 1);
     }
 
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
-    #[test]
-    fn len_lines_03() {
-        // Make sure splitting LF_CR pairs at the end works properly.
-        let r = {
-            let mut rb = RopeBuilder::new();
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb.finish()
-        };
-        for i in 0..=r.len() {
-            #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(r.slice(..i).len_lines(LineType::LF_CR), 1 + ((i + 1) / 2));
-
-            #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(r.slice(..i).len_lines(LineType::LF), 1 + (i / 2));
-        }
-    }
-
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
-    #[test]
-    fn len_lines_04() {
-        // Make sure splitting LF_CR pairs at the start works properly.
-        let r = {
-            let mut rb = RopeBuilder::new();
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb.finish()
-        };
-        for i in 0..=r.len() {
-            #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(r.slice(i..).len_lines(LineType::LF_CR), 16 - (i / 2));
-
-            #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(r.slice(i..).len_lines(LineType::LF), 16 - (i / 2));
-        }
-    }
-
     #[cfg(feature = "metric_utf16")]
     #[test]
     fn len_utf16_01() {
@@ -723,37 +679,6 @@ mod tests {
         s.byte_to_line(79, LineType::LF_CR);
     }
 
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
-    #[test]
-    fn byte_to_line_05() {
-        // Make sure splitting LF_CR pairs at the end works properly.
-        let r = {
-            let mut rb = RopeBuilder::new();
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb.finish()
-        };
-        for si in 0..=r.len() {
-            let s = r.slice(..si);
-            for i in 0..s.len() {
-                #[cfg(feature = "metric_lines_lf_cr")]
-                assert_eq!(s.byte_to_line(i, LineType::LF_CR), i / 2);
-
-                #[cfg(feature = "metric_lines_lf")]
-                assert_eq!(s.byte_to_line(i, LineType::LF), i / 2);
-            }
-
-            #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(s.byte_to_line(si, LineType::LF_CR), (si + 1) / 2);
-
-            #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(s.byte_to_line(si, LineType::LF), si / 2);
-        }
-    }
-
     #[cfg(feature = "metric_chars")]
     #[test]
     fn char_to_byte_01() {
@@ -818,50 +743,6 @@ mod tests {
         let s = r.slice(1..3);
 
         s.line_to_byte(4, LineType::LF_CR);
-    }
-
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_lf"))]
-    #[test]
-    fn line_to_byte_05() {
-        // Make sure splitting LF_CR pairs at the end works properly.
-        let r = {
-            let mut rb = RopeBuilder::new();
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r");
-            rb._append_chunk_as_leaf("\n\r\n\r\n\r\n");
-            rb._append_chunk_as_leaf("\r\n\r\n\r\n");
-            rb.finish()
-        };
-
-        #[cfg(feature = "metric_lines_lf_cr")]
-        for si in 0..=r.len() {
-            let s = r.slice(..si);
-            for li in 0..(s.len_lines(LineType::LF_CR) - 1) {
-                assert_eq!(s.line_to_byte(li, LineType::LF_CR), li * 2);
-            }
-            assert_eq!(
-                s.line_to_byte(s.len_lines(LineType::LF_CR) - 1, LineType::LF_CR),
-                si,
-            );
-            assert_eq!(
-                s.line_to_byte(s.len_lines(LineType::LF_CR), LineType::LF_CR),
-                si,
-            );
-        }
-
-        #[cfg(feature = "metric_lines_lf")]
-        for si in 0..=r.len() {
-            let s = r.slice(..si);
-            for li in 0..(s.len_lines(LineType::LF) - 1) {
-                assert_eq!(s.line_to_byte(li, LineType::LF), li * 2);
-            }
-            assert_eq!(
-                s.line_to_byte(s.len_lines(LineType::LF) - 1, LineType::LF),
-                si - (si % 2),
-            );
-            assert_eq!(s.line_to_byte(s.len_lines(LineType::LF), LineType::LF), si);
-        }
     }
 
     #[cfg(feature = "metric_utf16")]
@@ -1509,7 +1390,6 @@ mod tests {
         let s = r.slice(13..14);
         let cow: Cow<str> = r.slice(13..14).into();
 
-        dbg!(s);
         assert!(s.root.is_leaf());
 
         // Make sure it's borrowed.

@@ -224,7 +224,8 @@ impl<'a> ChunkCursor<'a> {
                 }
 
                 Node::Internal(ref children) => {
-                    let (child_i, acc_byte_idx) = children.search_byte_idx_only(local_byte_idx);
+                    let (child_i, acc_byte_idx) =
+                        children.search_byte_idx_only(local_byte_idx, false);
 
                     cursor.current_byte_idx += acc_byte_idx;
                     local_byte_idx -= acc_byte_idx;

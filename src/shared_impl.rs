@@ -140,75 +140,15 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         pub fn trailing_line_break_idx(&self, line_type: LineType) -> Option<usize> {
-            // Silence unused parameter warning with certain feature
-            // configurations.
-            let _ = line_type;
+            use crate::str_utils;
 
             if self.len() == 0 {
                 return None;
             }
 
-            // We try to do everything with just one chunk fetch.  However,
-            // there is a single case when checking for CRLF where we might need
-            // to fetch a second chunk, which is handled further below.  But
-            // otherwise, we do everything with this one chunk.
-            let last_chunk = self.chunk(self.len() - 1).0.as_bytes();
-            let last_byte = last_chunk[last_chunk.len() - 1];
+            let (last_chunk, offset) = self.chunk(self.len() - 1);
 
-            // First handle LF and CRLF since that's the most typical case, and
-            // also because it's the same for all line types.
-            if last_byte == 0x0A {
-                if self.len() > 1 {
-                    let second_to_last_byte = if last_chunk.len() > 1 {
-                        last_chunk[last_chunk.len() - 2]
-                    } else {
-                        // We need to fetch another chunk just for this one case.
-                        self.byte(self.len() - 2)
-                    };
-
-                    if second_to_last_byte == 0x0D {
-                        return Some(self.len() - 2);
-                    }
-                }
-
-                return Some(self.len() - 1);
-            }
-
-            // That was the only case for `LineType::LF`, so early out if that's
-            // the line type.
-            #[cfg(feature = "metric_lines_lf")]
-            if line_type == LineType::LF {
-                return None;
-            }
-
-            // Next we handle CR on its own.
-            if last_byte == 0x0D {
-                return Some(self.len() - 1);
-            }
-
-            // That was the last case for `LineType::LF_CR`, so early out if
-            // that's the line type.
-            #[cfg(feature = "metric_lines_lf_cr")]
-            if line_type == LineType::LF_CR {
-                return None;
-            }
-
-            // Last char and its byte index.
-            let last_char_byte_idx = crate::floor_char_boundary(last_chunk.len() - 1, last_chunk);
-            let last_char = &last_chunk[last_char_byte_idx..];
-
-            // Handle the remaining unicode cases.
-            match last_char {
-                // - VT (Vertical Tab)
-                // - FF (Form Feed)
-                // - NEL (Next Line)
-                // - Line Separator
-                // - Paragraph Separator
-                &[0xb] | &[0xc] | &[0xc2, 0x85] | &[0xe2, 0x80, 0xa8] | &[0xe2, 0x80, 0xa9] => {
-                    Some(last_char_byte_idx)
-                }
-                _ => None,
-            }
+            str_utils::lines::trailing_line_break_idx(last_chunk, line_type).map(|idx| offset + idx)
         }
 
         //-----------------------------------------------------

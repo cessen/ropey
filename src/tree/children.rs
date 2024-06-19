@@ -345,8 +345,14 @@ impl Children {
         (idx, accum)
     }
 
-    /// Same as `search_byte_idx()` below, except that it only calulates the
+    /// Same as `search_byte_idx()` below, except that it only calculates the
     /// left-side-accumulated _byte_ index rather than the full text info.
+    ///
+    /// This also has an additional parameter: `bias_left`.  This should be false
+    /// if you're looking for the node that actually contains the give byte.
+    /// However, if you're searching for *gap* (e.g. when inserting) and want to
+    /// traverse into nodes to the left of the boundary when there's a choice,
+    /// set it to true.
     ///
     /// Return is (child_index, left_acc_byte_index)
     ///
@@ -354,14 +360,14 @@ impl Children {
     ///
     /// The returned TextInfo has already had split-CRLF compensation
     /// applied.
-    pub fn search_byte_idx_only(&self, byte_idx: usize) -> (usize, usize) {
+    pub fn search_byte_idx_only(&self, byte_idx: usize, bias_left: bool) -> (usize, usize) {
         debug_assert!(self.len() > 0);
 
         let mut accum_byte_idx = 0;
         let mut idx = 0;
         for info in self.info()[0..(self.len() - 1)].iter() {
             let next_accum = accum_byte_idx + info.bytes;
-            if byte_idx < next_accum {
+            if byte_idx < next_accum || (bias_left && byte_idx == next_accum) {
                 break;
             }
             accum_byte_idx = next_accum;
@@ -1001,7 +1007,6 @@ mod inner {
         #[test]
         fn pop_01() {
             let mut children = make_children_full(true);
-            dbg!(children.subtree_unbalance_flags);
 
             for i in (0..MAX_CHILDREN).rev() {
                 let (info, node) = children.pop();

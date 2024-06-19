@@ -128,8 +128,8 @@ proptest::proptest! {
         string_insert(&mut text, idx, ins_text);
 
         assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
         rope.assert_invariants();
+        assert_metrics_eq(&rope, text.as_str());
     }
 
     #[test]
@@ -153,19 +153,26 @@ proptest::proptest! {
 
     #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
     #[test]
-    fn pt_remove_crlf(cr_or_lf: bool, idx: usize, ref start_text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}){0,200}") {
+    fn pt_remove_crlf(idx1: usize, idx2: usize, ref start_text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}){0,200}") {
+        if start_text.is_empty() {
+            return Ok(());
+        }
+
         let mut rope = Rope::from_str(start_text);
         let mut text = String::from(start_text);
 
-        let idx = closest_char_boundary(start_text, idx % (start_text.len() + 1));
-        let ins_text = if cr_or_lf { "\r" } else { "\n" };
+        let tmp1 = closest_char_boundary(TEXT, idx1 % (start_text.len() + 1));
+        let tmp2 = closest_char_boundary(TEXT, idx2 % (start_text.len() + 1));
 
-        rope.insert(idx, ins_text);
-        string_insert(&mut text, idx, ins_text);
+        let idx_left = tmp1.min(tmp2);
+        let idx_right = tmp1.max(tmp2);
+
+        rope.remove(idx_left..idx_right);
+        string_remove(&mut text, idx_left, idx_right);
 
         assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
         rope.assert_invariants();
+        assert_metrics_eq(&rope, text.as_str());
 
         assert!(rope.attempt_full_rebalance(100).0);
         rope.assert_invariants();

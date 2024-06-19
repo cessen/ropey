@@ -7,7 +7,7 @@ use crate::{
     iter::{Bytes, Chars, Chunks},
     rope_builder::RopeBuilder,
     slice::RopeSlice,
-    start_bound_to_num,
+    start_bound_to_num, str_utils,
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
     ChunkCursor,
     Error::*,
@@ -395,6 +395,7 @@ impl Rope {
         self.assert_equal_leaf_depth();
         self.assert_no_empty_internal();
         self.assert_no_empty_non_root_leaf();
+        self.assert_no_crlf_splits();
         self.assert_accurate_text_info();
         self.assert_accurate_unbalance_flags();
     }
@@ -419,6 +420,18 @@ impl Rope {
             return;
         }
         self.root.assert_no_empty_leaf();
+    }
+
+    /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
+    #[doc(hidden)]
+    pub fn assert_no_crlf_splits(&self) {
+        let mut last_ends_with_cr = false;
+        for chunk in self.chunks().filter(|c| !c.is_empty()) {
+            if last_ends_with_cr && str_utils::starts_with_lf(chunk) {
+                panic!("CRLF split found.");
+            }
+            last_ends_with_cr = str_utils::ends_with_cr(chunk);
+        }
     }
 
     /// NOT PART OF THE PUBLIC API (hidden from docs for a reason!)
@@ -535,23 +548,41 @@ impl Rope {
             // We do this from the end instead of the front so that the repeated
             // insertions can keep re-using the same insertion point.
             //
-            // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than just
-            // `MAX_TEXT_SIZE` to guarantee that nodes can split into node-sized
-            // chunks even in the face of multi-byte chars that may prevent
-            // splits at certain byte indices.  This is a subtle issue that in
-            // practice only very rarely manifest, but causes panics when it
-            // does.  Please do not remove that `- 4`!
-            let split_idx = crate::ceil_char_boundary(
-                text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
-                text.as_bytes(),
-            );
+            let (bias_left, split_idx) = {
+                // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than
+                // just `MAX_TEXT_SIZE` to guarantee that nodes can split into
+                // node-sized chunks even in the face of multi-byte chars and
+                // CRLF pairs that may prevent splits at certain byte indices.
+                // This is a subtle issue that in practice only very rarely
+                // manifest, but causes panics when it does.  Please do not
+                // remove that `- 4`!
+                let idx = crate::find_appropriate_split_ceil(
+                    text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
+                    text,
+                );
+
+                // Some shenanigans to avoid CRLF pairs ending up split across
+                // leaves in the tree.  If the text starts with an LF, we want
+                // to insert it on its own with a left bias to ensure it never
+                // ends up at the start of a chunk (unless it's the first
+                // chunk), since the chunk before it could end in a CR.
+                if idx == 0 && str_utils::starts_with_lf(text) {
+                    if text.len() > 1 {
+                        (false, idx + 1)
+                    } else {
+                        (true, idx)
+                    }
+                } else {
+                    (false, idx)
+                }
+            };
             let ins_text = &text[split_idx..];
             text = &text[..split_idx];
 
             // Do the insertion.
             let (new_root_info, residual) =
                 self.root
-                    .insert_at_byte_idx(byte_idx, ins_text, self.root_info)?;
+                    .insert_at_byte_idx(byte_idx, ins_text, bias_left, self.root_info)?;
             self.root_info = new_root_info;
 
             // Handle root split.
@@ -963,36 +994,42 @@ mod tests {
 
     #[test]
     fn insert_12() {
-        let (r, _) = make_rope_and_text_from_chunks(&["\r", "\n\r", "\n\r", "\n"]);
+        let (r, _) = make_rope_and_text_from_chunks(&["\n\r", "\r\n", "\n\r", "\r\n", "\n\r"]);
 
         {
             let mut r = r.clone();
-            r.insert(1, "\r");
+            r.insert(0, "\r");
+            r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }
         {
             let mut r = r.clone();
-            r.insert(1, "\n");
+            r.insert(2, "\n");
+            r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }
         {
             let mut r = r.clone();
-            r.insert(3, "\r");
+            r.insert(4, "\r");
+            r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }
         {
             let mut r = r.clone();
-            r.insert(3, "\n");
+            r.insert(6, "\n");
+            r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }
         {
             let mut r = r.clone();
-            r.insert(0, "\n");
+            r.insert(8, "\r");
+            r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }
         {
             let mut r = r.clone();
-            r.insert(r.len(), "\r");
+            r.insert(10, "\n");
+            r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }
     }

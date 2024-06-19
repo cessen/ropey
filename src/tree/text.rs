@@ -13,6 +13,8 @@ use str_indices::utf16;
 ))]
 use crate::{str_utils::lines, LineType};
 
+use crate::str_utils::{ends_with_cr, starts_with_lf};
+
 /// A leaf node of the Rope, containing text.
 #[derive(Copy, Clone)]
 pub(crate) struct Text(inner::Buffer);
@@ -139,6 +141,21 @@ impl Text {
         new_info
     }
 
+    /// Inserts `text` and splits the resulting text into two roughly equal
+    /// pieces, returning the right half.
+    ///
+    /// This can handle insertions even when already full, as long as the
+    /// resulting text can fit in two `Text`'s.
+    #[must_use]
+    pub fn insert_split(&mut self, byte_idx: usize, text: &str) -> Self {
+        let mut right_text = self.split(byte_idx);
+        let text_split_idx = crate::find_appropriate_split_floor(self.free_capacity(), text);
+        self.append_str(&text[..text_split_idx]);
+        right_text.prepend_str(&text[text_split_idx..]);
+        self.distribute(&mut right_text);
+        right_text
+    }
+
     /// Removes the text in the given right-exclusive byte range, and computes
     /// an updated TextInfo for the resulting text at the same time..
     ///
@@ -189,33 +206,29 @@ impl Text {
     /// result is then split between the two, with `other` being the right
     /// half of the text.
     pub fn distribute(&mut self, other: &mut Self) {
+        // Fix any pre-existing CRLF splits.
+        if ends_with_cr(self.text()) && starts_with_lf(other.text()) {
+            if self.len() > other.len() {
+                self.0.remove([self.len() - 1, self.len()]);
+                other.0.insert(0, "\r");
+            } else {
+                self.0.insert(self.len(), "\n");
+                other.0.remove([0, 1]);
+            }
+        }
+
+        // Distribute.
         let total_len = self.0.len() + other.0.len();
         let mut split_idx = (total_len + 1) / 2;
-
         if split_idx < self.len() {
-            while !self.0.is_char_boundary(split_idx) {
-                split_idx += 1;
-            }
+            split_idx = crate::find_appropriate_split_ceil(split_idx, self.text());
             other.0.insert(0, &self.0.text()[split_idx..]);
             self.0.remove([split_idx, self.0.len()]);
         } else if split_idx > self.len() {
             split_idx -= self.len();
-            while !other.is_char_boundary(split_idx) {
-                // We could subtract 1 here instead, which would avoid
-                // needing the special case below.  However, this ensures
-                // consistent splitting behavior regardless of whether
-                // self or other has more data in it.
-                split_idx += 1;
-            }
-            // There is a slim chance that the chosen split point would
-            // overflow the left capacity.  This only happens when both
-            // texts are nearly full, and thus essentially equidistributed
-            // already.  Thus, if we hit that case, we simply skip doing
-            // the equidistribution.
-            if (self.len() + split_idx) <= MAX_TEXT_SIZE {
-                self.0.insert(self.0.len(), &other.0.text()[0..split_idx]);
-                other.0.remove([0, split_idx]);
-            }
+            split_idx = crate::find_appropriate_split_floor(split_idx, other.text());
+            self.0.insert(self.0.len(), &other.0.text()[0..split_idx]);
+            other.0.remove([0, split_idx]);
         } else {
             // Already equidistributed, so do nothing.
         }
@@ -779,10 +792,15 @@ mod tests {
     #[test]
     fn distribute_02() {
         let text = "こんにちは";
-        let expected_left = "こんに";
-        let expected_right = "ちは";
-        for split_i in 0..=(text.len() / 3) {
-            let split_i = split_i * 3;
+        let splits = &[
+            (0, "こん", "にちは"),
+            (3, "こん", "にちは"),
+            (6, "こん", "にちは"),
+            (9, "こんに", "ちは"),
+            (12, "こんに", "ちは"),
+            (15, "こんに", "ちは"),
+        ];
+        for (split_i, expected_left, expected_right) in splits.iter().copied() {
             let mut leaf_1 = Text::from_str(&text[..split_i]);
             let mut leaf_2 = Text::from_str(&text[split_i..]);
             leaf_1.distribute(&mut leaf_2);

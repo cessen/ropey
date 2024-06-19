@@ -302,6 +302,48 @@ pub(crate) fn ceil_char_boundary(mut byte_idx: usize, text: &[u8]) -> usize {
     byte_idx
 }
 
+/// Returns the closest byte index <= `byte_idx` that is a char boundary and
+/// doesn't split a CRLF pair.
+///
+/// Mainly used for finding an appropriate place to split text.
+///
+/// Note for convenience, if `byte_idx > text.len()`, this simply returns
+/// `text.len()`.
+pub(crate) fn find_appropriate_split_floor(mut byte_idx: usize, text: &str) -> usize {
+    byte_idx = floor_char_boundary(byte_idx, text.as_bytes());
+
+    if byte_idx > 0
+        && byte_idx < text.len()
+        && str_utils::byte_is_lf(text, byte_idx)
+        && str_utils::byte_is_cr(text, byte_idx - 1)
+    {
+        byte_idx -= 1;
+    }
+
+    byte_idx
+}
+
+/// Returns the closest byte index >= `byte_idx` that is a char boundary and
+/// doesn't split a CRLF pair.
+///
+/// Mainly used for finding an appropriate place to split text.
+///
+/// Note for convenience, if `byte_idx > text.len()`, this simply returns
+/// `text.len()`.
+pub(crate) fn find_appropriate_split_ceil(mut byte_idx: usize, text: &str) -> usize {
+    byte_idx = ceil_char_boundary(byte_idx, text.as_bytes());
+
+    if byte_idx > 0
+        && byte_idx < text.len()
+        && str_utils::byte_is_lf(text, byte_idx)
+        && str_utils::byte_is_cr(text, byte_idx - 1)
+    {
+        byte_idx += 1;
+    }
+
+    byte_idx
+}
+
 //-------------------------------------------------------------
 // Range handling utilities.
 

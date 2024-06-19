@@ -75,6 +75,79 @@ pub(crate) mod lines {
             LineType::All => str_indices::lines::count_breaks(text),
         }
     }
+
+    /// If there is a trailing line break, returns its byte index.
+    /// Otherwise returns `None`.
+    ///
+    /// Note: a CRLF pair is always treated as a single unit, and thus
+    /// this function will return the index of the CR in such cases, even
+    /// with `LineType::LF` where CR is not on its own recognized as a line
+    /// break.
+    pub(crate) fn trailing_line_break_idx(text: &str, line_type: LineType) -> Option<usize> {
+        // Silence unused parameter warning with certain feature
+        // configurations.
+        let _ = line_type;
+
+        if text.len() == 0 {
+            return None;
+        }
+
+        let text = text.as_bytes();
+        let last_byte = text[text.len() - 1];
+
+        // First handle LF and CRLF since that's the most typical case, and
+        // also because it's the same for all line types.
+        if last_byte == 0x0A {
+            if text.len() > 1 {
+                let second_to_last_byte = text[text.len() - 2];
+                if second_to_last_byte == 0x0D {
+                    return Some(text.len() - 2);
+                }
+            }
+
+            return Some(text.len() - 1);
+        }
+
+        // That was the only case for `LineType::LF`, so early out if that's
+        // the line type.
+        #[cfg(feature = "metric_lines_lf")]
+        if line_type == LineType::LF {
+            return None;
+        }
+
+        // Next we handle CR on its own.
+        if last_byte == 0x0D {
+            return Some(text.len() - 1);
+        }
+
+        // That was the last case for `LineType::LF_CR`, so early out if
+        // that's the line type.
+        #[cfg(feature = "metric_lines_lf_cr")]
+        if line_type == LineType::LF_CR {
+            return None;
+        }
+
+        // Last char and its byte index.
+        let last_char_byte_idx = crate::floor_char_boundary(text.len() - 1, text);
+        let last_char = &text[last_char_byte_idx..];
+
+        // Handle the remaining unicode cases.
+        match last_char {
+            // - VT (Vertical Tab)
+            // - FF (Form Feed)
+            // - NEL (Next Line)
+            // - Line Separator
+            // - Paragraph Separator
+            &[0xb] | &[0xc] | &[0xc2, 0x85] | &[0xe2, 0x80, 0xa8] | &[0xe2, 0x80, 0xa9] => {
+                Some(last_char_byte_idx)
+            }
+            _ => None,
+        }
+    }
+
+    pub(crate) fn ends_with_line_break(text: &str, line_type: LineType) -> bool {
+        trailing_line_break_idx(text, line_type).is_some()
+    }
 }
 
 //=============================================================
