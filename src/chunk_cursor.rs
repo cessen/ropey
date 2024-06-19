@@ -38,7 +38,7 @@ impl<'a> ChunkCursor<'a> {
         self.current_byte_idx += current_leaf_len;
 
         // Progress the stack.
-        if self.current_byte_idx < self.byte_range[1] && self.node_stack.len() > 1 {
+        if self.node_stack.len() > 1 {
             // Start at the node above the leaf.
             let mut stack_idx = self.node_stack.len() - 2;
 
