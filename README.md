@@ -18,7 +18,7 @@ This is the WIP next major version of Ropey.  DO NOT USE THIS for anything even 
   - [x] UTF16 <-> bytes
   - [x] Lines <-> bytes
 - [ ] Non-panicking versions of various functions.
-- [ ] Iterators:
+- [x] Iterators:
   - [x] `reversed()` method.
   - [x] Non-line:
     - [x] `Chunks`
@@ -32,8 +32,8 @@ This is the WIP next major version of Ropey.  DO NOT USE THIS for anything even 
       - [x] Forward.
       - [x] Bidirectional.
     - [x] Creating iterators at a specific offset.
-  - [ ] `Lines`:
-    - [ ] Efficient implementation.
+  - [x] `Lines`:
+    - [x] Efficient implementation.
     - [x] LF
       - [x] Forward.
       - [x] Bidirectional.

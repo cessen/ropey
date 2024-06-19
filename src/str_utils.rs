@@ -76,6 +76,63 @@ pub(crate) mod lines {
         }
     }
 
+    /// Returns the byte index of the start of the last line of the passed text.
+    ///
+    /// Note: if the text ends in a line break, that means the last line is
+    /// an empty line that starts at the end of the text.
+    pub(crate) fn last_line_start_byte_idx(text: &str, line_type: LineType) -> usize {
+        // Silence unused parameter warning with certain feature
+        // configurations.
+        let _ = line_type;
+
+        let mut itr = text.bytes().enumerate().rev();
+
+        while let Some((idx, byte)) = itr.next() {
+            if byte == 0x0A {
+                return idx + 1;
+            }
+
+            // That was the only case for `LineType::LF`, so early out if that's
+            // the line type.
+            #[cfg(feature = "metric_lines_lf")]
+            if line_type == LineType::LF {
+                continue;
+            }
+
+            if byte == 0x0D {
+                return idx + 1;
+            }
+
+            // That was the last case for `LineType::LF_CR`, so early out if
+            // that's the line type.
+            #[cfg(feature = "metric_lines_lf_cr")]
+            if line_type == LineType::LF_CR {
+                continue;
+            }
+
+            // Handle the remaining unicode cases.
+            match byte {
+                0x0B | 0x0C => {
+                    return idx + 1;
+                }
+                0x85 => {
+                    if let Some((_, 0xC2)) = itr.next() {
+                        return idx + 1;
+                    }
+                }
+                0xA8 | 0xA9 => {
+                    if let Some((_, 0x80)) = itr.next() {
+                        if let Some((_, 0xE2)) = itr.next() {
+                            return idx + 1;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        return 0;
+    }
     /// If there is a trailing line break, returns its byte index.
     /// Otherwise returns `None`.
     ///
@@ -142,6 +199,18 @@ pub(crate) mod lines {
                 Some(last_char_byte_idx)
             }
             _ => None,
+        }
+    }
+
+    pub(crate) fn ends_with_line_break(text: &str, line_type: LineType) -> bool {
+        trailing_line_break_idx(text, line_type).is_some()
+    }
+
+    pub(crate) fn trim_trailing_line_break(text: &str, line_type: LineType) -> &str {
+        if let Some(idx) = trailing_line_break_idx(text, line_type) {
+            &text[..idx]
+        } else {
+            text
         }
     }
 }

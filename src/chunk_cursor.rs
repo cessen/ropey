@@ -1,4 +1,7 @@
-use crate::tree::{Node, TextInfo};
+use crate::{
+    tree::{Node, TextInfo},
+    RopeSlice,
+};
 
 #[cfg(any(
     feature = "metric_lines_lf",
@@ -12,6 +15,11 @@ struct StackItem<'a> {
     node: &'a Node,
     info: &'a TextInfo,
 
+    /// The absolute byte offset of this node from the start of the root node.
+    /// Importantly, *not* from the start of `byte_range`.  This doesn't take
+    /// into account trimming.
+    byte_offset: usize,
+
     /// For internal nodes, the current child index corresponding to the
     /// current line.
     child_idx: usize,
@@ -24,10 +32,6 @@ pub struct ChunkCursor<'a> {
     // The byte range within the root node that is considered part of this
     // cursor's contents.
     byte_range: [usize; 2],
-
-    // The offset within the root node (*not* `byte_range`) of the current
-    // un-trimmed chunk.
-    current_byte_idx: usize,
 }
 
 impl<'a> ChunkCursor<'a> {
@@ -40,50 +44,45 @@ impl<'a> ChunkCursor<'a> {
     #[inline(always)]
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
-        // Special case for empty cursors.
-        if self.byte_range[0] == self.byte_range[1] {
-            return false;
-        }
-
-        let current_leaf_len = self.node_stack.last().unwrap().node.leaf_text().len();
-
         // Already at the end.
-        if (self.current_byte_idx + current_leaf_len) >= self.byte_range[1] {
+        if self.at_last() {
             return false;
         }
 
-        self.current_byte_idx += current_leaf_len;
+        debug_assert!(self.node_stack.len() > 1);
 
-        // Progress the stack.
-        if self.node_stack.len() > 1 {
-            // Start at the node above the leaf.
-            let mut stack_idx = self.node_stack.len() - 2;
+        // Start at the node above the leaf.
+        let mut stack_idx = self.node_stack.len() - 2;
 
-            // Find the deepest node that's not at its end already.
-            while self.node_stack[stack_idx].child_idx
-                >= (self.node_stack[stack_idx].node.child_count() - 1)
-            {
-                debug_assert!(stack_idx > 0);
-                stack_idx -= 1;
-            }
-
-            // Refill the stack starting from that node.
-            self.node_stack[stack_idx].child_idx += 1;
-            while self.node_stack[stack_idx].node.is_internal() {
-                let child_i = self.node_stack[stack_idx].child_idx;
-                let node = &self.node_stack[stack_idx].node.children().nodes()[child_i];
-                let info = &self.node_stack[stack_idx].node.children().info()[child_i];
-
-                stack_idx += 1;
-                self.node_stack[stack_idx] = StackItem {
-                    node: node,
-                    info: info,
-                    child_idx: 0,
-                };
-            }
-
-            debug_assert!(stack_idx == self.node_stack.len() - 1);
+        // Find the deepest node that's not at its end already.
+        while self.node_stack[stack_idx].child_idx
+            >= (self.node_stack[stack_idx].node.child_count() - 1)
+        {
+            debug_assert!(stack_idx > 0);
+            stack_idx -= 1;
         }
+
+        // Refill the stack starting from that node.
+        self.node_stack[stack_idx].child_idx += 1;
+        let byte_offset = {
+            let child = &self.node_stack[stack_idx + 1];
+            child.byte_offset + child.info.bytes
+        };
+        while self.node_stack[stack_idx].node.is_internal() {
+            let child_i = self.node_stack[stack_idx].child_idx;
+            let node = &self.node_stack[stack_idx].node.children().nodes()[child_i];
+            let info = &self.node_stack[stack_idx].node.children().info()[child_i];
+
+            stack_idx += 1;
+            self.node_stack[stack_idx] = StackItem {
+                node: node,
+                info: info,
+                byte_offset: byte_offset,
+                child_idx: 0,
+            };
+        }
+
+        debug_assert!(stack_idx == self.node_stack.len() - 1);
 
         true
     }
@@ -96,80 +95,96 @@ impl<'a> ChunkCursor<'a> {
     /// Runs in amortized O(1) time and worst-case O(log N) time.
     #[inline(always)]
     pub fn prev(&mut self) -> bool {
-        // Special case for empty cursors.
-        if self.byte_range[0] == self.byte_range[1] {
-            return false;
-        }
-
         // Already at the start.
-        if self.current_byte_idx <= self.byte_range[0] {
+        if self.at_first() {
             return false;
         }
 
-        // Progress the stack backwards.
-        if self.node_stack.len() > 1 {
-            // Start at the node above the leaf.
-            let mut stack_idx = self.node_stack.len() - 2;
+        debug_assert!(self.node_stack.len() > 1);
 
-            // Find the deepest node that's not at its start already.
-            while self.node_stack[stack_idx].child_idx == 0 {
-                debug_assert!(stack_idx > 0);
-                stack_idx -= 1;
-            }
+        // Start at the node above the leaf.
+        let mut stack_idx = self.node_stack.len() - 2;
 
-            // Refill the stack starting from that node.
-            self.node_stack[stack_idx].child_idx -= 1;
-            while self.node_stack[stack_idx].node.is_internal() {
-                let child_i = self.node_stack[stack_idx].child_idx;
-                let node = &self.node_stack[stack_idx].node.children().nodes()[child_i];
-                let info = &self.node_stack[stack_idx].node.children().info()[child_i];
-                let position = match *node {
-                    Node::Leaf(_) => 0,
-                    Node::Internal(ref children) => children.len() - 1,
-                };
-
-                stack_idx += 1;
-                self.node_stack[stack_idx] = StackItem {
-                    node: node,
-                    info: info,
-                    child_idx: position,
-                };
-            }
-
-            debug_assert!(stack_idx == self.node_stack.len() - 1);
+        // Find the deepest node that's not at its start already.
+        while self.node_stack[stack_idx].child_idx == 0 {
+            debug_assert!(stack_idx > 0);
+            stack_idx -= 1;
         }
 
-        self.current_byte_idx -= self.node_stack.last().unwrap().node.leaf_text().len();
+        // Refill the stack starting from that node.
+        self.node_stack[stack_idx].child_idx -= 1;
+        let byte_offset_end = self.node_stack[stack_idx + 1].byte_offset;
+        while self.node_stack[stack_idx].node.is_internal() {
+            let child_i = self.node_stack[stack_idx].child_idx;
+            let node = &self.node_stack[stack_idx].node.children().nodes()[child_i];
+            let info = &self.node_stack[stack_idx].node.children().info()[child_i];
+            let byte_offset = {
+                let len = self.node_stack[stack_idx].node.children().info()[child_i].bytes;
+                byte_offset_end - len
+            };
+            let position = match *node {
+                Node::Leaf(_) => 0,
+                Node::Internal(ref children) => children.len() - 1,
+            };
+
+            stack_idx += 1;
+            self.node_stack[stack_idx] = StackItem {
+                node: node,
+                info: info,
+                byte_offset: byte_offset,
+                child_idx: position,
+            };
+        }
+
+        debug_assert!(stack_idx == self.node_stack.len() - 1);
 
         true
     }
 
     /// Returns the current chunk.
+    #[inline(always)]
     pub fn chunk(&self) -> &'a str {
-        // Special case for empty cursors.
-        if self.byte_range[0] == self.byte_range[1] {
-            return "";
-        }
+        self.chunk_slice().as_str().unwrap()
+    }
 
-        let text = self.node_stack.last().unwrap().node.leaf_text();
-        let trimmed_chunk = {
-            let mut chunk = text.text();
-            if (self.current_byte_idx + chunk.len()) > self.byte_range[1] {
-                chunk = &chunk[..(self.byte_range[1] - self.current_byte_idx)];
-            }
-            if self.current_byte_idx < self.byte_range[0] {
-                chunk = &chunk[(self.byte_range[0] - self.current_byte_idx)..];
-            }
-            chunk
+    /// Returns the current chunk as a rope slice.
+    ///
+    /// Since it's a chunk, it's guaranteed to be contiguous text.
+    pub fn chunk_slice(&self) -> RopeSlice<'a> {
+        let leaf = self.node_stack.last().unwrap();
+
+        let start = if leaf.byte_offset < self.byte_range[0] {
+            self.byte_range[0] - leaf.byte_offset
+        } else {
+            0
+        };
+        let end = if (leaf.byte_offset + leaf.info.bytes) > self.byte_range[1] {
+            self.byte_range[1] - leaf.byte_offset
+        } else {
+            leaf.info.bytes
         };
 
-        trimmed_chunk
+        RopeSlice::new(leaf.node, leaf.info, [start, end])
+    }
+
+    pub fn at_first(&self) -> bool {
+        let leaf = &self.node_stack.last().unwrap();
+        leaf.byte_offset <= self.byte_range[0]
+    }
+
+    pub fn at_last(&self) -> bool {
+        let leaf = &self.node_stack.last().unwrap();
+        (leaf.byte_offset + leaf.info.bytes) >= self.byte_range[1]
     }
 
     /// Returns the byte offset from the start of the text to the start of the current chunk.
     #[inline]
     pub fn byte_offset(&self) -> usize {
-        self.current_byte_idx
+        // Offset from start of root.
+        let offset = self.node_stack.last().unwrap().byte_offset;
+
+        // Trimmed offset.
+        offset
             .min(self.byte_range[1])
             .saturating_sub(self.byte_range[0])
     }
@@ -177,7 +192,11 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the byte offset from the start of the current chunk to the end of the text.
     #[inline]
     pub fn byte_offset_from_end(&self) -> usize {
-        self.byte_range[1].saturating_sub(self.current_byte_idx.max(self.byte_range[0]))
+        // Offset from start of root.
+        let offset = self.node_stack.last().unwrap().byte_offset;
+
+        // Trimmed and reversed offset.
+        self.byte_range[1].saturating_sub(offset.max(self.byte_range[0]))
     }
 
     //---------------------------------------------------------
@@ -199,18 +218,13 @@ impl<'a> ChunkCursor<'a> {
         let mut cursor = ChunkCursor {
             node_stack: vec![],
             byte_range: byte_range,
-            current_byte_idx: 0,
         };
-
-        // Special case: if it's an empty rope, don't store anything.
-        if byte_range[0] == byte_range[1] || node.is_empty() {
-            return cursor;
-        }
 
         // Find the chunk the contains `at_byte_idx` and set that as the current
         // chunk of the cursor.
         let mut current_node = node;
         let mut current_info = info;
+        let mut current_byte_idx = 0;
         let mut local_byte_idx = at_byte_idx;
         loop {
             match *current_node {
@@ -218,6 +232,7 @@ impl<'a> ChunkCursor<'a> {
                     cursor.node_stack.push(StackItem {
                         node: current_node,
                         info: current_info,
+                        byte_offset: current_byte_idx,
                         child_idx: 0,
                     });
                     break;
@@ -227,14 +242,15 @@ impl<'a> ChunkCursor<'a> {
                     let (child_i, acc_byte_idx) =
                         children.search_byte_idx_only(local_byte_idx, false);
 
-                    cursor.current_byte_idx += acc_byte_idx;
-                    local_byte_idx -= acc_byte_idx;
-
                     cursor.node_stack.push(StackItem {
                         node: current_node,
                         info: current_info,
+                        byte_offset: current_byte_idx,
                         child_idx: child_i,
                     });
+
+                    current_byte_idx += acc_byte_idx;
+                    local_byte_idx -= acc_byte_idx;
                     current_node = &children.nodes()[child_i];
                     current_info = &children.info()[child_i];
                 }
@@ -244,7 +260,8 @@ impl<'a> ChunkCursor<'a> {
         cursor
     }
 
-    /// Attempts to advance the cursor to the next chunk that contains a line boundary.
+    /// Attempts to advance the cursor to the next chunk that contains a line
+    /// boundary.
     ///
     /// A "line boundary" in this case means:
     ///
@@ -265,108 +282,202 @@ impl<'a> ChunkCursor<'a> {
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
-    #[allow(clippy::should_implement_trait)]
     pub(crate) fn next_with_line_boundary(
         &mut self,
         line_type: LineType,
     ) -> Option<(&'a Node, &'a TextInfo, isize)> {
-        // Special case for empty cursors.
-        if self.byte_range[0] == self.byte_range[1] {
-            return None;
-        }
-
-        let current_leaf_len = self.node_stack.last().unwrap().node.leaf_text().len();
-
         // Already at the end.
-        if (self.current_byte_idx + current_leaf_len) >= self.byte_range[1] {
+        if self.at_last() {
             return None;
         }
 
         debug_assert!(self.node_stack.len() > 1);
 
-        // Progress the stack, and find the closest common ancestor node of the
-        // from/to leaves.
-        let top_node;
-        let top_info;
-        let top_offset;
-        {
-            // Start at the node above the leaf.
-            let mut stack_idx = self.node_stack.len() - 2;
+        // Start at the node above the leaf.
+        let mut stack_idx = self.node_stack.len() - 2;
 
-            // Find the deepest node that's not at its end already and has a
-            // subsequent child node with a line break.
-            // The idea behind this loop is that you're always *on* the
-            // child you should move off of when you come in.
-            loop {
-                let current_child_len = self.node_stack[stack_idx].node.children().info()
-                    [self.node_stack[stack_idx].child_idx]
-                    .bytes;
+        // Find the deepest node that's not at its end already and has a
+        // subsequent child node with a line break.
+        // The idea behind this loop is that you're always *on* the
+        // child you should move off of when you come in.
+        loop {
+            let next_offset = self.node_stack[stack_idx + 1].info.bytes
+                + self.node_stack[stack_idx + 1].byte_offset;
 
-                if (self.current_byte_idx + current_child_len) >= self.byte_range[1] {
-                    break;
-                } else {
-                    self.current_byte_idx += current_child_len;
-                    self.node_stack[stack_idx].child_idx += 1;
-                }
-
-                if self.node_stack[stack_idx].child_idx
-                    >= self.node_stack[stack_idx].node.child_count()
-                {
-                    debug_assert!(stack_idx > 0);
-                    // We subtract the length back out, because the state should
-                    // be as if we're at the start of the node.  It will be
-                    // added back while processing the parent node.
-                    self.current_byte_idx -= self.node_stack[stack_idx].info.bytes;
-                    stack_idx -= 1;
-                    continue;
-                }
-
-                let child_i = self.node_stack[stack_idx].child_idx;
-                if self.node_stack[stack_idx].node.children().info()[child_i].line_breaks(line_type)
-                    > 0
-                {
-                    break;
-                }
+            if next_offset >= self.byte_range[1] {
+                break;
             }
 
-            top_node = self.node_stack[stack_idx].node;
-            top_info = self.node_stack[stack_idx].info;
-            top_offset = self.current_byte_idx as isize - self.byte_range[0] as isize;
-
-            // Refill the stack starting from that node.
-            // After the previous loop, we should now be on a child that either
-            // contains the next line break or is the last node in the byte
-            // range.
-            while self.node_stack[stack_idx].node.is_internal() {
-                let child_i = self.node_stack[stack_idx].child_idx;
-
-                let node = &self.node_stack[stack_idx].node.children().nodes()[child_i];
-                let info = &self.node_stack[stack_idx].node.children().info()[child_i];
-                let child_idx = if node.is_internal() {
-                    let mut child_idx = 0;
-                    let mut child_info = &node.children().info()[child_idx];
-                    while (self.current_byte_idx + child_info.bytes) < self.byte_range[1]
-                        && child_info.line_breaks(line_type) == 0
-                    {
-                        self.current_byte_idx += child_info.bytes;
-                        child_idx += 1;
-                        child_info = &node.children().info()[child_idx];
-                    }
-                    child_idx
-                } else {
-                    0
-                };
-
-                stack_idx += 1;
-                self.node_stack[stack_idx] = StackItem {
-                    node: node,
-                    info: info,
-                    child_idx: child_idx,
-                };
+            if (self.node_stack[stack_idx].child_idx + 1)
+                >= self.node_stack[stack_idx].node.child_count()
+            {
+                debug_assert!(stack_idx > 0);
+                stack_idx -= 1;
+                continue;
             }
 
-            debug_assert!(stack_idx == self.node_stack.len() - 1);
+            self.node_stack[stack_idx].child_idx += 1;
+
+            let child_i = self.node_stack[stack_idx].child_idx;
+            self.node_stack[stack_idx + 1] = StackItem {
+                node: &self.node_stack[stack_idx].node.children().nodes()[child_i],
+                info: &self.node_stack[stack_idx].node.children().info()[child_i],
+                byte_offset: next_offset,
+                child_idx: 0,
+            };
+
+            if self.node_stack[stack_idx].node.children().info()[child_i].line_breaks(line_type) > 0
+            {
+                break;
+            }
         }
+
+        // Store common anscestor for returning later.
+        let top_node = self.node_stack[stack_idx].node;
+        let top_info = self.node_stack[stack_idx].info;
+        let top_offset =
+            self.node_stack[stack_idx].byte_offset as isize - self.byte_range[0] as isize;
+
+        // Refill the stack starting from that node.
+        // After the previous loop, we should now be on a child that either
+        // contains the next line break or is the last node in the byte
+        // range.
+        stack_idx += 1; // We've already handled the immediate child in the previous loop.
+        while self.node_stack[stack_idx].node.is_internal() {
+            let item = &self.node_stack[stack_idx];
+            let mut child_idx = 0;
+            let mut child_byte_offset = item.byte_offset;
+            let mut child_node = &item.node.children().nodes()[child_idx];
+            let mut child_info = &item.node.children().info()[child_idx];
+            while (child_byte_offset + child_info.bytes) < self.byte_range[1]
+                && child_info.line_breaks(line_type) == 0
+            {
+                child_idx += 1;
+                child_byte_offset += child_info.bytes;
+                child_node = &item.node.children().nodes()[child_idx];
+                child_info = &item.node.children().info()[child_idx];
+            }
+
+            self.node_stack[stack_idx].child_idx = child_idx;
+
+            stack_idx += 1;
+            self.node_stack[stack_idx] = StackItem {
+                node: child_node,
+                info: child_info,
+                byte_offset: child_byte_offset,
+                child_idx: 0,
+            };
+        }
+
+        debug_assert!(stack_idx == self.node_stack.len() - 1);
+
+        Some((top_node, top_info, top_offset))
+    }
+
+    /// Attempts to backtrack the cursor to the previous chunk that contains a
+    /// line boundary.
+    ///
+    /// A "line boundary" in this case means:
+    ///
+    /// - The start of the text.
+    /// - The end of the text.
+    /// - A line break character.
+    ///
+    /// On success returns the common ancestor of the from/to chunks, along
+    /// with its text info and its byte offset from the start of the text.
+    /// Note that the offset may be negative, since the node is not clipped
+    /// to the slice boundaries.
+    ///
+    /// On failure (when already at the prev chunk), returns `None`, and
+    /// leaves the cursor state as-is.
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[inline(always)]
+    pub(crate) fn prev_with_line_boundary(
+        &mut self,
+        line_type: LineType,
+    ) -> Option<(&'a Node, &'a TextInfo, isize)> {
+        // Already at the start.
+        if self.at_first() {
+            return None;
+        }
+
+        debug_assert!(self.node_stack.len() > 1);
+
+        // Start at the node above the leaf.
+        let mut stack_idx = self.node_stack.len() - 2;
+
+        // Find the deepest node that's not at its start already and has a
+        // prior child node with a line break.
+        // The idea behind this loop is that you're always *on* the
+        // child you should move off of when you come in.
+        loop {
+            let current_offset = self.node_stack[stack_idx + 1].byte_offset;
+            if current_offset <= self.byte_range[0] {
+                break;
+            }
+
+            if self.node_stack[stack_idx].child_idx == 0 {
+                debug_assert!(stack_idx > 0);
+                stack_idx -= 1;
+                continue;
+            }
+
+            self.node_stack[stack_idx].child_idx -= 1;
+
+            let child_i = self.node_stack[stack_idx].child_idx;
+            let child_info = &self.node_stack[stack_idx].node.children().info()[child_i];
+            self.node_stack[stack_idx + 1] = StackItem {
+                node: &self.node_stack[stack_idx].node.children().nodes()[child_i],
+                info: child_info,
+                byte_offset: current_offset - child_info.bytes,
+                child_idx: 0,
+            };
+
+            if child_info.line_breaks(line_type) > 0 {
+                break;
+            }
+        }
+
+        // Store common anscestor for returning later.
+        let top_node = self.node_stack[stack_idx].node;
+        let top_info = self.node_stack[stack_idx].info;
+        let top_offset =
+            self.node_stack[stack_idx].byte_offset as isize - self.byte_range[0] as isize;
+
+        // Refill the stack starting from that node.
+        // After the previous loop, we should now be on a child that either
+        // contains the next line break or is the last node in the byte
+        // range.
+        stack_idx += 1; // We've already handled the immediate child in the previous loop.
+        while self.node_stack[stack_idx].node.is_internal() {
+            let item = &self.node_stack[stack_idx];
+            let mut child_idx = item.node.children().len() - 1;
+            let mut child_node = &item.node.children().nodes()[child_idx];
+            let mut child_info = &item.node.children().info()[child_idx];
+            let mut child_byte_offset = item.byte_offset + item.info.bytes - child_info.bytes;
+            while child_byte_offset > self.byte_range[0] && child_info.line_breaks(line_type) == 0 {
+                child_idx -= 1;
+                child_node = &item.node.children().nodes()[child_idx];
+                child_info = &item.node.children().info()[child_idx];
+                child_byte_offset -= child_info.bytes;
+            }
+
+            self.node_stack[stack_idx].child_idx = child_idx;
+
+            stack_idx += 1;
+            self.node_stack[stack_idx] = StackItem {
+                node: child_node,
+                info: child_info,
+                byte_offset: child_byte_offset,
+                child_idx: 0,
+            };
+        }
+
+        debug_assert!(stack_idx == self.node_stack.len() - 1);
 
         Some((top_node, top_info, top_offset))
     }
@@ -388,6 +499,21 @@ mod tests {
             rb._append_chunk_as_leaf("world!");
         }
         rb.finish()
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    fn lines_text() -> String {
+        let mut text = String::new();
+        text.push_str("\r\n");
+        for _ in 0..16 {
+            text.push_str(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n\
+                 こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+            );
+        }
+        text
     }
 
     #[test]
@@ -667,6 +793,7 @@ mod tests {
 
         let mut cursor = r.chunk_cursor();
 
+        // Forward.
         assert_eq!(0, cursor.byte_offset());
         assert_eq!("AAA", cursor.chunk());
 
@@ -693,6 +820,31 @@ mod tests {
         assert!(cursor.next_with_line_boundary(LF_CR).is_none());
         assert_eq!(30, cursor.byte_offset());
         assert_eq!("KKK", cursor.chunk());
+
+        // Backward.
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(27, cursor.byte_offset());
+        assert_eq!("J\nJ", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(15, cursor.byte_offset());
+        assert_eq!("F\nF", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(6, cursor.byte_offset());
+        assert_eq!("C\nC", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(3, cursor.byte_offset());
+        assert_eq!("B\nB", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(0, cursor.byte_offset());
+        assert_eq!("AAA", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_none());
+        assert_eq!(0, cursor.byte_offset());
+        assert_eq!("AAA", cursor.chunk());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -718,6 +870,7 @@ mod tests {
 
         let mut cursor = s.chunk_cursor();
 
+        // Forward.
         assert_eq!(0, cursor.byte_offset());
         assert_eq!("\nB", cursor.chunk());
 
@@ -736,5 +889,87 @@ mod tests {
         assert!(cursor.next_with_line_boundary(LF_CR).is_none());
         assert_eq!(23, cursor.byte_offset());
         assert_eq!("J\n", cursor.chunk());
+
+        // Backward.
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(11, cursor.byte_offset());
+        assert_eq!("F\nF", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(2, cursor.byte_offset());
+        assert_eq!("C\nC", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!(0, cursor.byte_offset());
+        assert_eq!("\nB", cursor.chunk());
+
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_none());
+        assert_eq!(0, cursor.byte_offset());
+        assert_eq!("\nB", cursor.chunk());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn chunk_cursor_line_boundary_03() {
+        use crate::LineType::LF_CR;
+        let r = {
+            let mut rb = RopeBuilder::new();
+            rb._append_chunk_as_leaf("AAA");
+            rb._append_chunk_as_leaf("B\nB");
+            rb._append_chunk_as_leaf("C\nC");
+            rb._append_chunk_as_leaf("DDD");
+            rb._append_chunk_as_leaf("EEE");
+            rb._append_chunk_as_leaf("F\nF");
+            rb._append_chunk_as_leaf("GGG");
+            rb._append_chunk_as_leaf("HHH");
+            rb._append_chunk_as_leaf("III");
+            rb._append_chunk_as_leaf("J\nJ");
+            rb._append_chunk_as_leaf("KKK");
+            rb.finish()
+        };
+        let s = r.slice(4..29);
+
+        let mut cursor = s.chunk_cursor();
+
+        assert_eq!("\nB", cursor.chunk());
+        assert!(cursor.next_with_line_boundary(LF_CR).is_some());
+        assert_eq!("C\nC", cursor.chunk());
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!("\nB", cursor.chunk());
+
+        assert!(cursor.next_with_line_boundary(LF_CR).is_some());
+        assert_eq!("C\nC", cursor.chunk());
+        assert!(cursor.next_with_line_boundary(LF_CR).is_some());
+        assert_eq!("F\nF", cursor.chunk());
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!("C\nC", cursor.chunk());
+
+        assert!(cursor.next_with_line_boundary(LF_CR).is_some());
+        assert_eq!("F\nF", cursor.chunk());
+        assert!(cursor.next_with_line_boundary(LF_CR).is_some());
+        assert_eq!("J\n", cursor.chunk());
+        assert!(cursor.prev_with_line_boundary(LF_CR).is_some());
+        assert_eq!("F\nF", cursor.chunk());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn chunk_cursor_line_boundary_04() {
+        use crate::LineType::LF_CR;
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+
+        let s = r.slice(..);
+        let mut cursor = s.chunk_cursor();
+
+        // Forward.
+        while cursor.next_with_line_boundary(LF_CR).is_some() {}
+        assert!(cursor.at_last());
+        assert_eq!(text.len(), cursor.byte_offset() + cursor.chunk().len());
+
+        // Backward.
+        while cursor.prev_with_line_boundary(LF_CR).is_some() {}
+        assert!(cursor.at_first());
+        assert_eq!(0, cursor.byte_offset());
     }
 }

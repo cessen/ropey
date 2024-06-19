@@ -546,24 +546,10 @@ impl<'a> Iterator for Chars<'a> {
 ))]
 mod lines {
     use crate::{
+        str_utils::lines,
         tree::{Node, TextInfo},
-        LineType, RopeSlice,
+        ChunkCursor, LineType, RopeSlice,
     };
-
-    #[derive(Debug, Clone)]
-    struct StackItem<'a> {
-        node: &'a Node,
-        node_info: &'a TextInfo,
-
-        /// The start line of this node relative to the root.
-        start_line: usize,
-
-        /// For internal nodes, the current child corresponding to the current
-        /// line.
-        /// For leaf nodes, the current byte position corresponding to the
-        /// current line.
-        current_pos: usize,
-    }
 
     /// An iterator over a `Rope`'s lines.
     ///
@@ -576,13 +562,18 @@ mod lines {
     /// is returned as an empty slice.
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
-        // TODO: use the stack to do line traversal more efficiently.
-        stack: Vec<StackItem<'a>>,
-
-        byte_range: [usize; 2],
-        line_range: [usize; 2],
+        cursor: ChunkCursor<'a>,
         line_type: LineType,
+
+        // The total line count in the iterator.
+        total_lines: usize,
+
+        // Byte index we're at within the current leaf chunk.
+        leaf_byte_idx: usize,
+
+        // The current line index.
         current_line_idx: usize,
+
         is_reversed: bool,
     }
 
@@ -636,90 +627,114 @@ mod lines {
             at_line_idx: usize,
             line_type: LineType,
         ) -> Self {
-            let start_line = {
-                let (text, info) = node.get_text_at_byte(byte_range[0]);
-                info.line_breaks(line_type)
-                    + text.byte_to_line(byte_range[0] - info.bytes, line_type)
-            };
-            let end_line = {
-                let (text, info) = node.get_text_at_byte(byte_range[1]);
-                info.line_breaks(line_type)
-                    + text.byte_to_line(byte_range[1] - info.bytes, line_type)
-                    + 1
-            };
+            let slice = RopeSlice::new(node, node_info, byte_range);
+            let total_lines = slice.len_lines(line_type);
+            let at_byte_idx = slice.line_to_byte(at_line_idx, line_type);
 
-            assert!(start_line + at_line_idx <= end_line);
+            let cursor = ChunkCursor::new(node, node_info, byte_range, byte_range[0] + at_byte_idx);
+            let leaf_byte_idx = at_byte_idx - cursor.byte_offset();
 
             Lines {
-                stack: vec![StackItem {
-                    node: node,
-                    node_info: node_info,
-                    start_line: 0,
-                    current_pos: 0,
-                }],
-                byte_range: byte_range,
-                line_range: [start_line, end_line],
+                cursor: cursor,
                 line_type: line_type,
-                current_line_idx: start_line + at_line_idx,
+                total_lines: total_lines,
+                leaf_byte_idx: leaf_byte_idx,
+                current_line_idx: at_line_idx,
                 is_reversed: false,
             }
         }
 
-        fn current_line(&self) -> Option<RopeSlice<'a>> {
-            if self.current_line_idx >= self.line_range[1] {
-                return None;
-            }
-
-            let start_byte = {
-                let (text, start_info) = self.stack[0]
-                    .node
-                    .get_text_at_line_break(self.current_line_idx, self.line_type);
-
-                start_info.bytes
-                    + text.line_to_byte(
-                        self.current_line_idx - start_info.line_breaks(self.line_type),
-                        self.line_type,
-                    )
-            };
-            let end_byte = {
-                let (text, start_info) = self.stack[0]
-                    .node
-                    .get_text_at_line_break(self.current_line_idx + 1, self.line_type);
-
-                start_info.bytes
-                    + text.line_to_byte(
-                        self.current_line_idx + 1 - start_info.line_breaks(self.line_type),
-                        self.line_type,
-                    )
-            };
-
-            Some(RopeSlice::new(
-                self.stack[0].node,
-                self.stack[0].node_info,
-                [
-                    start_byte.max(self.byte_range[0]),
-                    end_byte.min(self.byte_range[1]),
-                ],
-            ))
-        }
-
         fn next_impl(&mut self) -> Option<RopeSlice<'a>> {
-            if self.current_line_idx >= self.line_range[1] {
+            if self.current_line_idx >= self.total_lines {
                 return None;
             }
 
-            let line = self.current_line();
-            self.current_line_idx += 1;
-            line
+            // Try to advance within the current chunk.
+            let chunk = self.cursor.chunk();
+            if self.leaf_byte_idx < chunk.len() {
+                let next_idx = self.leaf_byte_idx
+                    + lines::to_byte_idx(&chunk[self.leaf_byte_idx..], 1, self.line_type);
+                if next_idx < chunk.len()
+                    || lines::ends_with_line_break(chunk, self.line_type)
+                    || self.cursor.at_last()
+                {
+                    let line = self
+                        .cursor
+                        .chunk_slice()
+                        .slice(self.leaf_byte_idx..next_idx);
+                    self.leaf_byte_idx = next_idx;
+                    self.current_line_idx += 1;
+                    return Some(line);
+                }
+            }
+
+            // Need to advance to another chunk.
+            let start_idx = self.cursor.byte_offset() + self.leaf_byte_idx;
+            if let Some((node, info, offset)) = self.cursor.next_with_line_boundary(self.line_type)
+            {
+                self.leaf_byte_idx = lines::to_byte_idx(self.cursor.chunk(), 1, self.line_type);
+                let end_idx = self.cursor.byte_offset() + self.leaf_byte_idx;
+                self.current_line_idx += 1;
+                let start = (start_idx as isize - offset) as usize;
+                let end = (end_idx as isize - offset) as usize;
+                return Some(RopeSlice::new(node, info, [start, end]));
+            } else {
+                // Can't advance, which means we're already at the end.  But
+                // since we're not at the last line (that's caught at the start
+                // of this function) that means there's a final empty line to
+                // return.
+                self.current_line_idx += 1;
+                return Some(self.cursor.chunk_slice().slice(0..0));
+            }
         }
 
         fn prev_impl(&mut self) -> Option<RopeSlice<'a>> {
-            if self.current_line_idx <= self.line_range[0] {
+            if self.current_line_idx == 0 {
                 return None;
             }
 
-            self.current_line_idx -= 1;
-            self.current_line()
+            let chunk_slice = self.cursor.chunk_slice();
+            let chunk = chunk_slice.as_str().unwrap();
+
+            // Special case to handle ending line break properly.
+            if self.current_line_idx == self.total_lines
+                && (chunk.is_empty() || lines::ends_with_line_break(chunk, self.line_type))
+            {
+                self.current_line_idx -= 1;
+                return Some(chunk_slice.slice(0..0));
+            }
+
+            // Try to backtrack within the current chunk.
+            if self.leaf_byte_idx > 0 {
+                let prev_idx = lines::last_line_start_byte_idx(
+                    lines::trim_trailing_line_break(&chunk[..self.leaf_byte_idx], self.line_type),
+                    self.line_type,
+                );
+                if prev_idx > 0 || self.cursor.at_first() {
+                    let line = chunk_slice.slice(prev_idx..self.leaf_byte_idx);
+                    self.leaf_byte_idx = prev_idx;
+                    self.current_line_idx -= 1;
+                    return Some(line);
+                }
+            }
+
+            // Need to backtrack to another chunk.
+            let end_idx = self.cursor.byte_offset() + self.leaf_byte_idx;
+            if let Some((node, info, offset)) = self.cursor.prev_with_line_boundary(self.line_type)
+            {
+                self.leaf_byte_idx =
+                    lines::last_line_start_byte_idx(self.cursor.chunk(), self.line_type);
+                let start_idx = self.cursor.byte_offset() + self.leaf_byte_idx;
+                self.current_line_idx -= 1;
+                let start = (start_idx as isize - offset) as usize;
+                let end = (end_idx as isize - offset) as usize;
+                return Some(RopeSlice::new(node, info, [start, end]));
+            } else {
+                // Can't advance, which means we're already at the start.  But
+                // that shouldn't be possible because that's caught at the start
+                // of this function.
+                unreachable!();
+            }
         }
     }
 
@@ -736,9 +751,9 @@ mod lines {
 
         fn size_hint(&self) -> (usize, Option<usize>) {
             let len = if self.is_reversed {
-                self.current_line_idx - self.line_range[0]
+                self.current_line_idx
             } else {
-                self.line_range[1] - self.current_line_idx
+                self.total_lines - self.current_line_idx
             };
             (len, Some(len))
         }
@@ -1312,8 +1327,47 @@ mod tests {
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    #[cfg_attr(miri, ignore)]
     fn lines_01() {
+        let r = make_rope_from_chunks(&[
+            "\nHi ",
+            "there",
+            " thing\nwith\n",
+            "\nline\nbreaks",
+            "\nand ",
+            "stuff ",
+            "in ",
+            "it\n",
+            "yar",
+        ]);
+        let mut lines = r.lines(LineType::LF_CR);
+
+        // Forward.
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("Hi there thing\n", lines.next().unwrap());
+        assert_eq!("with\n", lines.next().unwrap());
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("line\n", lines.next().unwrap());
+        assert_eq!("breaks\n", lines.next().unwrap());
+        assert_eq!("and stuff in it\n", lines.next().unwrap());
+        assert_eq!("yar", lines.next().unwrap());
+        assert_eq!(None, lines.next());
+
+        // Backward.
+        assert_eq!("yar", lines.prev().unwrap());
+        assert_eq!("and stuff in it\n", lines.prev().unwrap());
+        assert_eq!("breaks\n", lines.prev().unwrap());
+        assert_eq!("line\n", lines.prev().unwrap());
+        assert_eq!("\n", lines.prev().unwrap());
+        assert_eq!("with\n", lines.prev().unwrap());
+        assert_eq!("Hi there thing\n", lines.prev().unwrap());
+        assert_eq!("\n", lines.prev().unwrap());
+        assert_eq!(None, lines.prev());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_02() {
         let r = Rope::from_str("hi\nyo\nbye");
 
         let mut lines = r.lines(LineType::LF_CR);
@@ -1335,7 +1389,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_02() {
+    fn lines_03() {
         let text = "Hello there!\nHow goes it?";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1357,7 +1411,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_03() {
+    fn lines_04() {
         let text = "Hello there!\nHow goes it?\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1381,7 +1435,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_04() {
+    fn lines_05() {
         let text = "Hello there!\nHow goes it?\nYeah!";
         let r = Rope::from_str(text);
         let s1 = r.slice(..25);
@@ -1405,7 +1459,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_05() {
+    fn lines_06() {
         let text = "";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1425,7 +1479,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_06() {
+    fn lines_07() {
         let text = "a";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1445,7 +1499,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_07() {
+    fn lines_08() {
         let text = "a\nb";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1467,7 +1521,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_08() {
+    fn lines_09() {
         let text = "\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1489,7 +1543,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_09() {
+    fn lines_10() {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1513,7 +1567,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_10() {
+    fn lines_11() {
         let text = lines_text();
         let r = Rope::from_str(&text);
 
@@ -1526,7 +1580,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_11() {
+    fn lines_12() {
         let text = lines_text();
         let r = Rope::from_str(&text);
 
@@ -1547,7 +1601,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_12() {
+    fn lines_13() {
         let text = lines_text();
         let r = Rope::from_str(&text);
         let s = r.slice(34..2031);
@@ -1569,7 +1623,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_13() {
+    fn lines_14() {
         let text = "";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1591,7 +1645,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_14() {
+    fn lines_15() {
         let text = "a";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1613,7 +1667,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_15() {
+    fn lines_16() {
         let text = "a\nb";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1635,7 +1689,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_16() {
+    fn lines_17() {
         let text = "\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1657,7 +1711,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_17() {
+    fn lines_18() {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
@@ -1679,7 +1733,7 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn lines_18() {
+    fn lines_19() {
         let text = lines_text();
         let r = Rope::from_str(&text);
         let s = r.slice(..);
@@ -1724,9 +1778,10 @@ mod tests {
         assert!(lines.next().is_none());
     }
 
+    // // Get working again...?
     // #[test]
     // #[cfg_attr(miri, ignore)]
-    // fn lines_19() {
+    // fn lines_20() {
     //     let r = Rope::from_str("a\nb\nc\nd\ne\nf\ng\nh\n");
     //     for (line, c) in r.lines(LineType::LF_CR).zip('a'..='h') {
     //         assert_eq!(line, format!("{c}\n"))
