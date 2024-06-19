@@ -506,13 +506,8 @@ impl Node {
             _ => {
                 let (text, start_info) = self.get_text_at_byte(byte_idx);
                 let idx = byte_idx - start_info.bytes;
-
-                if idx == 0 {
-                    start_info.ends_with_split_crlf(crate::str_utils::starts_with_lf(text.text()))
-                } else {
-                    str_utils::ends_with_cr(&text.text()[..idx])
-                        && str_utils::starts_with_lf(&text.text()[idx..])
-                }
+                str_utils::ends_with_cr(&text.text()[..idx])
+                    && str_utils::starts_with_lf(&text.text()[idx..])
             }
         }
     }

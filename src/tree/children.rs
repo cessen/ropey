@@ -331,23 +331,16 @@ impl Children {
     {
         debug_assert!(self.len() > 0);
 
-        let mut accum = TextInfo::new_adjusted();
+        let mut accum = TextInfo::new();
         let mut idx = 0;
         while idx < (self.len() - 1) {
-            let next_accum = {
-                let next_info = self.info()[idx];
-                let next_next_info = self.info().get(idx + 1).copied().unwrap_or(TextInfo::new());
-                accum.concat(next_info).adjusted_by_next(next_next_info)
-            };
+            let next_accum = accum.concat(self.info()[idx]);
             if pred(next_accum) {
                 break;
             }
             accum = next_accum;
             idx += 1;
         }
-
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -404,8 +397,6 @@ impl Children {
             byte_idx <= (accum.bytes + self.info()[idx].bytes),
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -425,8 +416,6 @@ impl Children {
             char_idx <= (accum.chars + self.info()[idx].chars),
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -446,8 +435,6 @@ impl Children {
             utf16_idx <= (accum.utf16 + self.info()[idx].utf16),
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }
@@ -477,18 +464,11 @@ impl Children {
 
         debug_assert!(
             {
-                let next_info = if (idx + 1) < self.len() {
-                    self.info()[idx + 1]
-                } else {
-                    TextInfo::new()
-                };
-                let end_info = accum.concat(self.info()[idx]).adjusted_by_next(next_info);
+                let end_info = accum.concat(self.info()[idx]);
                 line_break_idx <= end_info.line_breaks(line_type) + 1
             },
             "Index out of bounds."
         );
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(accum.is_split_crlf_compensation_applied());
 
         (idx, accum)
     }

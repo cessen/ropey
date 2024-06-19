@@ -22,7 +22,6 @@ use str_indices::lines;
 ))]
 use crate::LineType;
 
-#[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
 use crate::str_utils::{byte_is_cr, byte_is_lf, ends_with_cr, starts_with_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -48,17 +47,10 @@ pub(crate) struct TextInfo {
     // Split CRLF handling.
 
     // Marks whether the text starts with an LF line break.
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    starts_with_lf: bool,
+    pub starts_with_lf: bool,
 
     // Marks whether the text ends with a CR line break.
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    ends_with_cr: bool,
-
-    // Whether split crlf line breaks have already been accounted for in the
-    // line break counts.
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    split_crlf_compensation_done: bool,
+    pub ends_with_cr: bool,
 }
 
 impl TextInfo {
@@ -86,55 +78,8 @@ impl TextInfo {
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: 0,
 
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             starts_with_lf: false,
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             ends_with_cr: false,
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            split_crlf_compensation_done: false,
-        }
-    }
-
-    /// Same as `new()` but sets up the CRLF flags to be "already adjusted".
-    ///
-    /// The correct uses for this are very narrow.  Strongly prefer `new()`
-    /// unless you really know what you're doing.
-    #[cfg(any(
-        feature = "metric_chars",
-        feature = "metric_utf16",
-        feature = "metric_lines_lf",
-        feature = "metric_lines_lf_cr",
-        feature = "metric_lines_unicode"
-    ))]
-    pub(crate) fn new_adjusted() -> TextInfo {
-        TextInfo {
-            bytes: 0,
-
-            #[cfg(any(feature = "metric_chars", feature = "metric_utf16"))]
-            chars: 0,
-
-            #[cfg(feature = "metric_utf16")]
-            utf16: 0,
-
-            #[cfg(feature = "metric_lines_lf")]
-            line_breaks_lf: 0,
-
-            #[cfg(feature = "metric_lines_lf_cr")]
-            line_breaks_cr_lf: 0,
-
-            #[cfg(feature = "metric_lines_unicode")]
-            line_breaks_unicode: 0,
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            starts_with_lf: false,
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            ends_with_cr: false,
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            split_crlf_compensation_done: true,
         }
     }
 
@@ -160,35 +105,9 @@ impl TextInfo {
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: lines::count_breaks(text),
 
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             starts_with_lf: starts_with_lf(text),
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             ends_with_cr: ends_with_cr(text),
-
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            split_crlf_compensation_done: false,
         }
-    }
-
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    pub(crate) fn is_split_crlf_compensation_applied(&self) -> bool {
-        self.split_crlf_compensation_done
-    }
-
-    /// NOTE: this intentionally doesn't account for whether the CR is active in
-    /// the line counts or not.
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    pub(crate) fn ends_with_split_crlf(&self, next_is_lf: bool) -> bool {
-        // To silence unused parameter warnings when the relevant features are
-        // disabled.
-        let _ = next_is_lf;
-
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        return self.ends_with_cr && next_is_lf;
-
-        #[cfg(not(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode")))]
-        false
     }
 
     #[cfg(any(
@@ -210,100 +129,34 @@ impl TextInfo {
         }
     }
 
-    /// Returns the line-break-count-adjusted version of self based on whatever
-    /// the next block is.
-    ///
-    /// Note: this does *not* update the starts/ends_with CRLF tags.  They are
-    /// left alone.
-    #[must_use]
-    #[inline(always)]
-    pub(crate) fn adjusted_by_next(self, next: TextInfo) -> TextInfo {
-        // To silence unused parameter warnings when the relevant features are
-        // disabled.
-        let _ = next;
-
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        {
-            self.adjusted_by_next_is_lf(next.starts_with_lf)
-        }
-
-        #[cfg(not(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode")))]
-        self
-    }
-
-    /// Returns the line-break-count-adjusted version of self based on whether
-    /// the next character after this block is LF or not.
-    ///
-    /// Note: this does *not* update the starts/ends_with CRLF tags.  They are
-    /// left alone.
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    #[must_use]
-    pub(crate) fn adjusted_by_next_is_lf(self, next_is_lf: bool) -> TextInfo {
-        // To silence unused parameter warnings when the relevant features are
-        // disabled.
-        let _ = next_is_lf;
-
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        {
-            if self.split_crlf_compensation_done {
-                return self;
-            }
-
-            let crlf_split_compensation = if self.ends_with_cr && next_is_lf {
-                1
-            } else {
-                0
-            };
-
-            TextInfo {
-                #[cfg(feature = "metric_lines_lf_cr")]
-                line_breaks_cr_lf: self.line_breaks_cr_lf - crlf_split_compensation,
-
-                #[cfg(feature = "metric_lines_unicode")]
-                line_breaks_unicode: self.line_breaks_unicode - crlf_split_compensation,
-
-                split_crlf_compensation_done: true,
-
-                ..self
-            }
-        }
-
-        #[cfg(not(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode")))]
-        self
-    }
-
     /// Combines two TextInfos as if their texts were concatenated.
-    ///
-    /// This properly accounts for split CRLF line breaks, and computes
-    /// the starts/ends_with CRLF tags appropriately.
     #[must_use]
     pub(crate) fn concat(self, rhs: TextInfo) -> TextInfo {
         TextInfo {
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             starts_with_lf: if self.bytes == 0 {
                 rhs.starts_with_lf
             } else {
                 self.starts_with_lf
             },
 
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             ends_with_cr: if rhs.bytes == 0 {
                 self.ends_with_cr
             } else {
                 rhs.ends_with_cr
             },
 
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            split_crlf_compensation_done: if rhs.bytes == 0 {
-                self.split_crlf_compensation_done
-            } else {
-                rhs.split_crlf_compensation_done
-            },
-
-            ..(self.adjusted_by_next(rhs) + rhs)
+            ..(self + rhs)
         }
     }
 
+    /// Updates the info of an internal node when one of its children
+    /// is modified.
+    ///
+    /// -
+    /// - `sub_old` and `sub_new` are the old and new versions of the
+    ///   modified child.
+    /// - `sub_left` and `sub_right` are the children to the
+    ///   left and right of the modified child.
     pub(crate) fn edit_sub_info(
         mut self,
         sub_old: TextInfo,
@@ -311,29 +164,13 @@ impl TextInfo {
         sub_left: Option<&TextInfo>,
         sub_right: Option<&TextInfo>,
     ) -> TextInfo {
-        // Silence unused parameter warning when relevant features are disabled.
-        let _ = (sub_left, sub_right);
-
-        // This method only works correctly when all the TextInfo's involved
-        // don't have split CRLF compensation applied yet.
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        {
-            debug_assert!(!self.split_crlf_compensation_done);
-            debug_assert!(!sub_old.split_crlf_compensation_done);
-            debug_assert!(!sub_new.split_crlf_compensation_done);
-            debug_assert!(!sub_left
-                .map(|info| info.split_crlf_compensation_done)
-                .unwrap_or(false));
-            debug_assert!(!sub_right
-                .map(|info| info.split_crlf_compensation_done)
-                .unwrap_or(false));
-        }
-
         self -= sub_old;
         self += sub_new;
 
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
+        // Silence unused parameter warning when relevant features are disabled.
+        #[allow(unused_variables)]
         if let Some(left) = sub_left {
+            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             if left.ends_with_cr && sub_old.starts_with_lf && !sub_new.starts_with_lf {
                 self.increment_crlf_relevant_counts();
             } else if left.ends_with_cr && !sub_old.starts_with_lf && sub_new.starts_with_lf {
@@ -343,8 +180,10 @@ impl TextInfo {
             self.starts_with_lf = sub_new.starts_with_lf;
         }
 
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
+        // Silence unused parameter warning when relevant features are disabled.
+        #[allow(unused_variables)]
         if let Some(right) = sub_right {
+            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
             if right.starts_with_lf && sub_old.ends_with_cr && !sub_new.ends_with_cr {
                 self.increment_crlf_relevant_counts();
             } else if right.starts_with_lf && !sub_old.ends_with_cr && sub_new.ends_with_cr {
@@ -383,6 +222,8 @@ impl TextInfo {
         }
     }
 
+    /// Updates info for a leaf node that has text inserted into it.  This
+    /// should be called with the pre-insertion `text`.
     #[must_use]
     pub(crate) fn str_insert(
         self,
@@ -394,13 +235,9 @@ impl TextInfo {
         // disabled.
         let _ = (text, byte_idx, insertion_info);
 
-        // This function only works correctly when these preconditions are met.
-        // It will give errorneous results otherwise.
+        // This function only works correctly when the inserted text is non-zero
+        // length.
         debug_assert!(insertion_info.bytes > 0);
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(!self.split_crlf_compensation_done);
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(!insertion_info.split_crlf_compensation_done);
 
         // Silence unused mut warnings when the relevant features are disabled.
         #[allow(unused_mut)]
@@ -427,25 +264,22 @@ impl TextInfo {
                 new_info.line_breaks_unicode -= crlf_merge_compensation_1;
                 new_info.line_breaks_unicode -= crlf_merge_compensation_2;
             }
+        }
 
-            if byte_idx == 0 {
-                new_info.starts_with_lf = insertion_info.starts_with_lf;
-            }
-            if byte_idx == text.len() {
-                new_info.ends_with_cr = insertion_info.ends_with_cr;
-            }
+        if byte_idx == 0 {
+            new_info.starts_with_lf = insertion_info.starts_with_lf;
+        }
+        if byte_idx == text.len() {
+            new_info.ends_with_cr = insertion_info.ends_with_cr;
         }
 
         new_info
     }
 
+    /// Updates info for a leaf node that has text removed from it.  This
+    /// should be called with the pre-removal `text`.
     #[must_use]
     pub(crate) fn str_remove(self, text: &str, byte_idx_range: [usize; 2]) -> TextInfo {
-        // This function only works correctly when these preconditions are met.
-        // It will give errorneous results otherwise.
-        #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-        debug_assert!(!self.split_crlf_compensation_done);
-
         // For terseness.
         let [start, end] = byte_idx_range;
 
@@ -464,15 +298,15 @@ impl TextInfo {
         }
 
         // Silence unused mut warnings when the relevant features are disabled.
-        #[allow(unused_mut)]
         let mut new_info = self - TextInfo::from_str(&text[byte_idx_range[0]..byte_idx_range[1]]);
+
+        let start_cr = start > 0 && byte_is_cr(text, start - 1);
+        let end_lf = end < text.len() && byte_is_lf(text, end);
 
         #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         {
-            let start_cr = start > 0 && byte_is_cr(text, start - 1);
             let start_lf = byte_is_lf(text, start);
             let end_cr = byte_is_cr(text, end - 1);
-            let end_lf = end < text.len() && byte_is_lf(text, end);
 
             let crlf_split_compensation_1 = (start_cr && start_lf) as usize;
             let crlf_split_compensation_2 = (end_cr && end_lf) as usize;
@@ -490,13 +324,13 @@ impl TextInfo {
                 new_info.line_breaks_unicode += crlf_split_compensation_2;
                 new_info.line_breaks_unicode -= crlf_merge_compensation;
             }
+        }
 
-            if start == 0 {
-                new_info.starts_with_lf = end_lf;
-            }
-            if end == text.len() {
-                new_info.ends_with_cr = start_cr;
-            }
+        if start == 0 {
+            new_info.starts_with_lf = end_lf;
+        }
+        if end == text.len() {
+            new_info.ends_with_cr = start_cr;
         }
 
         new_info
@@ -505,9 +339,8 @@ impl TextInfo {
 
 impl Add for TextInfo {
     type Output = Self;
-    // Note: this does *not* handle anything related to CRLF line breaks, such
-    // as split CRLF compensation or updating starts/ends_with flags.  It just
-    // does a simple sum of the metrics.
+    // Note: this does *not* handle anything related to CRLF line breaks.  It
+    // just does a simple sum of the metrics.
     //
     // Because of that, using this correctly typically requires special
     // handling.  Beware.
@@ -548,9 +381,8 @@ impl AddAssign for TextInfo {
 
 impl Sub for TextInfo {
     type Output = Self;
-    // IMPORTANT: this does *not* handle anything related to CRLF line breaks, such
-    // as split CRLF compensation or updating starts/ends_with flags.  It just
-    // does a simple subtraction of the metrics.
+    // IMPORTANT: this does *not* handle anything related to CRLF line breaks.
+    // It just does a simple subtraction of the metrics.
     //
     // Because of that, using this correctly typically requires special
     // handling.  Beware.
