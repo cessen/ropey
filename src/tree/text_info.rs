@@ -22,7 +22,10 @@ use str_indices::lines;
 ))]
 use crate::LineType;
 
-use crate::str_utils::{byte_is_cr, byte_is_lf, ends_with_cr, starts_with_lf};
+use crate::str_utils::{ends_with_cr, starts_with_lf};
+
+#[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
+use crate::str_utils::{byte_is_cr, byte_is_lf};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) struct TextInfo {
@@ -126,7 +129,7 @@ impl TextInfo {
     ) -> TextInfo {
         // To silence unused parameter warnings when the relevant features are
         // disabled.
-        let _ = (text, byte_idx, insertion_info);
+        let _ = (text, byte_idx, insertion_info, ins_text);
 
         // This function only works correctly when the inserted text is non-zero
         // length.
@@ -185,6 +188,7 @@ impl TextInfo {
             let left_info = TextInfo::from_str(&text[..start]);
             let right_info = TextInfo::from_str(&text[end..]);
 
+            #[allow(unused_mut)] // `mut` only needed with some features.
             let mut new_info = left_info + right_info;
 
             if ends_with_cr(left) && starts_with_lf(right) {
@@ -201,15 +205,14 @@ impl TextInfo {
             return new_info;
         }
 
-        // Silence unused mut warnings when the relevant features are disabled.
+        #[allow(unused_mut)] // `mut` only needed with some features.
         let mut new_info = self - TextInfo::from_str(&text[byte_idx_range[0]..byte_idx_range[1]]);
-
-        let start_cr = start > 0 && byte_is_cr(text, start - 1);
-        let end_lf = end < text.len() && byte_is_lf(text, end);
 
         #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         {
             let start_lf = byte_is_lf(text, start);
+            let start_cr = start > 0 && byte_is_cr(text, start - 1);
+            let end_lf = end < text.len() && byte_is_lf(text, end);
             let end_cr = byte_is_cr(text, end - 1);
 
             let crlf_split_compensation_1 = (start_cr && start_lf) as usize;

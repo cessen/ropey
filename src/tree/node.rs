@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{Error::*, Result};
 
+#[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
 use crate::str_utils;
 
 #[cfg(any(
