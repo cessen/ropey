@@ -542,50 +542,50 @@ impl Rope {
         // In practice, both cases are rolled into one here, where case #1 is
         // just a special case that naturally falls out of the handling of
         // case #2.
+        //
+        // Additionally, we handle a starting LF specially, to avoid creating
+        // split CRLF pairs.
         let mut text = text;
+        let starting_lf = if str_utils::starts_with_lf(text) {
+            // Take out the starting LF for special handling later.
+            text = &text[1..];
+            true
+        } else {
+            false
+        };
         while !text.is_empty() {
             // Split a chunk off from the end of the text.
             // We do this from the end instead of the front so that the repeated
             // insertions can keep re-using the same insertion point.
             //
-            let (bias_left, split_idx) = {
-                // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than
-                // just `MAX_TEXT_SIZE` to guarantee that nodes can split into
-                // node-sized chunks even in the face of multi-byte chars and
-                // CRLF pairs that may prevent splits at certain byte indices.
-                // This is a subtle issue that in practice only very rarely
-                // manifest, but causes panics when it does.  Please do not
-                // remove that `- 4`!
-                let idx = crate::find_appropriate_split_ceil(
-                    text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
-                    text,
-                );
-
-                // Some shenanigans to avoid CRLF pairs ending up split across
-                // leaves in the tree.  If the text starts with an LF, we want
-                // to insert it on its own with a left bias to ensure it never
-                // ends up at the start of a chunk (unless it's the first
-                // chunk), since the chunk before it could end in a CR.
-                if idx == 0 && str_utils::starts_with_lf(text) {
-                    if text.len() > 1 {
-                        (false, idx + 1)
-                    } else {
-                        (true, idx)
-                    }
-                } else {
-                    (false, idx)
-                }
-            };
+            // NOTE: the chunks are at most `MAX_TEXT_SIZE - 4` rather than
+            // just `MAX_TEXT_SIZE` to guarantee that nodes can split into
+            // node-sized chunks even in the face of multi-byte chars and
+            // CRLF pairs that may prevent splits at certain byte indices.
+            // This is a subtle issue that in practice only very rarely
+            // manifests, but causes panics when it does.  Please do not
+            // remove that `- 4`!
+            let split_idx = crate::find_appropriate_split_ceil(
+                text.len() - (MAX_TEXT_SIZE - 4).min(text.len()),
+                text,
+            );
             let ins_text = &text[split_idx..];
             text = &text[..split_idx];
 
             // Do the insertion.
-            self.insert_core_impl(byte_idx, ins_text, bias_left)?;
-
-            // Do a rebalancing step.
-            self.root.partial_rebalance();
-            self.pull_up_singular_nodes();
+            self.insert_core_impl(byte_idx, ins_text, false)?;
         }
+
+        if starting_lf {
+            // Insert the starting LF with bias_left = true.  This ensures
+            // that it gets inserted to the left of any chunk boundary, which
+            // prevents by construction creating any split CRLF pairs.
+            self.insert_core_impl(byte_idx, "\n", true)?;
+        }
+
+        // Do a rebalancing step.
+        self.root.partial_rebalance();
+        self.pull_up_singular_nodes();
 
         Ok(())
     }
