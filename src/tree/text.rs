@@ -134,7 +134,8 @@ impl Text {
         }
 
         // Update text info based on the upcoming insertion.
-        let new_info = current_info.str_insert(self.text(), byte_idx, TextInfo::from_str(text));
+        let new_info =
+            current_info.str_insert(self.text(), byte_idx, TextInfo::from_str(text), text);
 
         self.0.insert(byte_idx, text);
 

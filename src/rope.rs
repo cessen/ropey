@@ -580,28 +580,12 @@ impl Rope {
             text = &text[..split_idx];
 
             // Do the insertion.
-            let (new_root_info, residual) =
-                self.root
-                    .insert_at_byte_idx(byte_idx, ins_text, bias_left, self.root_info)?;
-            self.root_info = new_root_info;
-
-            // Handle root split.
-            if let Some((right_info, right_node)) = residual {
-                let mut left_node = Node::Internal(Arc::new(Children::new()));
-                std::mem::swap(&mut left_node, &mut self.root);
-
-                let children = self.root.children_mut();
-                children.push((self.root_info, left_node));
-                children.push((right_info, right_node));
-                self.root_info = children.combined_text_info();
-            }
+            self.insert_core_impl(byte_idx, ins_text, bias_left)?;
 
             // Do a rebalancing step.
             self.root.partial_rebalance();
             self.pull_up_singular_nodes();
         }
-
-        self.owned_slice_byte_range[1] = self.root_info.bytes;
 
         Ok(())
     }
@@ -640,25 +624,16 @@ impl Rope {
                 return Err(OutOfBounds);
             }
 
-            // Special case: if we're removing everything, just replace with a
-            // fresh new rope.  This is to ensure the invariant that an empty
-            // rope is always composed of a single empty leaf, which is not
-            // ensured by the general removal code.
-            if start_idx == 0 && end_idx == rope.len() {
-                *rope = Rope::new();
-                return Ok(());
-            }
+            // Do the actual removal.
+            let created_boundary = rope.remove_core_impl([start_idx, end_idx])?;
 
-            let new_info = rope
-                .root
-                .remove_byte_range([start_idx, end_idx], rope.root_info)?;
-            rope.root_info = new_info;
+            if created_boundary {
+                rope.fix_potential_crlf_split(start_idx);
+            }
 
             // Do a rebalancing step.
             rope.root.partial_rebalance();
             rope.pull_up_singular_nodes();
-
-            rope.owned_slice_byte_range[1] = rope.root_info.bytes;
 
             Ok(())
         }
@@ -700,6 +675,79 @@ impl Rope {
 
     // Methods shared between Rope and RopeSlice.
     crate::shared_impl::shared_no_panic_impl_methods!('_);
+
+    //---------------------------------------------------------
+
+    /// The core insertion procedure, without any checks (like the `text` length
+    /// being small enough to handle with a single insertion), tree reblancing,
+    /// CRLF split handling, etc.
+    #[inline(always)]
+    fn insert_core_impl(&mut self, byte_idx: usize, text: &str, bias_left: bool) -> Result<()> {
+        debug_assert!(byte_idx <= self.len());
+        debug_assert!(text.len() <= (MAX_TEXT_SIZE - 4));
+
+        // Do the insertion.
+        let (new_root_info, residual) =
+            self.root
+                .insert_at_byte_idx(byte_idx, text, bias_left, self.root_info)?;
+        self.root_info = new_root_info;
+
+        // Handle root split.
+        if let Some((right_info, right_node)) = residual {
+            let mut left_node = Node::Internal(Arc::new(Children::new()));
+            std::mem::swap(&mut left_node, &mut self.root);
+
+            let children = self.root.children_mut();
+            children.push((self.root_info, left_node));
+            children.push((right_info, right_node));
+            self.root_info = children.combined_text_info();
+        }
+
+        self.owned_slice_byte_range[1] = self.root_info.bytes;
+
+        Ok(())
+    }
+
+    /// The core removal procedure, without any checks (like the range being
+    /// well-formed), tree rebalancing, CRLF split handling, etc.
+    ///
+    /// The returned bool is whether a fresh boundary was created.
+    #[inline(always)]
+    fn remove_core_impl(&mut self, byte_range: [usize; 2]) -> Result<bool> {
+        debug_assert!(byte_range[0] <= byte_range[1]);
+        debug_assert!(byte_range[1] <= self.len());
+
+        // Special case: if we're removing everything, just replace with a
+        // fresh new rope.  This is to ensure the invariant that an empty
+        // rope is always composed of a single empty leaf, which is not
+        // ensured by the general removal code.
+        if byte_range[0] == 0 && byte_range[1] == self.len() {
+            *self = Rope::new();
+            return Ok(false);
+        }
+
+        let (new_info, created_boundary) =
+            self.root.remove_byte_range(byte_range, self.root_info)?;
+        self.root_info = new_info;
+        self.owned_slice_byte_range[1] = self.root_info.bytes;
+
+        Ok(created_boundary)
+    }
+
+    fn fix_potential_crlf_split(&mut self, byte_idx: usize) {
+        if byte_idx == 0 || byte_idx >= self.len() {
+            return;
+        }
+
+        if self.byte(byte_idx - 1) == b'\r' && self.byte(byte_idx) == b'\n' {
+            // First remove the LF.
+            self.remove_core_impl([byte_idx, byte_idx + 1]).unwrap();
+
+            // Then insert it again with a left bias, so it ends up in the same
+            // chunk as the CR.
+            self.insert_core_impl(byte_idx, "\n", true).unwrap();
+        }
+    }
 }
 
 //==============================================================

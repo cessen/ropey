@@ -202,16 +202,23 @@ impl Node {
         }
     }
 
+    /// Returns the updated text info of the node after removal, as well as a
+    /// bool indicating if the removal created a fresh chunk boundary.  The
+    /// bool is needed to know if a split-CRLF check is needed.
     pub fn remove_byte_range(
         &mut self,
         byte_idx_range: [usize; 2],
         node_info: TextInfo,
-    ) -> Result<TextInfo> {
+    ) -> Result<(TextInfo, bool)> {
         debug_assert!(byte_idx_range[0] <= byte_idx_range[1]);
 
         match *self {
             Node::Leaf(ref mut leaf_text) => {
                 debug_assert!(byte_idx_range[0] > 0 || byte_idx_range[1] < leaf_text.len());
+
+                let created_boundary = (byte_idx_range[0] == 0
+                    || byte_idx_range[1] == leaf_text.len())
+                    && byte_idx_range[0] < byte_idx_range[1];
 
                 if byte_idx_range
                     .iter()
@@ -224,7 +231,7 @@ impl Node {
                 let new_node_info =
                     leaf_text.remove_range_and_update_info(byte_idx_range, node_info);
 
-                Ok(new_node_info)
+                Ok((new_node_info, created_boundary))
             }
             Node::Internal(ref mut children) => {
                 let children = Arc::make_mut(children);
@@ -249,6 +256,7 @@ impl Node {
                 // Simple case: the removal is entirely within a single child.
                 if start_child_i == end_child_i {
                     if start_byte_idx == 0 && end_byte_idx == start_info.bytes {
+                        // The removal happens to be exactly the whole child.
                         let new_node_info = node_info.edit_sub_info(
                             children.info()[start_child_i],
                             TextInfo::new(),
@@ -256,9 +264,10 @@ impl Node {
                             children.info().get(start_child_i + 1),
                         );
                         children.remove(start_child_i);
-                        Ok(new_node_info)
+                        Ok((new_node_info, true))
                     } else {
-                        let new_child_info = children.nodes_mut()[start_child_i]
+                        let (new_child_info, created_boundary) = children.nodes_mut()
+                            [start_child_i]
                             .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
                         let new_node_info = node_info.edit_sub_info(
                             children.info()[start_child_i],
@@ -268,7 +277,7 @@ impl Node {
                         );
                         children.info_mut()[start_child_i] = new_child_info;
                         children.update_unbalance_flag(start_child_i);
-                        Ok(new_node_info)
+                        Ok((new_node_info, created_boundary))
                     }
                 }
                 // More complex case: the removal spans multiple children.
@@ -278,7 +287,7 @@ impl Node {
 
                     // Handle partial removal of leftmost child.
                     if !remove_whole_start_child {
-                        let new_info = children.nodes_mut()[start_child_i]
+                        let (new_info, _) = children.nodes_mut()[start_child_i]
                             .remove_byte_range([start_byte_idx, start_info.bytes], start_info)?;
                         children.info_mut()[start_child_i] = new_info;
                         children.update_unbalance_flag(start_child_i);
@@ -286,7 +295,7 @@ impl Node {
 
                     // Handle partial removal of rightmost child.
                     if !remove_whole_end_child {
-                        let new_info = children.nodes_mut()[end_child_i]
+                        let (new_info, _) = children.nodes_mut()[end_child_i]
                             .remove_byte_range([0, end_byte_idx], end_info)?;
                         children.info_mut()[end_child_i] = new_info;
                         children.update_unbalance_flag(end_child_i);
@@ -307,7 +316,9 @@ impl Node {
                         children.remove_multiple([removal_start, removal_end]);
                     }
 
-                    Ok(children.combined_text_info())
+                    // If the removal spanned multiple nodes, it had to create a
+                    // new boundary.
+                    Ok((children.combined_text_info(), true))
                 }
             }
         }

@@ -42,15 +42,6 @@ pub(crate) struct TextInfo {
 
     #[cfg(feature = "metric_lines_unicode")]
     pub line_breaks_unicode: usize,
-
-    //---------------------------------------------------------
-    // Split CRLF handling.
-
-    // Marks whether the text starts with an LF line break.
-    pub starts_with_lf: bool,
-
-    // Marks whether the text ends with a CR line break.
-    pub ends_with_cr: bool,
 }
 
 impl TextInfo {
@@ -77,9 +68,6 @@ impl TextInfo {
 
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: 0,
-
-            starts_with_lf: false,
-            ends_with_cr: false,
         }
     }
 
@@ -104,9 +92,6 @@ impl TextInfo {
 
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: lines::count_breaks(text),
-
-            starts_with_lf: starts_with_lf(text),
-            ends_with_cr: ends_with_cr(text),
         }
     }
 
@@ -132,21 +117,7 @@ impl TextInfo {
     /// Combines two TextInfos as if their texts were concatenated.
     #[must_use]
     pub(crate) fn concat(self, rhs: TextInfo) -> TextInfo {
-        TextInfo {
-            starts_with_lf: if self.bytes == 0 {
-                rhs.starts_with_lf
-            } else {
-                self.starts_with_lf
-            },
-
-            ends_with_cr: if rhs.bytes == 0 {
-                self.ends_with_cr
-            } else {
-                rhs.ends_with_cr
-            },
-
-            ..(self + rhs)
-        }
+        self + rhs
     }
 
     /// Updates the info of an internal node when one of its children
@@ -167,59 +138,7 @@ impl TextInfo {
         self -= sub_old;
         self += sub_new;
 
-        // Silence unused parameter warning when relevant features are disabled.
-        #[allow(unused_variables)]
-        if let Some(left) = sub_left {
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            if left.ends_with_cr && sub_old.starts_with_lf && !sub_new.starts_with_lf {
-                self.increment_crlf_relevant_counts();
-            } else if left.ends_with_cr && !sub_old.starts_with_lf && sub_new.starts_with_lf {
-                self.decrement_crlf_relevant_counts();
-            }
-        } else {
-            self.starts_with_lf = sub_new.starts_with_lf;
-        }
-
-        // Silence unused parameter warning when relevant features are disabled.
-        #[allow(unused_variables)]
-        if let Some(right) = sub_right {
-            #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-            if right.starts_with_lf && sub_old.ends_with_cr && !sub_new.ends_with_cr {
-                self.increment_crlf_relevant_counts();
-            } else if right.starts_with_lf && !sub_old.ends_with_cr && sub_new.ends_with_cr {
-                self.decrement_crlf_relevant_counts();
-            }
-        } else {
-            self.ends_with_cr = sub_new.ends_with_cr;
-        }
-
         self
-    }
-
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    #[inline(always)]
-    fn increment_crlf_relevant_counts(&mut self) {
-        #[cfg(feature = "metric_lines_lf_cr")]
-        {
-            self.line_breaks_cr_lf += 1;
-        }
-        #[cfg(feature = "metric_lines_unicode")]
-        {
-            self.line_breaks_unicode += 1;
-        }
-    }
-
-    #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
-    #[inline(always)]
-    fn decrement_crlf_relevant_counts(&mut self) {
-        #[cfg(feature = "metric_lines_lf_cr")]
-        {
-            self.line_breaks_cr_lf -= 1;
-        }
-        #[cfg(feature = "metric_lines_unicode")]
-        {
-            self.line_breaks_unicode -= 1;
-        }
     }
 
     /// Updates info for a leaf node that has text inserted into it.  This
@@ -230,6 +149,7 @@ impl TextInfo {
         text: &str,
         byte_idx: usize,
         insertion_info: TextInfo,
+        ins_text: &str,
     ) -> TextInfo {
         // To silence unused parameter warnings when the relevant features are
         // disabled.
@@ -249,8 +169,8 @@ impl TextInfo {
             let seam_lf = byte_is_lf(text, byte_idx);
 
             let crlf_split_compensation = (seam_cr && seam_lf) as usize;
-            let crlf_merge_compensation_1 = (seam_cr && insertion_info.starts_with_lf) as usize;
-            let crlf_merge_compensation_2 = (insertion_info.ends_with_cr && seam_lf) as usize;
+            let crlf_merge_compensation_1 = (seam_cr && starts_with_lf(ins_text)) as usize;
+            let crlf_merge_compensation_2 = (ends_with_cr(ins_text) && seam_lf) as usize;
 
             #[cfg(feature = "metric_lines_lf_cr")]
             {
@@ -264,13 +184,6 @@ impl TextInfo {
                 new_info.line_breaks_unicode -= crlf_merge_compensation_1;
                 new_info.line_breaks_unicode -= crlf_merge_compensation_2;
             }
-        }
-
-        if byte_idx == 0 {
-            new_info.starts_with_lf = insertion_info.starts_with_lf;
-        }
-        if byte_idx == text.len() {
-            new_info.ends_with_cr = insertion_info.ends_with_cr;
         }
 
         new_info
@@ -290,11 +203,29 @@ impl TextInfo {
             return TextInfo::new();
         }
 
-        // Easy case.
+        // Easier case: the removal range is larger than the text that will
+        // remain, so we just scan the text that will be left over.
         if (end - start) >= (text.len() / 2) {
-            let left = TextInfo::from_str(&text[..start]);
-            let right = TextInfo::from_str(&text[end..]);
-            return left.concat(right);
+            let left = &text[..start];
+            let right = &text[end..];
+
+            let left_info = TextInfo::from_str(&text[..start]);
+            let right_info = TextInfo::from_str(&text[end..]);
+
+            let mut new_info = left_info.concat(right_info);
+
+            if ends_with_cr(left) && starts_with_lf(right) {
+                #[cfg(feature = "metric_lines_lf_cr")]
+                {
+                    new_info.line_breaks_cr_lf -= 1
+                }
+                #[cfg(feature = "metric_lines_unicode")]
+                {
+                    new_info.line_breaks_unicode -= 1;
+                }
+            }
+
+            return new_info;
         }
 
         // Silence unused mut warnings when the relevant features are disabled.
@@ -324,13 +255,6 @@ impl TextInfo {
                 new_info.line_breaks_unicode += crlf_split_compensation_2;
                 new_info.line_breaks_unicode -= crlf_merge_compensation;
             }
-        }
-
-        if start == 0 {
-            new_info.starts_with_lf = end_lf;
-        }
-        if end == text.len() {
-            new_info.ends_with_cr = start_cr;
         }
 
         new_info
