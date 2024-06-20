@@ -128,8 +128,8 @@ proptest::proptest! {
         string_insert(&mut text, idx, ins_text);
 
         assert_eq!(rope, text.as_str());
-        rope.assert_invariants();
         assert_metrics_eq(&rope, text.as_str());
+        rope.assert_invariants();
     }
 
     #[test]
@@ -171,8 +171,8 @@ proptest::proptest! {
         string_remove(&mut text, idx_left, idx_right);
 
         assert_eq!(rope, text.as_str());
-        rope.assert_invariants();
         assert_metrics_eq(&rope, text.as_str());
+        rope.assert_invariants();
 
         assert!(rope.attempt_full_rebalance(100).0);
         rope.assert_invariants();
