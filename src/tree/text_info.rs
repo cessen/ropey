@@ -114,33 +114,6 @@ impl TextInfo {
         }
     }
 
-    /// Combines two TextInfos as if their texts were concatenated.
-    #[must_use]
-    pub(crate) fn concat(self, rhs: TextInfo) -> TextInfo {
-        self + rhs
-    }
-
-    /// Updates the info of an internal node when one of its children
-    /// is modified.
-    ///
-    /// -
-    /// - `sub_old` and `sub_new` are the old and new versions of the
-    ///   modified child.
-    /// - `sub_left` and `sub_right` are the children to the
-    ///   left and right of the modified child.
-    pub(crate) fn edit_sub_info(
-        mut self,
-        sub_old: TextInfo,
-        sub_new: TextInfo,
-        sub_left: Option<&TextInfo>,
-        sub_right: Option<&TextInfo>,
-    ) -> TextInfo {
-        self -= sub_old;
-        self += sub_new;
-
-        self
-    }
-
     /// Updates info for a leaf node that has text inserted into it.  This
     /// should be called with the pre-insertion `text`.
     #[must_use]
@@ -212,7 +185,7 @@ impl TextInfo {
             let left_info = TextInfo::from_str(&text[..start]);
             let right_info = TextInfo::from_str(&text[end..]);
 
-            let mut new_info = left_info.concat(right_info);
+            let mut new_info = left_info + right_info;
 
             if ends_with_cr(left) && starts_with_lf(right) {
                 #[cfg(feature = "metric_lines_lf_cr")]
@@ -406,21 +379,5 @@ mod tests {
             4,
             TextInfo::from_str("\nこん\rにち\nは！\r\n").line_breaks_unicode
         );
-    }
-
-    #[test]
-    fn concat_01() {
-        let test_texts = ["Hello world!", "\nHello\nworld!\n"];
-
-        for text in test_texts {
-            for split in 0..(text.len() + 1) {
-                let left = &text[..split];
-                let right = &text[split..];
-                assert_eq!(
-                    TextInfo::from_str(text),
-                    TextInfo::from_str(left).concat(TextInfo::from_str(right)),
-                );
-            }
-        }
     }
 }

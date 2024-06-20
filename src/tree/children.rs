@@ -108,7 +108,7 @@ impl Children {
             _ => panic!("Can't merge two nodes of different types."),
         }
 
-        *info1 = info1.concat(*info2);
+        *info1 += *info2;
         self.remove(idx2);
         self.update_unbalance_flag(idx1);
     }
@@ -306,7 +306,7 @@ impl Children {
     pub fn combined_text_info(&self) -> TextInfo {
         self.info()
             .iter()
-            .fold(TextInfo::new(), |acc, &next| acc.concat(next))
+            .fold(TextInfo::new(), |acc, &next| acc + next)
     }
 
     /// Returns the child index and left-side-accumulated text info of the
@@ -334,7 +334,7 @@ impl Children {
         let mut accum = TextInfo::new();
         let mut idx = 0;
         while idx < (self.len() - 1) {
-            let next_accum = accum.concat(self.info()[idx]);
+            let next_accum = accum + self.info()[idx];
             if pred(next_accum) {
                 break;
             }
@@ -470,7 +470,7 @@ impl Children {
 
         debug_assert!(
             {
-                let end_info = accum.concat(self.info()[idx]);
+                let end_info = accum + self.info()[idx];
                 line_break_idx <= end_info.line_breaks(line_type) + 1
             },
             "Index out of bounds."

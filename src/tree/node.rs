@@ -28,7 +28,7 @@ impl Node {
             Node::Internal(ref children) => {
                 let mut acc_info = TextInfo::new();
                 for info in children.info() {
-                    acc_info = acc_info.concat(*info);
+                    acc_info += *info;
                 }
                 acc_info
             }
@@ -173,12 +173,7 @@ impl Node {
                 // Handle the residual node if there is one and return.
                 if let Some((r_info, r_node)) = residual {
                     if children.len() < MAX_CHILDREN {
-                        let new_node_info = node_info.edit_sub_info(
-                            info,
-                            l_info.concat(r_info),
-                            children.info().get(child_i.wrapping_sub(1)),
-                            children.info().get(child_i + 1),
-                        );
+                        let new_node_info = node_info - info + l_info + r_info;
                         children.insert(child_i + 1, (r_info, r_node));
                         Ok((new_node_info, None))
                     } else {
@@ -190,12 +185,7 @@ impl Node {
                         ))
                     }
                 } else {
-                    let new_node_info = node_info.edit_sub_info(
-                        info,
-                        l_info,
-                        children.info().get(child_i.wrapping_sub(1)),
-                        children.info().get(child_i + 1),
-                    );
+                    let new_node_info = node_info - info + l_info;
                     Ok((new_node_info, None))
                 }
             }
@@ -257,24 +247,15 @@ impl Node {
                 if start_child_i == end_child_i {
                     if start_byte_idx == 0 && end_byte_idx == start_info.bytes {
                         // The removal happens to be exactly the whole child.
-                        let new_node_info = node_info.edit_sub_info(
-                            children.info()[start_child_i],
-                            TextInfo::new(),
-                            children.info().get(start_child_i.wrapping_sub(1)),
-                            children.info().get(start_child_i + 1),
-                        );
+                        let new_node_info = node_info - children.info()[start_child_i];
                         children.remove(start_child_i);
                         Ok((new_node_info, true))
                     } else {
                         let (new_child_info, created_boundary) = children.nodes_mut()
                             [start_child_i]
                             .remove_byte_range([start_byte_idx, end_byte_idx], start_info)?;
-                        let new_node_info = node_info.edit_sub_info(
-                            children.info()[start_child_i],
-                            new_child_info,
-                            children.info().get(start_child_i.wrapping_sub(1)),
-                            children.info().get(start_child_i + 1),
-                        );
+                        let new_node_info =
+                            node_info - children.info()[start_child_i] + new_child_info;
                         children.info_mut()[start_child_i] = new_child_info;
                         children.update_unbalance_flag(start_child_i);
                         Ok((new_node_info, created_boundary))
@@ -396,7 +377,7 @@ impl Node {
                 }
                 Node::Internal(ref children) => {
                     let (child_i, acc_info) = metric_scanner(children, metric_idx);
-                    left_info = left_info.concat(acc_info);
+                    left_info += acc_info;
                     node = &children.nodes()[child_i];
                     metric_idx = metric_subtractor(metric_idx, &acc_info);
                 }
@@ -576,7 +557,7 @@ impl Node {
                 let mut acc_info = TextInfo::new();
                 for (node, &info) in children.nodes().iter().zip(children.info().iter()) {
                     assert_eq!(info, node.assert_accurate_text_info());
-                    acc_info = acc_info.concat(info);
+                    acc_info += info;
                 }
 
                 acc_info
