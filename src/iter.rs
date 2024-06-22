@@ -562,7 +562,7 @@ mod lines {
     /// is returned as an empty slice.
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
-        cursor: ChunkCursor<'a>,
+        pub cursor: ChunkCursor<'a>,
         line_type: LineType,
 
         // The total line count in the iterator.
@@ -1327,6 +1327,7 @@ mod tests {
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_01() {
         let r = make_rope_from_chunks(&[
             "\nHi ",

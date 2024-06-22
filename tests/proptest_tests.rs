@@ -76,6 +76,19 @@ fn assert_metrics_eq(rope: &Rope, text: &str) {
     }
 }
 
+#[cfg(feature = "metric_lines_lf_cr")]
+fn prev_line_byte_idx(text: &str) -> usize {
+    let mut itr = text.bytes().enumerate().rev().skip(1);
+
+    while let Some((idx, byte)) = itr.next() {
+        if byte == 0x0A || byte == 0x0D {
+            return idx + 1;
+        }
+    }
+
+    return 0;
+}
+
 //===========================================================================
 
 proptest::proptest! {
@@ -261,6 +274,121 @@ proptest::proptest! {
         }
 
         assert_eq!(idx, text.len());
+    }
+
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn pt_lines_iter_next(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+        let r = Rope::from_str(text);
+        let mut line_txt = &text[..];
+
+        let mut idx = 0;
+        for line in r.lines(ropey::LineType::LF_CR) {
+            let next_idx = str_indices::lines_crlf::to_byte_idx(line_txt, 1);
+            let txt_chunk = &line_txt[..next_idx];
+            line_txt = &line_txt[next_idx..];
+            assert_eq!(line, txt_chunk);
+            idx += line.len();
+        }
+
+        assert_eq!(idx, text.len());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn pt_lines_iter_prev(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+        use ropey::LineType::LF_CR;
+
+        let r = Rope::from_str(text);
+        let mut line_txt = &text[..];
+
+        let mut first = true;
+        let mut idx = 0;
+        for line in r.lines_at(r.len_lines(LF_CR), LF_CR).reversed() {
+            let txt_chunk = if first && (line_txt.as_bytes().last() == Some(&b'\n') || line_txt.as_bytes().last() == Some(&b'\r')) {
+                ""
+            } else {
+                let prev_idx = prev_line_byte_idx(line_txt);
+                let txt_chunk = &line_txt[prev_idx..];
+                line_txt = &line_txt[..prev_idx];
+                txt_chunk
+            };
+            assert_eq!(line, txt_chunk);
+            idx += line.len();
+            first = false;
+        }
+
+        assert_eq!(idx, text.len());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn pt_slice_lines_iter_next(idx1: usize, idx2: usize, ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+        let r = Rope::from_str(text);
+        let (start, end) = {
+            let idx1 = closest_char_boundary(text, idx1 % (text.len() + 1));
+            let idx2 = closest_char_boundary(text, idx2 % (text.len() + 1));
+            (idx1.min(idx2), idx1.max(idx2))
+        };
+
+        let text = &text[start..end];
+        let s = r.slice(start..end);
+
+        let mut line_txt = &text[..];
+
+        let mut idx = 0;
+        for line in s.lines(ropey::LineType::LF_CR) {
+            let next_idx = str_indices::lines_crlf::to_byte_idx(line_txt, 1);
+            let txt_chunk = &line_txt[..next_idx];
+            line_txt = &line_txt[next_idx..];
+            assert_eq!(line, txt_chunk);
+            idx += line.len();
+        }
+
+        assert_eq!(idx, text.len());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn pt_slice_lines_iter_prev(idx1: usize, idx2: usize, ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+        use ropey::LineType::LF_CR;
+
+        let r = Rope::from_str(text);
+        let (start, end) = {
+            let idx1 = closest_char_boundary(text, idx1 % (text.len() + 1));
+            let idx2 = closest_char_boundary(text, idx2 % (text.len() + 1));
+            (idx1.min(idx2), idx1.max(idx2))
+        };
+
+        let text = &text[start..end];
+        let s = r.slice(start..end);
+
+        assert_eq!(s.len(), text.len());
+
+        let mut line_txt = &text[..];
+
+        let mut first = true;
+        let mut idx = text.len();
+        for line in s.lines_at(s.len_lines(LF_CR), LF_CR).reversed() {
+            let txt_chunk = if first && (line_txt.as_bytes().last() == Some(&b'\n') || line_txt.as_bytes().last() == Some(&b'\r')) {
+                ""
+            } else {
+                let prev_idx = prev_line_byte_idx(line_txt);
+                let txt_chunk = &line_txt[prev_idx..];
+                line_txt = &line_txt[..prev_idx];
+                txt_chunk
+            };
+            assert_eq!(line, txt_chunk);
+            idx -= line.len();
+            first = false;
+        }
+
+        assert_eq!(idx, 0);
     }
 }
 

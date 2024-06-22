@@ -133,6 +133,7 @@ pub(crate) mod lines {
 
         return 0;
     }
+
     /// If there is a trailing line break, returns its byte index.
     /// Otherwise returns `None`.
     ///

@@ -257,6 +257,13 @@ impl<'a> ChunkCursor<'a> {
             }
         }
 
+        // Handle a subtle corner case where the slice end is exactly on an
+        // internal chunk boundary, causing the selected chunk to be the one
+        // just *after* the slice range.
+        if cursor.byte_offset() >= (byte_range[1] - byte_range[0]) {
+            cursor.prev();
+        }
+
         cursor
     }
 
@@ -769,6 +776,26 @@ mod tests {
         let cursor_2 = s.chunk_cursor_at(text.len());
         assert_eq!(cursor_1.byte_offset(), cursor_2.byte_offset());
         assert_eq!(cursor_1.chunk(), cursor_2.chunk());
+    }
+
+    #[test]
+    fn chunk_cursor_at_03() {
+        // This tests a subtle corner case where the slice end aligns with an
+        // internal chunk boundary.  It requires a lot of nodes to trigger,
+        // because it needs the tree to have enough depth.
+        let r = {
+            let mut rb = RopeBuilder::new();
+            for _ in 0..100 {
+                rb._append_chunk_as_leaf("A");
+            }
+            rb.finish()
+        };
+
+        for i in 1..=100 {
+            let s = r.slice(..i);
+            let mut cursor = s.chunk_cursor_at(i);
+            assert_eq!("A", cursor.chunk());
+        }
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
