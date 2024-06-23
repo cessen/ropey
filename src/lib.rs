@@ -229,10 +229,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
+    /// The byte index(s) given were not on a char boundary, but needed to be
+    /// for the given operation.
     NonCharBoundary,
+
+    /// The index(s) given exceeded the size of the text.
     OutOfBounds,
+
+    /// The range given was intrinsically invalid (e.g. inverted).
     InvalidRange,
-    CannotEditOwnedSlice,
+
+    /// An attempt was made to edit an owning slice, which is not permitted.  See [`RopeSlice::to_owning_slice()`] for details.
+    CannotEditOwningSlice,
 }
 
 impl Error {
@@ -241,7 +249,7 @@ impl Error {
             Error::NonCharBoundary => panic!("Index is a non-char boundary."),
             Error::OutOfBounds => panic!("Index out of bounds."),
             Error::InvalidRange => panic!("Invalid index range: end < start."),
-            Error::CannotEditOwnedSlice => {
+            Error::CannotEditOwningSlice => {
                 panic!("Editing of owned slices is not permitted.")
             }
         }

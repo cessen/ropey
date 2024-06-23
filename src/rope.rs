@@ -484,17 +484,6 @@ impl Rope {
     }
 
     #[inline(always)]
-    fn get_full_info(&self) -> Option<&TextInfo> {
-        if self.owned_slice_byte_range[0] == 0
-            && self.owned_slice_byte_range[1] == self.root_info.bytes
-        {
-            Some(&self.root_info)
-        } else {
-            None
-        }
-    }
-
-    #[inline(always)]
     fn get_byte_range(&self) -> [usize; 2] {
         self.owned_slice_byte_range
     }
@@ -506,13 +495,11 @@ impl Rope {
 /// Non-panicking versions of some of `Rope`'s methods.
 impl Rope {
     pub fn try_insert(&mut self, byte_idx: usize, text: &str) -> Result<()> {
-        // TODO: this probably isn't really what we want to do for owned slices.
-        // Better would be to convert it to a proper rope by trimming the ends
-        // first.
+        // Editing owning slices is not allowed.
         if self.owned_slice_byte_range[0] != 0
             || self.owned_slice_byte_range[1] != self.root_info.bytes
         {
-            return Err(CannotEditOwnedSlice);
+            return Err(CannotEditOwningSlice);
         }
 
         if byte_idx > self.len() {
@@ -604,13 +591,11 @@ impl Rope {
         // Inner function to avoid code duplication on code gen due to the
         // generic type of `byte_range`.
         fn inner(rope: &mut Rope, start: Bound<&usize>, end: Bound<&usize>) -> Result<()> {
-            // TODO: this probably isn't really what we want to do for owned
-            // slices. Better would be to convert it to a proper rope by
-            // trimming the ends first.
+            // Editing owning slices is not allowed.
             if rope.owned_slice_byte_range[0] != 0
                 || rope.owned_slice_byte_range[1] != rope.root_info.bytes
             {
-                return Err(CannotEditOwnedSlice);
+                return Err(CannotEditOwningSlice);
             }
 
             let start_idx = start_bound_to_num(start).unwrap_or(0);

@@ -114,7 +114,7 @@ impl<'a> RopeSlice<'a> {
     /// this co-owns the data with the original `Rope` just like a `Rope`
     /// clone would, and thus can be passed around freely (e.g. across thread
     /// boundaries).  Additionally, its existence doesn't prevent the original
-    /// `Rope` from being edited.
+    /// `Rope` from being edited, dropped, etc.
     ///
     /// This is distinct from using `Into<Rope>` on a `RopeSlice`, which edits
     /// the resulting `Rope`'s data to trim it to the range of the slice, which
@@ -122,9 +122,9 @@ impl<'a> RopeSlice<'a> {
     /// method.  However, a `Rope` from `Into<Rope>` will be a normal editable
     /// `Rope`, whereas `Rope`s produced from this method are read-only.
     ///
-    /// **You probably don't need to use this method.**  Stick with normal
-    /// `RopeSlice`s when you can.  This method only exists for weird corner
-    /// cases.
+    /// **You probably don't need to use this method.**  Legitimate use cases
+    /// for it are rare, and you should stick to normal `Rope`s and `RopeSlice`s
+    /// when you can.
     ///
     /// Runs in O(1) time.  Space usage is constant unless the original `Rope`
     /// is edited, causing the otherwise shared contents to diverge.
@@ -135,7 +135,7 @@ impl<'a> RopeSlice<'a> {
     /// on the resulting `Rope` with the panicking variants `insert()` and
     /// `remove()`, they will panic.
     #[inline]
-    pub fn to_owned_slice(&self) -> Rope {
+    pub fn to_owning_slice(&self) -> Rope {
         Rope {
             root: self.root.clone(),
             root_info: *self.root_info,
@@ -161,15 +161,6 @@ impl<'a> RopeSlice<'a> {
     #[inline(always)]
     fn get_root_info(&self) -> &'a TextInfo {
         self.root_info
-    }
-
-    #[inline(always)]
-    fn get_full_info(&self) -> Option<&'a TextInfo> {
-        if self.byte_range[0] == 0 && self.byte_range[1] == self.root_info.bytes {
-            Some(self.root_info)
-        } else {
-            None
-        }
     }
 
     #[inline(always)]

@@ -3,9 +3,6 @@
 //!
 //! - `get_root()`: returns the root node of the Rope or RopeSlice.
 //! - `get_root_info()`: returns the TextInfo of the root node.
-//! - `get_full_info()`: like `get_root_info()` except it only returns the info
-//!   if it represents the full extent of the Rope or RopeSlice.  Otherwise
-//!   returns None.
 //! - `get_byte_range()`: returns the range of bytes of the root node that are
 //!   considered part of the actual text.
 
@@ -334,8 +331,8 @@ macro_rules! shared_main_impl_methods {
         /// Notes:
         ///
         /// - Counts lines according to the passed line type.
-        /// - Lines are zero-indexed.  This is functionally equivalent to
-        ///   counting the line endings before the specified byte.
+        /// - Lines are zero-indexed.  Therefore this is functionally equivalent
+        ///   to counting the line breaks before the specified byte.
         /// - `byte_idx` can be one-past-the-end, which will return the
         ///   last line index.
         ///
@@ -610,6 +607,17 @@ macro_rules! shared_main_impl_methods {
 
         //-----------------------------------------------------
         // Internal utility methods.
+
+        #[inline(always)]
+        fn get_full_info(&self) -> Option<&TextInfo> {
+            let range = self.get_byte_range();
+            let root_info = self.get_root_info();
+            if range[0] == 0 && range[1] == root_info.bytes {
+                Some(root_info)
+            } else {
+                None
+            }
+        }
 
         #[cfg(feature = "metric_chars")]
         fn _byte_to_char(&self, byte_idx: usize) -> usize {
