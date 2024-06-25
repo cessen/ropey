@@ -562,7 +562,7 @@ mod lines {
     /// is returned as an empty slice.
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
-        pub cursor: ChunkCursor<'a>,
+        cursor: ChunkCursor<'a>,
         line_type: LineType,
 
         // The total line count in the iterator.

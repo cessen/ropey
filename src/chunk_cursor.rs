@@ -142,6 +142,8 @@ impl<'a> ChunkCursor<'a> {
     }
 
     /// Returns the current chunk.
+    ///
+    /// Runs in O(1) time.
     #[inline(always)]
     pub fn chunk(&self) -> &'a str {
         self.chunk_slice().as_str().unwrap()
@@ -150,7 +152,7 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the current chunk as a rope slice.
     ///
     /// Since it's a chunk, it's guaranteed to be contiguous text.
-    pub fn chunk_slice(&self) -> RopeSlice<'a> {
+    pub(crate) fn chunk_slice(&self) -> RopeSlice<'a> {
         let leaf = self.node_stack.last().unwrap();
 
         let start = if leaf.byte_offset < self.byte_range[0] {
@@ -167,17 +169,25 @@ impl<'a> ChunkCursor<'a> {
         RopeSlice::new(leaf.node, leaf.info, [start, end])
     }
 
+    /// Returns whether the cursor is at the first chunk.
+    ///
+    /// Runs in O(1) time.
     pub fn at_first(&self) -> bool {
         let leaf = &self.node_stack.last().unwrap();
         leaf.byte_offset <= self.byte_range[0]
     }
 
+    /// Returns whether the cursor is at the last chunk.
+    ///
+    /// Runs in O(1) time.
     pub fn at_last(&self) -> bool {
         let leaf = &self.node_stack.last().unwrap();
         (leaf.byte_offset + leaf.info.bytes) >= self.byte_range[1]
     }
 
     /// Returns the byte offset from the start of the text to the start of the current chunk.
+    ///
+    /// Runs in O(1) time.
     #[inline]
     pub fn byte_offset(&self) -> usize {
         // Offset from start of root.
@@ -191,7 +201,7 @@ impl<'a> ChunkCursor<'a> {
 
     /// Returns the byte offset from the start of the current chunk to the end of the text.
     #[inline]
-    pub fn byte_offset_from_end(&self) -> usize {
+    pub(crate) fn byte_offset_from_end(&self) -> usize {
         // Offset from start of root.
         let offset = self.node_stack.last().unwrap().byte_offset;
 
