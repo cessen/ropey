@@ -106,6 +106,9 @@ impl<'a> RopeSlice<'a> {
         }
     }
 
+    // Methods shared between Rope and RopeSlice.
+    crate::shared_impl::shared_main_impl_methods!('a);
+
     /// Creates a cheap, non-editable `Rope` from the `RopeSlice`.
     ///
     /// The resulting `Rope` is guaranteed to not take up any additional
@@ -142,11 +145,6 @@ impl<'a> RopeSlice<'a> {
             owned_slice_byte_range: self.byte_range,
         }
     }
-
-    //---------------------------------------------------------
-    // Methods shared between Rope and RopeSlice.
-
-    crate::shared_impl::shared_main_impl_methods!('a);
 
     //---------------------------------------------------------
     // Utility methods needed by the shared impl macros in
