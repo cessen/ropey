@@ -790,9 +790,11 @@ mod tests {
 
     #[test]
     fn chunk_cursor_at_03() {
-        // This tests a subtle corner case where the slice end aligns with an
-        // internal chunk boundary.  It requires a lot of nodes to trigger,
-        // because it needs the tree to have enough depth.
+        // This tests a subtle corner case where the slice end aligns with
+        // an internal chunk boundary, which would erronerously cause the
+        // chunk cursor to be created on an empty chunk just *after* the slice
+        // contents.  It requires a lot of nodes to trigger, because it needs
+        // the tree to have enough depth.
         let r = {
             let mut rb = RopeBuilder::new();
             for _ in 0..100 {
@@ -803,7 +805,7 @@ mod tests {
 
         for i in 1..=100 {
             let s = r.slice(..i);
-            let mut cursor = s.chunk_cursor_at(i);
+            let cursor = s.chunk_cursor_at(i);
             assert_eq!("A", cursor.chunk());
         }
     }

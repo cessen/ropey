@@ -38,14 +38,6 @@ impl Node {
     }
 
     #[inline(always)]
-    pub(crate) fn is_empty(&self) -> bool {
-        match *self {
-            Self::Internal(ref children) => children.nodes().is_empty(),
-            Self::Leaf(ref text) => text.len() == 0,
-        }
-    }
-
-    #[inline(always)]
     pub(crate) fn is_internal(&self) -> bool {
         match *self {
             Self::Internal(_) => true,
@@ -98,6 +90,8 @@ impl Node {
         }
     }
 
+    // Only used in unit tests.
+    #[cfg(test)]
     #[inline(always)]
     pub fn leaf_text(&self) -> &Text {
         match *self {
