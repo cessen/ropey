@@ -40,8 +40,8 @@ let mut text = Rope::from_reader(
 println!("{}", text.line(515, LF_CR));
 
 // Get the start/end byte indices of the line.
-let start_idx = text.line_to_byte(515, LF_CR);
-let end_idx = text.line_to_byte(516, LF_CR);
+let start_idx = text.line_to_byte_idx(515, LF_CR);
+let end_idx = text.line_to_byte_idx(516, LF_CR);
 
 // Remove the line...
 text.remove(start_idx..end_idx);
@@ -50,8 +50,8 @@ text.remove(start_idx..end_idx);
 text.insert(start_idx, "The flowers are... so... dunno.\n");
 
 // Print the changes, along with the previous few lines for context.
-let start_idx = text.line_to_byte(511, LF_CR);
-let end_idx = text.line_to_byte(516, LF_CR);
+let start_idx = text.line_to_byte_idx(511, LF_CR);
+let end_idx = text.line_to_byte_idx(516, LF_CR);
 println!("{}", text.slice(start_idx..end_idx));
 
 // Write the file back out to disk.

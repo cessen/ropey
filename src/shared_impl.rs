@@ -31,8 +31,8 @@ macro_rules! shared_main_impl_methods {
             if let Some(info) = self.get_full_info() {
                 info.chars
             } else {
-                let char_start_idx = self._byte_to_char(self.get_byte_range()[0]);
-                let char_end_idx = self._byte_to_char(self.get_byte_range()[1]);
+                let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
+                let char_end_idx = self._byte_to_char_idx(self.get_byte_range()[1]);
                 char_end_idx - char_start_idx
             }
         }
@@ -47,8 +47,8 @@ macro_rules! shared_main_impl_methods {
             if let Some(info) = self.get_full_info() {
                 info.utf16
             } else {
-                let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
-                let utf16_end_idx = self._byte_to_utf16(self.get_byte_range()[1]);
+                let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
+                let utf16_end_idx = self._byte_to_utf16_idx(self.get_byte_range()[1]);
                 utf16_end_idx - utf16_start_idx
             }
         }
@@ -66,8 +66,8 @@ macro_rules! shared_main_impl_methods {
             if let Some(info) = self.get_full_info() {
                 info.line_breaks(line_type) + 1
             } else {
-                let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
-                let line_end_idx = self._byte_to_line(self.get_byte_range()[1], line_type);
+                let line_start_idx = self._byte_to_line_idx(self.get_byte_range()[0], line_type);
+                let line_end_idx = self._byte_to_line_idx(self.get_byte_range()[1], line_type);
                 let ends_with_crlf_split =
                     self._is_relevant_crlf_split(self.get_byte_range()[1], line_type);
 
@@ -166,6 +166,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the `char` at `byte_idx`.
         ///
+        /// Note that this takes a **byte index**, not a char index.
+        ///
         /// Runs in O(log N) time.
         ///
         /// # Panics
@@ -173,8 +175,8 @@ macro_rules! shared_main_impl_methods {
         /// - If `byte_idx` is out of bounds (i.e. `byte_idx >= len()`).
         /// - If `byte_idx` is not a char boundary.
         #[inline]
-        pub fn char_at_byte(&self, byte_idx: usize) -> char {
-            match self.try_char_at_byte(byte_idx) {
+        pub fn char(&self, byte_idx: usize) -> char {
+            match self.get_char(byte_idx) {
                 Ok(ch) => ch,
                 Err(NonCharBoundary) => panic!("Attempt to get a char at a non-char boundary."),
                 Err(e) => e.panic_with_msg(),
@@ -236,14 +238,14 @@ macro_rules! shared_main_impl_methods {
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(feature = "metric_chars")]
         #[inline]
-        pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+        pub fn byte_to_char_idx(&self, byte_idx: usize) -> usize {
             assert!(byte_idx <= self.len());
 
             if self.get_full_info().is_some() {
-                self._byte_to_char(byte_idx)
+                self._byte_to_char_idx(byte_idx)
             } else {
-                self._byte_to_char(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_char(self.get_byte_range()[0])
+                self._byte_to_char_idx(self.get_byte_range()[0] + byte_idx)
+                    - self._byte_to_char_idx(self.get_byte_range()[0])
             }
         }
 
@@ -261,13 +263,13 @@ macro_rules! shared_main_impl_methods {
         /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
         #[cfg(feature = "metric_chars")]
         #[inline]
-        pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        pub fn char_to_byte_idx(&self, char_idx: usize) -> usize {
             assert!(char_idx <= self.len_chars());
             if self.get_full_info().is_some() {
-                self._char_to_byte(char_idx)
+                self._char_to_byte_idx(char_idx)
             } else {
-                let char_start_idx = self._byte_to_char(self.get_byte_range()[0]);
-                self._char_to_byte(char_start_idx + char_idx) - self.get_byte_range()[0]
+                let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
+                self._char_to_byte_idx(char_start_idx + char_idx) - self.get_byte_range()[0]
             }
         }
 
@@ -288,13 +290,13 @@ macro_rules! shared_main_impl_methods {
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(feature = "metric_utf16")]
         #[inline]
-        pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
+        pub fn byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
             assert!(byte_idx <= self.len());
             if self.get_full_info().is_some() {
-                self._byte_to_utf16(byte_idx)
+                self._byte_to_utf16_idx(byte_idx)
             } else {
-                self._byte_to_utf16(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_utf16(self.get_byte_range()[0])
+                self._byte_to_utf16_idx(self.get_byte_range()[0] + byte_idx)
+                    - self._byte_to_utf16_idx(self.get_byte_range()[0])
             }
         }
 
@@ -316,13 +318,13 @@ macro_rules! shared_main_impl_methods {
         /// (i.e. `utf16_idx > len_utf16()`).
         #[cfg(feature = "metric_utf16")]
         #[inline]
-        pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
+        pub fn utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
             assert!(utf16_idx <= self.len_utf16());
             if self.get_full_info().is_some() {
-                self._utf16_to_byte(utf16_idx)
+                self._utf16_to_byte_idx(utf16_idx)
             } else {
-                let utf16_start_idx = self._byte_to_utf16(self.get_byte_range()[0]);
-                self._utf16_to_byte(utf16_start_idx + utf16_idx) - self.get_byte_range()[0]
+                let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
+                self._utf16_to_byte_idx(utf16_start_idx + utf16_idx) - self.get_byte_range()[0]
             }
         }
 
@@ -347,10 +349,10 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         #[inline]
-        pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+        pub fn byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
             assert!(byte_idx <= self.len());
             if self.get_full_info().is_some() {
-                self._byte_to_line(byte_idx, line_type)
+                self._byte_to_line_idx(byte_idx, line_type)
             } else {
                 let crlf_split = if byte_idx == self.get_byte_range()[1] {
                     self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
@@ -358,8 +360,8 @@ macro_rules! shared_main_impl_methods {
                     false
                 };
 
-                self._byte_to_line(self.get_byte_range()[0] + byte_idx, line_type)
-                    - self._byte_to_line(self.get_byte_range()[0], line_type)
+                self._byte_to_line_idx(self.get_byte_range()[0] + byte_idx, line_type)
+                    - self._byte_to_line_idx(self.get_byte_range()[0], line_type)
                     + crlf_split as usize
             }
         }
@@ -384,13 +386,13 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         #[inline]
-        pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+        pub fn line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
             assert!(line_idx <= self.len_lines(line_type));
             if self.get_full_info().is_some() {
-                self._line_to_byte(line_idx, line_type)
+                self._line_to_byte_idx(line_idx, line_type)
             } else {
-                let line_start_idx = self._byte_to_line(self.get_byte_range()[0], line_type);
-                self._line_to_byte(line_start_idx + line_idx, line_type)
+                let line_start_idx = self._byte_to_line_idx(self.get_byte_range()[0], line_type);
+                self._line_to_byte_idx(line_start_idx + line_idx, line_type)
                     .saturating_sub(self.get_byte_range()[0])
                     .min(self.len())
             }
@@ -448,6 +450,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Creates an iterator over the chars of the `Rope`, starting at the char
         /// at `byte_idx`.
+        ///
+        /// Note that this takes a **byte index**, not a char index.
         ///
         /// If `byte_idx == len()` then an iterator at the end of the
         /// `Rope` is created (i.e. `next()` will return `None`).
@@ -620,27 +624,27 @@ macro_rules! shared_main_impl_methods {
         }
 
         #[cfg(feature = "metric_chars")]
-        fn _byte_to_char(&self, byte_idx: usize) -> usize {
+        fn _byte_to_char_idx(&self, byte_idx: usize) -> usize {
             let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
-            start_info.chars + text.byte_to_char(byte_idx - start_info.bytes)
+            start_info.chars + text.byte_to_char_idx(byte_idx - start_info.bytes)
         }
 
         #[cfg(feature = "metric_chars")]
-        fn _char_to_byte(&self, char_idx: usize) -> usize {
+        fn _char_to_byte_idx(&self, char_idx: usize) -> usize {
             let (text, start_info) = self.get_root().get_text_at_char(char_idx);
-            start_info.bytes + text.char_to_byte(char_idx - start_info.chars)
+            start_info.bytes + text.char_to_byte_idx(char_idx - start_info.chars)
         }
 
         #[cfg(feature = "metric_utf16")]
-        fn _byte_to_utf16(&self, byte_idx: usize) -> usize {
+        fn _byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
             let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
-            start_info.utf16 + text.byte_to_utf16(byte_idx - start_info.bytes)
+            start_info.utf16 + text.byte_to_utf16_idx(byte_idx - start_info.bytes)
         }
 
         #[cfg(feature = "metric_utf16")]
-        fn _utf16_to_byte(&self, utf16_idx: usize) -> usize {
+        fn _utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
             let (text, start_info) = self.get_root().get_text_at_utf16(utf16_idx);
-            start_info.bytes + text.utf16_to_byte(utf16_idx - start_info.utf16)
+            start_info.bytes + text.utf16_to_byte_idx(utf16_idx - start_info.utf16)
         }
 
         #[cfg(any(
@@ -648,11 +652,11 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        fn _byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+        fn _byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
             let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
 
             start_info.line_breaks(line_type)
-                + text.byte_to_line(byte_idx - start_info.bytes, line_type)
+                + text.byte_to_line_idx(byte_idx - start_info.bytes, line_type)
         }
 
         #[cfg(any(
@@ -660,11 +664,11 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        fn _line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+        fn _line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
             let (text, start_info) = self.get_root().get_text_at_line_break(line_idx, line_type);
 
             start_info.bytes
-                + text.line_to_byte(line_idx - start_info.line_breaks(line_type), line_type)
+                + text.line_to_byte_idx(line_idx - start_info.line_breaks(line_type), line_type)
         }
 
         /// Returns whether splitting at `byte_idx` would split a CRLF pair,
@@ -704,7 +708,7 @@ macro_rules! shared_no_panic_impl_methods {
             Some(text.as_bytes()[byte_idx - offset])
         }
 
-        pub fn try_char_at_byte(&self, byte_idx: usize) -> Result<char> {
+        pub fn get_char(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len() {
                 return Err(OutOfBounds);
             }
@@ -731,8 +735,8 @@ macro_rules! shared_no_panic_impl_methods {
                 return None;
             }
 
-            let start_byte = self.line_to_byte(line_idx, line_type);
-            let end_byte = self.line_to_byte(line_idx + 1, line_type);
+            let start_byte = self.line_to_byte_idx(line_idx, line_type);
+            let end_byte = self.line_to_byte_idx(line_idx + 1, line_type);
 
             Some(self.slice(start_byte..end_byte))
         }

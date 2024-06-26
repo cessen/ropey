@@ -72,25 +72,25 @@ impl Text {
 
     #[cfg(feature = "metric_chars")]
     #[inline(always)]
-    pub fn byte_to_char(&self, byte_idx: usize) -> usize {
+    pub fn byte_to_char_idx(&self, byte_idx: usize) -> usize {
         chars::from_byte_idx(self.text(), byte_idx)
     }
 
     #[cfg(feature = "metric_chars")]
     #[inline(always)]
-    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+    pub fn char_to_byte_idx(&self, char_idx: usize) -> usize {
         chars::to_byte_idx(self.text(), char_idx)
     }
 
     #[cfg(feature = "metric_utf16")]
     #[inline(always)]
-    pub fn byte_to_utf16(&self, byte_idx: usize) -> usize {
+    pub fn byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
         utf16::from_byte_idx(self.text(), byte_idx)
     }
 
     #[cfg(feature = "metric_utf16")]
     #[inline(always)]
-    pub fn utf16_to_byte(&self, utf16_idx: usize) -> usize {
+    pub fn utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
         utf16::to_byte_idx(self.text(), utf16_idx)
     }
 
@@ -100,7 +100,7 @@ impl Text {
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
-    pub fn byte_to_line(&self, byte_idx: usize, line_type: LineType) -> usize {
+    pub fn byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
         lines::from_byte_idx(self.text(), byte_idx, line_type)
     }
 
@@ -110,7 +110,7 @@ impl Text {
         feature = "metric_lines_unicode"
     ))]
     #[inline(always)]
-    pub fn line_to_byte(&self, line_idx: usize, line_type: LineType) -> usize {
+    pub fn line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
         lines::to_byte_idx(self.text(), line_idx, line_type)
     }
 
@@ -585,67 +585,67 @@ mod tests {
 
     #[cfg(feature = "metric_chars")]
     #[test]
-    fn byte_to_char_01() {
+    fn byte_to_char_idx_01() {
         let text = Text::from_str("こんmちは");
 
-        assert_eq!(0, text.byte_to_char(0));
-        assert_eq!(0, text.byte_to_char(1));
-        assert_eq!(0, text.byte_to_char(2));
-        assert_eq!(1, text.byte_to_char(3));
-        assert_eq!(1, text.byte_to_char(4));
-        assert_eq!(1, text.byte_to_char(5));
-        assert_eq!(2, text.byte_to_char(6));
-        assert_eq!(3, text.byte_to_char(7));
-        assert_eq!(3, text.byte_to_char(8));
-        assert_eq!(3, text.byte_to_char(9));
-        assert_eq!(4, text.byte_to_char(10));
-        assert_eq!(4, text.byte_to_char(11));
-        assert_eq!(4, text.byte_to_char(12));
-        assert_eq!(5, text.byte_to_char(13));
+        assert_eq!(0, text.byte_to_char_idx(0));
+        assert_eq!(0, text.byte_to_char_idx(1));
+        assert_eq!(0, text.byte_to_char_idx(2));
+        assert_eq!(1, text.byte_to_char_idx(3));
+        assert_eq!(1, text.byte_to_char_idx(4));
+        assert_eq!(1, text.byte_to_char_idx(5));
+        assert_eq!(2, text.byte_to_char_idx(6));
+        assert_eq!(3, text.byte_to_char_idx(7));
+        assert_eq!(3, text.byte_to_char_idx(8));
+        assert_eq!(3, text.byte_to_char_idx(9));
+        assert_eq!(4, text.byte_to_char_idx(10));
+        assert_eq!(4, text.byte_to_char_idx(11));
+        assert_eq!(4, text.byte_to_char_idx(12));
+        assert_eq!(5, text.byte_to_char_idx(13));
     }
 
     #[cfg(feature = "metric_chars")]
     #[test]
-    fn char_to_byte_01() {
+    fn char_to_byte_idx_01() {
         let text = Text::from_str("こんmちは");
 
-        assert_eq!(0, text.char_to_byte(0));
-        assert_eq!(3, text.char_to_byte(1));
-        assert_eq!(6, text.char_to_byte(2));
-        assert_eq!(7, text.char_to_byte(3));
-        assert_eq!(10, text.char_to_byte(4));
-        assert_eq!(13, text.char_to_byte(5));
+        assert_eq!(0, text.char_to_byte_idx(0));
+        assert_eq!(3, text.char_to_byte_idx(1));
+        assert_eq!(6, text.char_to_byte_idx(2));
+        assert_eq!(7, text.char_to_byte_idx(3));
+        assert_eq!(10, text.char_to_byte_idx(4));
+        assert_eq!(13, text.char_to_byte_idx(5));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn byte_to_utf16_01() {
+    fn byte_to_utf16_idx_01() {
         let text = Text::from_str("ん🐸mち");
-        assert_eq!(0, text.byte_to_utf16(0));
-        assert_eq!(0, text.byte_to_utf16(1));
-        assert_eq!(0, text.byte_to_utf16(2));
-        assert_eq!(1, text.byte_to_utf16(3));
-        assert_eq!(1, text.byte_to_utf16(4));
-        assert_eq!(1, text.byte_to_utf16(5));
-        assert_eq!(1, text.byte_to_utf16(6));
-        assert_eq!(3, text.byte_to_utf16(7));
-        assert_eq!(4, text.byte_to_utf16(8));
-        assert_eq!(4, text.byte_to_utf16(9));
-        assert_eq!(4, text.byte_to_utf16(10));
-        assert_eq!(5, text.byte_to_utf16(11));
+        assert_eq!(0, text.byte_to_utf16_idx(0));
+        assert_eq!(0, text.byte_to_utf16_idx(1));
+        assert_eq!(0, text.byte_to_utf16_idx(2));
+        assert_eq!(1, text.byte_to_utf16_idx(3));
+        assert_eq!(1, text.byte_to_utf16_idx(4));
+        assert_eq!(1, text.byte_to_utf16_idx(5));
+        assert_eq!(1, text.byte_to_utf16_idx(6));
+        assert_eq!(3, text.byte_to_utf16_idx(7));
+        assert_eq!(4, text.byte_to_utf16_idx(8));
+        assert_eq!(4, text.byte_to_utf16_idx(9));
+        assert_eq!(4, text.byte_to_utf16_idx(10));
+        assert_eq!(5, text.byte_to_utf16_idx(11));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn utf16_to_byte_01() {
+    fn utf16_to_byte_idx_01() {
         let text = Text::from_str("ん🐸mち");
 
-        assert_eq!(0, text.utf16_to_byte(0));
-        assert_eq!(3, text.utf16_to_byte(1));
-        assert_eq!(3, text.utf16_to_byte(2));
-        assert_eq!(7, text.utf16_to_byte(3));
-        assert_eq!(8, text.utf16_to_byte(4));
-        assert_eq!(11, text.utf16_to_byte(5));
+        assert_eq!(0, text.utf16_to_byte_idx(0));
+        assert_eq!(3, text.utf16_to_byte_idx(1));
+        assert_eq!(3, text.utf16_to_byte_idx(2));
+        assert_eq!(7, text.utf16_to_byte_idx(3));
+        assert_eq!(8, text.utf16_to_byte_idx(4));
+        assert_eq!(11, text.utf16_to_byte_idx(5));
     }
 
     #[cfg(any(
@@ -654,7 +654,7 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn byte_to_line_01() {
+    fn byte_to_line_idx_01() {
         let text = Text::from_str("\r\n\r\n\n\r\r\n");
         let line_idxs = [
             [0, 0],
@@ -671,11 +671,11 @@ mod tests {
         #[allow(unused_variables)]
         for (j, [lf, crlf]) in line_idxs.iter().copied().enumerate() {
             #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(lf, text.byte_to_line(j, LineType::LF));
+            assert_eq!(lf, text.byte_to_line_idx(j, LineType::LF));
             #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(crlf, text.byte_to_line(j, LineType::LF_CR));
+            assert_eq!(crlf, text.byte_to_line_idx(j, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(crlf, text.byte_to_line(j, LineType::All));
+            assert_eq!(crlf, text.byte_to_line_idx(j, LineType::All));
         }
     }
 
@@ -685,7 +685,7 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn line_to_byte_01() {
+    fn line_to_byte_idx_01() {
         let text = Text::from_str("\r\n\r\n\n\r\r\n");
 
         #[cfg(feature = "metric_lines_lf")]
@@ -695,15 +695,15 @@ mod tests {
 
         #[cfg(feature = "metric_lines_lf")]
         for (l, byte_idx) in line_lf_byte_idxs.iter().copied().enumerate() {
-            assert_eq!(byte_idx, text.line_to_byte(l, LineType::LF));
+            assert_eq!(byte_idx, text.line_to_byte_idx(l, LineType::LF));
         }
 
         #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
         for (l, byte_idx) in line_crlf_byte_idxs.iter().copied().enumerate() {
             #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(byte_idx, text.line_to_byte(l, LineType::LF_CR));
+            assert_eq!(byte_idx, text.line_to_byte_idx(l, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(byte_idx, text.line_to_byte(l, LineType::All));
+            assert_eq!(byte_idx, text.line_to_byte_idx(l, LineType::All));
         }
     }
 

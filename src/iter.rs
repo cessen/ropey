@@ -629,7 +629,7 @@ mod lines {
         ) -> Self {
             let slice = RopeSlice::new(node, node_info, byte_range);
             let total_lines = slice.len_lines(line_type);
-            let at_byte_idx = slice.line_to_byte(at_line_idx, line_type);
+            let at_byte_idx = slice.line_to_byte_idx(at_line_idx, line_type);
 
             let cursor = ChunkCursor::new(node, node_info, byte_range, byte_range[0] + at_byte_idx);
             let leaf_byte_idx = at_byte_idx - cursor.byte_offset();

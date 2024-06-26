@@ -197,16 +197,16 @@ proptest::proptest! {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn pt_byte_to_line(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
+    fn pt_byte_to_line_idx(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
         let rope = Rope::from_str(text);
 
         for i in 0..=text.len() {
             #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(lines_lf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::LF));
+            assert_eq!(lines_lf::from_byte_idx(text, i), rope.byte_to_line_idx(i, LineType::LF));
             #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(lines_crlf::from_byte_idx(text, i), rope.byte_to_line(i, LineType::LF_CR));
+            assert_eq!(lines_crlf::from_byte_idx(text, i), rope.byte_to_line_idx(i, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(lines::from_byte_idx(text, i), rope.byte_to_line(i, LineType::All));
+            assert_eq!(lines::from_byte_idx(text, i), rope.byte_to_line_idx(i, LineType::All));
         }
     }
 
@@ -216,28 +216,28 @@ proptest::proptest! {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn pt_line_to_byte(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
+    fn pt_line_to_byte_idx(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
         let rope = Rope::from_str(text);
 
         #[cfg(feature = "metric_lines_lf")]
         {
             let line_count = lines_lf::count_breaks(text) + 1;
             for i in 0..=line_count {
-                assert_eq!(lines_lf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::LF));
+                assert_eq!(lines_lf::to_byte_idx(text, i), rope.line_to_byte_idx(i, LineType::LF));
             }
         }
         #[cfg(feature = "metric_lines_lf_cr")]
         {
             let line_count = lines_crlf::count_breaks(text) + 1;
             for i in 0..=line_count {
-                assert_eq!(lines_crlf::to_byte_idx(text, i), rope.line_to_byte(i, LineType::LF_CR));
+                assert_eq!(lines_crlf::to_byte_idx(text, i), rope.line_to_byte_idx(i, LineType::LF_CR));
             }
         }
         #[cfg(feature = "metric_lines_unicode")]
         {
             let line_count = lines::count_breaks(text) + 1;
             for i in 0..=line_count {
-                assert_eq!(lines::to_byte_idx(text, i), rope.line_to_byte(i, LineType::All));
+                assert_eq!(lines::to_byte_idx(text, i), rope.line_to_byte_idx(i, LineType::All));
             }
         }
     }

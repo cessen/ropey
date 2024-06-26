@@ -60,9 +60,9 @@ use ropey::LineType::LF_CR;
 
 let rope = Rope::from_str("Hello みんなさん!\nHow are you?\nThis text has multiple lines!");
 
-assert_eq!(rope.line_to_byte(0, LF_CR), 0);
-assert_eq!(rope.line_to_byte(1, LF_CR), 23);
-assert_eq!(rope.line_to_byte(2, LF_CR), 36);
+assert_eq!(rope.line_to_byte_idx(0, LF_CR), 0);
+assert_eq!(rope.line_to_byte_idx(1, LF_CR), 23);
+assert_eq!(rope.line_to_byte_idx(2, LF_CR), 36);
 ```
 
 # Slicing
@@ -1164,91 +1164,91 @@ mod tests {
 
     #[cfg(feature = "metric_chars")]
     #[test]
-    fn byte_to_char_01() {
+    fn byte_to_char_idx_01() {
         let r = Rope::from_str(TEXT);
 
-        assert_eq!(0, r.byte_to_char(0));
-        assert_eq!(1, r.byte_to_char(1));
-        assert_eq!(2, r.byte_to_char(2));
+        assert_eq!(0, r.byte_to_char_idx(0));
+        assert_eq!(1, r.byte_to_char_idx(1));
+        assert_eq!(2, r.byte_to_char_idx(2));
 
-        assert_eq!(91, r.byte_to_char(91));
-        assert_eq!(91, r.byte_to_char(92));
-        assert_eq!(91, r.byte_to_char(93));
+        assert_eq!(91, r.byte_to_char_idx(91));
+        assert_eq!(91, r.byte_to_char_idx(92));
+        assert_eq!(91, r.byte_to_char_idx(93));
 
-        assert_eq!(92, r.byte_to_char(94));
-        assert_eq!(92, r.byte_to_char(95));
-        assert_eq!(92, r.byte_to_char(96));
+        assert_eq!(92, r.byte_to_char_idx(94));
+        assert_eq!(92, r.byte_to_char_idx(95));
+        assert_eq!(92, r.byte_to_char_idx(96));
 
-        assert_eq!(102, r.byte_to_char(124));
-        assert_eq!(102, r.byte_to_char(125));
-        assert_eq!(102, r.byte_to_char(126));
-        assert_eq!(103, r.byte_to_char(127));
+        assert_eq!(102, r.byte_to_char_idx(124));
+        assert_eq!(102, r.byte_to_char_idx(125));
+        assert_eq!(102, r.byte_to_char_idx(126));
+        assert_eq!(103, r.byte_to_char_idx(127));
     }
 
     #[cfg(feature = "metric_chars")]
     #[test]
-    fn char_to_byte_01() {
+    fn char_to_byte_idx_01() {
         let r = Rope::from_str(TEXT);
 
-        assert_eq!(0, r.char_to_byte(0));
-        assert_eq!(1, r.char_to_byte(1));
-        assert_eq!(2, r.char_to_byte(2));
+        assert_eq!(0, r.char_to_byte_idx(0));
+        assert_eq!(1, r.char_to_byte_idx(1));
+        assert_eq!(2, r.char_to_byte_idx(2));
 
-        assert_eq!(91, r.char_to_byte(91));
-        assert_eq!(94, r.char_to_byte(92));
-        assert_eq!(97, r.char_to_byte(93));
-        assert_eq!(100, r.char_to_byte(94));
+        assert_eq!(91, r.char_to_byte_idx(91));
+        assert_eq!(94, r.char_to_byte_idx(92));
+        assert_eq!(97, r.char_to_byte_idx(93));
+        assert_eq!(100, r.char_to_byte_idx(94));
 
-        assert_eq!(124, r.char_to_byte(102));
-        assert_eq!(127, r.char_to_byte(103));
+        assert_eq!(124, r.char_to_byte_idx(102));
+        assert_eq!(127, r.char_to_byte_idx(103));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn byte_to_utf16_01() {
+    fn byte_to_utf16_idx_01() {
         let r = Rope::from_str(TEXT_EMOJI);
 
-        assert_eq!(0, r.byte_to_utf16(0));
+        assert_eq!(0, r.byte_to_utf16_idx(0));
 
-        assert_eq!(12, r.byte_to_utf16(12));
-        assert_eq!(12, r.byte_to_utf16(13));
-        assert_eq!(14, r.byte_to_utf16(16));
+        assert_eq!(12, r.byte_to_utf16_idx(12));
+        assert_eq!(12, r.byte_to_utf16_idx(13));
+        assert_eq!(14, r.byte_to_utf16_idx(16));
 
-        assert_eq!(33, r.byte_to_utf16(35));
-        assert_eq!(33, r.byte_to_utf16(36));
-        assert_eq!(35, r.byte_to_utf16(39));
+        assert_eq!(33, r.byte_to_utf16_idx(35));
+        assert_eq!(33, r.byte_to_utf16_idx(36));
+        assert_eq!(35, r.byte_to_utf16_idx(39));
 
-        assert_eq!(63, r.byte_to_utf16(67));
-        assert_eq!(63, r.byte_to_utf16(70));
-        assert_eq!(65, r.byte_to_utf16(71));
+        assert_eq!(63, r.byte_to_utf16_idx(67));
+        assert_eq!(63, r.byte_to_utf16_idx(70));
+        assert_eq!(65, r.byte_to_utf16_idx(71));
 
-        assert_eq!(95, r.byte_to_utf16(101));
-        assert_eq!(95, r.byte_to_utf16(102));
-        assert_eq!(97, r.byte_to_utf16(105));
+        assert_eq!(95, r.byte_to_utf16_idx(101));
+        assert_eq!(95, r.byte_to_utf16_idx(102));
+        assert_eq!(97, r.byte_to_utf16_idx(105));
 
-        assert_eq!(111, r.byte_to_utf16(143));
+        assert_eq!(111, r.byte_to_utf16_idx(143));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn utf16_to_byte_01() {
+    fn utf16_to_byte_idx_01() {
         let r = Rope::from_str(TEXT_EMOJI);
 
-        assert_eq!(0, r.utf16_to_byte(0));
+        assert_eq!(0, r.utf16_to_byte_idx(0));
 
-        assert_eq!(12, r.utf16_to_byte(12));
-        assert_eq!(16, r.utf16_to_byte(14));
+        assert_eq!(12, r.utf16_to_byte_idx(12));
+        assert_eq!(16, r.utf16_to_byte_idx(14));
 
-        assert_eq!(35, r.utf16_to_byte(33));
-        assert_eq!(39, r.utf16_to_byte(35));
+        assert_eq!(35, r.utf16_to_byte_idx(33));
+        assert_eq!(39, r.utf16_to_byte_idx(35));
 
-        assert_eq!(67, r.utf16_to_byte(63));
-        assert_eq!(71, r.utf16_to_byte(65));
+        assert_eq!(67, r.utf16_to_byte_idx(63));
+        assert_eq!(71, r.utf16_to_byte_idx(65));
 
-        assert_eq!(101, r.utf16_to_byte(95));
-        assert_eq!(105, r.utf16_to_byte(97));
+        assert_eq!(101, r.utf16_to_byte_idx(95));
+        assert_eq!(105, r.utf16_to_byte_idx(97));
 
-        assert_eq!(143, r.utf16_to_byte(111));
+        assert_eq!(143, r.utf16_to_byte_idx(111));
     }
 
     #[cfg(any(
@@ -1257,7 +1257,7 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn byte_to_line_01() {
+    fn byte_to_line_idx_01() {
         let r = Rope::from_str(TEXT_LINES);
         let byte_to_line_idxs = &[
             [0, 0],
@@ -1275,11 +1275,11 @@ mod tests {
         ];
         for [b, l] in byte_to_line_idxs.iter().copied() {
             #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(l, r.byte_to_line(b, LineType::LF));
+            assert_eq!(l, r.byte_to_line_idx(b, LineType::LF));
             #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(l, r.byte_to_line(b, LineType::LF_CR));
+            assert_eq!(l, r.byte_to_line_idx(b, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(l, r.byte_to_line(b, LineType::All));
+            assert_eq!(l, r.byte_to_line_idx(b, LineType::All));
         }
     }
 
@@ -1289,39 +1289,39 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn byte_to_line_02() {
+    fn byte_to_line_idx_02() {
         let r = Rope::from_str("");
 
         #[cfg(feature = "metric_lines_lf")]
-        assert_eq!(0, r.byte_to_line(0, LineType::LF));
+        assert_eq!(0, r.byte_to_line_idx(0, LineType::LF));
         #[cfg(feature = "metric_lines_lf_cr")]
-        assert_eq!(0, r.byte_to_line(0, LineType::LF_CR));
+        assert_eq!(0, r.byte_to_line_idx(0, LineType::LF_CR));
         #[cfg(feature = "metric_lines_unicode")]
-        assert_eq!(0, r.byte_to_line(0, LineType::All));
+        assert_eq!(0, r.byte_to_line_idx(0, LineType::All));
     }
 
     #[cfg(feature = "metric_lines_lf")]
     #[test]
     #[should_panic]
-    fn byte_to_line_03() {
+    fn byte_to_line_idx_03() {
         let r = Rope::from_str(TEXT_LINES);
-        r.byte_to_line(125, LineType::LF);
+        r.byte_to_line_idx(125, LineType::LF);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
-    fn byte_to_line_04() {
+    fn byte_to_line_idx_04() {
         let r = Rope::from_str(TEXT_LINES);
-        r.byte_to_line(125, LineType::LF_CR);
+        r.byte_to_line_idx(125, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_lines_unicode")]
     #[test]
     #[should_panic]
-    fn byte_to_line_05() {
+    fn byte_to_line_idx_05() {
         let r = Rope::from_str(TEXT_LINES);
-        r.byte_to_line(125, LineType::All);
+        r.byte_to_line_idx(125, LineType::All);
     }
 
     #[cfg(any(
@@ -1330,16 +1330,16 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn line_to_byte_01() {
+    fn line_to_byte_idx_01() {
         let r = Rope::from_str(TEXT_LINES);
         let byte_to_line_idxs = &[[0, 0], [32, 1], [59, 2], [88, 3], [124, 4]];
         for [b, l] in byte_to_line_idxs.iter().copied() {
             #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(b, r.line_to_byte(l, LineType::LF));
+            assert_eq!(b, r.line_to_byte_idx(l, LineType::LF));
             #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(b, r.line_to_byte(l, LineType::LF_CR));
+            assert_eq!(b, r.line_to_byte_idx(l, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(b, r.line_to_byte(l, LineType::All));
+            assert_eq!(b, r.line_to_byte_idx(l, LineType::All));
         }
     }
 
@@ -1349,47 +1349,47 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
-    fn line_to_byte_02() {
+    fn line_to_byte_idx_02() {
         let r = Rope::from_str("");
         #[cfg(feature = "metric_lines_lf")]
         {
-            assert_eq!(0, r.line_to_byte(0, LineType::LF));
-            assert_eq!(0, r.line_to_byte(1, LineType::LF));
+            assert_eq!(0, r.line_to_byte_idx(0, LineType::LF));
+            assert_eq!(0, r.line_to_byte_idx(1, LineType::LF));
         }
         #[cfg(feature = "metric_lines_lf_cr")]
         {
-            assert_eq!(0, r.line_to_byte(0, LineType::LF_CR));
-            assert_eq!(0, r.line_to_byte(1, LineType::LF_CR));
+            assert_eq!(0, r.line_to_byte_idx(0, LineType::LF_CR));
+            assert_eq!(0, r.line_to_byte_idx(1, LineType::LF_CR));
         }
         #[cfg(feature = "metric_lines_unicode")]
         {
-            assert_eq!(0, r.line_to_byte(0, LineType::All));
-            assert_eq!(0, r.line_to_byte(1, LineType::All));
+            assert_eq!(0, r.line_to_byte_idx(0, LineType::All));
+            assert_eq!(0, r.line_to_byte_idx(1, LineType::All));
         }
     }
 
     #[cfg(feature = "metric_lines_lf")]
     #[test]
     #[should_panic]
-    fn line_to_byte_03() {
+    fn line_to_byte_idx_03() {
         let r = Rope::from_str(TEXT_LINES);
-        r.line_to_byte(5, LineType::LF);
+        r.line_to_byte_idx(5, LineType::LF);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
-    fn line_to_byte_04() {
+    fn line_to_byte_idx_04() {
         let r = Rope::from_str(TEXT_LINES);
-        r.line_to_byte(5, LineType::LF_CR);
+        r.line_to_byte_idx(5, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_lines_unicode")]
     #[test]
     #[should_panic]
-    fn line_to_byte_05() {
+    fn line_to_byte_idx_05() {
         let r = Rope::from_str(TEXT_LINES);
-        r.line_to_byte(5, LineType::All);
+        r.line_to_byte_idx(5, LineType::All);
     }
 
     #[test]

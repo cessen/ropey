@@ -483,93 +483,93 @@ mod tests {
 
     #[cfg(feature = "metric_chars")]
     #[test]
-    fn byte_to_char_01() {
+    fn byte_to_char_idx_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(88..124);
 
         assert_eq!("?  こんにちは、みんなさん", s);
 
-        assert_eq!(0, s.byte_to_char(0));
-        assert_eq!(1, s.byte_to_char(1));
-        assert_eq!(2, s.byte_to_char(2));
+        assert_eq!(0, s.byte_to_char_idx(0));
+        assert_eq!(1, s.byte_to_char_idx(1));
+        assert_eq!(2, s.byte_to_char_idx(2));
 
-        assert_eq!(3, s.byte_to_char(3));
-        assert_eq!(3, s.byte_to_char(4));
-        assert_eq!(3, s.byte_to_char(5));
+        assert_eq!(3, s.byte_to_char_idx(3));
+        assert_eq!(3, s.byte_to_char_idx(4));
+        assert_eq!(3, s.byte_to_char_idx(5));
 
-        assert_eq!(4, s.byte_to_char(6));
-        assert_eq!(4, s.byte_to_char(7));
-        assert_eq!(4, s.byte_to_char(8));
+        assert_eq!(4, s.byte_to_char_idx(6));
+        assert_eq!(4, s.byte_to_char_idx(7));
+        assert_eq!(4, s.byte_to_char_idx(8));
 
-        assert_eq!(13, s.byte_to_char(33));
-        assert_eq!(13, s.byte_to_char(34));
-        assert_eq!(13, s.byte_to_char(35));
-        assert_eq!(14, s.byte_to_char(36));
+        assert_eq!(13, s.byte_to_char_idx(33));
+        assert_eq!(13, s.byte_to_char_idx(34));
+        assert_eq!(13, s.byte_to_char_idx(35));
+        assert_eq!(14, s.byte_to_char_idx(36));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn byte_to_utf16_01() {
+    fn byte_to_utf16_idx_01() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        assert_eq!(0, s.byte_to_utf16(0));
+        assert_eq!(0, s.byte_to_utf16_idx(0));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn byte_to_utf16_02() {
+    fn byte_to_utf16_idx_02() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        s.byte_to_utf16(1);
+        s.byte_to_utf16_idx(1);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn byte_to_utf16_03() {
+    fn byte_to_utf16_idx_03() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        assert_eq!(0, s.byte_to_utf16(0));
-        assert_eq!(0, s.byte_to_utf16(1));
-        assert_eq!(0, s.byte_to_utf16(2));
-        assert_eq!(0, s.byte_to_utf16(3));
-        assert_eq!(2, s.byte_to_utf16(4));
+        assert_eq!(0, s.byte_to_utf16_idx(0));
+        assert_eq!(0, s.byte_to_utf16_idx(1));
+        assert_eq!(0, s.byte_to_utf16_idx(2));
+        assert_eq!(0, s.byte_to_utf16_idx(3));
+        assert_eq!(2, s.byte_to_utf16_idx(4));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn byte_to_utf16_04() {
+    fn byte_to_utf16_idx_04() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        s.byte_to_utf16(5);
+        s.byte_to_utf16_idx(5);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn byte_to_utf16_05() {
+    fn byte_to_utf16_idx_05() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
 
-        assert_eq!(0, s.byte_to_utf16(0));
+        assert_eq!(0, s.byte_to_utf16_idx(0));
 
-        assert_eq!(12, s.byte_to_utf16(12));
-        assert_eq!(14, s.byte_to_utf16(16));
+        assert_eq!(12, s.byte_to_utf16_idx(12));
+        assert_eq!(14, s.byte_to_utf16_idx(16));
 
-        assert_eq!(33, s.byte_to_utf16(35));
-        assert_eq!(35, s.byte_to_utf16(39));
+        assert_eq!(33, s.byte_to_utf16_idx(35));
+        assert_eq!(35, s.byte_to_utf16_idx(39));
 
-        assert_eq!(63, s.byte_to_utf16(67));
-        assert_eq!(65, s.byte_to_utf16(71));
+        assert_eq!(63, s.byte_to_utf16_idx(67));
+        assert_eq!(65, s.byte_to_utf16_idx(71));
 
-        assert_eq!(95, s.byte_to_utf16(101));
-        assert_eq!(97, s.byte_to_utf16(105));
+        assert_eq!(95, s.byte_to_utf16_idx(101));
+        assert_eq!(97, s.byte_to_utf16_idx(105));
 
-        assert_eq!(99, s.byte_to_utf16(107));
-        assert_eq!(100, s.byte_to_utf16(110));
+        assert_eq!(99, s.byte_to_utf16_idx(107));
+        assert_eq!(100, s.byte_to_utf16_idx(110));
 
-        assert_eq!(110, s.byte_to_utf16(140));
-        assert_eq!(111, s.byte_to_utf16(143));
+        assert_eq!(110, s.byte_to_utf16_idx(140));
+        assert_eq!(111, s.byte_to_utf16_idx(143));
     }
 
     #[cfg(feature = "metric_utf16")]
@@ -578,48 +578,48 @@ mod tests {
     fn char_to_utf16_06() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
-        s.byte_to_utf16(144);
+        s.byte_to_utf16_idx(144);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn byte_to_utf16_07() {
+    fn byte_to_utf16_idx_07() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..137);
 
-        assert_eq!(0, s.byte_to_utf16(0));
+        assert_eq!(0, s.byte_to_utf16_idx(0));
 
-        assert_eq!(11, s.byte_to_utf16(11));
-        assert_eq!(13, s.byte_to_utf16(15));
+        assert_eq!(11, s.byte_to_utf16_idx(11));
+        assert_eq!(13, s.byte_to_utf16_idx(15));
 
-        assert_eq!(32, s.byte_to_utf16(34));
-        assert_eq!(34, s.byte_to_utf16(38));
+        assert_eq!(32, s.byte_to_utf16_idx(34));
+        assert_eq!(34, s.byte_to_utf16_idx(38));
 
-        assert_eq!(62, s.byte_to_utf16(66));
-        assert_eq!(64, s.byte_to_utf16(70));
+        assert_eq!(62, s.byte_to_utf16_idx(66));
+        assert_eq!(64, s.byte_to_utf16_idx(70));
 
-        assert_eq!(94, s.byte_to_utf16(100));
-        assert_eq!(96, s.byte_to_utf16(104));
+        assert_eq!(94, s.byte_to_utf16_idx(100));
+        assert_eq!(96, s.byte_to_utf16_idx(104));
 
-        assert_eq!(98, s.byte_to_utf16(106));
-        assert_eq!(99, s.byte_to_utf16(109));
+        assert_eq!(98, s.byte_to_utf16_idx(106));
+        assert_eq!(99, s.byte_to_utf16_idx(109));
 
-        assert_eq!(107, s.byte_to_utf16(133));
-        assert_eq!(108, s.byte_to_utf16(136));
+        assert_eq!(107, s.byte_to_utf16_idx(133));
+        assert_eq!(108, s.byte_to_utf16_idx(136));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn byte_to_utf16_08() {
+    fn byte_to_utf16_idx_08() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..137);
-        s.byte_to_utf16(137);
+        s.byte_to_utf16_idx(137);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    fn byte_to_line_01() {
+    fn byte_to_line_idx_01() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..112);
 
@@ -629,68 +629,68 @@ mod tests {
             s,
         );
 
-        assert_eq!(0, s.byte_to_line(0, LineType::LF_CR));
-        assert_eq!(0, s.byte_to_line(1, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line_idx(0, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line_idx(1, LineType::LF_CR));
 
-        assert_eq!(0, s.byte_to_line(24, LineType::LF_CR));
-        assert_eq!(1, s.byte_to_line(25, LineType::LF_CR));
-        assert_eq!(1, s.byte_to_line(26, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line_idx(24, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line_idx(25, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line_idx(26, LineType::LF_CR));
 
-        assert_eq!(1, s.byte_to_line(53, LineType::LF_CR));
-        assert_eq!(2, s.byte_to_line(54, LineType::LF_CR));
-        assert_eq!(2, s.byte_to_line(57, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line_idx(53, LineType::LF_CR));
+        assert_eq!(2, s.byte_to_line_idx(54, LineType::LF_CR));
+        assert_eq!(2, s.byte_to_line_idx(57, LineType::LF_CR));
 
-        assert_eq!(2, s.byte_to_line(78, LineType::LF_CR));
+        assert_eq!(2, s.byte_to_line_idx(78, LineType::LF_CR));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    fn byte_to_line_02() {
+    fn byte_to_line_idx_02() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(50..50);
-        assert_eq!(0, s.byte_to_line(0, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line_idx(0, LineType::LF_CR));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    fn byte_to_line_03() {
+    fn byte_to_line_idx_03() {
         let r = Rope::from_str("Hi there\nstranger!");
         let s = r.slice(0..9);
-        assert_eq!(0, s.byte_to_line(0, LineType::LF_CR));
-        assert_eq!(0, s.byte_to_line(8, LineType::LF_CR));
-        assert_eq!(1, s.byte_to_line(9, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line_idx(0, LineType::LF_CR));
+        assert_eq!(0, s.byte_to_line_idx(8, LineType::LF_CR));
+        assert_eq!(1, s.byte_to_line_idx(9, LineType::LF_CR));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
-    fn byte_to_line_04() {
+    fn byte_to_line_idx_04() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..112);
-        s.byte_to_line(79, LineType::LF_CR);
+        s.byte_to_line_idx(79, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_chars")]
     #[test]
-    fn char_to_byte_01() {
+    fn char_to_byte_idx_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(88..124);
 
         assert_eq!("?  こんにちは、みんなさん", s);
 
-        assert_eq!(0, s.char_to_byte(0));
-        assert_eq!(1, s.char_to_byte(1));
-        assert_eq!(2, s.char_to_byte(2));
+        assert_eq!(0, s.char_to_byte_idx(0));
+        assert_eq!(1, s.char_to_byte_idx(1));
+        assert_eq!(2, s.char_to_byte_idx(2));
 
-        assert_eq!(3, s.char_to_byte(3));
-        assert_eq!(6, s.char_to_byte(4));
-        assert_eq!(33, s.char_to_byte(13));
-        assert_eq!(36, s.char_to_byte(14));
+        assert_eq!(3, s.char_to_byte_idx(3));
+        assert_eq!(6, s.char_to_byte_idx(4));
+        assert_eq!(33, s.char_to_byte_idx(13));
+        assert_eq!(36, s.char_to_byte_idx(14));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    fn line_to_byte_01() {
+    fn line_to_byte_idx_01() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..112);
 
@@ -700,148 +700,148 @@ mod tests {
             s,
         );
 
-        assert_eq!(0, s.line_to_byte(0, LineType::LF_CR));
-        assert_eq!(25, s.line_to_byte(1, LineType::LF_CR));
-        assert_eq!(54, s.line_to_byte(2, LineType::LF_CR));
-        assert_eq!(78, s.line_to_byte(3, LineType::LF_CR));
+        assert_eq!(0, s.line_to_byte_idx(0, LineType::LF_CR));
+        assert_eq!(25, s.line_to_byte_idx(1, LineType::LF_CR));
+        assert_eq!(54, s.line_to_byte_idx(2, LineType::LF_CR));
+        assert_eq!(78, s.line_to_byte_idx(3, LineType::LF_CR));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
-    fn line_to_byte_02() {
+    fn line_to_byte_idx_02() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(43..43);
 
-        assert_eq!(0, s.line_to_byte(0, LineType::LF_CR));
-        assert_eq!(0, s.line_to_byte(1, LineType::LF_CR));
+        assert_eq!(0, s.line_to_byte_idx(0, LineType::LF_CR));
+        assert_eq!(0, s.line_to_byte_idx(1, LineType::LF_CR));
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
-    fn line_to_byte_03() {
+    fn line_to_byte_idx_03() {
         let r = Rope::from_str(TEXT_LINES);
         let s = r.slice(34..96);
 
-        s.line_to_byte(4, LineType::LF_CR);
+        s.line_to_byte_idx(4, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[should_panic]
-    fn line_to_byte_04() {
+    fn line_to_byte_idx_04() {
         let r = Rope::from_str("\n\n\n\n");
         let s = r.slice(1..3);
 
-        s.line_to_byte(4, LineType::LF_CR);
+        s.line_to_byte_idx(4, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn utf16_to_byte_01() {
+    fn utf16_to_byte_idx_01() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        assert_eq!(0, s.utf16_to_byte(0));
+        assert_eq!(0, s.utf16_to_byte_idx(0));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn utf16_to_byte_02() {
+    fn utf16_to_byte_idx_02() {
         let r = Rope::from_str("");
         let s = r.slice(..);
-        s.utf16_to_byte(1);
+        s.utf16_to_byte_idx(1);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn utf16_to_byte_03() {
+    fn utf16_to_byte_idx_03() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        assert_eq!(0, s.utf16_to_byte(0));
-        assert_eq!(0, s.utf16_to_byte(1));
-        assert_eq!(4, s.utf16_to_byte(2));
+        assert_eq!(0, s.utf16_to_byte_idx(0));
+        assert_eq!(0, s.utf16_to_byte_idx(1));
+        assert_eq!(4, s.utf16_to_byte_idx(2));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn utf16_to_byte_04() {
+    fn utf16_to_byte_idx_04() {
         let r = Rope::from_str("🐸");
         let s = r.slice(..);
-        s.utf16_to_byte(3);
+        s.utf16_to_byte_idx(3);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn utf16_to_byte_05() {
+    fn utf16_to_byte_idx_05() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
 
-        assert_eq!(0, s.utf16_to_byte(0));
+        assert_eq!(0, s.utf16_to_byte_idx(0));
 
-        assert_eq!(12, s.utf16_to_byte(12));
-        assert_eq!(16, s.utf16_to_byte(14));
+        assert_eq!(12, s.utf16_to_byte_idx(12));
+        assert_eq!(16, s.utf16_to_byte_idx(14));
 
-        assert_eq!(35, s.utf16_to_byte(33));
-        assert_eq!(39, s.utf16_to_byte(35));
+        assert_eq!(35, s.utf16_to_byte_idx(33));
+        assert_eq!(39, s.utf16_to_byte_idx(35));
 
-        assert_eq!(67, s.utf16_to_byte(63));
-        assert_eq!(71, s.utf16_to_byte(65));
+        assert_eq!(67, s.utf16_to_byte_idx(63));
+        assert_eq!(71, s.utf16_to_byte_idx(65));
 
-        assert_eq!(101, s.utf16_to_byte(95));
-        assert_eq!(105, s.utf16_to_byte(97));
+        assert_eq!(101, s.utf16_to_byte_idx(95));
+        assert_eq!(105, s.utf16_to_byte_idx(97));
 
-        assert_eq!(107, s.utf16_to_byte(99));
-        assert_eq!(110, s.utf16_to_byte(100));
+        assert_eq!(107, s.utf16_to_byte_idx(99));
+        assert_eq!(110, s.utf16_to_byte_idx(100));
 
-        assert_eq!(140, s.utf16_to_byte(110));
-        assert_eq!(143, s.utf16_to_byte(111));
+        assert_eq!(140, s.utf16_to_byte_idx(110));
+        assert_eq!(143, s.utf16_to_byte_idx(111));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn utf16_to_byte_06() {
+    fn utf16_to_byte_idx_06() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(..);
-        s.utf16_to_byte(112);
+        s.utf16_to_byte_idx(112);
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
-    fn utf16_to_byte_07() {
+    fn utf16_to_byte_idx_07() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..137);
 
-        assert_eq!(0, s.utf16_to_byte(0));
+        assert_eq!(0, s.utf16_to_byte_idx(0));
 
-        assert_eq!(11, s.utf16_to_byte(11));
-        assert_eq!(15, s.utf16_to_byte(13));
+        assert_eq!(11, s.utf16_to_byte_idx(11));
+        assert_eq!(15, s.utf16_to_byte_idx(13));
 
-        assert_eq!(34, s.utf16_to_byte(32));
-        assert_eq!(38, s.utf16_to_byte(34));
+        assert_eq!(34, s.utf16_to_byte_idx(32));
+        assert_eq!(38, s.utf16_to_byte_idx(34));
 
-        assert_eq!(66, s.utf16_to_byte(62));
-        assert_eq!(70, s.utf16_to_byte(64));
+        assert_eq!(66, s.utf16_to_byte_idx(62));
+        assert_eq!(70, s.utf16_to_byte_idx(64));
 
-        assert_eq!(100, s.utf16_to_byte(94));
-        assert_eq!(104, s.utf16_to_byte(96));
+        assert_eq!(100, s.utf16_to_byte_idx(94));
+        assert_eq!(104, s.utf16_to_byte_idx(96));
 
-        assert_eq!(106, s.utf16_to_byte(98));
-        assert_eq!(109, s.utf16_to_byte(99));
+        assert_eq!(106, s.utf16_to_byte_idx(98));
+        assert_eq!(109, s.utf16_to_byte_idx(99));
 
-        assert_eq!(133, s.utf16_to_byte(107));
-        assert_eq!(136, s.utf16_to_byte(108));
+        assert_eq!(133, s.utf16_to_byte_idx(107));
+        assert_eq!(136, s.utf16_to_byte_idx(108));
     }
 
     #[cfg(feature = "metric_utf16")]
     #[test]
     #[should_panic]
-    fn utf16_to_byte_08() {
+    fn utf16_to_byte_idx_08() {
         let r = Rope::from_str(TEXT_EMOJI);
         let s = r.slice(1..137);
-        s.utf16_to_byte(109);
+        s.utf16_to_byte_idx(109);
     }
 
     #[test]
@@ -875,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    fn char_at_byte_01() {
+    fn char_01() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
 
@@ -883,26 +883,26 @@ mod tests {
         // a fine day, isn't it?  Aren't you glad \
         // we're alive?  こんにちは、みんな
 
-        assert_eq!(s.char_at_byte(0), 't');
-        assert_eq!(s.char_at_byte(10), ' ');
-        assert_eq!(s.char_at_byte(18), 'n');
-        assert_eq!(s.char_at_byte(81), 'な');
+        assert_eq!(s.char(0), 't');
+        assert_eq!(s.char(10), ' ');
+        assert_eq!(s.char(18), 'n');
+        assert_eq!(s.char(81), 'な');
     }
 
     #[test]
     #[should_panic]
-    fn char_at_byte_02() {
+    fn char_02() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(34..118);
-        s.char_at_byte(s.len());
+        s.char(s.len());
     }
 
     #[test]
     #[should_panic]
-    fn char_at_byte_03() {
+    fn char_03() {
         let r = Rope::from_str(TEXT);
         let s = r.slice(43..43);
-        s.char_at_byte(0);
+        s.char(0);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1088,7 +1088,7 @@ mod tests {
     //     let mut prev_chunk = "";
     //     for i in 0..s.len_chars() {
     //         let (chunk, b, c, l) = s.chunk_at_char(i);
-    //         assert_eq!(b, char_to_byte_idx(text, c));
+    //         assert_eq!(b, char_to_byte_idx_idx(text, c));
     //         assert_eq!(l, char_to_line_idx(text, c));
     //         if chunk != prev_chunk {
     //             assert_eq!(chunk, &t[..chunk.len()]);
