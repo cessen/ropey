@@ -122,7 +122,7 @@ macro_rules! shared_main_impl_methods {
             offset + crate::ceil_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
-        /// If there is a trailing line break, returns its byte index.
+        /// If the text ends with a line break, returns its byte index.
         /// Otherwise returns `None`.
         ///
         /// Note: a CRLF pair is always treated as a single unit, and thus
