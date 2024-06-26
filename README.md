@@ -1,79 +1,24 @@
 # Ropey 2
 
-This is the WIP next major version of Ropey.  DO NOT USE THIS for anything even remotely serious.  This is pre-alpha.
+This is the WIP next major version of Ropey.  DO NOT USE THIS for anything serious.  This is alpha software, meaning both that the API is not fully stable yet and that it is likely pretty buggy.
 
-## TODO
 
-- [x] Insertion.
-- [x] Removal.
-- [x] Change line APIs to take an enum that determines which kind of lines.
-- [x] Rope length queries.
-- [x] Tree rebalancing.
-- [x] Chunk fetching function.
-- [x] Try rewriting `RopeBuilder` to be cleaner/faster.
-- [x] `RopeSlice`
-- [x] "Owned slices": full Ropes but that store meta data about a sliced range, so that owned slices (that don't depend on the lifetime of the original rope) can be created.
-- [x] Metric conversion functions:
-  - [x] Chars <-> bytes
-  - [x] UTF16 <-> bytes
-  - [x] Lines <-> bytes
-- [ ] Non-panicking versions of various functions.
-- [x] Iterators:
-  - [x] `reversed()` method.
-  - [x] Non-line:
-    - [x] `Chunks`
-      - [x] Forward.
-      - [x] Bidirectional.
-      - [x] Offset querying.
-    - [x] `Bytes`
-      - [x] Forward.
-      - [x] Bidirectional.
-    - [x] `Chars`
-      - [x] Forward.
-      - [x] Bidirectional.
-    - [x] Creating iterators at a specific offset.
-  - [x] `Lines`:
-    - [x] Efficient implementation.
-    - [x] LF
-      - [x] Forward.
-      - [x] Bidirectional.
-    - [x] LF + CR
-      - [x] Forward.
-      - [x] Bidirectional.
-    - [x] Full Unicode
-      - [x] Forward.
-      - [x] Bidirectional.
-    - [x] Creating iterator at a specific offset.
-- [x] Standard library trait impls:
-  - [x] `From`:
-    - [x] `RopeSlice` -> `String`
-    - [x] `RopeSlice` -> `Option<str>`
-    - [x] `RopeSlice` -> `Cow<str>`
-    - [x] `RopeSlice` -> `Rope`
-    - [x] `Rope` -> `RopeSlice`
-    - [x] `Rope` -> `String`
-    - [x] `Rope` -> `Option<str>`
-    - [x] `Rope` -> `Cow<str>`
-    - [x] `String` -> `Rope`
-    - [x] `str` -> `Rope`
-    - [x] `Cow<str>` -> `Rope`
-  - [x] `Hash`
-    - [x] `Rope`
-    - [x] `RopeSlice`.
-  - [x] Comparison operators:
-    - [x] `Eq` / `PartialEq`
-      - [x] `Rope` <-> `Rope`
-      - [x] `Rope` <-> `RopeSlice`
-      - [x] `Rope` <-> `str`
-      - [x] `Rope` <-> `String`
-      - [x] `Rope` <-> `Cow<str>`
-      - [x] `RopeSlice` <-> `RopeSlice`
-      - [x] `RopeSlice` <-> `str`
-      - [x] `RopeSlice` <-> `String`
-      - [x] `RopeSlice` <-> `Cow<str>`
-    - [x] `Ord` / `PartialOrd`
-      - [x] `Rope`
-      - [x] `RopeSlice`
+## Differences from Ropey 1.x
+
+There are many breaking API changes in Ropey 2.x.  However, the major ones are:
+
+- With the exception of some line-based APIs, all indexing is now done with **byte indices** rather than char indices.  For example, text insertion, text removal, and slicing are all done with byte indices now.  Even fetching chars is now done by byte index.  If you still want or need to work in terms of char indices, you can do so by using the index conversion functions to convert between byte and char indices as needed.
+- The index conversion functions now only convert between byte-to-metric and metric-to-byte rather than metricA-to-metricB.  The latter can still be accomplished by using byte indices as an intermediate.
+- The chunk fetching API's have been stripped down.  For example, there are no longer `chunk_at_line()`, etc. functions for fetching chunks based on arbitrary indexing metrics, instead being replaced by just `chunk_at()` which fetches using only byte indices.  Fetching based on arbitrary metrics can still be accomplished by combining `chunk_at()` with the index conversion functions.
+- All indexing metrics other than byte index are now behind feature flags, and can be enabled or disabled individually as desired.  Of those, only LF-CR lines are enabled by default.  Notably, this means that the char indexing metric is not enabled by default.
+- The line metric feature flags are now properly additive, and multiple line indexing metrics can be tracked simultaneously.  Because of this, all line-based APIs now take a `LineType` parameter that specifies which of the available metrics to use.
+
+
+## What does this mean for Ropey 1.x?
+
+Ropey 1.x will continue to be maintained for the foreseeable future, but will no longer receive new features. Ropey 1.x is still a good, high-quality rope library that can be depended on, and there is no urgency to move to Ropey 2.x.
+
+If at some point maintenance of Ropey 1.x stops, it will be with plenty of advance warning.
 
 
 ## License
