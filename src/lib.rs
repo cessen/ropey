@@ -1,10 +1,9 @@
 //! Ropey is a utf8 text rope for Rust.  It is fast, robust, and can handle huge
 //! texts and memory-incoherent edits with ease.
 //!
-//! Like Rust's built-in string types, Ropey stores text in utf8 and (with a
-//! handful of exceptions) uses byte indices to specify positions in the text.
-//! Invalid utf8 creation, such as by inserting into the middle of a multi-byte
-//! `char`, is enforced at run time.
+//! Like Rust's built-in string types, Ropey stores text in utf8 and uses byte
+//! indices to specify positions in the text.  Invalid utf8 creation, such as by
+//! inserting into the middle of a multi-byte `char`, is enforced at run time.
 //!
 //! The library is made up of four main components:
 //!
@@ -168,6 +167,7 @@ loading of non-utf8 text files.
 #![allow(clippy::needless_return)]
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::type_complexity)]
+#![warn(missing_docs)]
 
 use std::ops::Bound;
 
