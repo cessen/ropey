@@ -340,8 +340,8 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn insert(&mut self, char_idx: usize, text: &str) {
-        // Bounds check
         self.try_insert(char_idx, text).unwrap()
     }
 
@@ -353,6 +353,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn insert_char(&mut self, char_idx: usize, ch: char) {
         self.try_insert_char(char_idx, ch).unwrap()
     }
@@ -539,6 +540,7 @@ impl Rope {
     ///
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
+    #[track_caller]
     pub fn remove<R>(&mut self, char_range: R)
     where
         R: RangeBounds<usize>,
@@ -554,6 +556,7 @@ impl Rope {
     /// # Panics
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
+    #[track_caller]
     pub fn split_off(&mut self, char_idx: usize) -> Self {
         self.try_split_off(char_idx).unwrap()
     }
@@ -631,6 +634,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
+    #[track_caller]
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         self.try_byte_to_char(byte_idx).unwrap()
     }
@@ -650,6 +654,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
+    #[track_caller]
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
         self.try_byte_to_line(byte_idx).unwrap()
     }
@@ -667,6 +672,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
         self.try_char_to_byte(char_idx).unwrap()
     }
@@ -686,6 +692,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn char_to_line(&self, char_idx: usize) -> usize {
         self.try_char_to_line(char_idx).unwrap()
     }
@@ -703,6 +710,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn char_to_utf16_cu(&self, char_idx: usize) -> usize {
         self.try_char_to_utf16_cu(char_idx).unwrap()
     }
@@ -724,6 +732,7 @@ impl Rope {
     /// Panics if `utf16_cu_idx` is out of bounds
     /// (i.e. `utf16_cu_idx > len_utf16_cu()`).
     #[inline]
+    #[track_caller]
     pub fn utf16_cu_to_char(&self, utf16_cu_idx: usize) -> usize {
         self.try_utf16_cu_to_char(utf16_cu_idx).unwrap()
     }
@@ -742,6 +751,7 @@ impl Rope {
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     #[inline]
+    #[track_caller]
     pub fn line_to_byte(&self, line_idx: usize) -> usize {
         self.try_line_to_byte(line_idx).unwrap()
     }
@@ -760,6 +770,7 @@ impl Rope {
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     #[inline]
+    #[track_caller]
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         self.try_line_to_char(line_idx).unwrap()
     }
@@ -775,6 +786,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >= len_bytes()`).
     #[inline]
+    #[track_caller]
     pub fn byte(&self, byte_idx: usize) -> u8 {
         // Bounds check
         if let Some(out) = self.get_byte(byte_idx) {
@@ -796,6 +808,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx >= len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn char(&self, char_idx: usize) -> char {
         if let Some(out) = self.get_char(char_idx) {
             out
@@ -818,6 +831,7 @@ impl Rope {
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     #[inline]
+    #[track_caller]
     pub fn line(&self, line_idx: usize) -> RopeSlice {
         if let Some(out) = self.get_line(line_idx) {
             out
@@ -847,6 +861,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
+    #[track_caller]
     pub fn chunk_at_byte(&self, byte_idx: usize) -> (&str, usize, usize, usize) {
         // Bounds check
         if let Some(out) = self.get_chunk_at_byte(byte_idx) {
@@ -877,6 +892,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn chunk_at_char(&self, char_idx: usize) -> (&str, usize, usize, usize) {
         if let Some(out) = self.get_chunk_at_char(char_idx) {
             out
@@ -909,6 +925,7 @@ impl Rope {
     ///
     /// Panics if `line_break_idx` is out of bounds (i.e. `line_break_idx > len_lines()`).
     #[inline]
+    #[track_caller]
     pub fn chunk_at_line_break(&self, line_break_idx: usize) -> (&str, usize, usize, usize) {
         if let Some(out) = self.get_chunk_at_line_break(line_break_idx) {
             out
@@ -945,6 +962,7 @@ impl Rope {
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
     #[inline]
+    #[track_caller]
     pub fn slice<R>(&self, char_range: R) -> RopeSlice
     where
         R: RangeBounds<usize>,
@@ -964,6 +982,7 @@ impl Rope {
     /// - The start of the range is greater than the end.
     /// - The end is out of bounds (i.e. `end > len_bytes()`).
     /// - The range doesn't align with char boundaries.
+    #[track_caller]
     pub fn byte_slice<R>(&self, byte_range: R) -> RopeSlice
     where
         R: RangeBounds<usize>,
