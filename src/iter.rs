@@ -553,6 +553,8 @@ mod lines {
 
     /// An iterator over a `Rope`'s lines.
     ///
+    /// **Requires one of the `metric_lines` feature flags.**
+    ///
     /// Notes:
     /// - What the iterator considers to be a line depends on the line type it
     ///   was created with.

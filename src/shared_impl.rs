@@ -24,6 +24,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Length of the text in `char`s.
         ///
+        /// **Requires the `metric_chars` feature flag.**
+        ///
         /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(feature = "metric_chars")]
         #[inline]
@@ -40,6 +42,8 @@ macro_rules! shared_main_impl_methods {
         /// Total number of utf16 code units that would be in the text if it
         /// were encoded as utf16.
         ///
+        /// **Requires the `metric_utf16` feature flag.**
+        ///
         /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(feature = "metric_utf16")]
         #[inline]
@@ -54,6 +58,8 @@ macro_rules! shared_main_impl_methods {
         }
 
         /// Total number of lines in the text, according to the passed line type.
+        ///
+        /// **Requires one of the `metric_lines` feature flags.**
         ///
         /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(any(
@@ -125,6 +131,8 @@ macro_rules! shared_main_impl_methods {
         /// If the text ends with a line break, returns its byte index.
         /// Otherwise returns `None`.
         ///
+        /// **Requires one of the `metric_lines` feature flags.**
+        ///
         /// Note: a CRLF pair is always treated as a single unit, and thus
         /// this function will return the index of the CR in such cases, even
         /// with `LineType::LF` where CR is not on its own recognized as a line
@@ -185,6 +193,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the line at `line_idx`, according to the given line type.
         ///
+        /// **Requires one of the `metric_lines` feature flags.**
+        ///
         /// Note: lines are zero-indexed.
         ///
         /// Runs in O(log N) time.
@@ -224,6 +234,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the char index of the given byte.
         ///
+        /// **Requires the `metric_chars` feature flag.**
+        ///
         /// Notes:
         ///
         /// - If the byte is in the middle of a multi-byte char, returns the
@@ -251,6 +263,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the byte index of the given char.
         ///
+        /// **Requires the `metric_chars` feature flag.**
+        ///
         /// Notes:
         ///
         /// - `char_idx` can be one-past-the-end, which will return
@@ -274,6 +288,8 @@ macro_rules! shared_main_impl_methods {
         }
 
         /// Returns the utf16 code unit index of the given byte.
+        ///
+        /// **Requires the `metric_utf16` feature flag.**
         ///
         /// Ropey stores text internally as utf8, but sometimes it is necessary
         /// to interact with external APIs that still use utf16.  This function is
@@ -302,6 +318,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the byte index of the given utf16 code unit.
         ///
+        /// **Requires the `metric_utf16` feature flag.**
+        ///
         /// Ropey stores text internally as utf8, but sometimes it is necessary
         /// to interact with external APIs that still use utf16.  This function is
         /// primarily intended for such situations, and is otherwise not very
@@ -329,6 +347,8 @@ macro_rules! shared_main_impl_methods {
         }
 
         /// Returns the line index of the line that the given byte belongs to.
+        ///
+        /// **Requires one of the `metric_lines` feature flags.**
         ///
         /// Notes:
         ///
@@ -367,6 +387,8 @@ macro_rules! shared_main_impl_methods {
         }
 
         /// Returns the byte index of the start of the given line.
+        ///
+        /// **Requires one of the `metric_lines` feature flags.**
         ///
         /// Notes:
         ///
@@ -474,6 +496,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Creates an iterator over the lines of the `Rope`.
         ///
+        /// **Requires one of the `metric_lines` feature flags.**
+        ///
         /// Note: the iterator will iterate over lines according to the passed
         /// line type.
         ///
@@ -496,6 +520,8 @@ macro_rules! shared_main_impl_methods {
 
         /// Creates an iterator over the lines of the `Rope`, starting at line
         /// `line_idx`.
+        ///
+        /// **Requires one of the `metric_lines` feature flags.**
         ///
         /// Notes:
         /// - The iterator will iterate over lines according to the passed
