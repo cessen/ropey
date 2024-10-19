@@ -1,0 +1,36 @@
+[package]
+name = "ropey-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+
+[dependencies.ropey]
+path = ".."
+
+[features]
+small_chunks = ["ropey/internal_dev_small_chunks"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+
+[[bin]]
+name = "mutation"
+path = "fuzz_targets/mutation.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mutation_small_chunks"
+path = "fuzz_targets/mutation_small_chunks.rs"
+test = false
+doc = false
+required-features = ["small_chunks"]
