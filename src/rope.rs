@@ -609,6 +609,14 @@ impl Rope {
                 return Err(OutOfBounds);
             }
 
+            // Unlike with insertion, for removal we have to check if the
+            // indices are char boundaries ahead of time, because the nature
+            // of the removal code means it might do partial removals before it
+            // discovers that one of the ends isn't a char boundary.
+            if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
+                return Err(NonCharBoundary);
+            }
+
             // Do the actual removal.
             let created_boundary = rope.remove_core_impl([start_idx, end_idx])?;
 
@@ -695,6 +703,8 @@ impl Rope {
 
     /// The core removal procedure, without any checks (like the range being
     /// well-formed), tree rebalancing, CRLF split handling, etc.
+    ///
+    /// NOTE: even when this fails, some removal may have happened.
     ///
     /// The returned bool is whether a fresh boundary was created.
     #[inline(always)]
@@ -1162,6 +1172,21 @@ mod tests {
         rope.remove(42..21);
     }
 
+    // Removal failure should be atomic: either it fails with no modification,
+    // or the whole intended modification completes.
+    //
+    // Caught by fuzz testing.
+    #[test]
+    fn try_remove_failure_01() {
+        let mut r = Rope::from_str(include_str!("../fuzz/fuzz_targets/small.txt"));
+        let r_original = r.clone();
+        let result = r.try_remove(19..559);
+
+        assert!(result.is_err());
+        assert_eq!(r, r_original);
+        r.assert_invariants();
+    }
+
     #[cfg(feature = "metric_chars")]
     #[test]
     fn byte_to_char_idx_01() {
@@ -1439,15 +1464,5 @@ mod tests {
         Rope::hash_slice(&s, &mut h2);
 
         assert_ne!(h1.finish(), h2.finish());
-    }
-
-    // Error case caught by fuzz testing.
-    #[test]
-    fn fuzz_try_remove_01() {
-        let mut r = Rope::from_str(include_str!("../fuzz/fuzz_targets/small.txt"));
-        let result = r.try_remove(19..559);
-
-        assert!(result.is_err());
-        r.assert_invariants();
     }
 }

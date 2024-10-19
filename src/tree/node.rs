@@ -190,6 +190,8 @@ impl Node {
     /// Returns the updated text info of the node after removal, as well as a
     /// bool indicating if the removal created a fresh chunk boundary.  The
     /// bool is needed to know if a split-CRLF check is needed.
+    ///
+    /// NOTE: even when this fails, some removal may have happened.
     pub fn remove_byte_range(
         &mut self,
         byte_idx_range: [usize; 2],
