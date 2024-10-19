@@ -25,6 +25,7 @@ struct StackItem<'a> {
     child_idx: usize,
 }
 
+/// Cursor API for traversing the chunks of a rope.
 #[derive(Debug, Clone)]
 pub struct ChunkCursor<'a> {
     node_stack: Vec<StackItem<'a>>,

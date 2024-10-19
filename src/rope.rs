@@ -494,6 +494,10 @@ impl Rope {
 
 /// Non-panicking versions of some of `Rope`'s methods.
 impl Rope {
+    /// Non-panicking version of `insert()`.
+    ///
+    /// On failure this leaves the rope untouched and returns the cause of the
+    /// failure.
     pub fn try_insert(&mut self, byte_idx: usize, text: &str) -> Result<()> {
         // Editing owning slices is not allowed.
         if self.owned_slice_byte_range[0] != 0
@@ -577,12 +581,20 @@ impl Rope {
         Ok(())
     }
 
+    /// Non-panicking version of `insert_char()`.
+    ///
+    /// On failure this leaves the rope untouched and returns the cause of the
+    /// failure.
     #[inline]
     pub fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> Result<()> {
         let mut buf = [0u8; 4];
         self.try_insert(byte_idx, ch.encode_utf8(&mut buf))
     }
 
+    /// Non-panicking version of `remove()`.
+    ///
+    /// On failure this leaves the rope untouched and returns the cause of the
+    /// failure.
     #[inline]
     pub fn try_remove<R>(&mut self, byte_range: R) -> Result<()>
     where
@@ -634,6 +646,9 @@ impl Rope {
         inner(self, byte_range.start_bound(), byte_range.end_bound())
     }
 
+    /// Non-panicking version of `slice()`.
+    ///
+    /// On failure this returns the cause of the failure.
     #[inline]
     pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice>
     where

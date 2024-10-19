@@ -699,15 +699,9 @@ macro_rules! shared_no_panic_impl_methods {
         //-----------------------------------------------------
         // Fetching.
 
-        pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
-            if byte_idx >= self.len() {
-                return None;
-            }
-
-            let (text, offset) = self.chunk(byte_idx);
-            Some(text.as_bytes()[byte_idx - offset])
-        }
-
+        /// Non-panicking version of `char()`.
+        ///
+        /// On failure this returns the cause of the failure.
         pub fn get_char(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len() {
                 return Err(OutOfBounds);
@@ -725,12 +719,28 @@ macro_rules! shared_no_panic_impl_methods {
             Ok(text[(byte_idx - offset)..].chars().next().unwrap())
         }
 
+        //-----------------------------------------------------
+        // The below are currently private because they don't do anything
+        // more complex than bounds-check, which client code can do easily and
+        // efficiently.  If someone has a good reason to expose these other than
+        // convenience, please file an issue.
+
+        fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+            if byte_idx >= self.len() {
+                return None;
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(text.as_bytes()[byte_idx - offset])
+        }
+
+
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
+        fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
             if line_idx >= self.len_lines(line_type) {
                 return None;
             }
@@ -741,7 +751,7 @@ macro_rules! shared_no_panic_impl_methods {
             Some(self.slice(start_byte..end_byte))
         }
 
-        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
+        fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
             if byte_idx > self.len() {
                 return None;
             }

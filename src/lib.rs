@@ -2,8 +2,8 @@
 //! texts and memory-incoherent edits with ease.
 //!
 //! Like Rust's built-in string types, Ropey stores text in utf8 and uses byte
-//! indices to specify positions in the text.  Invalid utf8 creation, such as by
-//! inserting into the middle of a multi-byte `char`, is enforced at run time.
+//! indices to specify positions in the text, and invalid utf8 creation is
+//! prevented at run time.
 //!
 //! The library is made up of four main components:
 //!
@@ -79,12 +79,12 @@ loading of non-utf8 text files.
 //! - The [`chunk()`](Rope::chunk) chunk-fetching method of `Rope` and
 //!   `RopeSlice`.
 //! - The [`Chunks`](iter::Chunks) iterator.
-//! - The functions in [`str_utils`] for operating on `&str` slices.
+//! - The [`ChunkCursor`](chunk_cursor::ChunkCursor) type.
 //!
 //! Internally, each `Rope` stores text as a segemented collection of utf8
-//! strings.  The `chunk()` and the `Chunks` iterator provide direct access to
-//! those strings (or "chunks") as `&str` slices, allowing client code to work
-//! directly with the underlying utf8 data.
+//! strings.  The chunk APIs provide direct access to those strings as `&str`
+//! slices, allowing client code to work directly with the underlying utf8
+//! data.
 //!
 //!
 //! # Indexing Metrics
@@ -224,8 +224,12 @@ pub enum LineType {
     All,
 }
 
+/// Ropey's result type.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Ropey's error type.
+///
+/// Indicates the cause of a failed operation.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Error {

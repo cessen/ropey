@@ -169,6 +169,9 @@ impl<'a> RopeSlice<'a> {
 
 /// Non-panicking versions of some of `RopeSlice`'s methods.
 impl<'a> RopeSlice<'a> {
+    /// Non-panicking version of `slice()`.
+    ///
+    /// On failure this returns the cause of the failure.
     #[inline]
     pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'a>>
     where
