@@ -42,7 +42,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_char(random::<usize>() % (len + 1));
+            rope.byte_to_char_idx(random::<usize>() % (len + 1));
         })
     });
 
@@ -51,7 +51,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.char_to_byte(random::<usize>() % (len + 1));
+            rope.char_to_byte_idx(random::<usize>() % (len + 1));
         })
     });
 
@@ -60,7 +60,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line(random::<usize>() % (len + 1), LineType::LF);
+            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::LF);
         })
     });
 
@@ -69,7 +69,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF);
         bench.iter(|| {
-            rope.line_to_byte(random::<usize>() % (len + 1), LineType::LF);
+            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::LF);
         })
     });
 
@@ -78,7 +78,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line(random::<usize>() % (len + 1), LineType::LF_CR);
+            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::LF_CR);
         })
     });
 
@@ -87,7 +87,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line_to_byte(random::<usize>() % (len + 1), LineType::LF_CR);
+            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::LF_CR);
         })
     });
 
@@ -96,7 +96,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line(random::<usize>() % (len + 1), LineType::All);
+            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::All);
         })
     });
 
@@ -105,7 +105,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line_to_byte(random::<usize>() % (len + 1), LineType::All);
+            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::All);
         })
     });
 }
