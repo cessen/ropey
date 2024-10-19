@@ -12,6 +12,17 @@ keywords = ["rope", "text", "edit", "buffer"]
 categories = ["text-processing", "data-structures"]
 exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
 
+# Build with all APIs enabled on docs.rs.
+[package.metadata.docs.rs]
+features = [
+  "metric_chars",
+  "metric_utf16",
+  "metric_lines_lf",
+  "metric_lines_lf_cr",
+  "metric_lines_unicode",
+]
+
+
 [features]
 default = ["metric_lines_lf_cr", "simd"]
 metric_chars = []
