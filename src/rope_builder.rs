@@ -44,8 +44,8 @@ pub struct RopeBuilder {
     // fills up it gets added as a child of the node above it in the stack and
     // replaced with a fresh new node.
     //
-    // There is one except to the stack termining in a non-leaf node: when a
-    // leaf is the *only* node in the tree so far (i.e. the root).
+    // There is one exception to the stack terminating in a non-leaf node: when
+    // a leaf is the *only* node in the tree so far (i.e. the root).
     stack: Vec<Node>,
 
     buffer: String,
