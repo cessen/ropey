@@ -1440,4 +1440,14 @@ mod tests {
 
         assert_ne!(h1.finish(), h2.finish());
     }
+
+    // Error case caught by fuzz testing.
+    #[test]
+    fn fuzz_try_remove_01() {
+        let mut r = Rope::from_str(include_str!("../fuzz/fuzz_targets/small.txt"));
+        let result = r.try_remove(19..559);
+
+        assert!(result.is_err());
+        r.assert_invariants();
+    }
 }
