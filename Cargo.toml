@@ -1,16 +1,16 @@
 [package]
 name = "ropey"
-version = "2.0.0-alpha"
+version = "2.0.0-alpha.1"
 edition = "2021"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 description = "A fast and robust text rope for Rust"
 documentation = "https://docs.rs/ropey"
-repository = "https://github.com/cessen/ropey"
+repository = "https://github.com/cessen/ropey/tree/2.0-alpha"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["rope", "text", "edit", "buffer"]
 categories = ["text-processing", "data-structures"]
-exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
+exclude = ["/design/*", "/fuzz", "/.github/*"]
 
 # Build with all APIs enabled on docs.rs.
 [package.metadata.docs.rs]
@@ -21,7 +21,6 @@ features = [
   "metric_lines_lf_cr",
   "metric_lines_unicode",
 ]
-
 
 [features]
 default = ["metric_lines_lf_cr", "simd"]
