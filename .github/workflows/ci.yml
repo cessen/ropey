@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    # Every-other month, to make sure new Rust
+    # releases don't break things.
+    - cron: '15 12 5 1,3,5,7,9,11 *'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    name: Build and test
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - beta
+          - "1.65"
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{matrix.toolchain}}
+          override: true
+
+      # Make sure a vanilla build works.
+      - run: cargo +${{matrix.toolchain}} build
+
+      # Build and test with various feature combinations.
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_chars"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_utf16"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_lines_lf"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_lines_lf_cr"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_lines_unicode"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
+
+      # Make sure benchmarks build.
+      - run: cargo +${{matrix.toolchain}} bench --no-run --features "metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
+
+  run-miri:
+    name: Run Miri
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
+          components: miri
+
+      # Build and test.
+      # --no-default-features to get rid of the simd feature, which isn't
+      # compatible with miri.
+      - run: cargo miri test --no-default-features --features "metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"
