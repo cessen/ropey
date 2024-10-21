@@ -140,7 +140,7 @@ impl<'a> Chunks<'a> {
     //---------------------------------------------------------
 
     /// Returns the Chunks iterator as well as the actual start byte of the
-    /// first chunk, from the start of Node's contents.
+    /// chunk to be yeilded by `next()`, from the start of Node's contents.
     ///
     /// Note that all parameters are relative to the entire contents of `node`.
     /// In particular, `at_byte_idx` is NOT relative to `byte_range`, it is an
@@ -153,14 +153,15 @@ impl<'a> Chunks<'a> {
     ) -> (Self, usize) {
         let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
         let byte_offset = byte_range[0] + cursor.byte_offset();
+        let at_end = at_byte_idx == byte_range[1];
 
         let chunks = Chunks {
             cursor: cursor,
-            at_end: at_byte_idx == byte_range[1],
+            at_end: at_end,
             is_reversed: false,
         };
 
-        (chunks, byte_offset)
+        (chunks, if at_end { at_byte_idx } else { byte_offset })
     }
 
     fn next_impl(&mut self) -> Option<&'a str> {
@@ -996,15 +997,18 @@ mod tests {
 
         for i in 0..TEXT.len() {
             let mut current_byte = r.chunk(i).1;
+            let (chunks, idx) = r.chunks_at(i);
+            assert_eq!(current_byte, idx);
 
-            for chunk1 in r.chunks_at(i) {
+            for chunk1 in chunks {
                 let chunk2 = r.chunk(current_byte).0;
                 assert_eq!(chunk2, chunk1);
                 current_byte += chunk2.len();
             }
         }
 
-        let mut chunks = r.chunks_at(TEXT.len());
+        let (mut chunks, idx) = r.chunks_at(TEXT.len());
+        assert_eq!(TEXT.len(), idx);
         assert_eq!(None, chunks.next());
     }
 
@@ -1016,15 +1020,18 @@ mod tests {
 
         for i in 0..text.len() {
             let mut current_byte = s.chunk(i).1;
+            let (chunks, idx) = s.chunks_at(i);
+            assert_eq!(current_byte, idx);
 
-            for chunk1 in s.chunks_at(i) {
+            for chunk1 in chunks {
                 let chunk2 = s.chunk(current_byte).0;
                 assert_eq!(chunk2, chunk1);
                 current_byte += chunk2.len();
             }
         }
 
-        let mut chunks = s.chunks_at(text.len());
+        let (mut chunks, idx) = s.chunks_at(text.len());
+        assert_eq!(text.len(), idx);
         assert_eq!(None, chunks.next());
     }
 

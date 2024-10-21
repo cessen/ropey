@@ -567,11 +567,12 @@ macro_rules! shared_main_impl_methods {
         /// Creates an iterator over the chunks of the `Rope`, with the iterator
         /// starting at the chunk containing `byte_idx`.
         ///
-        /// Also returns the byte index of the beginning of the first chunk to
-        /// be yielded.
+        /// Also returns the byte index of the beginning of the chunk to be
+        /// yielded by `next()`.
         ///
         /// If `byte_idx == len()` an iterator at the end of the `Rope`
-        /// (yielding `None` on a call to `next()`) is created.
+        /// (yielding `None` on a call to `next()`) is created, and the returned
+        /// byte index is the end of the text.
         ///
         /// Runs in O(log N) time.
         ///
@@ -579,14 +580,15 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[inline]
-        pub fn chunks_at(&self, byte_idx: usize) -> Chunks<$rlt> {
-            Chunks::new(
+        pub fn chunks_at(&self, byte_idx: usize) -> (Chunks<$rlt>, usize) {
+            let (chunks, start_idx) = Chunks::new(
                 self.get_root(),
                 self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0] + byte_idx,
-            )
-            .0
+            );
+
+            (chunks, start_idx.saturating_sub(self.get_byte_range()[0]))
         }
 
         /// Creates a cursor for navigating the chunks of the text, starting on
@@ -759,7 +761,6 @@ macro_rules! shared_no_panic_impl_methods {
             let (text, offset) = self.chunk(byte_idx);
             Some(text.as_bytes()[byte_idx - offset])
         }
-
 
         #[cfg(any(
             feature = "metric_lines_lf",
