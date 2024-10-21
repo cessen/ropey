@@ -1008,7 +1008,7 @@ macro_rules! shared_std_impls {
         /// Attempts to borrow the text contents, but will return `None` if the
         /// contents is not contiguous in memory.
         ///
-        /// Runs in best case O(1), worst case O(N).
+        /// Runs in O(1) time.
         impl<'a> From<&'a $rope> for Option<&'a str> {
             #[inline]
             fn from(r: &'a $rope) -> Self {
