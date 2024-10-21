@@ -59,7 +59,7 @@ macro_rules! shared_main_impl_methods {
 
         /// Total number of lines in the text, according to the passed line type.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg(any(
@@ -131,7 +131,7 @@ macro_rules! shared_main_impl_methods {
         /// If the text ends with a line break, returns its byte index.
         /// Otherwise returns `None`.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Note: a CRLF pair is always treated as a single unit, and thus
         /// this function will return the index of the CR in such cases, even
@@ -193,7 +193,7 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the line at `line_idx`, according to the given line type.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Note: lines are zero-indexed.
         ///
@@ -348,7 +348,7 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the line index of the line that the given byte belongs to.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Notes:
         ///
@@ -388,7 +388,7 @@ macro_rules! shared_main_impl_methods {
 
         /// Returns the byte index of the start of the given line.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Notes:
         ///
@@ -496,7 +496,7 @@ macro_rules! shared_main_impl_methods {
 
         /// Creates an iterator over the lines of the `Rope`.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Note: the iterator will iterate over lines according to the passed
         /// line type.
@@ -521,7 +521,7 @@ macro_rules! shared_main_impl_methods {
         /// Creates an iterator over the lines of the `Rope`, starting at line
         /// `line_idx`.
         ///
-        /// **Requires one of the `metric_lines` feature flags.**
+        /// **Requires one of the `metric_lines_*` feature flags.**
         ///
         /// Notes:
         /// - The iterator will iterate over lines according to the passed

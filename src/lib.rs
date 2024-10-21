@@ -188,6 +188,8 @@ pub use rope_builder::RopeBuilder;
 pub use slice::RopeSlice;
 
 /// Specifies a set of line breaks to be recognized in Ropey's line-based APIs.
+///
+/// **Requires one of the `metric_lines_*` feature flags.**
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",
@@ -197,18 +199,24 @@ pub use slice::RopeSlice;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum LineType {
+    /// **Requires the `metric_lines_lf` feature flag.**
+    ///
     /// - LF (Line Feed)
     /// - CRLF (Carriage Return + Line Feed) &mdash; implicitly recognized, due to
     ///   CR being ignored.
     #[cfg(feature = "metric_lines_lf")]
     LF,
 
+    /// **Requires the `metric_lines_lf_cr` feature flag.**
+    ///
     /// - LF (Line Feed)
     /// - CR (Carriage Return)
     /// - CRLF (Carriage Return + Line Feed)
     #[cfg(feature = "metric_lines_lf_cr")]
     LF_CR,
 
+    /// **Requires the `metric_lines_unicode` feature flag.**
+    ///
     /// All Unicode line breaks (as specified in [Unicode Annex
     /// #14](https://www.unicode.org/reports/tr14/#BK)):
     ///
