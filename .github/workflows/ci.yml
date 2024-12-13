@@ -36,7 +36,11 @@ jobs:
       - run: cargo +${{matrix.toolchain}} build
       - run: cargo +${{matrix.toolchain}} test
       - run: cargo +${{matrix.toolchain}} test --no-default-features line
+      - run: cargo +${{matrix.toolchain}} test --no-default-features
       - run: cargo +${{matrix.toolchain}} test --no-default-features --features=cr_lines line
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features=cr_lines
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features=unicode_lines line
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features=unicode_lines
       - run: cargo +${{matrix.toolchain}} bench --no-run
 
   run-miri:
