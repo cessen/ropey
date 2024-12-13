@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
   schedule:
     # Every-other month, to make sure new Rust
     # releases don't break things.
@@ -59,4 +59,9 @@ jobs:
       - run: cargo miri test --no-default-features
         env:
           MIRIFLAGS: "-Zmiri-strict-provenance"
-
+      - run: cargo miri test --no-default-features --features=cr_lines
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"
+      - run: cargo miri test --no-default-features --features=unicode_lines
+        env:
+          MIRIFLAGS: "-Zmiri-strict-provenance"
