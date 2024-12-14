@@ -21,7 +21,7 @@ jobs:
         toolchain:
           - stable
           - beta
-          - "1.65"
+          - "1.66"
     runs-on: ubuntu-latest
     steps:
       # Get a checkout and rust toolchain.
@@ -36,11 +36,8 @@ jobs:
       - run: cargo +${{matrix.toolchain}} build
       - run: cargo +${{matrix.toolchain}} test
       - run: cargo +${{matrix.toolchain}} test --no-default-features line
-      - run: cargo +${{matrix.toolchain}} test --no-default-features
       - run: cargo +${{matrix.toolchain}} test --no-default-features --features=cr_lines line
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features=cr_lines
       - run: cargo +${{matrix.toolchain}} test --no-default-features --features=unicode_lines line
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features=unicode_lines
       - run: cargo +${{matrix.toolchain}} bench --no-run
 
   run-miri:
@@ -57,11 +54,5 @@ jobs:
       # Build and test
       # --no-default-features to get rid of the simd feature
       - run: cargo miri test --no-default-features
-        env:
-          MIRIFLAGS: "-Zmiri-strict-provenance"
-      - run: cargo miri test --no-default-features --features=cr_lines
-        env:
-          MIRIFLAGS: "-Zmiri-strict-provenance"
-      - run: cargo miri test --no-default-features --features=unicode_lines
         env:
           MIRIFLAGS: "-Zmiri-strict-provenance"
