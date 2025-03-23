@@ -237,6 +237,7 @@ mod inner {
 
     /// The backing internal buffer type for `NodeText`.
     #[derive(Copy, Clone)]
+    #[repr(transparent)]
     struct BackingArray([u8; MAX_BYTES]);
 
     /// We need a very specific size of array, which is not necessarily
