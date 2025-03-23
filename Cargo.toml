@@ -13,6 +13,7 @@ exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
 
 [features]
 default = ["unicode_lines", "simd"]
+memchr = ["dep:memchr"]
 cr_lines = [] # Enable recognizing carriage returns as line breaks.
 unicode_lines = ["cr_lines"] # Enable recognizing all Unicode line breaks.
 simd = ["str_indices/simd"]
@@ -23,6 +24,7 @@ simd = ["str_indices/simd"]
 small_chunks = []
 
 [dependencies]
+memchr = { version = "2.7.2", optional = true}
 smallvec = "1.0.0"
 str_indices = { version = "0.4", default-features = false }
 
