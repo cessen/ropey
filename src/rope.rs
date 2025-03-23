@@ -2077,6 +2077,38 @@ impl std::hash::Hash for Rope {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for Rope {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        let string: String = self.chars().collect();
+        serializer.serialize_str(&string)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Rope {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        struct V;
+        impl<'de> serde::de::Visitor<'de> for V {
+            type Value = Rope;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a borrowed string")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> std::result::Result<Rope, E> {
+                Ok(Rope::from_str(v))
+            }
+        }
+        deserializer.deserialize_str(V)
+    }
+}
+
 //==============================================================
 
 #[cfg(test)]
@@ -3452,4 +3484,15 @@ mod tests {
     }
 
     // Iterator tests are in the iter module
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serdes_as_str() {
+        let rope = Rope::from_str("Hello there!");
+        let json = serde_json::to_string(&rope).unwrap();
+        let string: String = serde_json::from_str(&json).unwrap();
+        assert_eq!(rope, string);
+        let rope2: Rope = serde_json::from_str(&json).unwrap();
+        assert_eq!(rope, rope2);
+    }
 }

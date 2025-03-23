@@ -167,6 +167,10 @@
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::type_complexity)]
 
+#[cfg(feature = "serde")]
+extern crate serde;
+#[cfg(all(test, feature = "serde"))]
+extern crate serde_json;
 extern crate smallvec;
 extern crate str_indices;
 
