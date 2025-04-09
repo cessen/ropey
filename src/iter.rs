@@ -204,6 +204,7 @@ impl<'a> Bytes<'a> {
     ///     println!("{} {}", i, b);
     /// #   assert_eq!(b, rope.byte(rope.len_bytes() - i - 1));
     /// }
+    /// ```
     #[inline]
     #[must_use]
     pub fn reversed(mut self) -> Bytes<'a> {
