@@ -59,10 +59,51 @@ pub(crate) fn utf16_code_unit_to_char_idx(text: &str, utf16_idx: usize) -> usize
     str_indices::chars::from_byte_idx(text, str_indices::utf16::to_byte_idx(text, utf16_idx))
 }
 
+#[cfg(all(not(feature = "unicode_lines"), feature = "memchr"))]
+pub(crate) fn next_line_byte_idx(text: &str) -> usize {
+    #[cfg(not(feature = "cr_lines"))]
+    let offset = memchr::memchr(b'\n', text.as_bytes());
+    #[cfg(feature = "cr_lines")]
+    let offset = memchr::memchr2(b'\n', b'\r', text.as_bytes());
+    match offset {
+        #[cfg(feature = "cr_lines")]
+        Some(i) if text[i..].starts_with("\r\n") => i + 2,
+        Some(i) => i + 1,
+        None => text.len(),
+    }
+}
+
+#[cfg(all(not(feature = "unicode_lines"), feature = "memchr"))]
+pub(crate) fn last_line_start_byte_idx(text: &str) -> usize {
+    #[cfg(not(feature = "cr_lines"))]
+    let offset = memchr::memrchr(b'\n', text.as_bytes());
+    #[cfg(feature = "cr_lines")]
+    let offset = memchr::memrchr2(b'\n', b'\r', text.as_bytes());
+    // TODO: this is quite slow  (3x slower than memchar). Std just uses a naive
+    // chars match loop. Using the packed (teddy) algorithm from the aoh-corasic
+    // crate would be much faster (particularly since it reports end of line
+    // matches), unfortunately that is a bit of a heavy dependency, maybe that
+    // aglorithm will be exctracted one day.
+    #[cfg(feature = "unicode_lines")]
+    let offset = text.rfind([
+        '\n', '\r', '\u{000B}', '\u{000C}', '\u{0085}', '\u{2028}', '\u{2029}',
+    ]);
+    match offset {
+        Some(i) => i + 1,
+        None => 0,
+    }
+}
+
+#[cfg(any(feature = "unicode_lines", not(feature = "memchr")))]
+pub(crate) fn next_line_byte_idx(text: &str) -> usize {
+    line_to_byte_idx(text, 1)
+}
+
 /// Returns the byte index of the start of the last line of the passed text.
 ///
 /// Note: if the text ends in a line break, that means the last line is
 /// an empty line that starts at the end of the text.
+#[cfg(any(feature = "unicode_lines", not(feature = "memchr")))]
 pub(crate) fn last_line_start_byte_idx(text: &str) -> usize {
     let mut itr = text.bytes().enumerate().rev();
 
@@ -106,6 +147,20 @@ pub(crate) fn last_line_start_byte_idx(text: &str) -> usize {
 ///
 /// If the string doesn't end in a line break, returns the string unchanged.
 #[inline]
+#[cfg(not(any(feature = "unicode_lines", feature = "cr_lines")))]
+pub(crate) fn trim_line_break(text: &str) -> &str {
+    // hacks: we don't ned to care about crlf here
+    // since we just use the in the line iterator and want to pevent
+    // matching the same line terminator a second time
+    // #[cfg(feature = "cr_lines")]
+    text.strip_suffix('\n').unwrap_or(text)
+}
+
+/// Trims a single trailing line break (if any) off the end of the passed string.
+///
+/// If the string doesn't end in a line break, returns the string unchanged.
+#[inline]
+#[cfg(any(feature = "unicode_lines", feature = "cr_lines"))]
 pub(crate) fn trim_line_break(text: &str) -> &str {
     if text.is_empty() {
         return "";
@@ -147,6 +202,14 @@ pub(crate) fn trim_line_break(text: &str) -> &str {
 
 /// Returns whether the given string ends in a line break or not.
 #[inline]
+#[cfg(not(any(feature = "cr_lines", feature = "unicode_lines")))]
+pub(crate) fn ends_with_line_break(text: &str) -> bool {
+    text.ends_with('\n')
+}
+
+/// Returns whether the given string ends in a line break or not.
+#[inline]
+#[cfg(any(feature = "cr_lines", feature = "unicode_lines"))]
 pub(crate) fn ends_with_line_break(text: &str) -> bool {
     if text.is_empty() {
         return false;
