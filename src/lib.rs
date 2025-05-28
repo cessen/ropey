@@ -180,6 +180,7 @@ mod slice;
 mod str_utils;
 mod tree;
 
+pub mod extra;
 pub mod iter;
 
 pub use chunk_cursor::ChunkCursor;

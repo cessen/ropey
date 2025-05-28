@@ -760,6 +760,15 @@ impl Rope {
     }
 }
 
+//=============================================================
+
+impl crate::extra::RopeExt for Rope {
+    #[inline]
+    fn to_owning_slice(&self) -> Rope {
+        self.clone()
+    }
+}
+
 //==============================================================
 // Stdlib trait impls.
 //
