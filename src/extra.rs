@@ -19,6 +19,9 @@ pub trait RopeExt {
     /// for it are rare, and you should stick to normal `Rope`s and `RopeSlice`s
     /// when you can.
     ///
+    /// Returns `None` if the `RopeSlice` is from a `&str` rather than from a
+    /// `Rope` (see the `From` impl for building `RopeSlice`s from `&str`s).
+    ///
     /// Runs in O(1) time.  Space usage is constant unless the original `Rope`
     /// is edited, causing the otherwise shared contents to diverge.
     ///

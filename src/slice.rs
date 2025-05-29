@@ -252,10 +252,13 @@ impl<'a> From<&'a Rope> for RopeSlice<'a> {
 impl<'a> From<&'a str> for RopeSlice<'a> {
     /// Creates a `RopeSlice` directly from a string slice.
     ///
-    /// **IMPORTANT:** `RopeSlice`s created this way don't have the same
-    /// performance guarantees as normal slices.  Specifically, most operations
-    /// become `O(N)` rather than `O(log N)`.  For short string slices this
-    /// doesn't matter, but for long ones it very much can.
+    /// **Warning:** `RopeSlice`s created this way aren't normal `RopeSlice`s:
+    ///
+    /// - Most operations become `O(N)` rather than `O(log N)`.  For short
+    ///   strings this doesn't matter, but for long strings this can have
+    ///   significant negative performance impacts.
+    /// - [`RopeExt::to_owning_slice()`](crate::extra::RopeExt::to_owning_slice())
+    ///   will return `None`.
     ///
     /// Runs in O(1) time.
     #[inline(always)]
