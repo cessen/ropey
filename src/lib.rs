@@ -252,7 +252,9 @@ pub enum Error {
     /// The range given was intrinsically invalid (e.g. inverted).
     InvalidRange,
 
-    /// An attempt was made to edit an owning slice, which is not permitted.  See [`RopeSlice::to_owning_slice()`] for details.
+    /// An attempt was made to edit an owning slice, which is not permitted.
+    /// See [`RopeExt::to_owning_slice()`](crate::extra::RopeExt::to_owning_slice())
+    /// for details.
     CannotEditOwningSlice,
 }
 
