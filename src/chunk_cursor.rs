@@ -28,7 +28,7 @@ struct StackItem<'a> {
 /// Cursor API for traversing the chunks of a rope.
 #[derive(Debug, Clone)]
 pub struct ChunkCursor<'a> {
-    // The node stack can be empty if If the node stack is empty, that means
+    // Note: empty and ignored when `str_slice` below is `Some`.
     node_stack: Vec<StackItem<'a>>,
 
     // If this is `Some`, then the chunk cursor is operating on a string slice,
