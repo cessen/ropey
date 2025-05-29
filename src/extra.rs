@@ -1,4 +1,39 @@
+use std::sync::Arc;
+
+use crate::{slice::SliceInner, tree::Node, Rope, RopeSlice};
+
 pub trait RopeExt {
+    fn is_instance(&self, other: &Self) -> bool;
+}
+
+impl RopeExt for Rope {
+    /// Returns true if this rope and `other` point to precisely the same
+    /// in-memory data.
+    ///
+    /// This happens when one of the ropes is a clone of the other and
+    /// neither have been modified since then.  Because clones initially
+    /// share all the same data, it can be useful to check if they still
+    /// point to precisely the same memory as a way of determining
+    /// whether they are both still unmodified.
+    ///
+    /// Note: this is distinct from checking for equality: two ropes can
+    /// have the same *contents* (equal) but be stored in different
+    /// memory locations (not instances).  Importantly, two clones that
+    /// post-cloning are modified identically will *not* be instances
+    /// anymore, even though they will have equal contents.
+    ///
+    /// Runs in O(1) time.
+    #[inline]
+    fn is_instance(&self, other: &Self) -> bool {
+        match (&self.root, &other.root) {
+            (Node::Internal(a), Node::Internal(b)) => Arc::ptr_eq(a, b),
+            (Node::Leaf(a), Node::Leaf(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
+pub trait RopeSliceExt {
     /// Creates a cheap, non-editable `Rope` from the `RopeSlice`.
     ///
     /// The resulting `Rope` is guaranteed to not take up any additional
@@ -30,7 +65,24 @@ pub trait RopeExt {
     /// This method does not panic itself.  However, if edits are attempted
     /// on the resulting `Rope` with the panicking variants `insert()` and
     /// `remove()`, they will panic.
-    fn to_owning_slice(&self) -> Option<crate::Rope>;
+    fn to_owning_slice(&self) -> Option<Rope>;
+}
 
-    // fn is_instance(&self, other: &Self) -> bool;
+impl RopeSliceExt for RopeSlice<'_> {
+    #[inline]
+    fn to_owning_slice(&self) -> Option<Rope> {
+        match self {
+            RopeSlice(SliceInner::Rope {
+                root,
+                root_info,
+                byte_range,
+            }) => Some(Rope {
+                root: (*root).clone(),
+                root_info: **root_info,
+                owned_slice_byte_range: *byte_range,
+            }),
+
+            RopeSlice(SliceInner::Str(_)) => None,
+        }
+    }
 }

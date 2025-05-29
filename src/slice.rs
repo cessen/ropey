@@ -28,7 +28,7 @@ use crate::{iter::Lines, LineType};
 /// of a full `Rope` created from the same text range.  Nothing should be
 /// surprising here.
 #[derive(Copy, Clone)]
-pub struct RopeSlice<'a>(SliceInner<'a>);
+pub struct RopeSlice<'a>(pub(crate) SliceInner<'a>);
 
 #[derive(Copy, Clone)]
 pub(crate) enum SliceInner<'a> {
@@ -205,28 +205,6 @@ impl<'a> RopeSlice<'a> {
     crate::shared_impl::shared_no_panic_impl_methods!('a);
 }
 
-//=============================================================
-
-impl crate::extra::RopeExt for RopeSlice<'_> {
-    #[inline]
-    fn to_owning_slice(&self) -> Option<Rope> {
-        match self {
-            RopeSlice(SliceInner::Rope {
-                root,
-                root_info,
-                byte_range,
-            }) => Some(Rope {
-                root: (*root).clone(),
-                root_info: **root_info,
-                owned_slice_byte_range: *byte_range,
-            }),
-
-            RopeSlice(SliceInner::Str(_)) => None,
-        }
-    }
-}
-
-//=============================================================
 // Stdlib trait impls.
 //
 // Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
