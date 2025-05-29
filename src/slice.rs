@@ -28,21 +28,27 @@ use crate::{iter::Lines, LineType};
 /// of a full `Rope` created from the same text range.  Nothing should be
 /// surprising here.
 #[derive(Copy, Clone)]
-pub struct RopeSlice<'a> {
-    root: &'a Node,
-    root_info: &'a TextInfo,
-    byte_range: [usize; 2],
+pub struct RopeSlice<'a>(SliceInner<'a>);
+
+#[derive(Copy, Clone)]
+pub(crate) enum SliceInner<'a> {
+    Rope {
+        root: &'a Node,
+        root_info: &'a TextInfo,
+        byte_range: [usize; 2],
+    },
+    Str(&'a str),
 }
 
 impl<'a> RopeSlice<'a> {
     pub(crate) fn new(root: &'a Node, root_info: &'a TextInfo, byte_range: [usize; 2]) -> Self {
         // Special case for performance, since this actually comes up a fair bit.
         if byte_range[0] == 0 && byte_range[1] == root_info.bytes {
-            return Self {
+            return RopeSlice(SliceInner::Rope {
                 root: root,
                 root_info: root_info,
                 byte_range: byte_range,
-            };
+            });
         }
 
         // Find the deepest node that still contains the full range given.
@@ -74,11 +80,11 @@ impl<'a> RopeSlice<'a> {
             }
         }
 
-        Self {
+        RopeSlice(SliceInner::Rope {
             root: node,
             root_info: node_info,
             byte_range: [start, end],
-        }
+        })
     }
 
     //-------------------------------------------------
@@ -114,19 +120,36 @@ impl<'a> RopeSlice<'a> {
     // `crate::shared_impl`.
 
     #[inline(always)]
+    fn get_str_text(&self) -> Option<&'a str> {
+        match self {
+            RopeSlice(SliceInner::Rope { .. }) => None,
+            RopeSlice(SliceInner::Str(text)) => Some(text),
+        }
+    }
+
+    #[inline(always)]
     fn get_root(&self) -> &'a Node {
-        self.root
+        match self {
+            RopeSlice(SliceInner::Rope { root, .. }) => root,
+            RopeSlice(SliceInner::Str(_)) => panic!(),
+        }
     }
 
     #[allow(dead_code)] // Only used with some features.
     #[inline(always)]
     fn get_root_info(&self) -> &'a TextInfo {
-        self.root_info
+        match self {
+            RopeSlice(SliceInner::Rope { root_info, .. }) => root_info,
+            RopeSlice(SliceInner::Str(_)) => panic!(),
+        }
     }
 
     #[inline(always)]
     fn get_byte_range(&self) -> [usize; 2] {
-        self.byte_range
+        match self {
+            RopeSlice(SliceInner::Rope { byte_range, .. }) => *byte_range,
+            RopeSlice(SliceInner::Str(text)) => [0, text.len()],
+        }
     }
 }
 
@@ -158,14 +181,21 @@ impl<'a> RopeSlice<'a> {
                 return Err(OutOfBounds);
             }
 
-            let start_idx_real = slice.byte_range[0] + start_idx;
-            let end_idx_real = slice.byte_range[0] + end_idx;
+            let start_idx_real = slice.get_byte_range()[0] + start_idx;
+            let end_idx_real = slice.get_byte_range()[0] + end_idx;
 
-            Ok(RopeSlice::new(
-                slice.root,
-                slice.root_info,
-                [start_idx_real, end_idx_real],
-            ))
+            match slice {
+                RopeSlice(SliceInner::Rope {
+                    root, root_info, ..
+                }) => Ok(RopeSlice::new(
+                    root,
+                    root_info,
+                    [start_idx_real, end_idx_real],
+                )),
+                RopeSlice(SliceInner::Str(text)) => {
+                    Ok((&text[start_idx_real..end_idx_real]).into())
+                }
+            }
         }
 
         inner(self, start_idx, end_idx)
@@ -179,11 +209,19 @@ impl<'a> RopeSlice<'a> {
 
 impl crate::extra::RopeExt for RopeSlice<'_> {
     #[inline]
-    fn to_owning_slice(&self) -> Rope {
-        Rope {
-            root: self.root.clone(),
-            root_info: *self.root_info,
-            owned_slice_byte_range: self.byte_range,
+    fn to_owning_slice(&self) -> Option<Rope> {
+        match self {
+            RopeSlice(SliceInner::Rope {
+                root,
+                root_info,
+                byte_range,
+            }) => Some(Rope {
+                root: (*root).clone(),
+                root_info: **root_info,
+                owned_slice_byte_range: *byte_range,
+            }),
+
+            RopeSlice(SliceInner::Str(_)) => None,
         }
     }
 }
@@ -198,25 +236,48 @@ impl crate::extra::RopeExt for RopeSlice<'_> {
 crate::shared_impl::shared_std_impls!(RopeSlice<'_>);
 
 impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
+    #[inline(always)]
     fn eq(&self, other: &Rope) -> bool {
         *self == RopeSlice::from(other)
     }
 }
 
 impl<'a> From<&'a Rope> for RopeSlice<'a> {
+    #[inline(always)]
     fn from(r: &Rope) -> RopeSlice {
         RopeSlice::new(&r.root, &r.root_info, [0, r.root_info.bytes])
+    }
+}
+
+impl<'a> From<&'a str> for RopeSlice<'a> {
+    /// Creates a `RopeSlice` directly from a string slice.
+    ///
+    /// **IMPORTANT:** `RopeSlice`s created this way don't have the same
+    /// performance guarantees as normal slices.  Specifically, most operations
+    /// become `O(N)` rather than `O(log N)`.  For short string slices this
+    /// doesn't matter, but for long ones it very much can.
+    ///
+    /// Runs in O(1) time.
+    #[inline(always)]
+    fn from(text: &'a str) -> Self {
+        RopeSlice(SliceInner::Str(text))
     }
 }
 
 impl<'a> From<RopeSlice<'a>> for std::borrow::Cow<'a, str> {
     #[inline]
     fn from(r: RopeSlice<'a>) -> Self {
-        match *r.root {
-            Node::Leaf(ref text) => {
-                std::borrow::Cow::Borrowed(&text.text()[r.byte_range[0]..r.byte_range[1]])
-            }
-            Node::Internal(_) => std::borrow::Cow::Owned(String::from(r)),
+        match r {
+            RopeSlice(SliceInner::Rope {
+                root, byte_range, ..
+            }) => match root {
+                Node::Leaf(ref text) => {
+                    std::borrow::Cow::Borrowed(&text.text()[byte_range[0]..byte_range[1]])
+                }
+                Node::Internal(_) => std::borrow::Cow::Owned(String::from(r)),
+            },
+
+            RopeSlice(SliceInner::Str(text)) => std::borrow::Cow::Borrowed(text),
         }
     }
 }
@@ -234,7 +295,9 @@ mod tests {
     ))]
     use crate::LineType;
 
-    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
+    use super::{RopeSlice, SliceInner};
+
+    use crate::{rope_builder::RopeBuilder, Rope};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -1358,7 +1421,11 @@ mod tests {
         let s = r.slice(13..14);
         let cow: Cow<str> = r.slice(13..14).into();
 
-        assert!(s.root.is_leaf());
+        if let RopeSlice(SliceInner::Rope { root, .. }) = s {
+            assert!(root.is_leaf());
+        } else {
+            panic!();
+        }
 
         // Make sure it's borrowed.
         if let Cow::Owned(_) = cow {

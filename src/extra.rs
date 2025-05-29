@@ -27,7 +27,7 @@ pub trait RopeExt {
     /// This method does not panic itself.  However, if edits are attempted
     /// on the resulting `Rope` with the panicking variants `insert()` and
     /// `remove()`, they will panic.
-    fn to_owning_slice(&self) -> crate::Rope;
+    fn to_owning_slice(&self) -> Option<crate::Rope>;
 
     // fn is_instance(&self, other: &Self) -> bool;
 }

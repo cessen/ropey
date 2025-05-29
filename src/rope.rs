@@ -474,6 +474,11 @@ impl Rope {
     // `crate::shared_impl`.
 
     #[inline(always)]
+    fn get_str_text(&self) -> Option<&str> {
+        None
+    }
+
+    #[inline(always)]
     fn get_root(&self) -> &Node {
         &self.root
     }
@@ -764,8 +769,8 @@ impl Rope {
 
 impl crate::extra::RopeExt for Rope {
     #[inline]
-    fn to_owning_slice(&self) -> Rope {
-        self.clone()
+    fn to_owning_slice(&self) -> Option<Rope> {
+        Some(self.clone())
     }
 }
 

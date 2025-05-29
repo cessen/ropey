@@ -164,6 +164,19 @@ impl<'a> Chunks<'a> {
         (chunks, if at_end { at_byte_idx } else { byte_offset })
     }
 
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> (Self, usize) {
+        let cursor = ChunkCursor::from_str(text);
+        let at_end = at_byte_idx == text.len();
+
+        let chunks = Chunks {
+            cursor: cursor,
+            at_end: at_end,
+            is_reversed: false,
+        };
+
+        (chunks, if at_end { at_byte_idx } else { 0 })
+    }
+
     fn next_impl(&mut self) -> Option<&'a str> {
         loop {
             if self.at_end {
@@ -308,6 +321,18 @@ impl<'a> Bytes<'a> {
         }
     }
 
+    #[inline]
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> Self {
+        Bytes {
+            cursor: ChunkCursor::from_str(text),
+            current_chunk: text.as_bytes(),
+            chunk_byte_idx: 0,
+            byte_idx_in_chunk: at_byte_idx,
+            at_end: at_byte_idx == text.len(),
+            is_reversed: false,
+        }
+    }
+
     #[inline(always)]
     fn next_impl(&mut self) -> Option<u8> {
         if self.at_end {
@@ -445,6 +470,20 @@ impl<'a> Chars<'a> {
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_end: at_byte_idx == byte_range[1],
+            is_reversed: false,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> Self {
+        assert!(text.is_char_boundary(at_byte_idx));
+
+        Chars {
+            cursor: ChunkCursor::from_str(text),
+            current_chunk: text,
+            chunk_byte_idx: 0,
+            byte_idx_in_chunk: at_byte_idx,
+            at_end: at_byte_idx == text.len(),
             is_reversed: false,
         }
     }
@@ -646,6 +685,22 @@ mod lines {
                 line_type: line_type,
                 total_lines: total_lines,
                 leaf_byte_idx: leaf_byte_idx,
+                current_line_idx: at_line_idx,
+                is_reversed: false,
+            }
+        }
+
+        pub(crate) fn from_str(text: &'a str, at_line_idx: usize, line_type: LineType) -> Self {
+            use crate::str_utils::lines;
+
+            let total_lines = lines::count_breaks(text, line_type) + 1;
+            let at_byte_idx = lines::to_byte_idx(text, at_line_idx, line_type);
+
+            Lines {
+                cursor: ChunkCursor::from_str(text),
+                line_type: line_type,
+                total_lines: total_lines,
+                leaf_byte_idx: at_byte_idx,
                 current_line_idx: at_line_idx,
                 is_reversed: false,
             }

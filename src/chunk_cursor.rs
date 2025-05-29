@@ -28,7 +28,13 @@ struct StackItem<'a> {
 /// Cursor API for traversing the chunks of a rope.
 #[derive(Debug, Clone)]
 pub struct ChunkCursor<'a> {
+    // The node stack can be empty if If the node stack is empty, that means
     node_stack: Vec<StackItem<'a>>,
+
+    // If this is `Some`, then the chunk cursor is operating on a string slice,
+    // not a normal rope.  In that case, the node stack should be empty and all
+    // operations ignore it.
+    str_slice: Option<&'a str>,
 
     // The byte range within the root node that is considered part of this
     // cursor's contents.
@@ -147,6 +153,10 @@ impl<'a> ChunkCursor<'a> {
     /// Runs in O(1) time.
     #[inline(always)]
     pub fn chunk(&self) -> &'a str {
+        if let Some(text) = self.str_slice {
+            return text;
+        }
+
         self.chunk_slice().as_str().unwrap()
     }
 
@@ -154,6 +164,10 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Since it's a chunk, it's guaranteed to be contiguous text.
     pub(crate) fn chunk_slice(&self) -> RopeSlice<'a> {
+        if let Some(text) = self.str_slice {
+            return text.into();
+        }
+
         let leaf = self.node_stack.last().unwrap();
 
         let start = if leaf.byte_offset < self.byte_range[0] {
@@ -174,6 +188,10 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Runs in O(1) time.
     pub fn at_first(&self) -> bool {
+        if let Some(_) = self.str_slice {
+            return true;
+        }
+
         let leaf = &self.node_stack.last().unwrap();
         leaf.byte_offset <= self.byte_range[0]
     }
@@ -182,6 +200,10 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Runs in O(1) time.
     pub fn at_last(&self) -> bool {
+        if let Some(_) = self.str_slice {
+            return true;
+        }
+
         let leaf = &self.node_stack.last().unwrap();
         (leaf.byte_offset + leaf.info.bytes) >= self.byte_range[1]
     }
@@ -191,6 +213,10 @@ impl<'a> ChunkCursor<'a> {
     /// Runs in O(1) time.
     #[inline]
     pub fn byte_offset(&self) -> usize {
+        if let Some(_) = self.str_slice {
+            return 0;
+        }
+
         // Offset from start of root.
         let offset = self.node_stack.last().unwrap().byte_offset;
 
@@ -203,6 +229,10 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the byte offset from the start of the current chunk to the end of the text.
     #[inline]
     pub(crate) fn byte_offset_from_end(&self) -> usize {
+        if let Some(_) = self.str_slice {
+            return self.byte_range[1];
+        }
+
         // Offset from start of root.
         let offset = self.node_stack.last().unwrap().byte_offset;
 
@@ -228,6 +258,7 @@ impl<'a> ChunkCursor<'a> {
 
         let mut cursor = ChunkCursor {
             node_stack: vec![],
+            str_slice: None,
             byte_range: byte_range,
         };
 
@@ -276,6 +307,14 @@ impl<'a> ChunkCursor<'a> {
         }
 
         cursor
+    }
+
+    pub(crate) fn from_str(text: &'a str) -> Self {
+        ChunkCursor {
+            node_stack: vec![],
+            str_slice: Some(text),
+            byte_range: [0, text.len()],
+        }
     }
 
     /// Attempts to advance the cursor to the next chunk that contains a line
