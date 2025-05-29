@@ -29,9 +29,9 @@ use crate::{iter::Lines, LineType};
 /// surprising here.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a> {
-    root: &'a Node,
-    root_info: &'a TextInfo,
-    byte_range: [usize; 2],
+    pub(crate) root: &'a Node,
+    pub(crate) root_info: &'a TextInfo,
+    pub(crate) byte_range: [usize; 2],
 }
 
 impl<'a> RopeSlice<'a> {
@@ -173,19 +173,6 @@ impl<'a> RopeSlice<'a> {
 
     // Methods shared between Rope and RopeSlice.
     crate::shared_impl::shared_no_panic_impl_methods!('a);
-}
-
-//=============================================================
-
-impl crate::extra::RopeExt for RopeSlice<'_> {
-    #[inline]
-    fn to_owning_slice(&self) -> Rope {
-        Rope {
-            root: self.root.clone(),
-            root_info: *self.root_info,
-            owned_slice_byte_range: self.byte_range,
-        }
-    }
 }
 
 //=============================================================
