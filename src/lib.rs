@@ -253,7 +253,7 @@ pub enum Error {
     InvalidRange,
 
     /// An attempt was made to edit an owning slice, which is not permitted.
-    /// See [`RopeExt::to_owning_slice()`](crate::extra::RopeExt::to_owning_slice())
+    /// See [`slice_to_owning_slice()`](crate::extra::slice_to_owning_slice())
     /// for details.
     CannotEditOwningSlice,
 }
