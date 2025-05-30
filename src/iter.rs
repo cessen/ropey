@@ -1998,6 +1998,7 @@ mod tests {
         assert!(lines.next().is_none());
     }
 
+    #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_20() {
