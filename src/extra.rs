@@ -3,10 +3,6 @@ use std::sync::Arc;
 use crate::{tree::Node, Rope, RopeSlice};
 
 pub trait RopeExt {
-    fn is_instance(&self, other: &Self) -> bool;
-}
-
-impl RopeExt for Rope {
     /// Returns true if this rope and `other` point to precisely the same
     /// in-memory data.
     ///
@@ -23,6 +19,10 @@ impl RopeExt for Rope {
     /// anymore, even though they will have equal contents.
     ///
     /// Runs in O(1) time.
+    fn is_instance(&self, other: &Self) -> bool;
+}
+
+impl RopeExt for Rope {
     #[inline]
     fn is_instance(&self, other: &Self) -> bool {
         match (&self.root, &other.root) {
