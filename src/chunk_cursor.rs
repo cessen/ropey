@@ -317,6 +317,10 @@ impl<'a> ChunkCursor<'a> {
         }
     }
 
+    pub(crate) fn is_from_str_slice(&self) -> bool {
+        self.str_slice.is_some()
+    }
+
     /// Attempts to advance the cursor to the next chunk that contains a line
     /// boundary.
     ///
