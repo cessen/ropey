@@ -546,7 +546,7 @@ impl<'a> ChunkCursor<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rope_builder::RopeBuilder, Rope};
+    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -793,6 +793,33 @@ mod tests {
     }
 
     #[test]
+    fn chunk_cursor_07() {
+        let texts = [TEXT, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+
+            let mut cursor = t.chunk_cursor();
+
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            assert_eq!(false, cursor.next());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            assert_eq!(false, cursor.prev());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+        }
+    }
+
+    #[test]
     fn chunk_cursor_at_01() {
         let r = Rope::from_str(TEXT);
 
@@ -851,6 +878,23 @@ mod tests {
             let s = r.slice(..i);
             let cursor = s.chunk_cursor_at(i);
             assert_eq!("A", cursor.chunk());
+        }
+    }
+
+    #[test]
+    fn chunk_cursor_at_04() {
+        let texts = [TEXT, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+
+            for i in 0..=text.len() {
+                let cursor = t.chunk_cursor_at(i);
+
+                assert!(cursor.at_first());
+                assert!(cursor.at_last());
+                assert_eq!(cursor.byte_offset(), 0);
+                assert_eq!(cursor.chunk(), text);
+            }
         }
     }
 
@@ -1054,5 +1098,36 @@ mod tests {
         while cursor.prev_with_line_boundary(LF_CR).is_some() {}
         assert!(cursor.at_first());
         assert_eq!(0, cursor.byte_offset());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn chunk_cursor_line_boundary_05() {
+        use crate::LineType::LF_CR;
+        let l_text = lines_text();
+        let texts = [&l_text, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+            let mut cursor = t.chunk_cursor();
+
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            // Forward.
+            assert!(cursor.next_with_line_boundary(LF_CR).is_none());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            // Backward.
+            assert!(cursor.prev_with_line_boundary(LF_CR).is_none());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+        }
     }
 }
