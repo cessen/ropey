@@ -1,3 +1,14 @@
+//! Less commonly needed and/or esoteric functionality.
+//!
+//! As a general rule, the functions provided by this module should be
+//! treated with a little suspicion.  There are legitimate uses for them, which
+//! is why they're provided.  But their use should be treated as at least a *bit*
+//! of a code smell.
+//!
+//! Additionally, the functionality here has a worse benefit-to-footgun ratio
+//! than the rest of Ropey, and should be used carefully even when it is
+//! legitimately needed.
+
 use std::sync::Arc;
 
 use crate::{tree::Node, Rope, RopeSlice};
