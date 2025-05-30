@@ -32,12 +32,13 @@ pub struct ChunkCursor<'a> {
     node_stack: Vec<StackItem<'a>>,
 
     // If this is `Some`, then the chunk cursor is operating on a string slice,
-    // not a normal rope.  In that case, the node stack should be empty and all
-    // operations ignore it.
+    // not a normal rope.  In that case, `node_stack` above is unused and should
+    // be empty.
     str_slice: Option<&'a str>,
 
-    // The byte range within the root node that is considered part of this
-    // cursor's contents.
+    // The byte range within the root node/string slice that is considered part
+    // of this cursor's contents. For string slices this should always be set to
+    // `[0, length_of_str]`.
     byte_range: [usize; 2],
 }
 
