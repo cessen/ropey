@@ -29,6 +29,10 @@ use crate::{slice::SliceInner, tree::Node, Rope, RopeSlice};
 ///
 /// Runs in O(1) time.
 pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
+    if a.owned_slice_byte_range != b.owned_slice_byte_range {
+        return false;
+    }
+
     match (&a.root, &b.root) {
         (Node::Internal(a_root), Node::Internal(b_root)) => Arc::ptr_eq(a_root, b_root),
         (Node::Leaf(a_root), Node::Leaf(b_root)) => Arc::ptr_eq(a_root, b_root),
@@ -82,3 +86,5 @@ pub fn slice_to_owning_slice(slice: RopeSlice) -> Option<Rope> {
         RopeSlice(SliceInner::Str(_)) => None,
     }
 }
+
+// TODO: unit tests.
