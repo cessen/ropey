@@ -258,14 +258,16 @@ pub enum Error {
     CannotEditOwningSlice,
 }
 
-impl Error {
-    fn panic_with_msg(&self) -> ! {
+impl std::error::Error for Error {}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Error::NonCharBoundary => panic!("Index is a non-char boundary."),
-            Error::OutOfBounds => panic!("Index out of bounds."),
-            Error::InvalidRange => panic!("Invalid index range: end < start."),
+            Error::NonCharBoundary => write!(f, "byte index is not a char boundary"),
+            Error::OutOfBounds => write!(f, "index is out of bounds"),
+            Error::InvalidRange => write!(f, "index range is invalid: end < start"),
             Error::CannotEditOwningSlice => {
-                panic!("Editing of owned slices is not permitted.")
+                write!(f, "edit attempted on owned slice")
             }
         }
     }

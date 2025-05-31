@@ -101,9 +101,10 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline]
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-            assert!(byte_idx <= self.len());
+            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return text.is_char_boundary(byte_idx);
@@ -121,9 +122,10 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline]
         pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len());
+            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return crate::floor_char_boundary(byte_idx, text.as_bytes());
@@ -141,9 +143,10 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline]
         pub fn ceil_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len());
+            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return crate::ceil_char_boundary(byte_idx, text.as_bytes());
@@ -195,9 +198,13 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx >=
         /// len()`).
+        #[track_caller]
         #[inline(always)]
         pub fn byte(&self, byte_idx: usize) -> u8 {
-            self.get_byte(byte_idx).unwrap()
+            match self.get_byte(byte_idx) {
+                Some(byte) => byte,
+                None => panic!("{}", crate::Error::OutOfBounds),
+            }
         }
 
         /// Returns the `char` at `byte_idx`.
@@ -210,12 +217,12 @@ macro_rules! shared_main_impl_methods {
         ///
         /// - If `byte_idx` is out of bounds (i.e. `byte_idx >= len()`).
         /// - If `byte_idx` is not a char boundary.
+        #[track_caller]
         #[inline]
         pub fn char(&self, byte_idx: usize) -> char {
-            match self.get_char(byte_idx) {
+            match self.try_get_char(byte_idx) {
                 Ok(ch) => ch,
-                Err(NonCharBoundary) => panic!("Attempt to get a char at a non-char boundary."),
-                Err(e) => e.panic_with_msg(),
+                Err(e) => panic!("{}", e),
             }
         }
 
@@ -235,9 +242,13 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
+        #[track_caller]
         #[inline(always)]
         pub fn line(&self, line_idx: usize, line_type: LineType) -> RopeSlice<$rlt> {
-            self.get_line(line_idx, line_type).unwrap()
+            match self.get_line(line_idx, line_type) {
+                Some(line) => line,
+                None => panic!("{}", crate::Error::OutOfBounds),
+            }
         }
 
         /// Returns the chunk containing the byte at `byte_idx`.
@@ -252,9 +263,13 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline(always)]
         pub fn chunk(&self, byte_idx: usize) -> (&$rlt str, usize) {
-            self.get_chunk(byte_idx).unwrap()
+            match self.get_chunk(byte_idx) {
+                Some(chunk) => chunk,
+                None => panic!("{}", crate::Error::OutOfBounds),
+            }
         }
 
         //-----------------------------------------------------
@@ -277,9 +292,10 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(feature = "metric_chars")]
+        #[track_caller]
         #[inline]
         pub fn byte_to_char_idx(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len());
+            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return str_indices::chars::from_byte_idx(text, byte_idx);
@@ -308,9 +324,10 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
         #[cfg(feature = "metric_chars")]
+        #[track_caller]
         #[inline]
         pub fn char_to_byte_idx(&self, char_idx: usize) -> usize {
-            assert!(char_idx <= self.len_chars());
+            assert!(char_idx <= self.len_chars(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return str_indices::chars::to_byte_idx(text, char_idx);
@@ -342,9 +359,10 @@ macro_rules! shared_main_impl_methods {
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         #[cfg(feature = "metric_utf16")]
+        #[track_caller]
         #[inline]
         pub fn byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len());
+            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return str_indices::utf16::from_byte_idx(text, byte_idx);
@@ -377,9 +395,10 @@ macro_rules! shared_main_impl_methods {
         /// Panics if `utf16_cu_idx` is out of bounds
         /// (i.e. `utf16_idx > len_utf16()`).
         #[cfg(feature = "metric_utf16")]
+        #[track_caller]
         #[inline]
         pub fn utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
-            assert!(utf16_idx <= self.len_utf16());
+            assert!(utf16_idx <= self.len_utf16(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return str_indices::utf16::to_byte_idx(text, utf16_idx);
@@ -415,9 +434,10 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
+        #[track_caller]
         #[inline]
         pub fn byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
-            assert!(byte_idx <= self.len());
+            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return crate::str_utils::lines::from_byte_idx(text, byte_idx, line_type);
@@ -459,9 +479,10 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
+        #[track_caller]
         #[inline]
         pub fn line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
-            assert!(line_idx <= self.len_lines(line_type));
+            assert!(line_idx <= self.len_lines(line_type), "{}", crate::Error::OutOfBounds);
 
             if let Some(text) = self.get_str_text() {
                 return crate::str_utils::lines::to_byte_idx(text, line_idx, line_type);
@@ -486,7 +507,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn bytes(&self) -> Bytes<$rlt> {
             if let Some(text) = self.get_str_text() {
-                return Bytes::from_str(text, 0);
+                return Bytes::from_str(text, 0).unwrap();
             }
 
             Bytes::new(
@@ -494,7 +515,7 @@ macro_rules! shared_main_impl_methods {
                 self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
-            )
+            ).unwrap()
         }
 
         /// Creates an iterator over the bytes of the `Rope`, starting at byte
@@ -508,20 +529,24 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline]
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<$rlt> {
-            assert!(byte_idx <= self.len());
+            let result = if let Some(text) = self.get_str_text() {
+                Bytes::from_str(text, byte_idx)
+            } else {
+                Bytes::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            };
 
-            if let Some(text) = self.get_str_text() {
-                return Bytes::from_str(text, byte_idx);
+            match result {
+                Ok(iter) => iter,
+                Err(e) => panic!("{}", e),
             }
-
-            Bytes::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            )
         }
 
         /// Creates an iterator over the chars of the `Rope`.
@@ -530,7 +555,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chars(&self) -> Chars<$rlt> {
             if let Some(text) = self.get_str_text() {
-                return Chars::from_str(text, 0);
+                return Chars::from_str(text, 0).unwrap();
             }
 
             Chars::new(
@@ -538,7 +563,7 @@ macro_rules! shared_main_impl_methods {
                 self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
-            )
+            ).unwrap()
         }
 
         /// Creates an iterator over the chars of the `Rope`, starting at the char
@@ -555,20 +580,24 @@ macro_rules! shared_main_impl_methods {
         ///
         /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
         /// - If `byte_idx` is not a char boundary.
+        #[track_caller]
         #[inline]
         pub fn chars_at(&self, byte_idx: usize) -> Chars<$rlt> {
-            assert!(byte_idx <= self.len());
+            let result = if let Some(text) = self.get_str_text() {
+                Chars::from_str(text, byte_idx)
+            } else {
+                Chars::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            };
 
-            if let Some(text) = self.get_str_text() {
-                return Chars::from_str(text, byte_idx);
+            match result {
+                Ok(iter) => iter,
+                Err(e) => panic!("{}", e),
             }
-
-            Chars::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            )
         }
 
         /// Creates an iterator over the lines of the `Rope`.
@@ -587,7 +616,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn lines(&self, line_type: LineType) -> Lines<$rlt> {
             if let Some(text) = self.get_str_text() {
-                return Lines::from_str(text, 0, line_type);
+                return Lines::from_str(text, 0, line_type).unwrap();
             }
 
             Lines::new(
@@ -596,7 +625,7 @@ macro_rules! shared_main_impl_methods {
                 self.get_byte_range(),
                 0,
                 line_type,
-            )
+            ).unwrap()
         }
 
         /// Creates an iterator over the lines of the `Rope`, starting at line
@@ -620,19 +649,25 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
+        #[track_caller]
         #[inline]
         pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<$rlt> {
-            if let Some(text) = self.get_str_text() {
-                return Lines::from_str(text, line_idx, line_type);
-            }
+            let result = if let Some(text) = self.get_str_text() {
+                Lines::from_str(text, line_idx, line_type)
+            } else {
+                Lines::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    line_idx,
+                    line_type,
+                )
+            };
 
-            Lines::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                line_idx,
-                line_type,
-            )
+            match result {
+                Ok(iter) => iter,
+                Err(e) => panic!("{}", e),
+            }
         }
 
         /// Creates an iterator over the chunks of the `Rope`.
@@ -641,7 +676,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chunks(&self) -> Chunks<$rlt> {
             if let Some(text) = self.get_str_text() {
-                return Chunks::from_str(text, 0).0;
+                return Chunks::from_str(text, 0).unwrap().0;
             }
 
             Chunks::new(
@@ -649,8 +684,7 @@ macro_rules! shared_main_impl_methods {
                 self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
-            )
-            .0
+            ).unwrap().0
         }
 
         /// Creates an iterator over the chunks of the `Rope`, with the iterator
@@ -668,22 +702,24 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline]
         pub fn chunks_at(&self, byte_idx: usize) -> (Chunks<$rlt>, usize) {
-            assert!(byte_idx <= self.len());
+            let result = if let Some(text) = self.get_str_text() {
+                Chunks::from_str(text, byte_idx)
+            } else {
+                Chunks::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            };
 
-            if let Some(text) = self.get_str_text() {
-                return Chunks::from_str(text, byte_idx);
+            match result {
+                Ok((chunks, start_idx)) => (chunks, start_idx.saturating_sub(self.get_byte_range()[0])),
+                Err(e) => panic!("{}", e),
             }
-
-            let (chunks, start_idx) = Chunks::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            );
-
-            (chunks, start_idx.saturating_sub(self.get_byte_range()[0]))
         }
 
         /// Creates a cursor for navigating the chunks of the text, starting on
@@ -693,7 +729,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chunk_cursor(&self) -> ChunkCursor<$rlt> {
             if let Some(text) = self.get_str_text() {
-                return ChunkCursor::from_str(text);
+                return ChunkCursor::from_str(text).unwrap();
             }
 
             ChunkCursor::new(
@@ -701,7 +737,7 @@ macro_rules! shared_main_impl_methods {
                 self.get_root_info(),
                 self.get_byte_range(),
                 self.get_byte_range()[0],
-            )
+            ).unwrap()
         }
 
         /// Creates a cursor for navigating the chunks of the text, with the
@@ -716,20 +752,24 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        #[track_caller]
         #[inline]
         pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<$rlt> {
-            assert!(byte_idx <= self.len());
+            let result = if let Some(text) = self.get_str_text() {
+                ChunkCursor::from_str(text)
+            } else {
+                ChunkCursor::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            };
 
-            if let Some(text) = self.get_str_text() {
-                return ChunkCursor::from_str(text);
+            match result {
+                Ok(cursor) => cursor,
+                Err(e) => panic!("{}", e),
             }
-
-            ChunkCursor::new(
-                self.get_root(),
-                self.get_root_info(),
-                self.get_byte_range(),
-                self.get_byte_range()[0] + byte_idx,
-            )
         }
 
         /// Returns the text as a string slice if it's contiguous in memory.
@@ -871,7 +911,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `char()`.
         ///
         /// On failure this returns the cause of the failure.
-        pub fn get_char(&self, byte_idx: usize) -> Result<char> {
+        pub fn try_get_char(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len() {
                 return Err(OutOfBounds);
             }

@@ -254,8 +254,10 @@ impl<'a> ChunkCursor<'a> {
         info: &'a TextInfo,
         byte_range: [usize; 2],
         at_byte_idx: usize,
-    ) -> Self {
-        debug_assert!(byte_range[0] <= at_byte_idx && at_byte_idx <= byte_range[1]);
+    ) -> crate::Result<Self> {
+        if at_byte_idx < byte_range[0] || at_byte_idx > byte_range[1] {
+            return Err(crate::Error::OutOfBounds);
+        }
 
         let mut cursor = ChunkCursor {
             node_stack: vec![],
@@ -307,15 +309,15 @@ impl<'a> ChunkCursor<'a> {
             cursor.prev();
         }
 
-        cursor
+        Ok(cursor)
     }
 
-    pub(crate) fn from_str(text: &'a str) -> Self {
-        ChunkCursor {
+    pub(crate) fn from_str(text: &'a str) -> crate::Result<Self> {
+        Ok(ChunkCursor {
             node_stack: vec![],
             str_slice: Some(text),
             byte_range: [0, text.len()],
-        }
+        })
     }
 
     pub(crate) fn is_from_str_slice(&self) -> bool {
@@ -883,7 +885,22 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn chunk_cursor_at_04() {
+        let r = Rope::from_str("foo");
+        r.chunk_cursor_at(4);
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_cursor_at_05() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        s.chunk_cursor_at(2);
+    }
+
+    #[test]
+    fn chunk_cursor_at_06() {
         let texts = [TEXT, ""];
         for text in texts {
             let t: RopeSlice = text.into();
