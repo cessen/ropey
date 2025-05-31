@@ -1,8 +1,10 @@
 #![cfg(not(miri))]
 
+use std::ops::{Bound, RangeBounds};
+
 use proptest::test_runner::Config;
 
-use ropey::Rope;
+use ropey::{Rope, RopeSlice};
 
 #[cfg(feature = "metric_lines_lf")]
 use str_indices::lines_lf;
@@ -38,7 +40,7 @@ fn string_remove(text: &mut String, byte_start: usize, byte_end: usize) {
     text.push_str(&text_r);
 }
 
-fn assert_metrics_eq(rope: &Rope, text: &str) {
+fn assert_metrics_eq(rope: &RopeSlice, text: &str) {
     assert_eq!(rope.len(), text.len());
 
     #[cfg(feature = "metric_chars")]
@@ -89,6 +91,31 @@ fn prev_line_byte_idx(text: &str) -> usize {
     return 0;
 }
 
+/// Constructs both a Rope-based slice and str-based slice, with the
+/// same contents. These can then be run through the same test, to ensure
+/// identical behavior between the two (when chunking doesn't matter).
+fn make_test_data<'a: 'c, 'b: 'c, 'c, R>(
+    rope: &'a Rope,
+    text: &'b str,
+    byte_range: R,
+) -> [RopeSlice<'c>; 2]
+where
+    R: RangeBounds<usize>,
+{
+    assert_eq!(rope, text);
+    let start = match byte_range.start_bound() {
+        Bound::Included(i) => *i,
+        Bound::Excluded(i) => *i + 1,
+        Bound::Unbounded => 0,
+    };
+    let end = match byte_range.end_bound() {
+        Bound::Included(i) => *i + 1,
+        Bound::Excluded(i) => *i,
+        Bound::Unbounded => text.len(),
+    };
+    [rope.slice(start..end), (&text[start..end]).into()]
+}
+
 //===========================================================================
 
 proptest::proptest! {
@@ -97,20 +124,25 @@ proptest::proptest! {
     #[test]
     fn pt_from_str(ref text in "\\PC{0,200}") {
         let rope = Rope::from_str(text);
-
-        assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
         rope.assert_invariants();
+
+        for t in make_test_data(&rope, text, ..) {
+            assert_eq!(t, text.as_str());
+            assert_metrics_eq(&t, text.as_str());
+        }
+
     }
 
     #[cfg(any(feature = "metric_lines_lf_cr", feature = "metric_lines_unicode"))]
     #[test]
     fn pt_from_str_crlf(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}){0,200}") {
         let rope = Rope::from_str(text);
-
-        assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
         rope.assert_invariants();
+
+        for t in make_test_data(&rope, text, ..) {
+            assert_eq!(t, text.as_str());
+            assert_metrics_eq(&t, text.as_str());
+        }
     }
 
     #[test]
@@ -123,8 +155,11 @@ proptest::proptest! {
         rope.insert(idx, ins_text);
         string_insert(&mut text, idx, ins_text);
 
-        assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
+        for t in make_test_data(&rope, &text, ..) {
+            assert_eq!(t, text.as_str());
+            assert_metrics_eq(&t, text.as_str());
+        }
+
         rope.assert_invariants();
     }
 
@@ -140,8 +175,11 @@ proptest::proptest! {
         rope.insert(idx, ins_text);
         string_insert(&mut text, idx, ins_text);
 
-        assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
+        for t in make_test_data(&rope, &text, ..) {
+            assert_eq!(t, text.as_str());
+            assert_metrics_eq(&t, text.as_str());
+        }
+
         rope.assert_invariants();
     }
 
@@ -156,8 +194,11 @@ proptest::proptest! {
         rope.remove(idx_left..idx_right);
         string_remove(&mut text, idx_left, idx_right);
 
-        assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
+        for t in make_test_data(&rope, &text, ..) {
+            assert_eq!(t, text.as_str());
+            assert_metrics_eq(&t, text.as_str());
+        }
+
         rope.assert_invariants();
 
         assert!(rope.attempt_full_rebalance(100).0);
@@ -183,8 +224,11 @@ proptest::proptest! {
         rope.remove(idx_left..idx_right);
         string_remove(&mut text, idx_left, idx_right);
 
-        assert_eq!(rope, text.as_str());
-        assert_metrics_eq(&rope, text.as_str());
+        for t in make_test_data(&rope, &text, ..) {
+            assert_eq!(t, text.as_str());
+            assert_metrics_eq(&t, text.as_str());
+        }
+
         rope.assert_invariants();
 
         assert!(rope.attempt_full_rebalance(100).0);
@@ -200,13 +244,15 @@ proptest::proptest! {
     fn pt_byte_to_line_idx(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
         let rope = Rope::from_str(text);
 
-        for i in 0..=text.len() {
-            #[cfg(feature = "metric_lines_lf")]
-            assert_eq!(lines_lf::from_byte_idx(text, i), rope.byte_to_line_idx(i, LineType::LF));
-            #[cfg(feature = "metric_lines_lf_cr")]
-            assert_eq!(lines_crlf::from_byte_idx(text, i), rope.byte_to_line_idx(i, LineType::LF_CR));
-            #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(lines::from_byte_idx(text, i), rope.byte_to_line_idx(i, LineType::All));
+        for t in make_test_data(&rope, text, ..) {
+            for i in 0..=text.len() {
+                #[cfg(feature = "metric_lines_lf")]
+                assert_eq!(lines_lf::from_byte_idx(text, i), t.byte_to_line_idx(i, LineType::LF));
+                #[cfg(feature = "metric_lines_lf_cr")]
+                assert_eq!(lines_crlf::from_byte_idx(text, i), t.byte_to_line_idx(i, LineType::LF_CR));
+                #[cfg(feature = "metric_lines_unicode")]
+                assert_eq!(lines::from_byte_idx(text, i), t.byte_to_line_idx(i, LineType::All));
+            }
         }
     }
 
@@ -219,25 +265,27 @@ proptest::proptest! {
     fn pt_line_to_byte_idx(ref text in "(\\u{000A}|\\u{000D}|\\u{000A}\\u{000D}|\\u{2028}){0,200}") {
         let rope = Rope::from_str(text);
 
-        #[cfg(feature = "metric_lines_lf")]
-        {
-            let line_count = lines_lf::count_breaks(text) + 1;
-            for i in 0..=line_count {
-                assert_eq!(lines_lf::to_byte_idx(text, i), rope.line_to_byte_idx(i, LineType::LF));
+        for t in make_test_data(&rope, text, ..) {
+            #[cfg(feature = "metric_lines_lf")]
+            {
+                let line_count = lines_lf::count_breaks(text) + 1;
+                for i in 0..=line_count {
+                    assert_eq!(lines_lf::to_byte_idx(text, i), t.line_to_byte_idx(i, LineType::LF));
+                }
             }
-        }
-        #[cfg(feature = "metric_lines_lf_cr")]
-        {
-            let line_count = lines_crlf::count_breaks(text) + 1;
-            for i in 0..=line_count {
-                assert_eq!(lines_crlf::to_byte_idx(text, i), rope.line_to_byte_idx(i, LineType::LF_CR));
+            #[cfg(feature = "metric_lines_lf_cr")]
+            {
+                let line_count = lines_crlf::count_breaks(text) + 1;
+                for i in 0..=line_count {
+                    assert_eq!(lines_crlf::to_byte_idx(text, i), t.line_to_byte_idx(i, LineType::LF_CR));
+                }
             }
-        }
-        #[cfg(feature = "metric_lines_unicode")]
-        {
-            let line_count = lines::count_breaks(text) + 1;
-            for i in 0..=line_count {
-                assert_eq!(lines::to_byte_idx(text, i), rope.line_to_byte_idx(i, LineType::All));
+            #[cfg(feature = "metric_lines_unicode")]
+            {
+                let line_count = lines::count_breaks(text) + 1;
+                for i in 0..=line_count {
+                    assert_eq!(lines::to_byte_idx(text, i), t.line_to_byte_idx(i, LineType::All));
+                }
             }
         }
     }
@@ -246,13 +294,15 @@ proptest::proptest! {
     fn pt_chunks_iter_next(ref text in "\\PC{0,200}") {
         let r = Rope::from_str(text);
 
-        let mut idx = 0;
-        for chunk in r.chunks() {
-            assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
-            idx += chunk.len();
-        }
+        for t in make_test_data(&r, text, ..) {
+            let mut idx = 0;
+            for chunk in t.chunks() {
+                assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
+                idx += chunk.len();
+            }
 
-        assert_eq!(idx, text.len());
+            assert_eq!(idx, text.len());
+        }
     }
 
     #[test]
@@ -264,16 +314,18 @@ proptest::proptest! {
             (idx1.min(idx2), idx1.max(idx2))
         };
 
-        let text = &text[start..end];
-        let s = r.slice(start..end);
+        for t in make_test_data(&r, text, ..) {
+            let text = &text[start..end];
+            let s = t.slice(start..end);
 
-        let mut idx = 0;
-        for chunk in s.chunks() {
-            assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
-            idx += chunk.len();
+            let mut idx = 0;
+            for chunk in s.chunks() {
+                assert_eq!(chunk, &text[idx..(idx + chunk.len())]);
+                idx += chunk.len();
+            }
+
+            assert_eq!(idx, text.len());
         }
-
-        assert_eq!(idx, text.len());
     }
 
 
@@ -282,18 +334,21 @@ proptest::proptest! {
     #[cfg_attr(miri, ignore)]
     fn pt_lines_iter_next(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
         let r = Rope::from_str(text);
-        let mut line_txt = &text[..];
 
-        let mut idx = 0;
-        for line in r.lines(ropey::LineType::LF_CR) {
-            let next_idx = str_indices::lines_crlf::to_byte_idx(line_txt, 1);
-            let txt_chunk = &line_txt[..next_idx];
-            line_txt = &line_txt[next_idx..];
-            assert_eq!(line, txt_chunk);
-            idx += line.len();
+        for t in make_test_data(&r, text, ..) {
+            let mut line_txt = &text[..];
+
+            let mut idx = 0;
+            for line in t.lines(ropey::LineType::LF_CR) {
+                let next_idx = str_indices::lines_crlf::to_byte_idx(line_txt, 1);
+                let txt_chunk = &line_txt[..next_idx];
+                line_txt = &line_txt[next_idx..];
+                assert_eq!(line, txt_chunk);
+                idx += line.len();
+            }
+
+            assert_eq!(idx, text.len());
         }
-
-        assert_eq!(idx, text.len());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -303,25 +358,28 @@ proptest::proptest! {
         use ropey::LineType::LF_CR;
 
         let r = Rope::from_str(text);
-        let mut line_txt = &text[..];
 
-        let mut first = true;
-        let mut idx = 0;
-        for line in r.lines_at(r.len_lines(LF_CR), LF_CR).reversed() {
-            let txt_chunk = if first && (line_txt.as_bytes().last() == Some(&b'\n') || line_txt.as_bytes().last() == Some(&b'\r')) {
-                ""
-            } else {
-                let prev_idx = prev_line_byte_idx(line_txt);
-                let txt_chunk = &line_txt[prev_idx..];
-                line_txt = &line_txt[..prev_idx];
-                txt_chunk
-            };
-            assert_eq!(line, txt_chunk);
-            idx += line.len();
-            first = false;
+        for t in make_test_data(&r, text, ..) {
+            let mut line_txt = &text[..];
+
+            let mut first = true;
+            let mut idx = 0;
+            for line in t.lines_at(t.len_lines(LF_CR), LF_CR).reversed() {
+                let txt_chunk = if first && (line_txt.as_bytes().last() == Some(&b'\n') || line_txt.as_bytes().last() == Some(&b'\r')) {
+                    ""
+                } else {
+                    let prev_idx = prev_line_byte_idx(line_txt);
+                    let txt_chunk = &line_txt[prev_idx..];
+                    line_txt = &line_txt[..prev_idx];
+                    txt_chunk
+                };
+                assert_eq!(line, txt_chunk);
+                idx += line.len();
+                first = false;
+            }
+
+            assert_eq!(idx, text.len());
         }
-
-        assert_eq!(idx, text.len());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -335,21 +393,23 @@ proptest::proptest! {
             (idx1.min(idx2), idx1.max(idx2))
         };
 
-        let text = &text[start..end];
-        let s = r.slice(start..end);
+        for t in make_test_data(&r, text, ..) {
+            let text = &text[start..end];
+            let s = t.slice(start..end);
 
-        let mut line_txt = &text[..];
+            let mut line_txt = &text[..];
 
-        let mut idx = 0;
-        for line in s.lines(ropey::LineType::LF_CR) {
-            let next_idx = str_indices::lines_crlf::to_byte_idx(line_txt, 1);
-            let txt_chunk = &line_txt[..next_idx];
-            line_txt = &line_txt[next_idx..];
-            assert_eq!(line, txt_chunk);
-            idx += line.len();
+            let mut idx = 0;
+            for line in s.lines(ropey::LineType::LF_CR) {
+                let next_idx = str_indices::lines_crlf::to_byte_idx(line_txt, 1);
+                let txt_chunk = &line_txt[..next_idx];
+                line_txt = &line_txt[next_idx..];
+                assert_eq!(line, txt_chunk);
+                idx += line.len();
+            }
+
+            assert_eq!(idx, text.len());
         }
-
-        assert_eq!(idx, text.len());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -365,30 +425,32 @@ proptest::proptest! {
             (idx1.min(idx2), idx1.max(idx2))
         };
 
-        let text = &text[start..end];
-        let s = r.slice(start..end);
+        for t in make_test_data(&r, text, ..) {
+            let text = &text[start..end];
+            let s = t.slice(start..end);
 
-        assert_eq!(s.len(), text.len());
+            assert_eq!(s.len(), text.len());
 
-        let mut line_txt = &text[..];
+            let mut line_txt = &text[..];
 
-        let mut first = true;
-        let mut idx = text.len();
-        for line in s.lines_at(s.len_lines(LF_CR), LF_CR).reversed() {
-            let txt_chunk = if first && (line_txt.as_bytes().last() == Some(&b'\n') || line_txt.as_bytes().last() == Some(&b'\r')) {
-                ""
-            } else {
-                let prev_idx = prev_line_byte_idx(line_txt);
-                let txt_chunk = &line_txt[prev_idx..];
-                line_txt = &line_txt[..prev_idx];
-                txt_chunk
-            };
-            assert_eq!(line, txt_chunk);
-            idx -= line.len();
-            first = false;
+            let mut first = true;
+            let mut idx = text.len();
+            for line in s.lines_at(s.len_lines(LF_CR), LF_CR).reversed() {
+                let txt_chunk = if first && (line_txt.as_bytes().last() == Some(&b'\n') || line_txt.as_bytes().last() == Some(&b'\r')) {
+                    ""
+                } else {
+                    let prev_idx = prev_line_byte_idx(line_txt);
+                    let txt_chunk = &line_txt[prev_idx..];
+                    line_txt = &line_txt[..prev_idx];
+                    txt_chunk
+                };
+                assert_eq!(line, txt_chunk);
+                idx -= line.len();
+                first = false;
+            }
+
+            assert_eq!(idx, 0);
         }
-
-        assert_eq!(idx, 0);
     }
 }
 

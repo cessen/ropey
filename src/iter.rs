@@ -164,6 +164,19 @@ impl<'a> Chunks<'a> {
         Ok((chunks, if at_end { at_byte_idx } else { byte_offset }))
     }
 
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<(Self, usize)> {
+        let cursor = ChunkCursor::from_str(text)?;
+        let at_end = at_byte_idx == text.len();
+
+        let chunks = Chunks {
+            cursor: cursor,
+            at_end: at_end,
+            is_reversed: false,
+        };
+
+        Ok((chunks, if at_end { at_byte_idx } else { 0 }))
+    }
+
     fn next_impl(&mut self) -> Option<&'a str> {
         loop {
             if self.at_end {
@@ -207,6 +220,10 @@ impl<'a> Iterator for Chunks<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.cursor.is_from_str_slice() {
+            return (0, Some(1));
+        }
+
         // For the `Chunks` iterator we only provide a minimum, since we don't
         // have enough information to provide a guaranteed maximum.  The minimum
         // we provide is a conservative fudged approximation of the number of
@@ -304,6 +321,18 @@ impl<'a> Bytes<'a> {
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_end: at_byte_idx == byte_range[1],
+            is_reversed: false,
+        })
+    }
+
+    #[inline]
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<Self> {
+        Ok(Bytes {
+            cursor: ChunkCursor::from_str(text)?,
+            current_chunk: text.as_bytes(),
+            chunk_byte_idx: 0,
+            byte_idx_in_chunk: at_byte_idx,
+            at_end: at_byte_idx == text.len(),
             is_reversed: false,
         })
     }
@@ -447,6 +476,22 @@ impl<'a> Chars<'a> {
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_end: at_byte_idx == byte_range[1],
+            is_reversed: false,
+        })
+    }
+
+    #[inline]
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<Self> {
+        if !text.is_char_boundary(at_byte_idx) {
+            return Err(crate::Error::NonCharBoundary);
+        }
+
+        Ok(Chars {
+            cursor: ChunkCursor::from_str(text)?,
+            current_chunk: text,
+            chunk_byte_idx: 0,
+            byte_idx_in_chunk: at_byte_idx,
+            at_end: at_byte_idx == text.len(),
             is_reversed: false,
         })
     }
@@ -657,6 +702,26 @@ mod lines {
             })
         }
 
+        pub(crate) fn from_str(
+            text: &'a str,
+            at_line_idx: usize,
+            line_type: LineType,
+        ) -> crate::Result<Self> {
+            use crate::str_utils::lines;
+
+            let total_lines = lines::count_breaks(text, line_type) + 1;
+            let at_byte_idx = lines::to_byte_idx(text, at_line_idx, line_type);
+
+            Ok(Lines {
+                cursor: ChunkCursor::from_str(text)?,
+                line_type: line_type,
+                total_lines: total_lines,
+                leaf_byte_idx: at_byte_idx,
+                current_line_idx: at_line_idx,
+                is_reversed: false,
+            })
+        }
+
         fn next_impl(&mut self) -> Option<RopeSlice<'a>> {
             if self.current_line_idx >= self.total_lines {
                 return None;
@@ -784,9 +849,11 @@ pub use lines::Lines;
 
 #[cfg(test)]
 mod tests {
+    use std::ops::{Bound, RangeBounds};
+
     use super::*;
 
-    use crate::{rope_builder::RopeBuilder, Rope};
+    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
 
     #[cfg(feature = "metric_lines_lf_cr")]
     use crate::LineType;
@@ -830,27 +897,53 @@ mod tests {
         rb.finish()
     }
 
+    /// Constructs both a Rope-based slice and str-based slice, with the
+    /// same contents. These can then be run through the same test, to ensure
+    /// identical behavior between the two (when chunking doesn't matter).
+    fn make_test_data<'a: 'c, 'b: 'c, 'c, R>(
+        rope: &'a Rope,
+        text: &'b str,
+        byte_range: R,
+    ) -> [RopeSlice<'c>; 2]
+    where
+        R: RangeBounds<usize>,
+    {
+        assert_eq!(rope, text);
+        let start = match byte_range.start_bound() {
+            Bound::Included(i) => *i,
+            Bound::Excluded(i) => *i + 1,
+            Bound::Unbounded => 0,
+        };
+        let end = match byte_range.end_bound() {
+            Bound::Included(i) => *i + 1,
+            Bound::Excluded(i) => *i,
+            Bound::Unbounded => text.len(),
+        };
+        [rope.slice(start..end), (&text[start..end]).into()]
+    }
+
     #[test]
     fn chunks_iter_01() {
         let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let mut text = TEXT;
+            let mut chunks = t.chunks();
+            let mut stack = Vec::new();
 
-        let mut text = TEXT;
-        let mut chunks = r.chunks();
-        let mut stack = Vec::new();
+            // Forward.
+            while let Some(chunk) = chunks.next() {
+                assert_eq!(&text[..chunk.len()], chunk);
+                stack.push(chunk);
+                text = &text[chunk.len()..];
+            }
+            assert_eq!("", text);
 
-        // Forward.
-        while let Some(chunk) = chunks.next() {
-            assert_eq!(&text[..chunk.len()], chunk);
-            stack.push(chunk);
-            text = &text[chunk.len()..];
+            // Backward.
+            while let Some(chunk) = chunks.prev() {
+                assert_eq!(stack.pop().unwrap(), chunk);
+            }
+            assert_eq!(0, stack.len());
         }
-        assert_eq!("", text);
-
-        // Backward.
-        while let Some(chunk) = chunks.prev() {
-            assert_eq!(stack.pop().unwrap(), chunk);
-        }
-        assert_eq!(0, stack.len());
     }
 
     #[test]
@@ -884,9 +977,11 @@ mod tests {
     fn chunks_iter_03() {
         let r = Rope::from_str("");
 
-        let mut chunks = r.chunks();
-        assert_eq!(None, chunks.next());
-        assert_eq!(None, chunks.prev());
+        for t in make_test_data(&r, "", ..) {
+            let mut chunks = t.chunks();
+            assert_eq!(None, chunks.next());
+            assert_eq!(None, chunks.prev());
+        }
     }
 
     #[test]
@@ -954,16 +1049,18 @@ mod tests {
     #[test]
     fn chunks_iter_07() {
         let r = Rope::from_str("A");
-        let mut chunks = r.chunks();
+        for t in make_test_data(&r, "A", ..) {
+            let mut chunks = t.chunks();
 
-        assert_eq!(Some("A"), chunks.next());
-        assert_eq!(None, chunks.next());
-        assert_eq!(Some("A"), chunks.prev());
-        assert_eq!(None, chunks.prev());
+            assert_eq!(Some("A"), chunks.next());
+            assert_eq!(None, chunks.next());
+            assert_eq!(Some("A"), chunks.prev());
+            assert_eq!(None, chunks.prev());
 
-        assert_eq!(Some("A"), chunks.next());
-        assert_eq!(Some("A"), chunks.prev());
-        assert_eq!(Some("A"), chunks.next());
+            assert_eq!(Some("A"), chunks.next());
+            assert_eq!(Some("A"), chunks.prev());
+            assert_eq!(Some("A"), chunks.next());
+        }
     }
 
     #[test]
@@ -1005,44 +1102,48 @@ mod tests {
     fn chunks_at_01() {
         let r = Rope::from_str(TEXT);
 
-        for i in 0..TEXT.len() {
-            let mut current_byte = r.chunk(i).1;
-            let (chunks, idx) = r.chunks_at(i);
-            assert_eq!(current_byte, idx);
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                let mut current_byte = t.chunk(i).1;
+                let (chunks, idx) = t.chunks_at(i);
+                assert_eq!(current_byte, idx);
 
-            for chunk1 in chunks {
-                let chunk2 = r.chunk(current_byte).0;
-                assert_eq!(chunk2, chunk1);
-                current_byte += chunk2.len();
+                for chunk1 in chunks {
+                    let chunk2 = t.chunk(current_byte).0;
+                    assert_eq!(chunk2, chunk1);
+                    current_byte += chunk2.len();
+                }
             }
-        }
 
-        let (mut chunks, idx) = r.chunks_at(TEXT.len());
-        assert_eq!(TEXT.len(), idx);
-        assert_eq!(None, chunks.next());
+            let (mut chunks, idx) = t.chunks_at(TEXT.len());
+            assert_eq!(TEXT.len(), idx);
+            assert_eq!(None, chunks.next());
+        }
     }
 
     #[test]
     fn chunks_at_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
-        let text = &TEXT[5..124];
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
 
-        for i in 0..text.len() {
-            let mut current_byte = s.chunk(i).1;
-            let (chunks, idx) = s.chunks_at(i);
-            assert_eq!(current_byte, idx);
+            for i in 0..text.len() {
+                let mut current_byte = s.chunk(i).1;
+                let (chunks, idx) = s.chunks_at(i);
+                assert_eq!(current_byte, idx);
 
-            for chunk1 in chunks {
-                let chunk2 = s.chunk(current_byte).0;
-                assert_eq!(chunk2, chunk1);
-                current_byte += chunk2.len();
+                for chunk1 in chunks {
+                    let chunk2 = s.chunk(current_byte).0;
+                    assert_eq!(chunk2, chunk1);
+                    current_byte += chunk2.len();
+                }
             }
-        }
 
-        let (mut chunks, idx) = s.chunks_at(text.len());
-        assert_eq!(text.len(), idx);
-        assert_eq!(None, chunks.next());
+            let (mut chunks, idx) = s.chunks_at(text.len());
+            assert_eq!(text.len(), idx);
+            assert_eq!(None, chunks.next());
+        }
     }
 
     #[test]
@@ -1064,29 +1165,27 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn chunks_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
 
-        let mut chunks = s.chunks();
+            let mut chunks = s.chunks();
 
-        // Forward.
-        assert!(chunks.clone().count() >= chunks.size_hint().0);
-        while let Some(_) = chunks.next() {
+            // Forward.
             assert!(chunks.clone().count() >= chunks.size_hint().0);
-        }
-        assert_eq!(0, chunks.size_hint().0);
+            while let Some(_) = chunks.next() {
+                assert!(chunks.clone().count() >= chunks.size_hint().0);
+            }
+            assert_eq!(0, chunks.size_hint().0);
 
-        // Backward.
-        chunks = chunks.reversed();
-        assert!(chunks.clone().count() >= chunks.size_hint().0);
-        while let Some(_) = chunks.next() {
+            // Backward.
+            chunks = chunks.reversed();
             assert!(chunks.clone().count() >= chunks.size_hint().0);
+            while let Some(_) = chunks.next() {
+                assert!(chunks.clone().count() >= chunks.size_hint().0);
+            }
+            assert_eq!(0, chunks.size_hint().0);
         }
-        assert_eq!(0, chunks.size_hint().0);
     }
-
-    // NOTE: when you add support for starting iterators at specific indices,
-    // ensure that the Bytes iterator can be created with a starting index that
-    // splits a char.
 
     fn test_bytes_against_text(mut bytes: Bytes, text: &str) {
         // Forward.
@@ -1119,79 +1218,90 @@ mod tests {
     #[test]
     fn bytes_iter_01() {
         let r = Rope::from_str(TEXT);
-        let iter = r.bytes();
+        for t in make_test_data(&r, TEXT, ..) {
+            let iter = t.bytes();
 
-        test_bytes_against_text(iter, TEXT);
+            test_bytes_against_text(iter, TEXT);
+        }
     }
 
     #[test]
     fn bytes_iter_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
-        let iter = s.bytes();
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let iter = s.bytes();
 
-        test_bytes_against_text(iter, &TEXT[5..124]);
+            test_bytes_against_text(iter, &TEXT[5..124]);
+        }
     }
 
     #[test]
     fn bytes_iter_03() {
         let text = "abc";
         let r = Rope::from_str(text);
-        let text = text.as_bytes();
+        for t in make_test_data(&r, text, ..) {
+            let text = text.as_bytes();
 
-        let mut bytes = r.bytes();
+            let mut bytes = t.bytes();
 
-        assert_eq!(Some(text[0]), bytes.next());
-        assert_eq!(Some(text[0]), bytes.prev());
-        assert_eq!(None, bytes.prev());
+            assert_eq!(Some(text[0]), bytes.next());
+            assert_eq!(Some(text[0]), bytes.prev());
+            assert_eq!(None, bytes.prev());
 
-        assert_eq!(Some(text[0]), bytes.next());
-        assert_eq!(Some(text[1]), bytes.next());
-        assert_eq!(Some(text[1]), bytes.prev());
+            assert_eq!(Some(text[0]), bytes.next());
+            assert_eq!(Some(text[1]), bytes.next());
+            assert_eq!(Some(text[1]), bytes.prev());
 
-        assert_eq!(Some(text[1]), bytes.next());
-        assert_eq!(Some(text[2]), bytes.next());
-        assert_eq!(Some(text[2]), bytes.prev());
+            assert_eq!(Some(text[1]), bytes.next());
+            assert_eq!(Some(text[2]), bytes.next());
+            assert_eq!(Some(text[2]), bytes.prev());
 
-        assert_eq!(Some(text[2]), bytes.next());
-        assert_eq!(None, bytes.next());
-        assert_eq!(Some(text[2]), bytes.prev());
+            assert_eq!(Some(text[2]), bytes.next());
+            assert_eq!(None, bytes.next());
+            assert_eq!(Some(text[2]), bytes.prev());
+        }
     }
 
     #[test]
     fn bytes_iter_04() {
         let r = Rope::from_str("");
-
-        assert_eq!(None, r.bytes().next());
-        assert_eq!(None, r.bytes().prev());
+        for t in make_test_data(&r, "", ..) {
+            assert_eq!(None, t.bytes().next());
+            assert_eq!(None, t.bytes().prev());
+        }
     }
 
     #[test]
     fn bytes_at_01() {
         let r = Rope::from_str(TEXT);
 
-        for i in 0..TEXT.len() {
-            let mut bytes = r.bytes_at(i);
-            assert_eq!(TEXT.as_bytes()[i], bytes.next().unwrap());
-        }
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                let mut bytes = t.bytes_at(i);
+                assert_eq!(TEXT.as_bytes()[i], bytes.next().unwrap());
+            }
 
-        let mut bytes = r.bytes_at(TEXT.len());
-        assert_eq!(None, bytes.next());
+            let mut bytes = t.bytes_at(TEXT.len());
+            assert_eq!(None, bytes.next());
+        }
     }
 
     #[test]
     fn bytes_at_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
-        let text = &TEXT[5..124];
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
 
-        for i in 0..text.len() {
-            let mut bytes = s.bytes_at(i);
-            assert_eq!(text.as_bytes()[i], bytes.next().unwrap());
+            for i in 0..text.len() {
+                let mut bytes = s.bytes_at(i);
+                assert_eq!(text.as_bytes()[i], bytes.next().unwrap());
+            }
+
+            let mut bytes = s.bytes_at(text.len());
+            assert_eq!(None, bytes.next());
         }
-
-        let mut bytes = s.bytes_at(text.len());
-        assert_eq!(None, bytes.next());
     }
 
     #[test]
@@ -1213,24 +1323,26 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn bytes_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
 
-        let mut bytes = s.bytes();
+            let mut bytes = s.bytes();
 
-        // Forward.
-        assert_eq!(bytes.clone().count(), bytes.size_hint().0);
-        while let Some(_) = bytes.next() {
+            // Forward.
             assert_eq!(bytes.clone().count(), bytes.size_hint().0);
-        }
-        assert_eq!(0, bytes.size_hint().0);
+            while let Some(_) = bytes.next() {
+                assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+            }
+            assert_eq!(0, bytes.size_hint().0);
 
-        // Backward.
-        bytes = bytes.reversed();
-        assert_eq!(bytes.clone().count(), bytes.size_hint().0);
-        while let Some(_) = bytes.next() {
+            // Backward.
+            bytes = bytes.reversed();
             assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+            while let Some(_) = bytes.next() {
+                assert_eq!(bytes.clone().count(), bytes.size_hint().0);
+            }
+            assert_eq!(0, bytes.size_hint().0);
         }
-        assert_eq!(0, bytes.size_hint().0);
     }
 
     fn test_chars_against_text(mut chars: Chars, text: &str) {
@@ -1264,84 +1376,95 @@ mod tests {
     #[test]
     fn chars_iter_01() {
         let r = Rope::from_str(TEXT);
-        let iter = r.chars();
+        for t in make_test_data(&r, TEXT, ..) {
+            let iter = t.chars();
 
-        test_chars_against_text(iter, TEXT);
+            test_chars_against_text(iter, TEXT);
+        }
     }
 
     #[test]
     fn chars_iter_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
-        let iter = s.chars();
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let iter = s.chars();
 
-        test_chars_against_text(iter, &TEXT[5..124]);
+            test_chars_against_text(iter, &TEXT[5..124]);
+        }
     }
 
     #[test]
     fn chars_iter_03() {
         let text = "abc";
         let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, ..) {
+            let mut chars = t.chars();
 
-        let mut chars = r.chars();
+            assert_eq!(Some('a'), chars.next());
+            assert_eq!(Some('a'), chars.prev());
+            assert_eq!(None, chars.prev());
 
-        assert_eq!(Some('a'), chars.next());
-        assert_eq!(Some('a'), chars.prev());
-        assert_eq!(None, chars.prev());
+            assert_eq!(Some('a'), chars.next());
+            assert_eq!(Some('b'), chars.next());
+            assert_eq!(Some('b'), chars.prev());
 
-        assert_eq!(Some('a'), chars.next());
-        assert_eq!(Some('b'), chars.next());
-        assert_eq!(Some('b'), chars.prev());
+            assert_eq!(Some('b'), chars.next());
+            assert_eq!(Some('c'), chars.next());
+            assert_eq!(Some('c'), chars.prev());
 
-        assert_eq!(Some('b'), chars.next());
-        assert_eq!(Some('c'), chars.next());
-        assert_eq!(Some('c'), chars.prev());
-
-        assert_eq!(Some('c'), chars.next());
-        assert_eq!(None, chars.next());
-        assert_eq!(Some('c'), chars.prev());
+            assert_eq!(Some('c'), chars.next());
+            assert_eq!(None, chars.next());
+            assert_eq!(Some('c'), chars.prev());
+        }
     }
 
     #[test]
     fn chars_iter_04() {
         let r = Rope::from_str("");
 
-        assert_eq!(None, r.chars().next());
-        assert_eq!(None, r.chars().prev());
+        for t in make_test_data(&r, "", ..) {
+            assert_eq!(None, t.chars().next());
+            assert_eq!(None, t.chars().prev());
+        }
     }
 
     #[test]
-    fn chars_at_01() {
+    fn chars_at_t1() {
         let r = Rope::from_str(TEXT);
 
-        for i in 0..TEXT.len() {
-            if !TEXT.is_char_boundary(i) {
-                continue;
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                if !TEXT.is_char_boundary(i) {
+                    continue;
+                }
+                let mut chars = t.chars_at(i);
+                assert_eq!(TEXT[i..].chars().next(), chars.next());
             }
-            let mut chars = r.chars_at(i);
-            assert_eq!(TEXT[i..].chars().next(), chars.next());
-        }
 
-        let mut chars = r.chars_at(TEXT.len());
-        assert_eq!(None, chars.next());
+            let mut chars = t.chars_at(TEXT.len());
+            assert_eq!(None, chars.next());
+        }
     }
 
     #[test]
     fn chars_at_02() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
-        let text = &TEXT[5..124];
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
 
-        for i in 0..text.len() {
-            if !text.is_char_boundary(i) {
-                continue;
+            for i in 0..text.len() {
+                if !text.is_char_boundary(i) {
+                    continue;
+                }
+                let mut chars = s.chars_at(i);
+                assert_eq!(text[i..].chars().next(), chars.next());
             }
-            let mut chars = s.chars_at(i);
-            assert_eq!(text[i..].chars().next(), chars.next());
-        }
 
-        let mut chars = s.chars_at(text.len());
-        assert_eq!(None, chars.next());
+            let mut chars = s.chars_at(text.len());
+            assert_eq!(None, chars.next());
+        }
     }
 
     #[test]
@@ -1363,30 +1486,32 @@ mod tests {
     #[cfg_attr(miri, ignore)]
     fn chars_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);
-        let s = r.slice(5..124);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
 
-        let mut chars = s.chars();
+            let mut chars = s.chars();
 
-        // Forward.
-        assert!(chars.clone().count() >= chars.size_hint().0);
-        assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
-        while let Some(_) = chars.next() {
+            // Forward.
             assert!(chars.clone().count() >= chars.size_hint().0);
             assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
-        }
-        assert_eq!(0, chars.size_hint().0);
-        assert_eq!(0, chars.size_hint().1.unwrap());
+            while let Some(_) = chars.next() {
+                assert!(chars.clone().count() >= chars.size_hint().0);
+                assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+            }
+            assert_eq!(0, chars.size_hint().0);
+            assert_eq!(0, chars.size_hint().1.unwrap());
 
-        // Backward.
-        chars = chars.reversed();
-        assert!(chars.clone().count() >= chars.size_hint().0);
-        assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
-        while let Some(_) = chars.next() {
+            // Backward.
+            chars = chars.reversed();
             assert!(chars.clone().count() >= chars.size_hint().0);
             assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+            while let Some(_) = chars.next() {
+                assert!(chars.clone().count() >= chars.size_hint().0);
+                assert!(chars.clone().count() <= chars.size_hint().1.unwrap());
+            }
+            assert_eq!(0, chars.size_hint().0);
+            assert_eq!(0, chars.size_hint().1.unwrap());
         }
-        assert_eq!(0, chars.size_hint().0);
-        assert_eq!(0, chars.size_hint().1.unwrap());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1433,22 +1558,24 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore)]
     fn lines_02() {
-        let r = Rope::from_str("hi\nyo\nbye");
+        let text = "hi\nyo\nbye";
+        let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, ..) {
+            let mut lines = t.lines(LineType::LF_CR);
 
-        let mut lines = r.lines(LineType::LF_CR);
+            assert_eq!("hi\n", lines.next().unwrap());
+            assert_eq!("hi\n", lines.prev().unwrap());
+            assert_eq!(None, lines.prev());
 
-        assert_eq!("hi\n", lines.next().unwrap());
-        assert_eq!("hi\n", lines.prev().unwrap());
-        assert_eq!(None, lines.prev());
+            assert_eq!("hi\n", lines.next().unwrap());
+            assert_eq!("yo\n", lines.next().unwrap());
+            assert_eq!("yo\n", lines.prev().unwrap());
 
-        assert_eq!("hi\n", lines.next().unwrap());
-        assert_eq!("yo\n", lines.next().unwrap());
-        assert_eq!("yo\n", lines.prev().unwrap());
-
-        assert_eq!("yo\n", lines.next().unwrap());
-        assert_eq!("bye", lines.next().unwrap());
-        assert_eq!(None, lines.next());
-        assert_eq!("bye", lines.prev().unwrap());
+            assert_eq!("yo\n", lines.next().unwrap());
+            assert_eq!("bye", lines.next().unwrap());
+            assert_eq!(None, lines.next());
+            assert_eq!("bye", lines.prev().unwrap());
+        }
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1458,9 +1585,11 @@ mod tests {
         let text = "Hello there!\nHow goes it?";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(2, r.lines(LineType::LF_CR).count());
         assert_eq!(2, s.lines(LineType::LF_CR).count());
+        assert_eq!(2, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
@@ -1468,6 +1597,11 @@ mod tests {
         assert!(lines.next().is_none());
 
         let mut lines = s.lines(LineType::LF_CR);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?", lines.next().unwrap());
         assert!(lines.next().is_none());
@@ -1480,9 +1614,11 @@ mod tests {
         let text = "Hello there!\nHow goes it?\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(3, r.lines(LineType::LF_CR).count());
         assert_eq!(3, s.lines(LineType::LF_CR).count());
+        assert_eq!(3, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
@@ -1491,6 +1627,12 @@ mod tests {
         assert!(lines.next().is_none());
 
         let mut lines = s.lines(LineType::LF_CR);
+        assert_eq!("Hello there!\n", lines.next().unwrap());
+        assert_eq!("How goes it?\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
         assert_eq!("Hello there!\n", lines.next().unwrap());
         assert_eq!("How goes it?\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
@@ -1503,22 +1645,24 @@ mod tests {
     fn lines_05() {
         let text = "Hello there!\nHow goes it?\nYeah!";
         let r = Rope::from_str(text);
-        let s1 = r.slice(..25);
-        let s2 = r.slice(..26);
+        for t in make_test_data(&r, text, ..) {
+            let s1 = t.slice(..25);
+            let s2 = t.slice(..26);
 
-        assert_eq!(2, s1.lines(LineType::LF_CR).count());
-        assert_eq!(3, s2.lines(LineType::LF_CR).count());
+            assert_eq!(2, s1.lines(LineType::LF_CR).count());
+            assert_eq!(3, s2.lines(LineType::LF_CR).count());
 
-        let mut lines = s1.lines(LineType::LF_CR);
-        assert_eq!("Hello there!\n", lines.next().unwrap());
-        assert_eq!("How goes it?", lines.next().unwrap());
-        assert!(lines.next().is_none());
+            let mut lines = s1.lines(LineType::LF_CR);
+            assert_eq!("Hello there!\n", lines.next().unwrap());
+            assert_eq!("How goes it?", lines.next().unwrap());
+            assert!(lines.next().is_none());
 
-        let mut lines = s2.lines(LineType::LF_CR);
-        assert_eq!("Hello there!\n", lines.next().unwrap());
-        assert_eq!("How goes it?\n", lines.next().unwrap());
-        assert_eq!("", lines.next().unwrap());
-        assert!(lines.next().is_none());
+            let mut lines = s2.lines(LineType::LF_CR);
+            assert_eq!("Hello there!\n", lines.next().unwrap());
+            assert_eq!("How goes it?\n", lines.next().unwrap());
+            assert_eq!("", lines.next().unwrap());
+            assert!(lines.next().is_none());
+        }
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1528,15 +1672,21 @@ mod tests {
         let text = "";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(1, r.lines(LineType::LF_CR).count());
         assert_eq!(1, s.lines(LineType::LF_CR).count());
+        assert_eq!(1, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
 
         let mut lines = s.lines(LineType::LF_CR);
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
@@ -1548,15 +1698,21 @@ mod tests {
         let text = "a";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(1, r.lines(LineType::LF_CR).count());
         assert_eq!(1, s.lines(LineType::LF_CR).count());
+        assert_eq!(1, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("a", lines.next().unwrap());
         assert!(lines.next().is_none());
 
         let mut lines = s.lines(LineType::LF_CR);
+        assert_eq!("a", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
         assert_eq!("a", lines.next().unwrap());
         assert!(lines.next().is_none());
     }
@@ -1568,9 +1724,11 @@ mod tests {
         let text = "a\nb";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(2, r.lines(LineType::LF_CR).count());
         assert_eq!(2, s.lines(LineType::LF_CR).count());
+        assert_eq!(2, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
@@ -1578,6 +1736,11 @@ mod tests {
         assert!(lines.next().is_none());
 
         let mut lines = s.lines(LineType::LF_CR);
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
         assert_eq!("b", lines.next().unwrap());
         assert!(lines.next().is_none());
@@ -1590,9 +1753,11 @@ mod tests {
         let text = "\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(2, r.lines(LineType::LF_CR).count());
         assert_eq!(2, s.lines(LineType::LF_CR).count());
+        assert_eq!(2, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("\n", lines.next().unwrap());
@@ -1600,6 +1765,11 @@ mod tests {
         assert!(lines.next().is_none());
 
         let mut lines = s.lines(LineType::LF_CR);
+        assert_eq!("\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
         assert_eq!("\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
@@ -1612,9 +1782,11 @@ mod tests {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
         let s = r.slice(..);
+        let t: RopeSlice = text.into();
 
         assert_eq!(3, r.lines(LineType::LF_CR).count());
         assert_eq!(3, s.lines(LineType::LF_CR).count());
+        assert_eq!(3, t.lines(LineType::LF_CR).count());
 
         let mut lines = r.lines(LineType::LF_CR);
         assert_eq!("a\n", lines.next().unwrap());
@@ -1627,6 +1799,12 @@ mod tests {
         assert_eq!("b\n", lines.next().unwrap());
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
+
+        let mut lines = t.lines(LineType::LF_CR);
+        assert_eq!("a\n", lines.next().unwrap());
+        assert_eq!("b\n", lines.next().unwrap());
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1635,11 +1813,12 @@ mod tests {
     fn lines_11() {
         let text = lines_text();
         let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            let mut itr = t.lines(LineType::LF_CR);
 
-        let mut itr = r.lines(LineType::LF_CR);
-
-        assert_eq!(None, itr.prev());
-        assert_eq!(None, itr.prev());
+            assert_eq!(None, itr.prev());
+            assert_eq!(None, itr.prev());
+        }
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1648,19 +1827,20 @@ mod tests {
     fn lines_12() {
         let text = lines_text();
         let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            let mut lines = Vec::new();
+            let mut itr = t.lines(LineType::LF_CR);
 
-        let mut lines = Vec::new();
-        let mut itr = r.lines(LineType::LF_CR);
+            while let Some(line) = itr.next() {
+                lines.push(line);
+            }
 
-        while let Some(line) = itr.next() {
-            lines.push(line);
+            while let Some(line) = itr.prev() {
+                assert_eq!(line, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(line) = itr.prev() {
-            assert_eq!(line, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1669,20 +1849,22 @@ mod tests {
     fn lines_13() {
         let text = lines_text();
         let r = Rope::from_str(&text);
-        let s = r.slice(34..2031);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..2031);
 
-        let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::LF_CR);
+            let mut lines = Vec::new();
+            let mut itr = s.lines(LineType::LF_CR);
 
-        while let Some(line) = itr.next() {
-            lines.push(line);
+            while let Some(line) = itr.next() {
+                lines.push(line);
+            }
+
+            while let Some(line) = itr.prev() {
+                assert_eq!(line, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(line) = itr.prev() {
-            assert_eq!(line, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1691,20 +1873,22 @@ mod tests {
     fn lines_14() {
         let text = "";
         let r = Rope::from_str(text);
-        let s = r.slice(..);
+        for t in make_test_data(&r, text, ..) {
+            let s = t.slice(..);
 
-        let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::LF_CR);
+            let mut lines = Vec::new();
+            let mut itr = s.lines(LineType::LF_CR);
 
-        while let Some(text) = itr.next() {
-            lines.push(text);
+            while let Some(text) = itr.next() {
+                lines.push(text);
+            }
+
+            while let Some(text) = itr.prev() {
+                assert_eq!(text, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(text) = itr.prev() {
-            assert_eq!(text, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1713,20 +1897,22 @@ mod tests {
     fn lines_15() {
         let text = "a";
         let r = Rope::from_str(text);
-        let s = r.slice(..);
+        for t in make_test_data(&r, text, ..) {
+            let s = t.slice(..);
 
-        let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::LF_CR);
+            let mut lines = Vec::new();
+            let mut itr = s.lines(LineType::LF_CR);
 
-        while let Some(text) = itr.next() {
-            lines.push(text);
+            while let Some(text) = itr.next() {
+                lines.push(text);
+            }
+
+            while let Some(text) = itr.prev() {
+                assert_eq!(text, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(text) = itr.prev() {
-            assert_eq!(text, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1735,20 +1921,22 @@ mod tests {
     fn lines_16() {
         let text = "a\nb";
         let r = Rope::from_str(text);
-        let s = r.slice(..);
+        for t in make_test_data(&r, text, ..) {
+            let s = t.slice(..);
 
-        let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::LF_CR);
+            let mut lines = Vec::new();
+            let mut itr = s.lines(LineType::LF_CR);
 
-        while let Some(text) = itr.next() {
-            lines.push(text);
+            while let Some(text) = itr.next() {
+                lines.push(text);
+            }
+
+            while let Some(text) = itr.prev() {
+                assert_eq!(text, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(text) = itr.prev() {
-            assert_eq!(text, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1757,20 +1945,22 @@ mod tests {
     fn lines_17() {
         let text = "\n";
         let r = Rope::from_str(text);
-        let s = r.slice(..);
+        for t in make_test_data(&r, text, ..) {
+            let s = t.slice(..);
 
-        let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::LF_CR);
+            let mut lines = Vec::new();
+            let mut itr = s.lines(LineType::LF_CR);
 
-        while let Some(text) = itr.next() {
-            lines.push(text);
+            while let Some(text) = itr.next() {
+                lines.push(text);
+            }
+
+            while let Some(text) = itr.prev() {
+                assert_eq!(text, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(text) = itr.prev() {
-            assert_eq!(text, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1779,20 +1969,22 @@ mod tests {
     fn lines_18() {
         let text = "a\nb\n";
         let r = Rope::from_str(text);
-        let s = r.slice(..);
+        for t in make_test_data(&r, text, ..) {
+            let s = t.slice(..);
 
-        let mut lines = Vec::new();
-        let mut itr = s.lines(LineType::LF_CR);
+            let mut lines = Vec::new();
+            let mut itr = s.lines(LineType::LF_CR);
 
-        while let Some(text) = itr.next() {
-            lines.push(text);
+            while let Some(text) = itr.next() {
+                lines.push(text);
+            }
+
+            while let Some(text) = itr.prev() {
+                assert_eq!(text, lines.pop().unwrap());
+            }
+
+            assert!(lines.is_empty());
         }
-
-        while let Some(text) = itr.prev() {
-            assert_eq!(text, lines.pop().unwrap());
-        }
-
-        assert!(lines.is_empty());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1802,9 +1994,11 @@ mod tests {
         let text = lines_text();
         let r = Rope::from_str(&text);
         let s = r.slice(..);
+        let t: RopeSlice = (&text[..]).into();
 
         assert_eq!(34, r.lines(LineType::LF_CR).count());
         assert_eq!(34, s.lines(LineType::LF_CR).count());
+        assert_eq!(34, t.lines(LineType::LF_CR).count());
 
         // Rope
         let mut lines = r.lines(LineType::LF_CR);
@@ -1841,29 +2035,53 @@ mod tests {
         }
         assert_eq!("", lines.next().unwrap());
         assert!(lines.next().is_none());
+
+        // Slice from str
+        let mut lines = t.lines(LineType::LF_CR);
+        assert_eq!("\r\n", lines.next().unwrap());
+        for _ in 0..16 {
+            assert_eq!(
+                "Hello there!  How're you doing?  It's a fine day, \
+                 isn't it?  Aren't you glad we're alive?\r\n",
+                lines.next().unwrap()
+            );
+            assert_eq!(
+                "こんにちは！元気ですか？日はいいですね。\
+                 私たちが生きだって嬉しいではないか？\r\n",
+                lines.next().unwrap()
+            );
+        }
+        assert_eq!("", lines.next().unwrap());
+        assert!(lines.next().is_none());
     }
 
-    // // Get working again...?
-    // #[test]
-    // #[cfg_attr(miri, ignore)]
-    // fn lines_20() {
-    //     let r = Rope::from_str("a\nb\nc\nd\ne\nf\ng\nh\n");
-    //     for (line, c) in r.lines(LineType::LF_CR).zip('a'..='h') {
-    //         assert_eq!(line, format!("{c}\n"))
-    //     }
-    //     for (line, c) in r
-    //         .lines_at(r.len_lines() - 1)
-    //         .reversed()
-    //         .zip(('a'..='h').rev())
-    //     {
-    //         assert_eq!(line, format!("{c}\n"))
-    //     }
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn lines_20() {
+        let text = "a\nb\nc\nd\ne\nf\ng\nh\n";
+        let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, ..) {
+            for (line, c) in t.lines(LineType::LF_CR).zip('a'..='h') {
+                assert_eq!(line, format!("{c}\n"))
+            }
+            for (line, c) in t
+                .lines_at(t.len_lines(LineType::LF_CR) - 1, LineType::LF_CR)
+                .reversed()
+                .zip(('a'..='h').rev())
+            {
+                assert_eq!(line, format!("{c}\n"))
+            }
+        }
 
-    //     let r = Rope::from_str("ab\nc\nd\ne\nf\ng\nh\n");
-    //     for (line, c) in r.slice(1..).lines(LineType::LF_CR).zip('b'..='h') {
-    //         assert_eq!(line, format!("{c}\n"))
-    //     }
-    // }
+        let text = "ab\nc\nd\ne\nf\ng\nh\n";
+        let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, ..) {
+            for (line, c) in t.slice(1..).lines(LineType::LF_CR).zip('b'..='h') {
+                assert_eq!(line, format!("{c}\n"))
+            }
+        }
+    }
 
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
@@ -1871,15 +2089,16 @@ mod tests {
     fn lines_at_01() {
         let text = lines_text();
         let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            for i in 0..t.len_lines(LineType::LF_CR) {
+                let line = t.line(i, LineType::LF_CR);
+                let mut lines = t.lines_at(i, LineType::LF_CR);
+                assert_eq!(Some(line), lines.next());
+            }
 
-        for i in 0..r.len_lines(LineType::LF_CR) {
-            let line = r.line(i, LineType::LF_CR);
-            let mut lines = r.lines_at(i, LineType::LF_CR);
-            assert_eq!(Some(line), lines.next());
+            let mut lines = t.lines_at(t.len_lines(LineType::LF_CR), LineType::LF_CR);
+            assert_eq!(None, lines.next());
         }
-
-        let mut lines = r.lines_at(r.len_lines(LineType::LF_CR), LineType::LF_CR);
-        assert_eq!(None, lines.next());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1888,16 +2107,18 @@ mod tests {
     fn lines_at_02() {
         let text = lines_text();
         let r = Rope::from_str(&text);
-        let s = r.slice(34..2031);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..2031);
 
-        for i in 0..s.len_lines(LineType::LF_CR) {
-            let line = s.line(i, LineType::LF_CR);
-            let mut lines = s.lines_at(i, LineType::LF_CR);
-            assert_eq!(Some(line), lines.next());
+            for i in 0..s.len_lines(LineType::LF_CR) {
+                let line = s.line(i, LineType::LF_CR);
+                let mut lines = s.lines_at(i, LineType::LF_CR);
+                assert_eq!(Some(line), lines.next());
+            }
+
+            let mut lines = s.lines_at(s.len_lines(LineType::LF_CR), LineType::LF_CR);
+            assert_eq!(None, lines.next());
         }
-
-        let mut lines = s.lines_at(s.len_lines(LineType::LF_CR), LineType::LF_CR);
-        assert_eq!(None, lines.next());
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1906,13 +2127,15 @@ mod tests {
     fn lines_at_03() {
         let text = lines_text();
         let r = Rope::from_str(&text);
-        let s = r.slice(34..34);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..34);
 
-        let mut lines = s.lines_at(0, LineType::LF_CR);
-        assert_eq!("", lines.next().unwrap());
+            let mut lines = s.lines_at(0, LineType::LF_CR);
+            assert_eq!("", lines.next().unwrap());
 
-        let mut lines = s.lines_at(1, LineType::LF_CR);
-        assert_eq!(None, lines.next());
+            let mut lines = s.lines_at(1, LineType::LF_CR);
+            assert_eq!(None, lines.next());
+        }
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1938,29 +2161,31 @@ mod tests {
     fn lines_iter_size_hint_01() {
         let text = lines_text();
         let r = Rope::from_str(&text);
-        let s = r.slice(34..2031);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..2031);
 
-        let mut lines = s.lines(LineType::LF_CR);
-        let mut line_count = lines.clone().count();
+            let mut lines = s.lines(LineType::LF_CR);
+            let mut line_count = lines.clone().count();
 
-        // Forward.
-        assert_eq!(line_count, lines.size_hint().0);
-        while let Some(_) = lines.next() {
-            line_count -= 1;
+            // Forward.
+            assert_eq!(line_count, lines.size_hint().0);
+            while let Some(_) = lines.next() {
+                line_count -= 1;
+                assert_eq!(line_count, lines.size_hint().0);
+            }
+            assert_eq!(line_count, 0);
+            assert_eq!(line_count, lines.size_hint().0);
+
+            // Backward.
+            lines = lines.reversed();
+            line_count = lines.clone().count();
+            assert_eq!(line_count, lines.size_hint().0);
+            while let Some(_) = lines.next() {
+                line_count -= 1;
+                assert_eq!(line_count, lines.size_hint().0);
+            }
+            assert_eq!(line_count, 0);
             assert_eq!(line_count, lines.size_hint().0);
         }
-        assert_eq!(line_count, 0);
-        assert_eq!(line_count, lines.size_hint().0);
-
-        // Backward.
-        lines = lines.reversed();
-        line_count = lines.clone().count();
-        assert_eq!(line_count, lines.size_hint().0);
-        while let Some(_) = lines.next() {
-            line_count -= 1;
-            assert_eq!(line_count, lines.size_hint().0);
-        }
-        assert_eq!(line_count, 0);
-        assert_eq!(line_count, lines.size_hint().0);
     }
 }

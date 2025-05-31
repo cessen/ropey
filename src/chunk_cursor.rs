@@ -28,10 +28,17 @@ struct StackItem<'a> {
 /// Cursor API for traversing the chunks of a rope.
 #[derive(Debug, Clone)]
 pub struct ChunkCursor<'a> {
+    // Note: empty and ignored when `str_slice` below is `Some`.
     node_stack: Vec<StackItem<'a>>,
 
-    // The byte range within the root node that is considered part of this
-    // cursor's contents.
+    // If this is `Some`, then the chunk cursor is operating on a string slice,
+    // not a normal rope.  In that case, `node_stack` above is unused and should
+    // be empty.
+    str_slice: Option<&'a str>,
+
+    // The byte range within the root node/string slice that is considered part
+    // of this cursor's contents. For string slices this should always be set to
+    // `[0, length_of_str]`.
     byte_range: [usize; 2],
 }
 
@@ -147,6 +154,10 @@ impl<'a> ChunkCursor<'a> {
     /// Runs in O(1) time.
     #[inline(always)]
     pub fn chunk(&self) -> &'a str {
+        if let Some(text) = self.str_slice {
+            return text;
+        }
+
         self.chunk_slice().as_str().unwrap()
     }
 
@@ -154,6 +165,10 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Since it's a chunk, it's guaranteed to be contiguous text.
     pub(crate) fn chunk_slice(&self) -> RopeSlice<'a> {
+        if let Some(text) = self.str_slice {
+            return text.into();
+        }
+
         let leaf = self.node_stack.last().unwrap();
 
         let start = if leaf.byte_offset < self.byte_range[0] {
@@ -174,6 +189,10 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Runs in O(1) time.
     pub fn at_first(&self) -> bool {
+        if let Some(_) = self.str_slice {
+            return true;
+        }
+
         let leaf = &self.node_stack.last().unwrap();
         leaf.byte_offset <= self.byte_range[0]
     }
@@ -182,6 +201,10 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Runs in O(1) time.
     pub fn at_last(&self) -> bool {
+        if let Some(_) = self.str_slice {
+            return true;
+        }
+
         let leaf = &self.node_stack.last().unwrap();
         (leaf.byte_offset + leaf.info.bytes) >= self.byte_range[1]
     }
@@ -191,6 +214,10 @@ impl<'a> ChunkCursor<'a> {
     /// Runs in O(1) time.
     #[inline]
     pub fn byte_offset(&self) -> usize {
+        if let Some(_) = self.str_slice {
+            return 0;
+        }
+
         // Offset from start of root.
         let offset = self.node_stack.last().unwrap().byte_offset;
 
@@ -203,6 +230,10 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the byte offset from the start of the current chunk to the end of the text.
     #[inline]
     pub(crate) fn byte_offset_from_end(&self) -> usize {
+        if let Some(_) = self.str_slice {
+            return self.byte_range[1];
+        }
+
         // Offset from start of root.
         let offset = self.node_stack.last().unwrap().byte_offset;
 
@@ -230,6 +261,7 @@ impl<'a> ChunkCursor<'a> {
 
         let mut cursor = ChunkCursor {
             node_stack: vec![],
+            str_slice: None,
             byte_range: byte_range,
         };
 
@@ -278,6 +310,18 @@ impl<'a> ChunkCursor<'a> {
         }
 
         Ok(cursor)
+    }
+
+    pub(crate) fn from_str(text: &'a str) -> crate::Result<Self> {
+        Ok(ChunkCursor {
+            node_stack: vec![],
+            str_slice: Some(text),
+            byte_range: [0, text.len()],
+        })
+    }
+
+    pub(crate) fn is_from_str_slice(&self) -> bool {
+        self.str_slice.is_some()
     }
 
     /// Attempts to advance the cursor to the next chunk that contains a line
@@ -505,7 +549,7 @@ impl<'a> ChunkCursor<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rope_builder::RopeBuilder, Rope};
+    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -752,6 +796,33 @@ mod tests {
     }
 
     #[test]
+    fn chunk_cursor_07() {
+        let texts = [TEXT, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+
+            let mut cursor = t.chunk_cursor();
+
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            assert_eq!(false, cursor.next());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            assert_eq!(false, cursor.prev());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+        }
+    }
+
+    #[test]
     fn chunk_cursor_at_01() {
         let r = Rope::from_str(TEXT);
 
@@ -826,6 +897,23 @@ mod tests {
         let r = Rope::from_str("foo");
         let s = r.slice(1..2);
         s.chunk_cursor_at(2);
+    }
+
+    #[test]
+    fn chunk_cursor_at_06() {
+        let texts = [TEXT, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+
+            for i in 0..=text.len() {
+                let cursor = t.chunk_cursor_at(i);
+
+                assert!(cursor.at_first());
+                assert!(cursor.at_last());
+                assert_eq!(cursor.byte_offset(), 0);
+                assert_eq!(cursor.chunk(), text);
+            }
+        }
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
@@ -1028,5 +1116,36 @@ mod tests {
         while cursor.prev_with_line_boundary(LF_CR).is_some() {}
         assert!(cursor.at_first());
         assert_eq!(0, cursor.byte_offset());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn chunk_cursor_line_boundary_05() {
+        use crate::LineType::LF_CR;
+        let l_text = lines_text();
+        let texts = [&l_text, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+            let mut cursor = t.chunk_cursor();
+
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            // Forward.
+            assert!(cursor.next_with_line_boundary(LF_CR).is_none());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+
+            // Backward.
+            assert!(cursor.prev_with_line_boundary(LF_CR).is_none());
+            assert!(cursor.at_first());
+            assert!(cursor.at_last());
+            assert_eq!(cursor.byte_offset(), 0);
+            assert_eq!(cursor.chunk(), text);
+        }
     }
 }
