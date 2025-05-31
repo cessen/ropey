@@ -150,8 +150,8 @@ impl<'a> Chunks<'a> {
         node_info: &'a TextInfo,
         byte_range: [usize; 2],
         at_byte_idx: usize,
-    ) -> (Self, usize) {
-        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
+    ) -> crate::Result<(Self, usize)> {
+        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx)?;
         let byte_offset = byte_range[0] + cursor.byte_offset();
         let at_end = at_byte_idx == byte_range[1];
 
@@ -161,7 +161,7 @@ impl<'a> Chunks<'a> {
             is_reversed: false,
         };
 
-        (chunks, if at_end { at_byte_idx } else { byte_offset })
+        Ok((chunks, if at_end { at_byte_idx } else { byte_offset }))
     }
 
     fn next_impl(&mut self) -> Option<&'a str> {
@@ -293,19 +293,19 @@ impl<'a> Bytes<'a> {
         node_info: &'a TextInfo,
         byte_range: [usize; 2],
         at_byte_idx: usize,
-    ) -> Self {
-        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
+    ) -> crate::Result<Self> {
+        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx)?;
         let chunk = cursor.chunk();
         let byte_offset = cursor.byte_offset();
 
-        Bytes {
+        Ok(Bytes {
             cursor: cursor,
             current_chunk: chunk.as_bytes(),
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_end: at_byte_idx == byte_range[1],
             is_reversed: false,
-        }
+        })
     }
 
     #[inline(always)]
@@ -432,21 +432,23 @@ impl<'a> Chars<'a> {
         node_info: &'a TextInfo,
         byte_range: [usize; 2],
         at_byte_idx: usize,
-    ) -> Self {
-        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx);
+    ) -> crate::Result<Self> {
+        let cursor = ChunkCursor::new(node, node_info, byte_range, at_byte_idx)?;
         let chunk = cursor.chunk();
         let byte_offset = cursor.byte_offset();
 
-        assert!(chunk.is_char_boundary(at_byte_idx - byte_range[0] - byte_offset));
+        if !chunk.is_char_boundary(at_byte_idx - byte_range[0] - byte_offset) {
+            return Err(crate::Error::NonCharBoundary);
+        }
 
-        Chars {
+        Ok(Chars {
             cursor: cursor,
             current_chunk: chunk,
             chunk_byte_idx: byte_offset,
             byte_idx_in_chunk: at_byte_idx - byte_range[0] - byte_offset,
             at_end: at_byte_idx == byte_range[1],
             is_reversed: false,
-        }
+        })
     }
 
     #[inline(always)]
@@ -633,22 +635,26 @@ mod lines {
             byte_range: [usize; 2],
             at_line_idx: usize,
             line_type: LineType,
-        ) -> Self {
+        ) -> crate::Result<Self> {
             let slice = RopeSlice::new(node, node_info, byte_range);
             let total_lines = slice.len_lines(line_type);
+            if dbg!(at_line_idx) > dbg!(total_lines) {
+                return Err(crate::Error::OutOfBounds);
+            }
             let at_byte_idx = slice.line_to_byte_idx(at_line_idx, line_type);
 
-            let cursor = ChunkCursor::new(node, node_info, byte_range, byte_range[0] + at_byte_idx);
+            let cursor =
+                ChunkCursor::new(node, node_info, byte_range, byte_range[0] + at_byte_idx)?;
             let leaf_byte_idx = at_byte_idx - cursor.byte_offset();
 
-            Lines {
+            Ok(Lines {
                 cursor: cursor,
                 line_type: line_type,
                 total_lines: total_lines,
                 leaf_byte_idx: leaf_byte_idx,
                 current_line_idx: at_line_idx,
                 is_reversed: false,
-            }
+            })
         }
 
         fn next_impl(&mut self) -> Option<RopeSlice<'a>> {
@@ -1040,6 +1046,21 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn chunks_at_03() {
+        let r = Rope::from_str("foo");
+        r.chunks_at(4);
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunks_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        s.chunks_at(2);
+    }
+
+    #[test]
     #[cfg_attr(miri, ignore)]
     fn chunks_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);
@@ -1171,6 +1192,21 @@ mod tests {
 
         let mut bytes = s.bytes_at(text.len());
         assert_eq!(None, bytes.next());
+    }
+
+    #[test]
+    #[should_panic]
+    fn bytes_at_03() {
+        let r = Rope::from_str("foo");
+        r.bytes_at(4);
+    }
+
+    #[test]
+    #[should_panic]
+    fn bytes_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        s.bytes_at(2);
     }
 
     #[test]
@@ -1306,6 +1342,21 @@ mod tests {
 
         let mut chars = s.chars_at(text.len());
         assert_eq!(None, chars.next());
+    }
+
+    #[test]
+    #[should_panic]
+    fn chars_at_03() {
+        let r = Rope::from_str("foo");
+        r.chars_at(4);
+    }
+
+    #[test]
+    #[should_panic]
+    fn chars_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        s.chars_at(2);
     }
 
     #[test]
@@ -1862,6 +1913,23 @@ mod tests {
 
         let mut lines = s.lines_at(1, LineType::LF_CR);
         assert_eq!(None, lines.next());
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[should_panic]
+    fn lines_at_04() {
+        let r = Rope::from_str("AA\nA");
+        r.lines_at(3, LineType::LF_CR);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[should_panic]
+    fn lines_at_05() {
+        let r = Rope::from_str("AA\nA");
+        let s = r.slice(1..2);
+        s.lines_at(2, LineType::LF_CR);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]

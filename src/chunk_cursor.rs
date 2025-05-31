@@ -223,8 +223,10 @@ impl<'a> ChunkCursor<'a> {
         info: &'a TextInfo,
         byte_range: [usize; 2],
         at_byte_idx: usize,
-    ) -> Self {
-        debug_assert!(byte_range[0] <= at_byte_idx && at_byte_idx <= byte_range[1]);
+    ) -> crate::Result<Self> {
+        if at_byte_idx < byte_range[0] || at_byte_idx > byte_range[1] {
+            return Err(crate::Error::OutOfBounds);
+        }
 
         let mut cursor = ChunkCursor {
             node_stack: vec![],
@@ -275,7 +277,7 @@ impl<'a> ChunkCursor<'a> {
             cursor.prev();
         }
 
-        cursor
+        Ok(cursor)
     }
 
     /// Attempts to advance the cursor to the next chunk that contains a line
@@ -809,6 +811,21 @@ mod tests {
             let cursor = s.chunk_cursor_at(i);
             assert_eq!("A", cursor.chunk());
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_cursor_at_04() {
+        let r = Rope::from_str("foo");
+        r.chunk_cursor_at(4);
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_cursor_at_05() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        s.chunk_cursor_at(2);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]

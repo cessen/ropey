@@ -95,6 +95,7 @@ impl<'a> RopeSlice<'a> {
     /// - If the start of the range is greater than the end.
     /// - If the end of the range is out of bounds (i.e. `end > len()`).
     /// - If the range ends are not on char boundaries.
+    #[track_caller]
     #[inline(always)]
     pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'a>
     where
@@ -102,7 +103,7 @@ impl<'a> RopeSlice<'a> {
     {
         match self.try_slice(byte_range) {
             Ok(slice) => slice,
-            Err(e) => e.panic_with_msg(),
+            Err(e) => panic!("{}", e),
         }
     }
 

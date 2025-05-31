@@ -264,11 +264,12 @@ impl Rope {
     ///
     /// - If `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
     /// - If `byte_idx` is not on a char boundary.
+    #[track_caller]
     #[inline]
     pub fn insert(&mut self, byte_idx: usize, text: &str) {
         match self.try_insert(byte_idx, text) {
             Ok(_) => {}
-            Err(e) => e.panic_with_msg(),
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -318,6 +319,7 @@ impl Rope {
     /// - If the start of the range is greater than the end.
     /// - If the end of the range is out of bounds (i.e. `end > len()`).
     /// - If the range ends are not on char boundaries.
+    #[track_caller]
     #[inline]
     pub fn remove<R>(&mut self, byte_range: R)
     where
@@ -325,7 +327,7 @@ impl Rope {
     {
         match self.try_remove(byte_range) {
             Ok(_) => {}
-            Err(e) => e.panic_with_msg(),
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -353,6 +355,7 @@ impl Rope {
     /// - If the start of the range is greater than the end.
     /// - If the end of the range is out of bounds (i.e. `end > len()`).
     /// - If the range ends are not on char boundaries.
+    #[track_caller]
     #[inline]
     pub fn slice<R>(&self, byte_range: R) -> RopeSlice
     where
@@ -360,7 +363,7 @@ impl Rope {
     {
         match self.try_slice(byte_range) {
             Ok(slice) => slice,
-            Err(e) => e.panic_with_msg(),
+            Err(e) => panic!("{}", e),
         }
     }
 
