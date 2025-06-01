@@ -3,15 +3,20 @@
 
 ## [Unreleased]
 
+- Move esoteric functionality to new `extra` module.
+- Add function to check if two ropes are instances of each other.
+- Allow constructing `RopeSlice`s directly from `&str` slices.
+- "Owning slices" can now be edited, which implicitly converts them to normal ropes.
+- Improved error reporting.
+- Misc documentation improvements.
+- Misc bug fixes.
+
 
 ## [2.0.0 alpha 2] - 2024-10-21
 
 ### Bug fixes
 
 - Fixed `chunks_at()`.
-
-### Misc
-- Memory overhead has been significantly reduced for ropes built up by many small coherent insertions.
 
 
 ## [2.0.0 alpha 1] - 2024-10-20
