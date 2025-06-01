@@ -683,7 +683,7 @@ mod lines {
         ) -> crate::Result<Self> {
             let slice = RopeSlice::new(node, node_info, byte_range);
             let total_lines = slice.len_lines(line_type);
-            if dbg!(at_line_idx) > dbg!(total_lines) {
+            if at_line_idx > total_lines {
                 return Err(crate::Error::OutOfBounds);
             }
             let at_byte_idx = slice.line_to_byte_idx(at_line_idx, line_type);
