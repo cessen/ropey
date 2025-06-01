@@ -86,7 +86,7 @@ fn iter_prev(c: &mut Criterion) {
 
     group.bench_function("chunks", |bench| {
         let r = Rope::from_str(&large_string());
-        let itr_src = r.chunks_at(r.len());
+        let itr_src = r.chunks_at(r.len()).0;
         let mut itr = itr_src.clone();
         bench.iter(|| {
             if itr.prev().is_none() {
