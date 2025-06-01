@@ -97,9 +97,11 @@ pub struct Rope {
     pub(crate) root: Node,
     pub(crate) root_info: TextInfo,
 
-    // Normally just set to the full range of `root`, but can be used to create
-    // ropes that behave as "owned slices".
-    pub(crate) owned_slice_byte_range: [usize; 2],
+    /// Specifies the sub-range of `root` to use as this rope's
+    /// contents.  Normally just set to the full range of `root`, but
+    /// [`crate::extra::disconnect_slice()`] uses this to create "disconnected
+    /// slices".
+    pub(crate) byte_range: [usize; 2],
 }
 
 impl Rope {
@@ -112,7 +114,7 @@ impl Rope {
         Rope {
             root: Node::Leaf(Arc::new(Text::new())),
             root_info: TextInfo::new(),
-            owned_slice_byte_range: [0; 2],
+            byte_range: [0; 2],
         }
     }
 
@@ -331,6 +333,24 @@ impl Rope {
         }
     }
 
+    /// Converts a "disconnected slice" into a proper rope, in preparation for
+    /// edits.
+    fn trim_disconnected_slice(&mut self) {
+        let trim_range_start = [0, self.byte_range[0]];
+        let trim_range_end = [self.byte_range[1], self.root_info.bytes];
+
+        // Note: unlike with normal removal, we don't have to worry about crlf
+        // splits because we know we're trimming off the ends, not removing a
+        // section in the middle.
+        self.remove_core_impl(trim_range_end)
+            .expect("Trimming to slice range should always succeed.");
+        self.remove_core_impl(trim_range_start)
+            .expect("Trimming to slice range should always succeed.");
+
+        self.byte_range[0] = 0;
+        self.byte_range[1] = self.root_info.bytes;
+    }
+
     //---------------------------------------------------------
     // Slicing.
 
@@ -493,7 +513,7 @@ impl Rope {
 
     #[inline(always)]
     fn get_byte_range(&self) -> [usize; 2] {
-        self.owned_slice_byte_range
+        self.byte_range
     }
 }
 
@@ -507,13 +527,6 @@ impl Rope {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     pub fn try_insert(&mut self, byte_idx: usize, text: &str) -> Result<()> {
-        // Editing owning slices is not allowed.
-        if self.owned_slice_byte_range[0] != 0
-            || self.owned_slice_byte_range[1] != self.root_info.bytes
-        {
-            return Err(CannotEditOwningSlice);
-        }
-
         if byte_idx > self.len() {
             return Err(OutOfBounds);
         }
@@ -526,6 +539,17 @@ impl Rope {
         // consistent this way, and might help catch bugs in client code.
         if text.is_empty() && !self.is_char_boundary(byte_idx) {
             return Err(NonCharBoundary);
+        }
+
+        // If this is a "disconnected slice", rather than a normal rope, then
+        // we need to first trim it to a normal rope before proceeding with
+        // editing.
+        if self.byte_range[0] != 0 || self.byte_range[1] != self.root_info.bytes {
+            if !self.is_char_boundary(byte_idx) {
+                // Don't bother if the edit is going to fail anyway.
+                return Err(NonCharBoundary);
+            }
+            self.trim_disconnected_slice();
         }
 
         // We have two cases here:
@@ -611,13 +635,6 @@ impl Rope {
         // Inner function to avoid code duplication on code gen due to the
         // generic type of `byte_range`.
         fn inner(rope: &mut Rope, start: Bound<&usize>, end: Bound<&usize>) -> Result<()> {
-            // Editing owning slices is not allowed.
-            if rope.owned_slice_byte_range[0] != 0
-                || rope.owned_slice_byte_range[1] != rope.root_info.bytes
-            {
-                return Err(CannotEditOwningSlice);
-            }
-
             let start_idx = start_bound_to_num(start).unwrap_or(0);
             let end_idx = end_bound_to_num(end).unwrap_or_else(|| rope.len());
 
@@ -635,6 +652,13 @@ impl Rope {
             // discovers that one of the ends isn't a char boundary.
             if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
                 return Err(NonCharBoundary);
+            }
+
+            // If this is a "disconnected slice", rather than a normal rope,
+            // then we need to first trim it to a normal rope before proceeding
+            // with editing.
+            if rope.byte_range[0] != 0 || rope.byte_range[1] != rope.root_info.bytes {
+                rope.trim_disconnected_slice();
             }
 
             // Do the actual removal.
@@ -719,7 +743,7 @@ impl Rope {
             self.root_info = children.combined_text_info();
         }
 
-        self.owned_slice_byte_range[1] = self.root_info.bytes;
+        self.byte_range[1] = self.root_info.bytes;
 
         Ok(())
     }
@@ -733,13 +757,13 @@ impl Rope {
     #[inline(always)]
     fn remove_core_impl(&mut self, byte_range: [usize; 2]) -> Result<bool> {
         debug_assert!(byte_range[0] <= byte_range[1]);
-        debug_assert!(byte_range[1] <= self.len());
+        debug_assert!(byte_range[1] <= self.root_info.bytes);
 
         // Special case: if we're removing everything, just replace with a
         // fresh new rope.  This is to ensure the invariant that an empty
         // rope is always composed of a single empty leaf, which is not
         // ensured by the general removal code.
-        if byte_range[0] == 0 && byte_range[1] == self.len() {
+        if byte_range[0] == 0 && byte_range[1] == self.root_info.bytes {
             *self = Rope::new();
             return Ok(false);
         }
@@ -747,7 +771,7 @@ impl Rope {
         let (new_info, created_boundary) =
             self.root.remove_byte_range(byte_range, self.root_info)?;
         self.root_info = new_info;
-        self.owned_slice_byte_range[1] = self.root_info.bytes;
+        self.byte_range[1] = self.root_info.bytes;
 
         Ok(created_boundary)
     }

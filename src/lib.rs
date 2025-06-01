@@ -251,10 +251,6 @@ pub enum Error {
 
     /// The range given was intrinsically invalid (e.g. inverted).
     InvalidRange,
-
-    /// An attempt was made to edit an owning slice, which is not permitted. See
-    /// [`disconnect_slice()`](crate::extra::disconnect_slice()) for details.
-    CannotEditOwningSlice,
 }
 
 impl std::error::Error for Error {}
@@ -262,12 +258,9 @@ impl std::error::Error for Error {}
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Error::NonCharBoundary => write!(f, "byte index is not a char boundary"),
+            Error::NonCharBoundary => write!(f, "byte index is not on a char boundary"),
             Error::OutOfBounds => write!(f, "index is out of bounds"),
             Error::InvalidRange => write!(f, "index range is invalid: end < start"),
-            Error::CannotEditOwningSlice => {
-                write!(f, "edit attempted on owned slice")
-            }
         }
     }
 }

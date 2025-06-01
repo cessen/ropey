@@ -133,7 +133,7 @@ impl RopeBuilder {
         Rope {
             root: root,
             root_info: root_info,
-            owned_slice_byte_range: [0, root_info.bytes],
+            byte_range: [0, root_info.bytes],
         }
     }
 

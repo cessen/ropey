@@ -31,7 +31,7 @@ use crate::{slice::SliceInner, tree::Node, Rope, RopeSlice};
 ///
 /// Runs in O(1) time.
 pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
-    if a.owned_slice_byte_range != b.owned_slice_byte_range {
+    if a.byte_range != b.byte_range {
         return false;
     }
 
@@ -67,7 +67,7 @@ pub fn disconnect_slice(slice: RopeSlice) -> Option<Rope> {
         }) => Some(Rope {
             root: root.clone(),
             root_info: *root_info,
-            owned_slice_byte_range: byte_range,
+            byte_range: byte_range,
         }),
 
         RopeSlice(SliceInner::Str(_)) => None,
