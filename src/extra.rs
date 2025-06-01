@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use crate::{tree::Node, Rope, RopeSlice};
+use crate::{slice::SliceInner, tree::Node, Rope, RopeSlice};
 
 /// Returns true if both ropes point to precisely the same in-memory data.
 ///
@@ -60,6 +60,9 @@ pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
 /// for it are rare, and you should stick to normal `Rope`s and `RopeSlice`s
 /// when you can.
 ///
+/// Returns `None` if the `RopeSlice` is from a `&str` rather than from a
+/// `Rope` (see the `From` impl for building `RopeSlice`s from `&str`s).
+///
 /// Runs in O(1) time.  Space usage is constant unless the original `Rope`
 /// is edited, causing the otherwise shared contents to diverge.
 ///
@@ -68,11 +71,19 @@ pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
 /// This function does not panic itself.  However, if edits are attempted
 /// on the resulting `Rope` with the panicking variants `insert()` and
 /// `remove()`, they will panic.
-pub fn slice_to_owning_slice(slice: RopeSlice) -> Rope {
-    Rope {
-        root: slice.root.clone(),
-        root_info: *slice.root_info,
-        owned_slice_byte_range: slice.byte_range,
+pub fn slice_to_owning_slice(slice: RopeSlice) -> Option<Rope> {
+    match slice {
+        RopeSlice(SliceInner::Rope {
+            root,
+            root_info,
+            byte_range,
+        }) => Some(Rope {
+            root: root.clone(),
+            root_info: *root_info,
+            owned_slice_byte_range: byte_range,
+        }),
+
+        RopeSlice(SliceInner::Str(_)) => None,
     }
 }
 

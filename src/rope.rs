@@ -477,6 +477,11 @@ impl Rope {
     // `crate::shared_impl`.
 
     #[inline(always)]
+    fn get_str_text(&self) -> Option<&str> {
+        None
+    }
+
+    #[inline(always)]
     fn get_root(&self) -> &Node {
         &self.root
     }
