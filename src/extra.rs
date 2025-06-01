@@ -1,31 +1,33 @@
 //! Less commonly needed and/or esoteric functionality.
 //!
-//! As a general rule, the functions provided by this module should be
-//! treated with a little suspicion.  There are legitimate uses for them, which
-//! is why they're provided.  But their use should be treated as at least a *bit*
-//! of a code smell.
-//!
-//! Additionally, the functionality here has a worse benefit-to-footgun ratio
-//! than the rest of Ropey, and should be used carefully even when it is
-//! legitimately needed.
+//! **Warning:** the functions in this module expose you to esoterica of Ropey's
+//! internal data model, and take you off the beaten path of Ropey's intended
+//! API semantics.  They are nevertheless API promises and can be depended on to
+//! continue functioning as documented.  However, you should **read their
+//! documentation carefully** and make sure you fully understand exactly what
+//! they do and don't promise before using them.
 
 use std::sync::Arc;
 
 use crate::{slice::SliceInner, tree::Node, Rope, RopeSlice};
 
-/// Returns true if both ropes point to precisely the same in-memory data.
+/// Returns true if both ropes internally point to the same memory and share the
+/// same content.
 ///
-/// This happens when one of the ropes is a clone of the other and
-/// neither have been modified since then.  Because clones initially
-/// share all the same data, it can be useful to check if they still
-/// point to precisely the same memory as a way of determining
-/// whether they are both still unmodified.
+/// The API promises of this function are narrow and specific.  The following
+/// two things and *only* the following two things are guaranteed:
 ///
-/// Note: this is distinct from checking for equality: two ropes can
-/// have the same *contents* (equal) but be stored in different
-/// memory locations (not instances).  Importantly, two clones that
-/// post-cloning are modified identically will *not* be instances
-/// anymore, even though they will have equal contents.
+/// 1. If rope A and rope B are *unmodified* clones of each other (i.e. no edits
+///    have been made to either since cloning), then this function returns true.
+///    This applies to both direct and indirect clones, since cloning is
+///    transitive.
+/// 2. If the text contents of rope A and rope B are different, then this
+///    function returns false.
+///
+/// This function's return value may change between non-breaking releases in all
+/// other cases.  For example: rope B is cloned from rope A, and then the same
+/// edit is made to both ropes.  They have then both been modified since cloning
+/// (not case 1), but they also compare equal (not case 2 either).
 ///
 /// Runs in O(1) time.
 pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
@@ -40,38 +42,23 @@ pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
     }
 }
 
-/// Creates a cheap, non-editable `Rope` from a `RopeSlice`.
+/// Disconnects a `RopeSlice` from its originating `Rope`, creating a new
+/// independent `Rope` in O(1) time.
 ///
-/// The resulting `Rope` is guaranteed to not take up any additional
-/// space itself beyond a small constant size, instead referencing the
-/// original data.  The difference between this and a `RopeSlice` is that
-/// this co-owns the data with the original `Rope` just like a `Rope`
-/// clone would, and thus can be passed around freely (e.g. across thread
-/// boundaries).  Additionally, its existence doesn't prevent the original
-/// `Rope` from being edited, dropped, etc.
+/// This function is like `Into<Rope>` (the normal way to make `Rope`s from
+/// `RopeSlice`s), but with the time/space complexity of `Rope` cloning.  In
+/// exchange for this efficiency, there is the possibility of failure under some
+/// circumstances.
 ///
-/// This is distinct from using `Into<Rope>` on a `RopeSlice`, which edits
-/// the resulting `Rope`'s data to trim it to the range of the slice, which
-/// is both more expensive and results in space overhead compared to this
-/// function.  However, a `Rope` from `Into<Rope>` will be a normal editable
-/// `Rope`, whereas `Rope`s produced from this function are read-only.
+/// Success is guaranteed for `RopeSlice`s of `Rope`s.  Whether this function
+/// succeeds for `RopeSlice`s constructed in other ways (see e.g. `impl
+/// From<&str> for RopeSlice`) is unspecified, and may change between
+/// non-breaking releases.  On failure, returns `None`.
 ///
-/// **You probably don't need to use this function.**  Legitimate use cases
-/// for it are rare, and you should stick to normal `Rope`s and `RopeSlice`s
-/// when you can.
-///
-/// Returns `None` if the `RopeSlice` is from a `&str` rather than from a
-/// `Rope` (see the `From` impl for building `RopeSlice`s from `&str`s).
-///
-/// Runs in O(1) time.  Space usage is constant unless the original `Rope`
-/// is edited, causing the otherwise shared contents to diverge.
-///
-/// # Panics
-///
-/// This function does not panic itself.  However, if edits are attempted
-/// on the resulting `Rope` with the panicking variants `insert()` and
-/// `remove()`, they will panic.
-pub fn slice_to_owning_slice(slice: RopeSlice) -> Option<Rope> {
+/// Like `Rope` cloning, runs in O(1) time, and the resulting `Rope` shares its
+/// data with the `Rope` it comes from, taking up O(1) additional space until
+/// edits are made to either one.
+pub fn disconnect_slice(slice: RopeSlice) -> Option<Rope> {
     match slice {
         RopeSlice(SliceInner::Rope {
             root,
