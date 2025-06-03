@@ -1,9 +1,10 @@
-//! Ropey is a utf8 text rope for Rust.  It is fast, robust, and can handle huge
-//! texts and memory-incoherent edits with ease.
+//! Ropey is a utf8 text rope for Rust.  It is efficient, robust, and can handle
+//! large texts (measured in gigabytes) with ease.
 //!
-//! Like Rust's built-in string types, Ropey stores text in utf8 and uses byte
-//! indices to specify positions in the text, and invalid utf8 creation is
-//! prevented at run time.
+//! Ropey stores text as utf8 and uses byte indices into that utf8 data to
+//! specify positions in the text.  Like Rust's built-in `String` and `&str`
+//! types, creation of invalid utf8 data through those indices is prevented at
+//! runtime.
 //!
 //! The library is made up of four main components:
 //!
@@ -81,41 +82,9 @@ loading of non-utf8 text files.
 //! - The [`Chunks`](iter::Chunks) iterator.
 //! - The [`ChunkCursor`](chunk_cursor::ChunkCursor) type.
 //!
-//! Internally, each `Rope` stores text as a segemented collection of utf8
+//! Internally, each `Rope` stores text as a segmented collection of utf8
 //! strings.  The chunk APIs provide direct access to those strings as `&str`
-//! slices, allowing client code to work directly with the underlying utf8
-//! data.
-//!
-//!
-//! # Indexing Metrics
-//!
-//! In addition to indexing by byte, Ropey also supports some additional
-//! indexing metrics which can be enabled/disabled by the following crate
-//! features:
-//!
-//! - `metric_chars`: indexing by `char`.
-//! - `metric_utf16`: indexing by UTF16 code unit.
-//! - `metric_lines_lf`: indexing by line, recognizing only Line Feed as a line
-//!   break.
-//! - `metric_lines_lf_cr`: indexing by line, recognizing both Line Feed and
-//!   Carriage Return.
-//! - `metric_lines_unicode`: indexing by line, recognizing *all* Unicode line
-//!   breaks (as specified in [Unicode Annex
-//!   #14](https://www.unicode.org/reports/tr14/#BK)).
-//!
-//! Of these crate features, only `metric_lines_lf_cr` is enabled by default.
-//!
-//! The main APIs enabled by these features are just conversion to/from byte
-//! indices.  However, the line-based metrics additionally enable the `Lines`
-//! iterator and a convenience method for fetching individual lines as
-//! `RopeSlice`s.
-//!
-//! Note that since more than one line-based metric can be enabled
-//! simultaneously, all of Ropey's line-based APIs take [`LineType`] as a
-//! parameter to specify which line break(s) should be used.  This is admittedly
-//! a little awkward, and client code is encouraged to implement their own
-//! extension trait to wrap these APIs.  However, the benefit of this approach is
-//! that it allows conversion between different line break conventions if needed.
+//! slices, allowing client code to work directly with the underlying utf8 data.
 //!
 //!
 //! # A Note About Line Breaks
@@ -133,33 +102,57 @@ loading of non-utf8 text files.
 //! - `"Hello\nworld\n"` has 3 lines: `"Hello\n"`, `"world\n"`, and `""`.
 //!
 //! Importantly, **this departs from Rust's standard library**, which follows
-//! the Unix convention of treating `\n` as a line *ending* rather than
-//! a line *break*.  The reason for Ropey's departure is not to favor one
-//! convention over the other, but rather is to avoid being opinionated: the
-//! Unix convention is not universal, and it is easier to implement the Unix
+//! the Unix convention of treating `\n` as a line *ending* rather than a line
+//! *break*.  The reason for Ropey's departure is not to favor one convention
+//! over the other, but rather is to avoid being opinionated: the Unix
+//! convention is not universal, and it is easier to implement the Unix
 //! convention on top of Ropey's behavior than the other way around.  Client
 //! code is encouraged to choose and implement whichever convention they prefer
 //! on top of Ropey.
 //!
+//! Another thing you will run into with Ropey's line-based APIs is that they
+//! all take a [`LineType`] parameter.  This is because Ropey can track lines
+//! according to multiple conventions simultaneously (e.g. whether or not
+//! Carriage Return qualifies as a line break).  This additional parameter
+//! specifies which of those conventions to use for a call.  See  [`LineType`]'s
+//! documentation for more details.
 //!
-//! # A Note About SIMD Acceleration
+//!
+//! # Crate Features
+//!
+//! In addition to byte indices (Ropey's primary indexing metric), Ropey also
+//! has crate features to enable additional secondary indexing metrics:
+//!
+//! - `metric_chars`: indexing by `char`.
+//! - `metric_utf16`: indexing by UTF16 code unit.
+//! - `metric_lines_lf`: indexing by line with [`LineType::LF`].
+//! - `metric_lines_lf_cr`: indexing by line with [`LineType::LF_CR`].
+//! - `metric_lines_unicode`: indexing by line with [`LineType::All`].
+//!
+//! Of these crate features, only `metric_lines_lf_cr` is enabled by default.
+//!
+//! The main APIs enabled by these features are conversions to/from byte
+//! indices. However, the line-based metrics additionally enable the `Lines`
+//! iterator and a convenience method for fetching individual lines as
+//! `RopeSlice`s.
+//!
+//! ## A Note About SIMD Acceleration
 //!
 //! Ropey has a `simd` feature flag (enabled by default) that enables explicit
 //! SIMD on supported platforms to improve performance.
 //!
-//! There is a bit of a footgun here: if you disable default features to
-//! configure line break behavior (as per the section above) then SIMD will also
-//! get disabled, and performance will suffer.  So be careful to explicitly
-//! re-enable the `simd` feature flag (if desired) when doing that.
+//! There is a bit of a footgun here: if you disable default features (e.g. to
+//! configure secondary indexing metrics) then SIMD will also get disabled, and
+//! performance will suffer.  So be careful to explicitly re-enable the `simd`
+//! feature flag (if desired) when doing that.
 //!
+//! ## A Warning About Internal-Only Crate Features
 //!
-//! # A Warning About Internal-Only Crate Features
-//!
-//! Please avoid using a blanket `all-features` with Ropey, because there are some
-//! internal-only crate features that you probably don't want.  These features will
-//! not break any APIs, but they may substantially slow down Ropey and/or make it
-//! significantly more memory hungry.  The purpose of those features is for internal
-//! testing and debugging during Ropey development.
+//! Please avoid using a blanket `all-features` with Ropey, because there are
+//! some internal-only crate features that you probably don't want.  These
+//! features will not break any APIs, but they may substantially slow down Ropey
+//! and/or make it significantly more memory hungry.  The purpose of those
+//! features is for internal testing and debugging during Ropey development.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(clippy::collapsible_if)]
@@ -190,6 +183,48 @@ pub use rope_builder::RopeBuilder;
 pub use slice::RopeSlice;
 
 /// Specifies a set of line breaks to be recognized in Ropey's line-based APIs.
+///
+/// Ropey can track more than one line break convention simultaneously, and
+/// `LineType` is used to specify which convention to use for a given function
+/// call.  For example:
+///
+/// ```
+/// # use ropey::Rope;
+/// # #[cfg(any(feature = "metric_lines_lf", feature = "metric_lines_lf_cr"))]
+/// # use ropey::LineType;
+/// // Text with both an LF and CR line break.
+/// let text = Rope::from_str("Line 1\nLine 2\rLine 3");
+///
+/// # #[cfg(feature = "metric_lines_lf")]
+/// # {
+/// // A call with only LF as a line break, so it sees just two lines.
+/// assert_eq!("Line 1\n", text.line(0, LineType::LF));
+/// assert_eq!("Line 2\rLine 3", text.line(1, LineType::LF));
+/// # }
+///
+/// # #[cfg(feature = "metric_lines_lf_cr")]
+/// # {
+/// // A call with LF and CR as line breaks, so it sees three lines.
+/// assert_eq!("Line 1\n", text.line(0, LineType::LF_CR));
+/// assert_eq!("Line 2\r", text.line(1, LineType::LF_CR));
+/// assert_eq!("Line 3", text.line(2, LineType::LF_CR));
+/// # }
+///```
+///
+/// This is admittedly a little awkward if you only ever use one line break
+/// convention.  However, this approach provides a lot of flexibility that would
+/// otherwise be impossible.  A few examples:
+///
+/// - If you want your application to recognize all Unicode-specified line
+///   breaks, but you also need it to communicate with Language Server Protocol
+///   which only recognizes a small subset of that, you can track both
+///   conventions and use the latter only for LSP communication.
+/// - If you want your application to recognize LF and CR, but you also want to
+///   jump to compilation errors from a compiler that only recognizes LF, you
+///   can track both conventions and use Ropey's metric conversion functions to
+///   translate line numbers.
+/// - If desired, you can let your users switch between line break conventions
+///   for different documents.
 #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
 #[cfg(any(
     feature = "metric_lines_lf",
