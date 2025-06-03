@@ -236,7 +236,7 @@ impl<'a> From<&'a str> for RopeSlice<'a> {
     /// - Most operations become `O(N)` rather than `O(log N)`.  For short
     ///   strings this doesn't matter, but for long strings this can have
     ///   significant negative performance impacts.
-    /// - [`disconnect_slice()`](crate::extra::disconnect_slice()) will return
+    /// - [`disconnect_slice()`](crate::extra::disconnect_slice()) may return
     ///   `None`.
     ///
     /// Runs in O(1) time.
