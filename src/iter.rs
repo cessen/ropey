@@ -630,9 +630,12 @@ mod lines {
     impl<'a> Lines<'a> {
         /// Advances the iterator forward and returns the next value.
         ///
-        /// Runs in average-case O(log M) time (where M is the length of the
-        /// returned line) and worst-case O(log N) time (where N is the length
-        /// of the text).
+        /// The exact performance characteristics are involved, but can be
+        /// summarized as:
+        ///
+        /// - A single step of the iterator runs in worst-case O(log N).
+        /// - A full traversal of all lines (exhausting the iterator) runs in
+        ///   worst-case O(N).
         #[inline(always)]
         #[allow(clippy::should_implement_trait)]
         pub fn next(&mut self) -> Option<RopeSlice<'a>> {
@@ -645,9 +648,12 @@ mod lines {
 
         /// Advances the iterator backward and returns the previous value.
         ///
-        /// Runs in average-case O(log M) time (where M is the length of the
-        /// returned line) and worst-case O(log N) time (where N is the length
-        /// of the text).
+        /// The exact performance characteristics are involved, but can be
+        /// summarized as:
+        ///
+        /// - A single step of the iterator runs in worst-case O(log N).
+        /// - A full traversal of all lines (exhausting the iterator) runs in
+        ///   worst-case O(N).
         #[inline(always)]
         pub fn prev(&mut self) -> Option<RopeSlice<'a>> {
             if self.is_reversed {
