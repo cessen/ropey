@@ -21,6 +21,7 @@ features = [
   "metric_lines_lf_cr",
   "metric_lines_unicode",
 ]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["metric_lines_lf_cr", "simd"]

@@ -161,6 +161,7 @@ loading of non-utf8 text files.
 //! significantly more memory hungry.  The purpose of those features is for internal
 //! testing and debugging during Ropey development.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::comparison_chain)]
 #![allow(clippy::inline_always)]
@@ -189,8 +190,7 @@ pub use rope_builder::RopeBuilder;
 pub use slice::RopeSlice;
 
 /// Specifies a set of line breaks to be recognized in Ropey's line-based APIs.
-///
-/// **Requires one of the `metric_lines_*` feature flags.**
+#[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",
@@ -200,24 +200,20 @@ pub use slice::RopeSlice;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum LineType {
-    /// **Requires the `metric_lines_lf` feature flag.**
-    ///
     /// - LF (Line Feed)
     /// - CRLF (Carriage Return + Line Feed) &mdash; implicitly recognized, due to
     ///   CR being ignored.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_lf")))]
     #[cfg(feature = "metric_lines_lf")]
     LF,
 
-    /// **Requires the `metric_lines_lf_cr` feature flag.**
-    ///
     /// - LF (Line Feed)
     /// - CR (Carriage Return)
     /// - CRLF (Carriage Return + Line Feed)
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_lf_cr")))]
     #[cfg(feature = "metric_lines_lf_cr")]
     LF_CR,
 
-    /// **Requires the `metric_lines_unicode` feature flag.**
-    ///
     /// All Unicode line breaks (as specified in [Unicode Annex
     /// #14](https://www.unicode.org/reports/tr14/#BK)):
     ///
@@ -229,6 +225,7 @@ pub enum LineType {
     /// - NEL (Next Line)
     /// - Line Separator
     /// - Paragraph Separator
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_unicode")))]
     #[cfg(feature = "metric_lines_unicode")]
     All,
 }

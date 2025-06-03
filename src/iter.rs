@@ -601,8 +601,6 @@ mod lines {
 
     /// An iterator over a `Rope`'s lines.
     ///
-    /// **Requires one of the `metric_lines_*` feature flags.**
-    ///
     /// Notes:
     /// - What the iterator considers to be a line depends on the line type it
     ///   was created with.
@@ -610,6 +608,7 @@ mod lines {
     ///
     /// The last line is returned even if blank, in which case it
     /// is returned as an empty slice.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
         cursor: ChunkCursor<'a>,
@@ -844,6 +843,7 @@ mod lines {
     }
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",
