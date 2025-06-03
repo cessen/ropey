@@ -313,9 +313,6 @@ impl Children {
     /// first child that matches the given predicate.
     ///
     /// If no child matches the predicate, the last child is returned.
-    ///
-    /// The returned TextInfo has already had split-CRLF compensation
-    /// applied.
     #[cfg(any(
         feature = "metric_chars",
         feature = "metric_utf16",
@@ -357,9 +354,6 @@ impl Children {
     /// Return is (child_index, left_acc_byte_index)
     ///
     /// One-past-the end is valid, and will return the last child.
-    ///
-    /// The returned TextInfo has already had split-CRLF compensation
-    /// applied.
     pub fn search_byte_idx_only(&self, byte_idx: usize, bias_left: bool) -> (usize, usize) {
         debug_assert!(self.len() > 0);
 
@@ -386,9 +380,6 @@ impl Children {
     /// child that contains the given byte.
     ///
     /// One-past-the end is valid, and will return the last child.
-    ///
-    /// The returned TextInfo has already had split-CRLF compensation
-    /// applied.
     #[cfg(any(
         feature = "metric_chars",
         feature = "metric_utf16",
@@ -411,9 +402,6 @@ impl Children {
     /// child that contains the given char.
     ///
     /// One-past-the end is valid, and will return the last child.
-    ///
-    /// The returned TextInfo has already had split-CRLF compensation
-    /// applied.
     #[cfg(feature = "metric_chars")]
     pub fn search_char_idx(&self, char_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|end| char_idx < end.chars);
@@ -430,9 +418,6 @@ impl Children {
     /// child that contains the given utf16 code unit offset.
     ///
     /// One-past-the end is valid, and will return the last child.
-    ///
-    /// The returned TextInfo has already had split-CRLF compensation
-    /// applied.
     #[cfg(feature = "metric_utf16")]
     pub fn search_utf16_code_unit_idx(&self, utf16_idx: usize) -> (usize, TextInfo) {
         let (idx, accum) = self.search_by(|end| utf16_idx < end.utf16);
@@ -453,9 +438,6 @@ impl Children {
     /// text info.
     ///
     /// One-past-the end is valid, and will return the last child.
-    ///
-    /// The returned TextInfo has already had split-CRLF compensation
-    /// applied.
     #[cfg(any(
         feature = "metric_lines_lf",
         feature = "metric_lines_lf_cr",

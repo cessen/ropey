@@ -342,8 +342,7 @@ impl Node {
     ///   child that contains `metric_idx`, returning the child's index and
     ///   it's left-side accumulated text info within its sublings. See
     ///   `Children::search_*_idx()` for methods that do exactly this for
-    ///   various metrics.  Note that the returned TextInfo should already
-    ///   have split-CRLF compensation applied.
+    ///   various metrics.
     /// - `metric_subtractor`: a simple function that subtracts the relevant
     ///   metric in a TextInfo from a usize.
     #[cfg(any(
