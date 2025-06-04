@@ -25,7 +25,40 @@ struct StackItem<'a> {
     child_idx: usize,
 }
 
-/// Cursor API for traversing the chunks of a rope.
+/// Cursor for traversing the chunks of a `Rope` or `RopeSlice`.
+///
+/// The methods `next()` and `prev()` move the cursor to the next or previous
+/// chunk, and `chunk()` fetches the chunk that the cursor is currently on.
+///
+/// For example:
+///
+/// ```
+/// # use ropey::Rope;
+/// // Assume this rope has the chunks "Hello world, h" and "ow are you?".
+/// let text = Rope::from_str("Hello world, how are you?");
+/// # let text = {
+/// # let mut builder = ropey::RopeBuilder::new();
+/// # // Note: `_append_chunk_as_leaf()` is NOT part af the public API.
+/// # // Do not use it outside of Ropey's code base.
+/// # builder._append_chunk_as_leaf("Hello world, h");
+/// # builder._append_chunk_as_leaf("ow are you?");
+/// # builder.finish()
+/// # };
+///
+/// let mut cursor = text.chunk_cursor();
+///
+/// assert_eq!(cursor.chunk(), "Hello world, h");
+/// assert_eq!(cursor.next(), true);
+/// assert_eq!(cursor.chunk(), "ow are you?");
+/// assert_eq!(cursor.next(), false);
+/// assert_eq!(cursor.chunk(), "ow are you?");
+/// assert_eq!(cursor.prev(), true);
+/// assert_eq!(cursor.chunk(), "Hello world, h");
+/// ```
+///
+/// Note that unlike Ropey's iterators, `ChunkCursor` sits *on* a chunk, not
+/// between chunks.
+
 #[derive(Debug, Clone)]
 pub struct ChunkCursor<'a> {
     // Note: empty and ignored when `str_slice` below is `Some`.
