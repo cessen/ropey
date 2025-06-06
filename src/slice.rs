@@ -19,14 +19,24 @@ use crate::{iter::Lines, LineType};
 
 /// An immutable view into part of a `Rope`.
 ///
-/// Just like standard `&str` slices, `RopeSlice`s behave as if the text in
-/// their range is the only text that exists.  All indexing is relative to
-/// the start of their range, and all iterators and methods that return text
-/// truncate that text to the range of the slice.
-///
-/// In other words, the behavior of a `RopeSlice` is always identical to that
-/// of a full `Rope` created from the same text range.  Nothing should be
+/// `RopeSlice` is to `Rope` what `&str` is to `String`: `RopeSlice`s only know
+/// about the text within their range, all indexing is relative to their range,
+/// all iterators are truncated their range, etc.  Nothing should be too
 /// surprising here.
+///
+/// # A Warning About `From<&str>`
+///
+/// `RopeSlice` implements `From<&str>`, allowing you to create `RopeSlice`s
+/// directly from string slices without an intermediate `Rope`.  However, such
+/// `RopeSlice`s **are not normal** `RopeSlice`s. They are just a thin wrapper
+/// over the `&str` they were created from, and unlike normal `RopeSlice`s have
+/// no underlying rope data structure to rely on.
+///
+/// The most important implication of this is that most operations that are
+/// documented as running in `O(log N)` actually run in `O(N)` for such slices.
+/// For short strings (this feature's intended use case) this doesn't matter.
+/// However, for long strings this can have significant negative performance
+/// impacts.
 #[derive(Copy, Clone)]
 pub struct RopeSlice<'a>(pub(crate) SliceInner<'a>);
 
@@ -228,18 +238,16 @@ impl<'a> From<&'a Rope> for RopeSlice<'a> {
     }
 }
 
+/// Creates a `RopeSlice` directly from a string slice.
+///
+/// **Warning:** `RopeSlice`s created this way aren't normal `RopeSlice`s:
+///
+/// - Most operations become `O(N)` rather than `O(log N)`.
+/// - [`disconnect_slice()`](crate::extra::disconnect_slice()) may return
+///   `None`.
+///
+/// Runs in O(1) time.
 impl<'a> From<&'a str> for RopeSlice<'a> {
-    /// Creates a `RopeSlice` directly from a string slice.
-    ///
-    /// **Warning:** `RopeSlice`s created this way aren't normal `RopeSlice`s:
-    ///
-    /// - Most operations become `O(N)` rather than `O(log N)`.  For short
-    ///   strings this doesn't matter, but for long strings this can have
-    ///   significant negative performance impacts.
-    /// - [`disconnect_slice()`](crate::extra::disconnect_slice()) may return
-    ///   `None`.
-    ///
-    /// Runs in O(1) time.
     #[inline(always)]
     fn from(text: &'a str) -> Self {
         RopeSlice(SliceInner::Str(text))
