@@ -20,17 +20,17 @@ pub mod esoterica {
     /// This function's API promises are very specific.  The following two things
     /// and *only* the following two things are guaranteed:
     ///
-    /// 1. If rope `a` and rope `b` are *unmodified* clones of each other (i.e.
-    ///    no edits have been made to either since cloning), then this function
+    /// 1. If ropes `a` and `b` are *unmodified* clones of each other (i.e. no
+    ///    edits have been made to either since cloning), then this function
     ///    returns true. This applies to both direct and indirect clones, since
     ///    cloning is transitive.
-    /// 2. If the text contents of rope A and rope B are different, then this
+    /// 2. If the text contents of ropes `a` and `b` are different, then this
     ///    function returns false.
     ///
     /// In all other cases, this function's return value is unspecified (may
     /// change between non-breaking releases) and should not be relied on for
-    /// program correctness. An example of such a case: rope B is cloned from
-    /// rope A, and then the same edit is made to both ropes.  They have then
+    /// program correctness. An example of such a case: rope `b` is cloned from
+    /// rope `a`, and then the same edit is made to both ropes.  They have then
     /// both been modified since cloning (not case 1), but they also compare
     /// equal (not case 2 either).
     ///
