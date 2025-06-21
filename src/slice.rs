@@ -243,7 +243,7 @@ impl<'a> From<&'a Rope> for RopeSlice<'a> {
 /// **Warning:** `RopeSlice`s created this way aren't normal `RopeSlice`s:
 ///
 /// - Most operations become `O(N)` rather than `O(log N)`.
-/// - [`disconnect_slice()`](crate::extra::disconnect_slice()) may return
+/// - [`disconnect_slice()`](crate::extra::esoterica::disconnect_slice()) may return
 ///   `None`.
 ///
 /// Runs in O(1) time.
