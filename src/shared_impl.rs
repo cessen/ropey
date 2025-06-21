@@ -219,7 +219,7 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn char(&self, byte_idx: usize) -> char {
-            match self.try_get_char(byte_idx) {
+            match self.get_char(byte_idx) {
                 Ok(ch) => ch,
                 Err(e) => panic!("{}", e),
             }
@@ -898,10 +898,27 @@ macro_rules! shared_no_panic_impl_methods {
         //-----------------------------------------------------
         // Fetching.
 
+        /// Non-panicking version of `byte()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+            if byte_idx >= self.len() {
+                return None;
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(text.as_bytes()[byte_idx - offset])
+        }
+
         /// Non-panicking version of `char()`.
         ///
-        /// On failure this returns the cause of the failure.
-        pub fn try_get_char(&self, byte_idx: usize) -> Result<char> {
+        /// Will fail if `byte_idx` is either:
+        ///
+        /// - Not a char boundary.
+        /// - Out of bounds.
+        ///
+        /// On failure returns the cause of failure.
+        pub fn get_char(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len() {
                 return Err(OutOfBounds);
             }
@@ -918,27 +935,20 @@ macro_rules! shared_no_panic_impl_methods {
             Ok(text[(byte_idx - offset)..].chars().next().unwrap())
         }
 
-        //-----------------------------------------------------
-        // The below are currently private because they don't do anything
-        // more complex than bounds-check, which client code can do easily and
-        // efficiently.  If someone has a good reason to expose these other than
-        // convenience, please file an issue.
 
-        fn get_byte(&self, byte_idx: usize) -> Option<u8> {
-            if byte_idx >= self.len() {
-                return None;
-            }
-
-            let (text, offset) = self.chunk(byte_idx);
-            Some(text.as_bytes()[byte_idx - offset])
-        }
-
+        /// Non-panicking version of `line()`.
+        ///
+        /// If `line_idx` is out of bounds, returns `None`.
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(feature = "metric_lines_*"))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
+        pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
             if line_idx >= self.len_lines(line_type) {
                 return None;
             }
@@ -957,7 +967,10 @@ macro_rules! shared_no_panic_impl_methods {
             Some(self.slice(start_byte..end_byte))
         }
 
-        fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
+        /// Non-panicking version of `chunk()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
             if byte_idx > self.len() {
                 return None;
             }
