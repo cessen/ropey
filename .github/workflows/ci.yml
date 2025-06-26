@@ -4,7 +4,6 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master ]
   schedule:
     # Every-other month, to make sure new Rust
     # releases don't break things.
