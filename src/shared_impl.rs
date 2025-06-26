@@ -558,7 +558,7 @@ macro_rules! shared_main_impl_methods {
             ).unwrap()
         }
 
-        /// Creates an iterator over the chars of the `Rope`, starting at the char
+        /// Creates an iterator over the chars of the `Rope`, starting
         /// at `byte_idx`.
         ///
         /// Note that this takes a **byte index**, not a char index.
