@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::{
     end_bound_to_num,
-    iter::{Bytes, Chars, Chunks},
+    iter::{Bytes, CharIndices, Chars, Chunks},
     rope_builder::RopeBuilder,
     slice::RopeSlice,
     start_bound_to_num, str_utils,

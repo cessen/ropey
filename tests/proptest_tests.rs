@@ -452,6 +452,34 @@ proptest::proptest! {
             assert_eq!(idx, 0);
         }
     }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn pt_char_indices_iter_next(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+        let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, ..) {
+            let mut offset = 0;
+            for (byte_idx, ch) in t.char_indices() {
+                assert_eq!(offset, byte_idx);
+                offset += ch.len_utf8();
+            }
+            assert_eq!(offset, t.len());
+        }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn pt_char_indices_iter_prev(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+        let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, ..) {
+            let mut offset = t.len();
+            for (byte_idx, ch) in t.char_indices_at(t.len()).reversed() {
+                offset -= ch.len_utf8();
+                assert_eq!(offset, byte_idx);
+            }
+            assert_eq!(offset, 0);
+        }
+    }
 }
 
 //===========================================================================

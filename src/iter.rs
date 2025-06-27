@@ -587,6 +587,105 @@ impl<'a> Iterator for Chars<'a> {
 
 //=============================================================
 
+/// An iterator over a `Rope`'s `char`s, and their positions.
+///
+/// Positions returned by this iterator are the **byte index**
+/// where the returned character starts.
+#[derive(Debug, Clone)]
+pub struct CharIndices<'a> {
+    iter: Chars<'a>,
+    is_reversed: bool,
+}
+
+impl<'a> CharIndices<'a> {
+    /// Returns the **byte index** of the next character, or the length
+    /// of the `Rope` if there are no more characters.
+    ///
+    /// This means that, when the iterator has not been fully consumed,
+    /// the returned value will match the index that will be returned
+    /// by the next call to [`next()`](Self::next).
+    #[inline]
+    fn offset(&self) -> usize {
+        self.iter.chunk_byte_idx + self.iter.byte_idx_in_chunk
+    }
+
+    /// Advances the iterator forward and returns the next value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn next(&mut self) -> Option<(usize, char)> {
+        if self.is_reversed {
+            self.prev_impl()
+        } else {
+            self.next_impl()
+        }
+    }
+
+    /// Advances the iterator backward and returns the previous value.
+    ///
+    /// Runs in amortized O(1) time and worst-case O(log N) time.
+    #[inline]
+    pub fn prev(&mut self) -> Option<(usize, char)> {
+        if self.is_reversed {
+            self.next_impl()
+        } else {
+            self.prev_impl()
+        }
+    }
+
+    /// Reverses the direction of iteration.
+    ///
+    /// NOTE: this is distinct from the standard library's `rev()` method for
+    /// `DoubleEndedIterator`.  Unlike that method, this reverses the direction
+    /// of the iterator without changing its position in the stream.
+    #[inline(always)]
+    #[must_use]
+    pub fn reversed(mut self) -> CharIndices<'a> {
+        self.is_reversed = !self.is_reversed;
+        self
+    }
+
+    //---------------------------------------------------------
+
+    pub(crate) fn new(iter: Chars<'a>) -> Self {
+        Self {
+            iter,
+            is_reversed: false,
+        }
+    }
+
+    #[inline(always)]
+    fn next_impl(&mut self) -> Option<(usize, char)> {
+        let byte_idx = self.offset();
+        let ch = self.iter.next()?;
+        Some((byte_idx, ch))
+    }
+
+    fn prev_impl(&mut self) -> Option<(usize, char)> {
+        let ch = self.iter.prev()?;
+        Some((self.offset(), ch))
+    }
+}
+
+impl Iterator for CharIndices<'_> {
+    type Item = (usize, char);
+
+    fn next(&mut self) -> Option<(usize, char)> {
+        CharIndices::next(self)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.is_reversed {
+            self.iter.clone().reversed().size_hint()
+        } else {
+            self.iter.size_hint()
+        }
+    }
+}
+
+//=============================================================
+
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",
