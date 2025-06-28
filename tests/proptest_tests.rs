@@ -455,29 +455,65 @@ proptest::proptest! {
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn pt_char_indices_iter_next(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+    fn pt_char_indices_iter(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
         let r = Rope::from_str(text);
         for t in make_test_data(&r, text, ..) {
+            // Forward.
             let mut offset = 0;
-            for (byte_idx, ch) in t.char_indices() {
+            let mut iter = t.char_indices();
+            while let Some((byte_idx, ch)) = iter.next() {
                 assert_eq!(offset, byte_idx);
                 offset += ch.len_utf8();
+
+                let remaining = t.len() - offset;
+                let hint = iter.size_hint();
+                assert!(hint.0 <= remaining && hint.1.unwrap() >= remaining);
             }
             assert_eq!(offset, t.len());
+
+            // Backward.
+            let mut offset = t.len();
+            let mut iter = t.char_indices_at(t.len());
+            while let Some((byte_idx, ch)) = iter.prev() {
+                offset -= ch.len_utf8();
+                assert_eq!(offset, byte_idx);
+
+                let remaining = t.len() - offset;
+                let hint = iter.size_hint();
+                assert!(hint.0 <= remaining && hint.1.unwrap() >= remaining);
+            }
+            assert_eq!(offset, 0);
         }
     }
 
     #[test]
     #[cfg_attr(miri, ignore)]
-    fn pt_char_indices_iter_prev(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
+    fn pt_char_indices_iter_reversed(ref text in "\\n{0,5}\\PC{0,100}\\n{0,5}\\PC{0,100}\\n{0,5}") {
         let r = Rope::from_str(text);
         for t in make_test_data(&r, text, ..) {
+            // Backward.
             let mut offset = t.len();
-            for (byte_idx, ch) in t.char_indices_at(t.len()).reversed() {
+            let mut iter = t.char_indices_at(t.len()).reversed();
+            while let Some((byte_idx, ch)) = iter.next() {
                 offset -= ch.len_utf8();
                 assert_eq!(offset, byte_idx);
+
+                let hint = iter.size_hint();
+                assert!(hint.0 <= offset && hint.1.unwrap() >= offset);
             }
             assert_eq!(offset, 0);
+
+            // Forward.
+            let mut offset = 0;
+            let mut iter = t.char_indices().reversed();
+            while let Some((byte_idx, ch)) = iter.prev() {
+                assert_eq!(offset, byte_idx);
+                offset += ch.len_utf8();
+
+                let hint = iter.size_hint();
+                assert!(hint.0 <= offset && hint.1.unwrap() >= offset);
+            }
+            assert_eq!(offset, t.len());
         }
     }
 }
