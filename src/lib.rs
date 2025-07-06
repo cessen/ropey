@@ -155,9 +155,13 @@ loading of non-utf8 text files.
 //! features is for internal testing and debugging during Ropey development.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![allow(clippy::collapsible_else_if)]
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::comparison_chain)]
 #![allow(clippy::inline_always)]
+#![allow(clippy::len_without_is_empty)]
+#![allow(clippy::manual_div_ceil)]
+#![allow(clippy::missing_transmute_annotations)]
 #![allow(clippy::needless_return)]
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::type_complexity)]

@@ -266,8 +266,6 @@ impl Add for TextInfo {
 
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: self.line_breaks_unicode + rhs.line_breaks_unicode,
-
-            ..self
         }
     }
 }
@@ -305,8 +303,6 @@ impl Sub for TextInfo {
 
             #[cfg(feature = "metric_lines_unicode")]
             line_breaks_unicode: self.line_breaks_unicode - rhs.line_breaks_unicode,
-
-            ..self
         }
     }
 }

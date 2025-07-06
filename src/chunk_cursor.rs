@@ -204,11 +204,7 @@ impl<'a> ChunkCursor<'a> {
 
         let leaf = self.node_stack.last().unwrap();
 
-        let start = if leaf.byte_offset < self.byte_range[0] {
-            self.byte_range[0] - leaf.byte_offset
-        } else {
-            0
-        };
+        let start = self.byte_range[0].saturating_sub(leaf.byte_offset);
         let end = if (leaf.byte_offset + leaf.info.bytes) > self.byte_range[1] {
             self.byte_range[1] - leaf.byte_offset
         } else {
@@ -222,7 +218,7 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Runs in O(1) time.
     pub fn at_first(&self) -> bool {
-        if let Some(_) = self.str_slice {
+        if self.str_slice.is_some() {
             return true;
         }
 
@@ -234,7 +230,7 @@ impl<'a> ChunkCursor<'a> {
     ///
     /// Runs in O(1) time.
     pub fn at_last(&self) -> bool {
-        if let Some(_) = self.str_slice {
+        if self.str_slice.is_some() {
             return true;
         }
 
@@ -247,7 +243,7 @@ impl<'a> ChunkCursor<'a> {
     /// Runs in O(1) time.
     #[inline]
     pub fn byte_offset(&self) -> usize {
-        if let Some(_) = self.str_slice {
+        if self.str_slice.is_some() {
             return 0;
         }
 
@@ -263,7 +259,7 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the byte offset from the start of the current chunk to the end of the text.
     #[inline]
     pub(crate) fn byte_offset_from_end(&self) -> usize {
-        if let Some(_) = self.str_slice {
+        if self.str_slice.is_some() {
             return self.byte_range[1];
         }
 

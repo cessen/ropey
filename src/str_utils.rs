@@ -146,7 +146,7 @@ pub(crate) mod lines {
         // configurations.
         let _ = line_type;
 
-        if text.len() == 0 {
+        if text.is_empty() {
             return None;
         }
 

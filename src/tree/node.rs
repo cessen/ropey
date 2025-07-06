@@ -107,7 +107,7 @@ impl Node {
     /// being recomputed from scratch.
     ///
     /// - `bias_left`: if true, takes the left node when `byte_idx` hits a
-    /// node boundary.  If false, takes the right node.
+    ///   node boundary.  If false, takes the right node.
     ///
     /// On success, returns the new text info for the current node, and if a
     /// split was caused returns the right side of the split (the left remaining
