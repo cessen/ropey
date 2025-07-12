@@ -5,14 +5,14 @@ mod text_info;
 
 pub(crate) use text_info::TextInfo;
 
-#[cfg(not(any(test, feature = "internal_dev_small_chunks")))]
+#[cfg(not(any(test, feature = "__dev__small_chunks")))]
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 16;
     pub(crate) const MIN_CHILDREN: usize = 7;
     pub(crate) const MAX_TEXT_SIZE: usize = 1024;
     pub(crate) const MIN_TEXT_SIZE: usize = (MAX_TEXT_SIZE / 2) - (MAX_TEXT_SIZE / 32);
 }
-#[cfg(any(test, feature = "internal_dev_small_chunks"))]
+#[cfg(any(test, feature = "__dev__small_chunks"))]
 mod constants {
     pub(crate) const MAX_CHILDREN: usize = 5;
     pub(crate) const MIN_CHILDREN: usize = 2;

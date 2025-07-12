@@ -36,7 +36,7 @@ simd = ["str_indices/simd"]
 # only, and makes Ropey much slower and more memory hungry.  It is also not
 # part of the stable public API, and may be removed or changed in non-breaking
 # releases.
-internal_dev_small_chunks = []
+__dev__small_chunks = []
 
 [dependencies]
 str_indices = { version = "0.4", default-features = false }
