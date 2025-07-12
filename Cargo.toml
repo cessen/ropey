@@ -2,6 +2,7 @@
 name = "ropey"
 version = "2.0.0-alpha.3"
 edition = "2021"
+rust-version = "1.65"
 authors = ["Nathan Vegdahl <cessen@cessen.com>"]
 description = "A fast and robust text rope for Rust"
 documentation = "https://docs.rs/ropey"
