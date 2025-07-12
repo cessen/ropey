@@ -44,10 +44,15 @@ str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 rand = "0.8"
-proptest = "1.4"
-criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "~1.6"
+criterion = { version = "0.3", features = ["html_reports"] }
 fnv = "1"
 fxhash = "0.2"
+
+# This is a transitive dependency of criterion--we don't use it directly. We
+# lock it to this exact version because newer versions don't work on our MSRV,
+# and thus CI fails if it's on a newer version.
+unicode-width = "=0.1.13"
 
 #-----------------------------------------
 
