@@ -113,7 +113,7 @@ impl TextInfo {
             LineType::LF_CR => self.line_breaks_cr_lf,
 
             #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => self.line_breaks_unicode,
+            LineType::Unicode => self.line_breaks_unicode,
         }
     }
 

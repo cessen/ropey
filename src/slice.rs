@@ -1223,19 +1223,19 @@ mod tests {
     #[cfg(feature = "metric_lines_unicode")]
     #[test]
     fn trailing_line_break_idx_unicode_01() {
-        use LineType::All;
+        use LineType::Unicode;
         let text = "Hello\u{2029}\u{2028}\u{85}\u{0C}\u{0B}\r\r\n\n";
         let r = Rope::from_str(text);
         for t in make_test_data(&r, text, ..) {
-            assert_eq!(Some(18), t.slice(..19).trailing_line_break_idx(All));
-            assert_eq!(Some(16), t.slice(..18).trailing_line_break_idx(All));
-            assert_eq!(Some(15), t.slice(..16).trailing_line_break_idx(All));
-            assert_eq!(Some(14), t.slice(..15).trailing_line_break_idx(All));
-            assert_eq!(Some(13), t.slice(..14).trailing_line_break_idx(All));
-            assert_eq!(Some(11), t.slice(..13).trailing_line_break_idx(All));
-            assert_eq!(Some(8), t.slice(..11).trailing_line_break_idx(All));
-            assert_eq!(Some(5), t.slice(..8).trailing_line_break_idx(All));
-            assert_eq!(None, t.slice(..5).trailing_line_break_idx(All));
+            assert_eq!(Some(18), t.slice(..19).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(16), t.slice(..18).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(15), t.slice(..16).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(14), t.slice(..15).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(13), t.slice(..14).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(11), t.slice(..13).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(8), t.slice(..11).trailing_line_break_idx(Unicode));
+            assert_eq!(Some(5), t.slice(..8).trailing_line_break_idx(Unicode));
+            assert_eq!(None, t.slice(..5).trailing_line_break_idx(Unicode));
         }
     }
 

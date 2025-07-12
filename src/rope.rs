@@ -1351,7 +1351,7 @@ mod tests {
             #[cfg(feature = "metric_lines_lf_cr")]
             assert_eq!(l, r.byte_to_line_idx(b, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(l, r.byte_to_line_idx(b, LineType::All));
+            assert_eq!(l, r.byte_to_line_idx(b, LineType::Unicode));
         }
     }
 
@@ -1369,7 +1369,7 @@ mod tests {
         #[cfg(feature = "metric_lines_lf_cr")]
         assert_eq!(0, r.byte_to_line_idx(0, LineType::LF_CR));
         #[cfg(feature = "metric_lines_unicode")]
-        assert_eq!(0, r.byte_to_line_idx(0, LineType::All));
+        assert_eq!(0, r.byte_to_line_idx(0, LineType::Unicode));
     }
 
     #[cfg(feature = "metric_lines_lf")]
@@ -1393,7 +1393,7 @@ mod tests {
     #[should_panic]
     fn byte_to_line_idx_05() {
         let r = Rope::from_str(TEXT_LINES);
-        r.byte_to_line_idx(125, LineType::All);
+        r.byte_to_line_idx(125, LineType::Unicode);
     }
 
     #[cfg(any(
@@ -1411,7 +1411,7 @@ mod tests {
             #[cfg(feature = "metric_lines_lf_cr")]
             assert_eq!(b, r.line_to_byte_idx(l, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(b, r.line_to_byte_idx(l, LineType::All));
+            assert_eq!(b, r.line_to_byte_idx(l, LineType::Unicode));
         }
     }
 
@@ -1435,8 +1435,8 @@ mod tests {
         }
         #[cfg(feature = "metric_lines_unicode")]
         {
-            assert_eq!(0, r.line_to_byte_idx(0, LineType::All));
-            assert_eq!(0, r.line_to_byte_idx(1, LineType::All));
+            assert_eq!(0, r.line_to_byte_idx(0, LineType::Unicode));
+            assert_eq!(0, r.line_to_byte_idx(1, LineType::Unicode));
         }
     }
 
@@ -1461,7 +1461,7 @@ mod tests {
     #[should_panic]
     fn line_to_byte_idx_05() {
         let r = Rope::from_str(TEXT_LINES);
-        r.line_to_byte_idx(5, LineType::All);
+        r.line_to_byte_idx(5, LineType::Unicode);
     }
 
     #[test]

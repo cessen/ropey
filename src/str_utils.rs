@@ -47,7 +47,7 @@ pub(crate) mod lines {
             #[cfg(feature = "metric_lines_lf_cr")]
             LineType::LF_CR => str_indices::lines_crlf::from_byte_idx(text, byte_idx),
             #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => str_indices::lines::from_byte_idx(text, byte_idx),
+            LineType::Unicode => str_indices::lines::from_byte_idx(text, byte_idx),
         }
     }
 
@@ -59,7 +59,7 @@ pub(crate) mod lines {
             #[cfg(feature = "metric_lines_lf_cr")]
             LineType::LF_CR => str_indices::lines_crlf::to_byte_idx(text, byte_idx),
             #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => str_indices::lines::to_byte_idx(text, byte_idx),
+            LineType::Unicode => str_indices::lines::to_byte_idx(text, byte_idx),
         }
     }
 
@@ -72,7 +72,7 @@ pub(crate) mod lines {
             #[cfg(feature = "metric_lines_lf_cr")]
             LineType::LF_CR => str_indices::lines_crlf::count_breaks(text),
             #[cfg(feature = "metric_lines_unicode")]
-            LineType::All => str_indices::lines::count_breaks(text),
+            LineType::Unicode => str_indices::lines::count_breaks(text),
         }
     }
 

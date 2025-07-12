@@ -127,7 +127,7 @@ loading of non-utf8 text files.
 //! - `metric_utf16`: indexing by UTF16 code unit.
 //! - `metric_lines_lf`: indexing by line with [`LineType::LF`].
 //! - `metric_lines_lf_cr`: indexing by line with [`LineType::LF_CR`].
-//! - `metric_lines_unicode`: indexing by line with [`LineType::All`].
+//! - `metric_lines_unicode`: indexing by line with [`LineType::Unicode`].
 //!
 //! Of these crate features, only `metric_lines_lf_cr` is enabled by default.
 //!
@@ -273,7 +273,7 @@ pub enum LineType {
     /// - Paragraph Separator
     #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_unicode")))]
     #[cfg(feature = "metric_lines_unicode")]
-    All,
+    Unicode,
 }
 
 /// Ropey's result type.

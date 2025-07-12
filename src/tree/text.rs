@@ -675,7 +675,7 @@ mod tests {
             #[cfg(feature = "metric_lines_lf_cr")]
             assert_eq!(crlf, text.byte_to_line_idx(j, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(crlf, text.byte_to_line_idx(j, LineType::All));
+            assert_eq!(crlf, text.byte_to_line_idx(j, LineType::Unicode));
         }
     }
 
@@ -703,7 +703,7 @@ mod tests {
             #[cfg(feature = "metric_lines_lf_cr")]
             assert_eq!(byte_idx, text.line_to_byte_idx(l, LineType::LF_CR));
             #[cfg(feature = "metric_lines_unicode")]
-            assert_eq!(byte_idx, text.line_to_byte_idx(l, LineType::All));
+            assert_eq!(byte_idx, text.line_to_byte_idx(l, LineType::Unicode));
         }
     }
 

@@ -72,7 +72,7 @@ fn assert_metrics_eq(rope: &RopeSlice, text: &str) {
     #[cfg(feature = "metric_lines_unicode")]
     {
         assert_eq!(
-            rope.len_lines(LineType::All),
+            rope.len_lines(LineType::Unicode),
             str_indices::lines::count_breaks(text) + 1
         );
     }
@@ -251,7 +251,7 @@ proptest::proptest! {
                 #[cfg(feature = "metric_lines_lf_cr")]
                 assert_eq!(lines_crlf::from_byte_idx(text, i), t.byte_to_line_idx(i, LineType::LF_CR));
                 #[cfg(feature = "metric_lines_unicode")]
-                assert_eq!(lines::from_byte_idx(text, i), t.byte_to_line_idx(i, LineType::All));
+                assert_eq!(lines::from_byte_idx(text, i), t.byte_to_line_idx(i, LineType::Unicode));
             }
         }
     }
@@ -284,7 +284,7 @@ proptest::proptest! {
             {
                 let line_count = lines::count_breaks(text) + 1;
                 for i in 0..=line_count {
-                    assert_eq!(lines::to_byte_idx(text, i), t.line_to_byte_idx(i, LineType::All));
+                    assert_eq!(lines::to_byte_idx(text, i), t.line_to_byte_idx(i, LineType::Unicode));
                 }
             }
         }
