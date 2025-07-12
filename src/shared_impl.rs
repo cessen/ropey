@@ -69,7 +69,11 @@ macro_rules! shared_main_impl_methods {
         /// Runs in best case O(1) time, worst-case O(log N).
         #[cfg_attr(
             docsrs,
-            doc(cfg(feature = "metric_lines_*"))
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
         )]
         #[cfg(any(
             feature = "metric_lines_lf",
@@ -165,7 +169,14 @@ macro_rules! shared_main_impl_methods {
         /// break.
         ///
         /// Runs in O(log N) time.
-        #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -234,7 +245,14 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
-        #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -421,7 +439,14 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
-        #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -465,7 +490,14 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
-        #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -635,7 +667,14 @@ macro_rules! shared_main_impl_methods {
         /// line type.
         ///
         /// Runs in O(log N) time.
-        #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -670,7 +709,14 @@ macro_rules! shared_main_impl_methods {
         /// # Panics
         ///
         /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
-        #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+        #[cfg_attr(
+            docsrs,
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
+        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
@@ -978,7 +1024,11 @@ macro_rules! shared_no_panic_impl_methods {
         /// If `line_idx` is out of bounds, returns `None`.
         #[cfg_attr(
             docsrs,
-            doc(cfg(feature = "metric_lines_*"))
+            doc(cfg(any(
+                feature = "metric_lines_lf",
+                feature = "metric_lines_lf_cr",
+                feature = "metric_lines_unicode"
+            )))
         )]
         #[cfg(any(
             feature = "metric_lines_lf",

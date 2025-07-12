@@ -80,7 +80,7 @@ loading of non-utf8 text files.
 //! - The [`chunk()`](Rope::chunk) chunk-fetching method of `Rope` and
 //!   `RopeSlice`.
 //! - The [`Chunks`](iter::Chunks) iterator.
-//! - The [`ChunkCursor`](chunk_cursor::ChunkCursor) type.
+//! - The [`ChunkCursor`](ChunkCursor) type.
 //!
 //! Internally, each `Rope` stores text as a segmented collection of utf8
 //! strings.  The chunk APIs provide direct access to those strings as `&str`
@@ -229,7 +229,14 @@ pub use slice::RopeSlice;
 ///   translate line numbers.
 /// - If desired, you can let your users switch between line break conventions
 ///   for different documents.
-#[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    )))
+)]
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",

@@ -687,7 +687,14 @@ mod lines {
     ///
     /// The last line is returned even if blank, in which case it
     /// is returned as an empty slice.
-    #[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        )))
+    )]
     #[derive(Debug, Clone)]
     pub struct Lines<'a> {
         cursor: ChunkCursor<'a>,
@@ -922,7 +929,14 @@ mod lines {
     }
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "metric_lines_*")))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    )))
+)]
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",
