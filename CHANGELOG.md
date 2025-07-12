@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Features
+
+- Added `CharIndices` iterator.
+- Added some additional non-panicking method variants.
+
+### Other
+
+- Renamed `LineType::All` to `LineType::Unicode`.
+- Moved esoteric functionality to `extra::esoterica` submodule.
+
 
 ## [2.0.0 alpha 3] - 2025-06-01
 
