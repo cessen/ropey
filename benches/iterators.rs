@@ -75,7 +75,7 @@ fn iter_prev(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("lines_all", |bench| {
         let r = Rope::from_str(&large_string());
-        let itr_src = r.lines_at(r.len_lines(LineType::All), LineType::All);
+        let itr_src = r.lines_at(r.len_lines(LineType::Unicode), LineType::Unicode);
         let mut itr = itr_src.clone();
         bench.iter(|| {
             if itr.prev().is_none() {
@@ -136,7 +136,7 @@ fn iter_next(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("lines_all", |bench| {
         let r = Rope::from_str(&large_string());
-        let mut itr = r.lines(LineType::All).cycle();
+        let mut itr = r.lines(LineType::Unicode).cycle();
         bench.iter(|| {
             itr.next();
         })
@@ -188,7 +188,7 @@ fn iter_create(c: &mut Criterion) {
     group.bench_function("lines_all", |bench| {
         let r = Rope::from_str(&large_string());
         bench.iter(|| {
-            r.lines(LineType::All);
+            r.lines(LineType::Unicode);
         })
     });
 
@@ -248,10 +248,10 @@ fn iter_create_at(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("lines_all", |bench| {
         let r = Rope::from_str(&large_string());
-        let len = r.len_lines(LineType::All);
+        let len = r.len_lines(LineType::Unicode);
         let mut i = 0;
         bench.iter(|| {
-            r.lines_at(i % (len + 1), LineType::All);
+            r.lines_at(i % (len + 1), LineType::Unicode);
             i += 1;
         })
     });

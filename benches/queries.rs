@@ -96,7 +96,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::All);
+            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::Unicode);
         })
     });
 
@@ -105,7 +105,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::All);
+            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::Unicode);
         })
     });
 }
@@ -163,7 +163,7 @@ fn index_query(c: &mut Criterion) {
         text.push_str("\u{2028}");
         let rope = Rope::from_str(&text);
         bench.iter(|| {
-            rope.trailing_line_break_idx(LineType::All);
+            rope.trailing_line_break_idx(LineType::Unicode);
         })
     });
 }
@@ -209,9 +209,9 @@ fn get(c: &mut Criterion) {
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("line_unicode", |bench| {
         let rope = Rope::from_str(&large_string());
-        let len = rope.len_lines(LineType::All);
+        let len = rope.len_lines(LineType::Unicode);
         bench.iter(|| {
-            rope.line(random::<usize>() % len, LineType::All);
+            rope.line(random::<usize>() % len, LineType::Unicode);
         })
     });
 
