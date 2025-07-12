@@ -36,13 +36,13 @@ jobs:
       - run: cargo +${{matrix.toolchain}} build
 
       # Build and test with various feature combinations.
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd"
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_chars"
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_utf16"
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_lines_lf"
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_lines_lf_cr"
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_lines_unicode"
-      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "internal_dev_small_chunks, simd, metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd, metric_chars"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd, metric_utf16"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd, metric_lines_lf"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd, metric_lines_lf_cr"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd, metric_lines_unicode"
+      - run: cargo +${{matrix.toolchain}} test --no-default-features --features "__dev__small_chunks, simd, metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
 
       # Make sure benchmarks build.
       - run: cargo +${{matrix.toolchain}} bench --no-run --features "metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
