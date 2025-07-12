@@ -377,7 +377,7 @@ impl Rope {
     /// - If the range ends are not on char boundaries.
     #[track_caller]
     #[inline]
-    pub fn slice<R>(&self, byte_range: R) -> RopeSlice
+    pub fn slice<R>(&self, byte_range: R) -> RopeSlice<'_>
     where
         R: RangeBounds<usize>,
     {
@@ -682,14 +682,14 @@ impl Rope {
     ///
     /// On failure this returns the cause of the failure.
     #[inline]
-    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice>
+    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'_>>
     where
         R: RangeBounds<usize>,
     {
         let start_idx = start_bound_to_num(byte_range.start_bound()).unwrap_or(0);
         let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len());
 
-        fn inner(rope: &Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice> {
+        fn inner(rope: &Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice<'_>> {
             if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
                 return Err(NonCharBoundary);
             }

@@ -233,7 +233,7 @@ impl std::cmp::PartialEq<Rope> for RopeSlice<'_> {
 
 impl<'a> From<&'a Rope> for RopeSlice<'a> {
     #[inline(always)]
-    fn from(r: &Rope) -> RopeSlice {
+    fn from(r: &Rope) -> RopeSlice<'_> {
         RopeSlice::new(&r.root, &r.root_info, [0, r.root_info.bytes])
     }
 }
