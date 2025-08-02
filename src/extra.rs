@@ -5,20 +5,19 @@ pub mod esoterica {
     //!
     //! **Warning:** the functions in this module expose you to esoterica of
     //! Ropey's internal data model, and take you off the beaten path of Ropey's
-    //! intended API semantics.  They are nevertheless API promises and can be
-    //! depended on to continue functioning as documented.  However, you should
-    //! **read their documentation carefully** and make sure you fully understand
-    //! exactly what they do/don't promise before using them.
+    //! intended API semantics.  Their summary-line descriptions are not enough
+    //! to properly understand them, so you should **read their full
+    //! documentation carefully** before using them.
 
     use std::sync::Arc;
 
     use crate::{slice::SliceInner, tree::Node, Rope, RopeSlice};
 
-    /// Returns true if both ropes internally point to the same memory and share
+    /// Returns true if both ropes are cloned instances of each other that share
     /// the same content.
     ///
-    /// This function's API promises are very specific.  The following two things
-    /// and *only* the following two things are guaranteed:
+    /// This function's API promises are very specific.  The following two
+    /// things and *only* the following two things are guaranteed:
     ///
     /// 1. If ropes `a` and `b` are *unmodified* clones of each other (i.e. no
     ///    edits have been made to either since cloning), then this function

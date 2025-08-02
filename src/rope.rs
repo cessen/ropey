@@ -47,7 +47,7 @@ use crate::{iter::Lines, LineType};
 ///
 /// `Rope` provides a rich set of efficient query functions, including querying
 /// rope length in bytes/`char`s/lines, fetching individual `char`s or lines,
-/// and converting between byte/`char`/line indices.
+/// and converting between different indexing metrics.
 ///
 #[cfg_attr(
     feature = "metric_lines_lf_cr",
@@ -84,14 +84,15 @@ assert_eq!(middle, "lo みん");
 ///
 /// Cloning `Rope`s is extremely cheap, running in `O(1)` time and taking a
 /// small constant amount of memory for the new clone, regardless of text size.
-/// This is accomplished by data sharing between `Rope` clones.  The memory
-/// used by clones only grows incrementally as the their contents diverge due
-/// to edits.  All of this is thread safe, so clones can be sent freely
-/// between threads.
+/// This is accomplished by data sharing between `Rope` clones.  The memory used
+/// by clones only grows incrementally as the their contents diverge due to
+/// edits.  All of this is thread safe, so clones can be sent freely between
+/// threads.
 ///
-/// The primary intended use-case for this feature is to allow asynchronous
-/// processing of `Rope`s.  For example, saving a large document to disk in a
-/// separate thread while the user continues to perform edits.
+/// The primary intended use case for this feature is to allow asynchronous (in
+/// the general sense, not necessarily in the `async` sense) processing of
+/// `Rope`s.  For example, saving a large document to disk in a separate thread
+/// while the user continues to perform edits.
 #[derive(Clone)]
 pub struct Rope {
     pub(crate) root: Node,

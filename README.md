@@ -1,44 +1,101 @@
-# Ropey 2 (alpha)
+# Ropey 2 (beta)
 
-This is the WIP next major version of Ropey.  DO NOT USE THIS for serious work.  This is alpha software, meaning both that the API is not fully stable yet and that it is likely pretty buggy.
+[![CI Build Status][github-ci-img]][github-ci]
+[![Latest Release][crates-io-badge]][crates-io-url]
+[![Documentation][docs-rs-img]][docs-rs-url]
 
-Trying it out, kicking its tires, and providing feedback is welcome, however.
+Ropey is a utf8 text rope for Rust, designed to be the backing text-buffer for applications such as text editors.  Ropey is fast, robust, and can handle huge texts and memory-incoherent edits with ease.
 
+**Note:** this is the 2.0 version of Ropey, which is currently in beta.  It is not battle-tested like Ropey 1.x, and there may still be some minor breaking API changes before final release, but generally things should be pretty stable at this point.  We encourage you to use Ropey 2 Beta in non-critical projects and provide feedback, report bugs, etc.
 
-## Differences from Ropey 1.x
-
-There are many breaking API changes in Ropey 2.x.  However, the major ones are:
-
-- **Indexing is now byte based** rather than char based.  For example, text insertion, text removal, and slicing are all done with byte indices now.  Even fetching chars is now done by byte index.  If you still want or need to work in terms of char indices, you can do so by using the index conversion functions to convert between byte and char indices as needed.
-- **The index conversion functions are now byte-to-metric and metric-to-byte** rather than metricA-to-metricB.  The latter can still be accomplished by using byte indices as an intermediate.
-- **The chunk fetching API's have been stripped down.**  For example, there are no longer `chunk_at_line()`, etc. functions for fetching chunks based on arbitrary indexing metrics, instead being replaced by just `chunk_at()` which fetches using only byte indices.  Fetching based on arbitrary metrics can still be accomplished by combining `chunk_at()` with the index conversion functions.
-- **All indexing metrics other than byte index are now behind feature flags**, and can be enabled or disabled individually as desired.  Of those, only LF-CR lines are enabled by default.  Notably, this means that the char indexing metric is not enabled by default.
-- **The line metric feature flags are now properly additive,** and multiple line indexing metrics can be tracked simultaneously.  Because of this, all line-based APIs now take a `LineType` parameter that specifies which of the available metrics to use.
+For a summary of what's different between Ropey 2.x and Ropey 1.x, please see the [changelog](CHANGELOG.md#200-alpha-1---2024-10-20).
 
 
-## What does this mean for Ropey 1.x?
+## Example Usage
 
-Ropey 1.x will continue to be maintained for the foreseeable future, but will no longer receive new features.  Ropey 1.x is still a good, high-quality rope library that can be depended on, and you don't need to move to Ropey 2.x if 1.x serves your needs.
+```rust
+use ropey::{Rope, LineType::LF_CR};
 
-If at some point maintenance of Ropey 1.x stops, it will be with plenty of advance warning to ensure that everyone has ample time to migrate.
+// Load a text file.
+let mut text = Rope::from_reader(
+    BufReader::new(File::open("my_great_book.txt")?)
+)?;
+
+// Print the 516th line (zero-indexed) to see the terrible
+// writing.
+println!("{}", text.line(515, LF_CR));
+
+// Get the start/end byte indices of the line.
+let start_idx = text.line_to_byte_idx(515, LF_CR);
+let end_idx = text.line_to_byte_idx(516, LF_CR);
+
+// Remove the line...
+text.remove(start_idx..end_idx);
+
+// ...and replace it with something better.
+text.insert(start_idx, "The flowers are... so... dunno.\n");
+
+// Print the changes, along with the previous few lines for context.
+let start_idx = text.line_to_byte_idx(511, LF_CR);
+let end_idx = text.line_to_byte_idx(516, LF_CR);
+println!("{}", text.slice(start_idx..end_idx));
+
+// Write the file back out to disk.
+text.write_to(
+    BufWriter::new(File::create("my_great_book.txt")?)
+)?;
+```
+
+
+## When Should I Use Ropey?
+
+Ropey is designed and built to be the backing text buffer for applications such as text editors, and its design trade-offs reflect that.  Ropey is good at:
+
+- Handling frequent edits to medium-to-large texts.  Even on texts that are multiple gigabytes large, edits are measured in single-digit microseconds.
+- Handling Unicode correctly.  It is impossible to create invalid utf8 through Ropey, and all Unicode line breaks can be correctly tracked including CRLF.
+- Having flat, predictable performance characteristics.  Ropey will never be the source of hiccups or stutters in your software.
+
+On the other hand, Ropey is _not_ good at:
+
+- Handling texts smaller than a couple of kilobytes or so.  That is to say, Ropey will handle them fine, but Ropey allocates space in kilobyte chunks, which introduces unnecessary bloat if your texts are almost always small.
+- Handling texts that are larger than available memory.  Ropey is an in-memory data structure.
+- Directly handling text that is non-unicode, corrupted, or includes chunks of binary data. Ropey only handles utf8 text, so non-utf8 data needs to be converted/sanitized before being passed to Ropey.
+- Getting the best performance/memory characteristics for every possible use case.  For example, Ropey puts work into tracking line breaks and other secondary metrics, which introduces overhead you may not need depending on your use case.
+
+Keep this in mind when selecting Ropey for your project.  Ropey is very good at what it does, but like all software it is designed with certain applications in mind.
+
+
+## With Ropey 2.x soon to be released, what will happen to development of Ropey 1.x?
+
+Ropey 1.x will continue to be maintained, but will no longer receive new features.  Ropey 1.x is still a good, high-quality rope library that can be depended on, and you don't need to move to Ropey 2.x if 1.x serves your needs.
+
+The rate of incoming bug reports for Ropey 1.x is very low, despite it being widely used.  Therefore, we don't foresee dropping its maintenance any time soon, as the burden imposed by continued maintenance is very low.  If we do drop maintenance of Ropey 1.x in the future, it will be with plenty of advance warning to ensure that everyone has ample time to migrate.
+
+
+## Unsafe code
+
+Ropey uses unsafe code to help achieve some of its space and performance characteristics.  Although effort has been put into keeping the unsafe code minimal, compartmentalized, and correct, please be cautious about using Ropey in software that may face adversarial conditions.
 
 
 ## License
 
 This project is licensed under either of
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
-   http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or
-   http://opensource.org/licenses/MIT)
+ * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 at your option.
 
 
 ## Contributing
 
-Bug reports and API feedback based on testing Ropey 2 are very welcome.
+Contributions are absolutely welcome!  However, please open an issue to discuss larger changes, to avoid doing a lot of work that may get rejected.  Also note that PRs that add dependencies are very likely to be rejected (Ropey aims to have minimal dependencies).
 
-**Code contributions are NOT currently welcome** from anyone outside of the dev team.  All PRs, no matter how good, no matter how seemingly obvious or minor, even if they helpfully fix a reported bug or other issue, will be rejected without review.
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in Ropey by you will be licensed as above, without any additional terms or conditions.
 
-Ropey 2 will become open to code contributions once it's out of alpha.
+[crates-io-badge]: https://img.shields.io/crates/v/ropey.svg
+[crates-io-url]: https://crates.io/crates/ropey
+[github-ci-img]: https://github.com/cessen/ropey/workflows/ci/badge.svg
+[github-ci]: https://github.com/cessen/ropey/actions?query=workflow%3Aci
+[docs-rs-img]: https://docs.rs/ropey/badge.svg
+[docs-rs-url]: https://docs.rs/ropey

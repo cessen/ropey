@@ -624,11 +624,12 @@ macro_rules! shared_main_impl_methods {
             }
         }
 
-        /// Creates an iterator over the chars of the `Rope`, and their positions.
+        /// Creates an iterator over the chars of the `Rope` and their byte
+        /// positions.
         ///
-        /// On each call to [`next`](CharIndices::next) or [`prev`](CharIndices::prev)
-        /// this iterator returns the **byte index** where the returned character
-        /// starts.
+        /// On each call to [`next`](CharIndices::next) or
+        /// [`prev`](CharIndices::prev) this iterator returns the byte index
+        /// where the returned character starts.
         ///
         /// Runs in O(log N) time.
         #[track_caller]
@@ -637,17 +638,17 @@ macro_rules! shared_main_impl_methods {
             CharIndices::new(self.chars())
         }
 
-        /// Creates an iterator over the chars of the `Rope`, and their positions,
-        /// starting at `byte_idx`.
+        /// Creates an iterator over the chars of the `Rope` and their byte
+        /// positions, starting at `byte_idx`.
         ///
         /// Note that this takes a **byte index**, not a char index.
         ///
-        /// If `byte_idx == len()` then an iterator at the end of the
-        /// `Rope` is created (i.e. `next()` will return `None`).
+        /// If `byte_idx == len()` then an iterator at the end of the `Rope` is
+        /// created (i.e. `next()` will return `None`).
         ///
-        /// On each call to [`next`](CharIndices::next) or [`prev`](CharIndices::prev)
-        /// this iterator returns the **byte index** where the returned character
-        /// starts.
+        /// On each call to [`next`](CharIndices::next) or
+        /// [`prev`](CharIndices::prev) this iterator returns the byte index
+        /// where the returned character starts.
         ///
         /// Runs in O(log N) time.
         ///

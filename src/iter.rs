@@ -589,8 +589,8 @@ impl<'a> Iterator for Chars<'a> {
 
 /// An iterator over a `Rope`'s `char`s, and their positions.
 ///
-/// Positions returned by this iterator are the **byte index**
-/// where the returned character starts.
+/// Positions returned by this iterator are the byte index where the returned
+/// character starts.
 #[derive(Debug, Clone)]
 pub struct CharIndices<'a>(Chars<'a>);
 
@@ -639,12 +639,12 @@ impl<'a> CharIndices<'a> {
 
     //---------------------------------------------------------
 
-    /// Returns the **byte index** of the next character, or the length
-    /// of the `Rope` if there are no more characters.
+    /// Returns the byte index of the next character, or the length of the
+    /// `Rope` if there are no more characters.
     ///
-    /// This means that, when the iterator has not been fully consumed,
-    /// the returned value will match the index that will be returned
-    /// by the next call to [`next()`](Self::next).
+    /// This means that, when the iterator has not been fully consumed, the
+    /// returned value will match the index that will be returned by the next
+    /// call to [`next()`](Self::next).
     #[inline]
     fn offset(&self) -> usize {
         self.0.chunk_byte_idx + self.0.byte_idx_in_chunk
