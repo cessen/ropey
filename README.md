@@ -67,9 +67,7 @@ Keep this in mind when selecting Ropey for your project.  Ropey is very good at 
 
 ## With Ropey 2.x soon to be released, what will happen to development of Ropey 1.x?
 
-Ropey 1.x will continue to be maintained, but will no longer receive new features.  Ropey 1.x is still a good, high-quality rope library that can be depended on, and you don't need to move to Ropey 2.x if 1.x serves your needs.
-
-The rate of incoming bug reports for Ropey 1.x is very low, despite it being widely used.  Therefore, we don't foresee dropping its maintenance any time soon, as the burden imposed by continued maintenance is very low.  If we do drop maintenance of Ropey 1.x in the future, it will be with plenty of advance warning to ensure that everyone has ample time to migrate.
+Ropey 1.x will continue to be maintained for the foreseeable future, but will no longer receive new features.  Ropey 1.x is still a good, high-quality rope library that can be depended on, and you don't need to move to Ropey 2.x if 1.x serves your needs.
 
 
 ## Unsafe code
