@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [2.0.0 Beta 1] - 2025-08-03
+
 ### Features
 
 - Added `CharIndices` iterator.
@@ -47,7 +50,8 @@
 - **The line metric feature flags are now properly additive,** and multiple line indexing metrics can be tracked simultaneously.  Because of this, all line-based APIs now take a `LineType` parameter that specifies which of the available metrics to use.
 
 
-[Unreleased]: https://github.com/cessen/ropey/compare/v2.0.0-alpha.3...HEAD
+[Unreleased]: https://github.com/cessen/ropey/compare/v2.0.0-beta.1...HEAD
+[2.0.0 beta 1]: https://github.com/cessen/ropey/compare/v2.0.0-alpha.3...v2.0.0-beta.1
 [2.0.0 alpha 3]: https://github.com/cessen/ropey/compare/v2.0.0-alpha.2...v2.0.0-alpha.3
 [2.0.0 alpha 2]: https://github.com/cessen/ropey/compare/v2.0.0-alpha.1...v2.0.0-alpha.2
 [2.0.0 alpha 1]: https://github.com/cessen/ropey/releases/tag/v2.0.0-alpha.1
