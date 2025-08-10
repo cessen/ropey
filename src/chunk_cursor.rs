@@ -82,7 +82,7 @@ impl<'a> ChunkCursor<'a> {
     /// chunk, in which case the cursor remains on the last chunk.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> bool {
         // Already at the end.
@@ -134,7 +134,7 @@ impl<'a> ChunkCursor<'a> {
     /// chunk, in which case the cursor remains on the first chunk.
     ///
     /// Runs in amortized O(1) time and worst-case O(log N) time.
-    #[inline(always)]
+    #[inline]
     pub fn prev(&mut self) -> bool {
         // Already at the start.
         if self.at_first() {
@@ -185,7 +185,7 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the current chunk.
     ///
     /// Runs in O(1) time.
-    #[inline(always)]
+    #[inline]
     pub fn chunk(&self) -> &'a str {
         if let Some(text) = self.str_slice {
             return text;
@@ -197,6 +197,7 @@ impl<'a> ChunkCursor<'a> {
     /// Returns the current chunk as a rope slice.
     ///
     /// Since it's a chunk, it's guaranteed to be contiguous text.
+    #[inline(always)]
     pub(crate) fn chunk_slice(&self) -> RopeSlice<'a> {
         if let Some(text) = self.str_slice {
             return text.into();
@@ -217,6 +218,7 @@ impl<'a> ChunkCursor<'a> {
     /// Returns whether the cursor is at the first chunk.
     ///
     /// Runs in O(1) time.
+    #[inline]
     pub fn at_first(&self) -> bool {
         if self.str_slice.is_some() {
             return true;
@@ -229,6 +231,7 @@ impl<'a> ChunkCursor<'a> {
     /// Returns whether the cursor is at the last chunk.
     ///
     /// Runs in O(1) time.
+    #[inline]
     pub fn at_last(&self) -> bool {
         if self.str_slice.is_some() {
             return true;
