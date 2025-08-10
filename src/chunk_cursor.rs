@@ -16,12 +16,12 @@ struct StackItem<'a> {
     info: &'a TextInfo,
 
     /// The absolute byte offset of this node from the start of the root node.
-    /// Importantly, *not* from the start of `byte_range`.  This doesn't take
-    /// into account trimming.
+    /// Importantly, *not* from the start of `byte_range` in ChunkCursor: this
+    /// doesn't take into account trimming.
     byte_offset: usize,
 
     /// For internal nodes, the current child index corresponding to the
-    /// current line.
+    /// current chunk.
     child_idx: usize,
 }
 
@@ -70,8 +70,8 @@ pub struct ChunkCursor<'a> {
     str_slice: Option<&'a str>,
 
     // The byte range within the root node/string slice that is considered part
-    // of this cursor's contents. For string slices this should always be set to
-    // `[0, length_of_str]`.
+    // of this cursor's contents.  For string slices (as opposed to rope slices)
+    // this should always be set to `[0, length_of_str]`.
     byte_range: [usize; 2],
 }
 
@@ -238,7 +238,8 @@ impl<'a> ChunkCursor<'a> {
         (leaf.byte_offset + leaf.info.bytes) >= self.byte_range[1]
     }
 
-    /// Returns the byte offset from the start of the text to the start of the current chunk.
+    /// Returns the byte offset from the start of the text to the start of the
+    /// current chunk.
     ///
     /// Runs in O(1) time.
     #[inline]
