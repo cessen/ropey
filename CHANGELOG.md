@@ -1,7 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+### Features
 
+- Added `Extend` implementation to `RopeBuilder`.
 
 ## [2.0.0 Beta 1] - 2025-08-03
 
