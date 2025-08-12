@@ -231,6 +231,14 @@ impl Default for RopeBuilder {
     }
 }
 
+impl<I: AsRef<str>> Extend<I> for RopeBuilder {
+    fn extend<T: IntoIterator<Item = I>>(&mut self, iter: T) {
+        for item in iter {
+            self.append(item.as_ref());
+        }
+    }
+}
+
 fn compute_and_set_unbalance_flags_deep(node: &mut Node) {
     match *node {
         Node::Leaf(_) => {}
@@ -287,6 +295,20 @@ mod tests {
         b.append("Hello there!  How're you doing?\r");
         b.append("\nIt's a fine day, isn't it?\r\nAren't you ");
         b.append("glad we're alive?\r\nこんにちは、みんなさん！");
+
+        let r = b.finish();
+
+        assert_eq!(r, TEXT);
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn rope_builder_extend_01() {
+        let mut b = RopeBuilder::new();
+
+        b.append("Hello there!  How're you doing?\r");
+        b.extend(["\nIt's a fine day,", " isn't it?\r\nAren't you "]);
+        b.extend(&["glad we're alive?", "\r\nこんにちは", "、みんなさん！"]);
 
         let r = b.finish();
 
