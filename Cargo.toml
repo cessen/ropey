@@ -34,10 +34,12 @@ unicode-segmentation = "1.3"
 fnv = "1"
 fxhash = "0.2"
 
-# This is a transitive dependency of criterion--we don't use it directly. We
-# lock it to this exact version because newer versions don't work on our MSRV,
-# and thus CI fails if it's on a newer version.
+# These are transitive dependencies of some of the dev-dependencies--we don't
+# use them directly. We lock them to exact versions because newer versions don't
+# work on our MSRV, and thus CI fails if they're on newer versions.
 unicode-width = "=0.1.13"
+rayon = "=1.10.0"
+rayon-core = "=1.12.1"
 
 #-----------------------------------------
 
