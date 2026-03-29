@@ -16,13 +16,12 @@ env:
 
 jobs:
   build-and-test:
-    name: Build and test
+    name: Build and Test
     strategy:
       matrix:
         toolchain:
           - stable
           - beta
-          - "1.65"
     runs-on: ubuntu-latest
     steps:
       # Get a checkout and rust toolchain.
@@ -39,6 +38,25 @@ jobs:
       - run: cargo +${{matrix.toolchain}} test --no-default-features line
       - run: cargo +${{matrix.toolchain}} test --no-default-features --features=cr_lines line
       - run: cargo +${{matrix.toolchain}} bench --no-run
+
+  build:
+    name: Build Only
+    strategy:
+      matrix:
+        toolchain:
+          - "1.65"
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{matrix.toolchain}}
+          override: true
+
+      # Build
+      - run: cargo +${{matrix.toolchain}} build
 
   run-miri:
     name: Run Miri
