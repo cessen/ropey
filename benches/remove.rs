@@ -40,7 +40,7 @@ fn remove_small(c: &mut Criterion) {
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -55,7 +55,7 @@ fn remove_small(c: &mut Criterion) {
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -70,7 +70,7 @@ fn remove_small(c: &mut Criterion) {
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -85,7 +85,7 @@ fn remove_small(c: &mut Criterion) {
             let start = end - (1).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -106,7 +106,7 @@ fn remove_medium(c: &mut Criterion) {
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -121,7 +121,7 @@ fn remove_medium(c: &mut Criterion) {
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -136,7 +136,7 @@ fn remove_medium(c: &mut Criterion) {
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
@@ -151,7 +151,7 @@ fn remove_medium(c: &mut Criterion) {
             let start = end - (15).min(len);
             rope.remove(start..end);
 
-            if rope.len() == text.len() / 2 {
+            if rope.len() <= text.len() / 2 {
                 rope = Rope::from_str(&text);
             }
         })
