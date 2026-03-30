@@ -161,11 +161,27 @@
 //! to explicitly re-enable the `simd` feature flag (if desired) when
 //! doing that.
 
+// Clippy lints that we intentionally don't follow.
 #![allow(clippy::collapsible_if)]
 #![allow(clippy::inline_always)]
 #![allow(clippy::needless_return)]
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::type_complexity)]
+#![allow(clippy::needless_lifetimes)]
+// Clippy lints that are silenced for now, because the code base is mature and
+// battle-tested, and these lints were introduced after that was already the
+// case. These are lints that at some point we may want to address, but should
+// be done carefully and one-at-a-time.
+#![allow(clippy::manual_unwrap_or)]
+#![allow(clippy::manual_unwrap_or_default)]
+#![allow(clippy::unnecessary_cast)]
+#![allow(clippy::explicit_auto_deref)]
+#![allow(clippy::missing_transmute_annotations)]
+#![allow(clippy::doc_overindented_list_items)]
+#![allow(clippy::len_zero)]
+#![allow(clippy::implicit_saturating_sub)]
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::partialeq_to_none)]
 
 extern crate smallvec;
 extern crate str_indices;
