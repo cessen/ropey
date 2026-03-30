@@ -3,7 +3,7 @@ extern crate rand;
 extern crate ropey;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::random;
+use rand::random_range;
 use ropey::Rope;
 
 const TEXT: &str = include_str!("large.txt");
@@ -30,7 +30,7 @@ fn remove_small(c: &mut Criterion) {
 
         bench.iter(|| {
             let len = rope.len_chars();
-            let start = random::<usize>() % (len + 1);
+            let start = random_range(0..(len + 1));
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
@@ -100,7 +100,7 @@ fn remove_medium(c: &mut Criterion) {
 
         bench.iter(|| {
             let len = rope.len_chars();
-            let start = random::<usize>() % (len + 1);
+            let start = random_range(0..(len + 1));
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
@@ -170,7 +170,7 @@ fn remove_large(c: &mut Criterion) {
 
         bench.iter(|| {
             let len = rope.len_chars();
-            let start = random::<usize>() % (len + 1);
+            let start = random_range(0..(len + 1));
             let end = (start + TEXT_SMALL.len()).min(len);
             rope.remove(start..end);
 
@@ -240,7 +240,7 @@ fn remove_initial_after_clone(c: &mut Criterion) {
                 rope_clone = rope.clone();
             }
             let len = rope_clone.len_chars();
-            let start = random::<usize>() % (len + 1);
+            let start = random_range(0..(len + 1));
             let end = (start + 1).min(len);
             rope_clone.remove(start..end);
             i += 1;

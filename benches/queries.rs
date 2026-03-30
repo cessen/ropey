@@ -3,7 +3,7 @@ extern crate rand;
 extern crate ropey;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::random;
+use rand::random_range;
 use ropey::Rope;
 
 const TEXT: &str = include_str!("large.txt");
@@ -18,7 +18,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_bytes();
         bench.iter(|| {
-            rope.byte_to_char(random::<usize>() % (len + 1));
+            rope.byte_to_char(random_range(0..(len + 1)));
         })
     });
 
@@ -26,7 +26,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_bytes();
         bench.iter(|| {
-            rope.byte_to_line(random::<usize>() % (len + 1));
+            rope.byte_to_line(random_range(0..(len + 1)));
         })
     });
 
@@ -34,7 +34,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.char_to_byte(random::<usize>() % (len + 1));
+            rope.char_to_byte(random_range(0..(len + 1)));
         })
     });
 
@@ -42,7 +42,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.char_to_line(random::<usize>() % (len + 1));
+            rope.char_to_line(random_range(0..(len + 1)));
         })
     });
 
@@ -50,7 +50,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_lines();
         bench.iter(|| {
-            rope.line_to_byte(random::<usize>() % (len + 1));
+            rope.line_to_byte(random_range(0..(len + 1)));
         })
     });
 
@@ -58,7 +58,7 @@ fn index_convert(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_lines();
         bench.iter(|| {
-            rope.line_to_char(random::<usize>() % (len + 1));
+            rope.line_to_char(random_range(0..(len + 1)));
         })
     });
 }
@@ -70,7 +70,7 @@ fn get(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_bytes();
         bench.iter(|| {
-            rope.byte(random::<usize>() % len);
+            rope.byte(random_range(0..len));
         })
     });
 
@@ -78,7 +78,7 @@ fn get(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.char(random::<usize>() % len);
+            rope.char(random_range(0..len));
         })
     });
 
@@ -86,7 +86,7 @@ fn get(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_lines();
         bench.iter(|| {
-            rope.line(random::<usize>() % len);
+            rope.line(random_range(0..len));
         })
     });
 
@@ -94,7 +94,7 @@ fn get(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_bytes();
         bench.iter(|| {
-            rope.chunk_at_byte(random::<usize>() % (len + 1));
+            rope.chunk_at_byte(random_range(0..(len + 1)));
         })
     });
 
@@ -103,7 +103,7 @@ fn get(c: &mut Criterion) {
         let slice = rope.slice(324..(rope.len_chars() - 213));
         let len = slice.len_bytes();
         bench.iter(|| {
-            slice.chunk_at_byte(random::<usize>() % (len + 1));
+            slice.chunk_at_byte(random_range(0..(len + 1)));
         })
     });
 
@@ -111,7 +111,7 @@ fn get(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.chunk_at_char(random::<usize>() % (len + 1));
+            rope.chunk_at_char(random_range(0..(len + 1)));
         })
     });
 
@@ -120,7 +120,7 @@ fn get(c: &mut Criterion) {
         let slice = rope.slice(324..(rope.len_chars() - 213));
         let len = slice.len_chars();
         bench.iter(|| {
-            slice.chunk_at_char(random::<usize>() % (len + 1));
+            slice.chunk_at_char(random_range(0..(len + 1)));
         })
     });
 
@@ -128,7 +128,7 @@ fn get(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_lines();
         bench.iter(|| {
-            rope.chunk_at_line_break(random::<usize>() % (len + 1));
+            rope.chunk_at_line_break(random_range(0..(len + 1)));
         })
     });
 
@@ -137,7 +137,7 @@ fn get(c: &mut Criterion) {
         let slice = rope.slice(324..(rope.len_chars() - 213));
         let len = slice.len_lines();
         bench.iter(|| {
-            slice.chunk_at_line_break(random::<usize>() % (len + 1));
+            slice.chunk_at_line_break(random_range(0..(len + 1)));
         })
     });
 }
@@ -149,8 +149,8 @@ fn slice(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            let mut start = random::<usize>() % (len + 1);
-            let mut end = random::<usize>() % (len + 1);
+            let mut start = random_range(0..(len + 1));
+            let mut end = random_range(0..(len + 1));
             if start > end {
                 std::mem::swap(&mut start, &mut end);
             }
@@ -162,7 +162,7 @@ fn slice(c: &mut Criterion) {
         let rope = Rope::from_str(TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            let mut start = random::<usize>() % (len + 1);
+            let mut start = random_range(0..(len + 1));
             if start > (len - 65) {
                 start = len - 65;
             }
@@ -175,8 +175,8 @@ fn slice(c: &mut Criterion) {
         let rope = Rope::from_str(SMALL_TEXT);
         let len = rope.len_chars();
         bench.iter(|| {
-            let mut start = random::<usize>() % (len + 1);
-            let mut end = random::<usize>() % (len + 1);
+            let mut start = random_range(0..(len + 1));
+            let mut end = random_range(0..(len + 1));
             if start > end {
                 std::mem::swap(&mut start, &mut end);
             }
