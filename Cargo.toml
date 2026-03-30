@@ -44,10 +44,10 @@ str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 fastrand = "2.3.0"
-proptest = "~1.6"
-criterion = { version = "0.3", features = ["html_reports"] }
-fnv = "1"
-fxhash = "0.2"
+proptest = "1.11.0"
+criterion = { version = "0.8.2", features = ["html_reports"] }
+fnv = "1.0.7"
+fxhash = "0.2.1"
 
 # This is a transitive dependency of criterion--we don't use it directly. We
 # lock it to this exact version because newer versions don't work on our MSRV,
