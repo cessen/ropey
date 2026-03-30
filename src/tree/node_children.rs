@@ -277,7 +277,7 @@ impl NodeChildren {
     }
 
     /// Creates an iterator over the array's items.
-    pub fn iter(&self) -> Zip<slice::Iter<TextInfo>, slice::Iter<Arc<Node>>> {
+    pub fn iter(&self) -> Zip<slice::Iter<'_, TextInfo>, slice::Iter<'_, Arc<Node>>> {
         Iterator::zip(self.info().iter(), self.nodes().iter())
     }
 

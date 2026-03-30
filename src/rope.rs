@@ -818,7 +818,7 @@ impl Rope {
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx >= len_lines()`).
     #[inline]
-    pub fn line(&self, line_idx: usize) -> RopeSlice {
+    pub fn line(&self, line_idx: usize) -> RopeSlice<'_> {
         if let Some(out) = self.get_line(line_idx) {
             out
         } else {
@@ -945,7 +945,7 @@ impl Rope {
     /// Panics if the start of the range is greater than the end, or if the
     /// end is out of bounds (i.e. `end > len_chars()`).
     #[inline]
-    pub fn slice<R>(&self, char_range: R) -> RopeSlice
+    pub fn slice<R>(&self, char_range: R) -> RopeSlice<'_>
     where
         R: RangeBounds<usize>,
     {
@@ -964,7 +964,7 @@ impl Rope {
     /// - The start of the range is greater than the end.
     /// - The end is out of bounds (i.e. `end > len_bytes()`).
     /// - The range doesn't align with char boundaries.
-    pub fn byte_slice<R>(&self, byte_range: R) -> RopeSlice
+    pub fn byte_slice<R>(&self, byte_range: R) -> RopeSlice<'_>
     where
         R: RangeBounds<usize>,
     {
@@ -981,7 +981,7 @@ impl Rope {
     ///
     /// Runs in O(log N) time.
     #[inline]
-    pub fn bytes(&self) -> Bytes {
+    pub fn bytes(&self) -> Bytes<'_> {
         Bytes::new(&self.root)
     }
 
@@ -997,7 +997,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
-    pub fn bytes_at(&self, byte_idx: usize) -> Bytes {
+    pub fn bytes_at(&self, byte_idx: usize) -> Bytes<'_> {
         if let Some(out) = self.get_bytes_at(byte_idx) {
             out
         } else {
@@ -1013,7 +1013,7 @@ impl Rope {
     ///
     /// Runs in O(log N) time.
     #[inline]
-    pub fn chars(&self) -> Chars {
+    pub fn chars(&self) -> Chars<'_> {
         Chars::new(&self.root)
     }
 
@@ -1029,7 +1029,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
-    pub fn chars_at(&self, char_idx: usize) -> Chars {
+    pub fn chars_at(&self, char_idx: usize) -> Chars<'_> {
         if let Some(out) = self.get_chars_at(char_idx) {
             out
         } else {
@@ -1045,7 +1045,7 @@ impl Rope {
     ///
     /// Runs in O(log N) time.
     #[inline]
-    pub fn lines(&self) -> Lines {
+    pub fn lines(&self) -> Lines<'_> {
         Lines::new(&self.root)
     }
 
@@ -1061,7 +1061,7 @@ impl Rope {
     ///
     /// Panics if `line_idx` is out of bounds (i.e. `line_idx > len_lines()`).
     #[inline]
-    pub fn lines_at(&self, line_idx: usize) -> Lines {
+    pub fn lines_at(&self, line_idx: usize) -> Lines<'_> {
         if let Some(out) = self.get_lines_at(line_idx) {
             out
         } else {
@@ -1077,7 +1077,7 @@ impl Rope {
     ///
     /// Runs in O(log N) time.
     #[inline]
-    pub fn chunks(&self) -> Chunks {
+    pub fn chunks(&self) -> Chunks<'_> {
         Chunks::new(&self.root)
     }
 
@@ -1099,7 +1099,7 @@ impl Rope {
     ///
     /// Panics if `byte_idx` is out of bounds (i.e. `byte_idx > len_bytes()`).
     #[inline]
-    pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks, usize, usize, usize) {
+    pub fn chunks_at_byte(&self, byte_idx: usize) -> (Chunks<'_>, usize, usize, usize) {
         if let Some(out) = self.get_chunks_at_byte(byte_idx) {
             out
         } else {
@@ -1129,7 +1129,7 @@ impl Rope {
     ///
     /// Panics if `char_idx` is out of bounds (i.e. `char_idx > len_chars()`).
     #[inline]
-    pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks, usize, usize, usize) {
+    pub fn chunks_at_char(&self, char_idx: usize) -> (Chunks<'_>, usize, usize, usize) {
         if let Some(out) = self.get_chunks_at_char(char_idx) {
             out
         } else {
@@ -1163,7 +1163,7 @@ impl Rope {
     ///
     /// Panics if `line_break_idx` is out of bounds (i.e. `line_break_idx > len_lines()`).
     #[inline]
-    pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks, usize, usize, usize) {
+    pub fn chunks_at_line_break(&self, line_break_idx: usize) -> (Chunks<'_>, usize, usize, usize) {
         if let Some(out) = self.get_chunks_at_line_break(line_break_idx) {
             out
         } else {
@@ -1550,7 +1550,7 @@ impl Rope {
 
     /// Non-panicking version of [`line()`](Rope::line).
     #[inline]
-    pub fn get_line(&self, line_idx: usize) -> Option<RopeSlice> {
+    pub fn get_line(&self, line_idx: usize) -> Option<RopeSlice<'_>> {
         use crate::slice::RSEnum;
         use crate::str_utils::{count_chars, count_utf16_surrogates};
 
@@ -1635,7 +1635,7 @@ impl Rope {
 
     /// Non-panicking version of [`slice()`](Rope::slice).
     #[inline]
-    pub fn get_slice<R>(&self, char_range: R) -> Option<RopeSlice>
+    pub fn get_slice<R>(&self, char_range: R) -> Option<RopeSlice<'_>>
     where
         R: RangeBounds<usize>,
     {
@@ -1652,14 +1652,14 @@ impl Rope {
 
     /// Non-panicking version of [`byte_slice()`](Rope::byte_slice).
     #[inline]
-    pub fn get_byte_slice<R>(&self, byte_range: R) -> Option<RopeSlice>
+    pub fn get_byte_slice<R>(&self, byte_range: R) -> Option<RopeSlice<'_>>
     where
         R: RangeBounds<usize>,
     {
         self.get_byte_slice_impl(byte_range).ok()
     }
 
-    pub(crate) fn get_byte_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice>
+    pub(crate) fn get_byte_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice<'_>>
     where
         R: RangeBounds<usize>,
     {
@@ -1716,7 +1716,7 @@ impl Rope {
 
     /// Non-panicking version of [`bytes_at()`](Rope::bytes_at).
     #[inline]
-    pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes> {
+    pub fn get_bytes_at(&self, byte_idx: usize) -> Option<Bytes<'_>> {
         // Bounds check
         if byte_idx <= self.len_bytes() {
             let info = self.root.text_info();
@@ -1734,7 +1734,7 @@ impl Rope {
 
     /// Non-panicking version of [`chars_at()`](Rope::chars_at).
     #[inline]
-    pub fn get_chars_at(&self, char_idx: usize) -> Option<Chars> {
+    pub fn get_chars_at(&self, char_idx: usize) -> Option<Chars<'_>> {
         // Bounds check
         if char_idx <= self.len_chars() {
             let info = self.root.text_info();
@@ -1752,7 +1752,7 @@ impl Rope {
 
     /// Non-panicking version of [`lines_at()`](Rope::lines_at).
     #[inline]
-    pub fn get_lines_at(&self, line_idx: usize) -> Option<Lines> {
+    pub fn get_lines_at(&self, line_idx: usize) -> Option<Lines<'_>> {
         // Bounds check
         if line_idx <= self.len_lines() {
             Some(Lines::new_with_range_at(
@@ -1768,7 +1768,7 @@ impl Rope {
 
     /// Non-panicking version of [`chunks_at_byte()`](Rope::chunks_at_byte).
     #[inline]
-    pub fn get_chunks_at_byte(&self, byte_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
+    pub fn get_chunks_at_byte(&self, byte_idx: usize) -> Option<(Chunks<'_>, usize, usize, usize)> {
         // Bounds check
         if byte_idx <= self.len_bytes() {
             Some(Chunks::new_with_range_at_byte(
@@ -1785,7 +1785,7 @@ impl Rope {
 
     /// Non-panicking version of [`chunks_at_char()`](Rope::chunks_at_char).
     #[inline]
-    pub fn get_chunks_at_char(&self, char_idx: usize) -> Option<(Chunks, usize, usize, usize)> {
+    pub fn get_chunks_at_char(&self, char_idx: usize) -> Option<(Chunks<'_>, usize, usize, usize)> {
         // Bounds check
         if char_idx <= self.len_chars() {
             Some(Chunks::new_with_range_at_char(
@@ -1805,7 +1805,7 @@ impl Rope {
     pub fn get_chunks_at_line_break(
         &self,
         line_break_idx: usize,
-    ) -> Option<(Chunks, usize, usize, usize)> {
+    ) -> Option<(Chunks<'_>, usize, usize, usize)> {
         // Bounds check
         if line_break_idx <= self.len_lines() {
             Some(Chunks::new_with_range_at_line_break(
