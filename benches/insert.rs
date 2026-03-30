@@ -1,9 +1,8 @@
 extern crate criterion;
-extern crate rand;
+extern crate fastrand;
 extern crate ropey;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::random;
 use ropey::Rope;
 
 const TEXT_SMALL: &str = include_str!("small.txt");
@@ -24,10 +23,11 @@ fn insert_char(c: &mut Criterion) {
     let mut group = c.benchmark_group("insert_char");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
             let len = rope.len();
-            rope.insert_char(random::<usize>() % len, 'a')
+            rope.insert_char(rng.usize(0..len), 'a')
         })
     });
 
@@ -61,10 +61,11 @@ fn insert_small(c: &mut Criterion) {
     let mut group = c.benchmark_group("insert_small");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
             let len = rope.len();
-            rope.insert(random::<usize>() % len, "a");
+            rope.insert(rng.usize(0..len), "a");
         })
     });
 
@@ -98,10 +99,11 @@ fn insert_medium(c: &mut Criterion) {
     let mut group = c.benchmark_group("insert_medium");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
             let len = rope.len();
-            rope.insert(random::<usize>() % len, "This is some text.");
+            rope.insert(rng.usize(0..len), "This is some text.");
         })
     });
 
@@ -137,10 +139,11 @@ fn insert_large(c: &mut Criterion) {
     let mut group = c.benchmark_group("insert_large");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
         bench.iter(|| {
             let len = rope.len();
-            rope.insert(random::<usize>() % len, INSERT_TEXT);
+            rope.insert(rng.usize(0..len), INSERT_TEXT);
         })
     });
 
@@ -174,6 +177,7 @@ fn insert_after_clone(c: &mut Criterion) {
     let text = large_string();
 
     c.bench_function("insert_after_clone", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&text);
         let mut rope_clone = rope.clone();
         let mut i = 0;
@@ -183,7 +187,7 @@ fn insert_after_clone(c: &mut Criterion) {
                 rope_clone = rope.clone();
             }
             let len = rope_clone.len();
-            rope_clone.insert(random::<usize>() % len, "a");
+            rope_clone.insert(rng.usize(0..len), "a");
             i += 1;
         })
     });

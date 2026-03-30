@@ -43,7 +43,7 @@ __dev__small_chunks = []
 str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
-rand = "0.8"
+fastrand = "2.3.0"
 proptest = "~1.6"
 criterion = { version = "0.3", features = ["html_reports"] }
 fnv = "1"

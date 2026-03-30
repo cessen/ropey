@@ -1,9 +1,8 @@
 extern crate criterion;
-extern crate rand;
+extern crate fastrand;
 extern crate ropey;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::random;
 use ropey::Rope;
 
 const TEXT_SMALL: &str = include_str!("small.txt");
@@ -32,11 +31,12 @@ fn remove_small(c: &mut Criterion) {
     let mut group = c.benchmark_group("remove_small");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
             let len = rope.len();
-            let start = random::<usize>() % (len + 1);
+            let start = rng.usize(0..(len + 1));
             let end = (start + 1).min(len);
             rope.remove(start..end);
 
@@ -98,11 +98,12 @@ fn remove_medium(c: &mut Criterion) {
     let mut group = c.benchmark_group("remove_medium");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
             let len = rope.len();
-            let start = random::<usize>() % (len + 1);
+            let start = rng.usize(0..(len + 1));
             let end = (start + 15).min(len);
             rope.remove(start..end);
 
@@ -165,11 +166,12 @@ fn remove_large(c: &mut Criterion) {
     let mut group = c.benchmark_group("remove_large");
 
     group.bench_function("random", |bench| {
+        let mut rng = fastrand::Rng::new();
         let mut rope = Rope::from_str(&text);
 
         bench.iter(|| {
             let len = rope.len();
-            let start = random::<usize>() % (len + 1);
+            let start = rng.usize(0..(len + 1));
             let end = (start + removal_len).min(len);
             rope.remove(start..end);
 
@@ -229,6 +231,7 @@ fn remove_initial_after_clone(c: &mut Criterion) {
     let text = large_string();
 
     c.bench_function("remove_initial_after_clone", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&text);
         let mut rope_clone = rope.clone();
         let mut i = 0;
@@ -238,7 +241,7 @@ fn remove_initial_after_clone(c: &mut Criterion) {
                 rope_clone = rope.clone();
             }
             let len = rope_clone.len();
-            let start = random::<usize>() % (len + 1);
+            let start = rng.usize(0..(len + 1));
             let end = (start + 1).min(len);
             rope_clone.remove(start..end);
             i += 1;

@@ -1,9 +1,8 @@
 extern crate criterion;
-extern crate rand;
+extern crate fastrand;
 extern crate ropey;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::random;
 use ropey::Rope;
 
 #[cfg(any(
@@ -39,73 +38,81 @@ fn index_convert(c: &mut Criterion) {
 
     #[cfg(feature = "metric_chars")]
     group.bench_function("byte_to_char", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_char_idx(random::<usize>() % (len + 1));
+            rope.byte_to_char_idx(rng.usize(0..(len + 1)));
         })
     });
 
     #[cfg(feature = "metric_chars")]
     group.bench_function("char_to_byte", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.char_to_byte_idx(random::<usize>() % (len + 1));
+            rope.char_to_byte_idx(rng.usize(0..(len + 1)));
         })
     });
 
     #[cfg(feature = "metric_lines_lf")]
     group.bench_function("byte_to_line_lf", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::LF);
+            rope.byte_to_line_idx(rng.usize(0..(len + 1)), LineType::LF);
         })
     });
 
     #[cfg(feature = "metric_lines_lf")]
     group.bench_function("line_lf_to_byte", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF);
         bench.iter(|| {
-            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::LF);
+            rope.line_to_byte_idx(rng.usize(0..(len + 1)), LineType::LF);
         })
     });
 
     #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("byte_to_line_cr_lf", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::LF_CR);
+            rope.byte_to_line_idx(rng.usize(0..(len + 1)), LineType::LF_CR);
         })
     });
 
     #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("line_cr_lf_to_byte", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::LF_CR);
+            rope.line_to_byte_idx(rng.usize(0..(len + 1)), LineType::LF_CR);
         })
     });
 
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("byte_to_line_all", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte_to_line_idx(random::<usize>() % (len + 1), LineType::Unicode);
+            rope.byte_to_line_idx(rng.usize(0..(len + 1)), LineType::Unicode);
         })
     });
 
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("line_all_to_byte", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line_to_byte_idx(random::<usize>() % (len + 1), LineType::Unicode);
+            rope.line_to_byte_idx(rng.usize(0..(len + 1)), LineType::Unicode);
         })
     });
 }
@@ -114,26 +121,29 @@ fn index_query(c: &mut Criterion) {
     let mut group = c.benchmark_group("index_query");
 
     group.bench_function("is_char_boundary", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string_multibyte());
         let len = rope.len();
         bench.iter(|| {
-            rope.is_char_boundary(random::<usize>() % (len + 1));
+            rope.is_char_boundary(rng.usize(0..(len + 1)));
         })
     });
 
     group.bench_function("floor_char_boundary", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string_multibyte());
         let len = rope.len();
         bench.iter(|| {
-            rope.floor_char_boundary(random::<usize>() % (len + 1));
+            rope.floor_char_boundary(rng.usize(0..(len + 1)));
         })
     });
 
     group.bench_function("ceil_char_boundary", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string_multibyte());
         let len = rope.len();
         bench.iter(|| {
-            rope.ceil_char_boundary(random::<usize>() % (len + 1));
+            rope.ceil_char_boundary(rng.usize(0..(len + 1)));
         })
     });
 
@@ -172,63 +182,70 @@ fn get(c: &mut Criterion) {
     let mut group = c.benchmark_group("get");
 
     group.bench_function("byte", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.byte(random::<usize>() % len);
+            rope.byte(rng.usize(0..len));
         })
     });
 
     #[cfg(feature = "metric_chars")]
     group.bench_function("char", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_chars();
         bench.iter(|| {
-            rope.char(random::<usize>() % len);
+            rope.char(rng.usize(0..len));
         })
     });
 
     #[cfg(feature = "metric_lines_lf")]
     group.bench_function("line_lf", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF);
         bench.iter(|| {
-            rope.line(random::<usize>() % len, LineType::LF);
+            rope.line(rng.usize(0..len), LineType::LF);
         })
     });
 
     #[cfg(feature = "metric_lines_lf_cr")]
     group.bench_function("line_cr_lf", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::LF_CR);
         bench.iter(|| {
-            rope.line(random::<usize>() % len, LineType::LF_CR);
+            rope.line(rng.usize(0..len), LineType::LF_CR);
         })
     });
 
     #[cfg(feature = "metric_lines_unicode")]
     group.bench_function("line_unicode", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len_lines(LineType::Unicode);
         bench.iter(|| {
-            rope.line(random::<usize>() % len, LineType::Unicode);
+            rope.line(rng.usize(0..len), LineType::Unicode);
         })
     });
 
     group.bench_function("chunk", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            rope.chunk(random::<usize>() % (len + 1));
+            rope.chunk(rng.usize(0..(len + 1)));
         })
     });
 
     group.bench_function("chunk_slice", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let slice = rope.slice(324..(rope.len() - 213));
         let len = slice.len();
         bench.iter(|| {
-            slice.chunk(random::<usize>() % (len + 1));
+            slice.chunk(rng.usize(0..(len + 1)));
         })
     });
 }
@@ -237,11 +254,12 @@ fn slice(c: &mut Criterion) {
     let mut group = c.benchmark_group("slice");
 
     group.bench_function("slice", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            let mut start = random::<usize>() % (len + 1);
-            let mut end = random::<usize>() % (len + 1);
+            let mut start = rng.usize(0..(len + 1));
+            let mut end = rng.usize(0..(len + 1));
             if start > end {
                 std::mem::swap(&mut start, &mut end);
             }
@@ -250,10 +268,11 @@ fn slice(c: &mut Criterion) {
     });
 
     group.bench_function("slice_small", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(&large_string());
         let len = rope.len();
         bench.iter(|| {
-            let mut start = random::<usize>() % (len + 1);
+            let mut start = rng.usize(0..(len + 1));
             if start > (len - 65) {
                 start = len - 65;
             }
@@ -263,11 +282,12 @@ fn slice(c: &mut Criterion) {
     });
 
     group.bench_function("slice_from_small_rope", |bench| {
+        let mut rng = fastrand::Rng::new();
         let rope = Rope::from_str(TEXT_SMALL);
         let len = rope.len();
         bench.iter(|| {
-            let mut start = random::<usize>() % (len + 1);
-            let mut end = random::<usize>() % (len + 1);
+            let mut start = rng.usize(0..(len + 1));
+            let mut end = rng.usize(0..(len + 1));
             if start > end {
                 std::mem::swap(&mut start, &mut end);
             }
