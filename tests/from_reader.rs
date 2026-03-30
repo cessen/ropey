@@ -1,4 +1,3 @@
-extern crate rand;
 extern crate ropey;
 
 use std::io::Cursor;

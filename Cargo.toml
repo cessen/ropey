@@ -27,7 +27,7 @@ smallvec = "1.0.0"
 str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
-rand = "0.10.0"
+fastrand = "2.3.0"
 proptest = "1.11.0"
 criterion = { version = "0.8.2", features = ["html_reports"] }
 unicode-segmentation = "=1.13.2"
