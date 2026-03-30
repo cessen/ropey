@@ -97,7 +97,9 @@ loading of non-utf8 text files.
 //!
 //! Examples:
 //!
+//! - `""` has 1 line: `""`.
 //! - `"Hello"` has 1 line: `"Hello"`.
+//! - `"Hello\n"` has 2 lines: `"Hello\n"` and `""`.
 //! - `"Hello\nworld"` has 2 lines: `"Hello\n"` and `"world"`.
 //! - `"Hello\nworld\n"` has 3 lines: `"Hello\n"`, `"world\n"`, and `""`.
 //!
