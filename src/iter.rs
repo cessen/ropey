@@ -798,8 +798,6 @@ mod lines {
             at_line_idx: usize,
             line_type: LineType,
         ) -> crate::Result<Self> {
-            use crate::str_utils::lines;
-
             let total_lines = lines::count_breaks(text, line_type) + 1;
             let at_byte_idx = lines::to_byte_idx(text, at_line_idx, line_type);
 
