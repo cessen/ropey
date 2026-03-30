@@ -25,23 +25,23 @@ impl TextBuffer {
         })
     }
 
-    fn get_line(&self, idx: usize) -> RopeSlice {
+    fn get_line(&self, idx: usize) -> RopeSlice<'_> {
         self.text.line(idx)
     }
 
-    fn bytes(&self) -> Bytes {
+    fn bytes(&self) -> Bytes<'_> {
         self.text.bytes()
     }
 
-    fn chars(&self) -> Chars {
+    fn chars(&self) -> Chars<'_> {
         self.text.chars()
     }
 
-    fn lines(&self) -> Lines {
+    fn lines(&self) -> Lines<'_> {
         self.text.lines()
     }
 
-    fn chunks(&self) -> Chunks {
+    fn chunks(&self) -> Chunks<'_> {
         self.text.chunks()
     }
 
