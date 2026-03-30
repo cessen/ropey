@@ -22,7 +22,6 @@ jobs:
         toolchain:
           - stable
           - beta
-          - "1.65"
     runs-on: ubuntu-latest
     steps:
       # Get a checkout and rust toolchain.
@@ -47,6 +46,34 @@ jobs:
 
       # Make sure benchmarks build.
       - run: cargo +${{matrix.toolchain}} bench --no-run --features "metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
+
+  build:
+    name: Build only
+    strategy:
+      matrix:
+        toolchain:
+          - "1.65"
+    runs-on: ubuntu-latest
+    steps:
+      # Get a checkout and rust toolchain.
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{matrix.toolchain}}
+          override: true
+
+      # Make sure a vanilla build works.
+      - run: cargo +${{matrix.toolchain}} build
+
+      # Make sure builds with various feature combos work.
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd"
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd, metric_chars"
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd, metric_utf16"
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd, metric_lines_lf"
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd, metric_lines_lf_cr"
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd, metric_lines_unicode"
+      - run: cargo +${{matrix.toolchain}} build --no-default-features --features "simd, metric_chars, metric_utf16, metric_lines_lf, metric_lines_lf_cr, metric_lines_unicode"
 
   run-miri:
     name: Run Miri
