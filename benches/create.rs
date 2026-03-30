@@ -1,7 +1,9 @@
 extern crate criterion;
 extern crate ropey;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
+
+use criterion::{criterion_group, criterion_main, Criterion};
 use ropey::Rope;
 
 const TEXT_SMALL: &str = include_str!("small.txt");

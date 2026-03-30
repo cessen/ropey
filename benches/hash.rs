@@ -5,8 +5,9 @@ extern crate ropey;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::hint::black_box;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use fnv::FnvHasher;
 use fxhash::FxHasher;
 use ropey::Rope;
