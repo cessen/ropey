@@ -298,8 +298,8 @@ impl<'a> ChunkCursor<'a> {
             byte_range: byte_range,
         };
 
-        // Find the chunk the contains `at_byte_idx` and set that as the current
-        // chunk of the cursor.
+        // Find the chunk that contains `at_byte_idx` and set that as the
+        // current chunk of the cursor.
         let mut current_node = node;
         let mut current_info = info;
         let mut current_byte_idx = 0;
@@ -367,7 +367,7 @@ impl<'a> ChunkCursor<'a> {
     /// - A line break character.
     ///
     /// On success returns the common ancestor of the from/to chunks, along
-    /// with its text info and it's byte offset from the start of the text.
+    /// with its text info and its byte offset from the start of the text.
     /// Note that the offset may be negative, since the node is not clipped
     /// to the slice boundaries.
     ///
