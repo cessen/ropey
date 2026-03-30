@@ -28,11 +28,11 @@ str_indices = { version = "0.4", default-features = false }
 
 [dev-dependencies]
 rand = "0.10.0"
-proptest = "~1.6"
-criterion = { version = "0.3", features = ["html_reports"] }
-unicode-segmentation = "=1.12.0"
-fnv = "1"
-fxhash = "0.2"
+proptest = "1.11.0"
+criterion = { version = "0.8.2", features = ["html_reports"] }
+unicode-segmentation = "=1.13.2"
+fnv = "1.0.7"
+fxhash = "0.2.1"
 
 #-----------------------------------------
 
