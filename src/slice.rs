@@ -21,7 +21,7 @@ use crate::{iter::Lines, LineType};
 ///
 /// `RopeSlice` is to `Rope` what `&str` is to `String`: `RopeSlice`s only know
 /// about the text within their range, all indexing is relative to their range,
-/// all iterators are truncated their range, etc.  Nothing should be too
+/// all iterators are truncated to their range, etc.  Nothing should be too
 /// surprising here.
 ///
 /// # A Warning About `From<&str>`
