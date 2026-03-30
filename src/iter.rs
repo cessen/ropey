@@ -70,7 +70,7 @@ use std::sync::Arc;
 use crate::slice::{RSEnum, RopeSlice};
 use crate::str_utils::{
     byte_to_line_idx, char_to_byte_idx, count_chars, count_utf16_surrogates, ends_with_line_break,
-    last_line_start_byte_idx, line_to_byte_idx, trim_line_break,
+    last_line_start_byte_idx, line_to_byte_idx, next_line_byte_idx, trim_line_break,
 };
 use crate::tree::{Count, Node, TextInfo};
 
@@ -1022,7 +1022,7 @@ impl<'a> Lines<'a> {
                 *line_idx += 1;
 
                 let head = &text[*leaf_byte_idx as usize..];
-                let mut line_len = line_to_byte_idx(head, 1);
+                let mut line_len = next_line_byte_idx(head);
 
                 // Check if the iterators needs to advance to the next chunk.
                 // During this check the number of newline (0 or 1) is yielded
@@ -1126,7 +1126,7 @@ impl<'a> Lines<'a> {
                         // This chunk contains a line break so it will contain the start of our line.
                         *text = node.children().nodes()[child_i].leaf_text();
                         // Find the end of the line within the chunk.
-                        let mut line_end = line_to_byte_idx(text, 1);
+                        let mut line_end = next_line_byte_idx(text);
                         // Check if the iterator was exhausted.
                         let ends_with_newline = if line_end >= available_bytes {
                             // Handle terminating lines without a line break properly.
@@ -1203,7 +1203,7 @@ impl<'a> Lines<'a> {
                 }
 
                 let start_idx = *byte_idx;
-                let end_idx = line_to_byte_idx(&text[start_idx..], 1) + start_idx;
+                let end_idx = next_line_byte_idx(&text[start_idx..]) + start_idx;
                 *byte_idx = end_idx;
                 *line_idx += 1;
 
