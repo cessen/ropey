@@ -7,6 +7,7 @@ documentation = "https://docs.rs/ropey"
 repository = "https://github.com/cessen/ropey"
 readme = "README.md"
 license = "MIT"
+rust-version = "1.65"
 keywords = ["rope", "text", "edit", "buffer"]
 categories = ["text-processing", "data-structures"]
 exclude = ["/design/*", "/benches/*.txt", "/fuzz/**", "/.github/*"]
