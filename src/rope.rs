@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use crate::{
     end_bound_to_num,
+    extra::esoterica,
     iter::{Bytes, CharIndices, Chars, Chunks},
     rope_builder::RopeBuilder,
-    slice::RopeSlice,
+    slice::{RopeSlice, SliceInner},
     start_bound_to_num, str_utils,
     tree::{Children, Node, Text, TextInfo, MAX_TEXT_SIZE},
     ChunkCursor,
@@ -817,11 +818,14 @@ impl std::cmp::PartialEq<RopeSlice<'_>> for Rope {
 
 impl From<RopeSlice<'_>> for Rope {
     fn from(rs: RopeSlice) -> Rope {
-        let mut rb = RopeBuilder::new();
-        for chunk in rs.chunks() {
-            rb.append(chunk);
+        match rs.0 {
+            SliceInner::Str(s) => Rope::from_str(s),
+            SliceInner::Rope { .. } => {
+                let mut r = esoterica::disconnect_slice(rs).unwrap();
+                r.trim_disconnected_slice();
+                r
+            }
         }
-        rb.finish()
     }
 }
 
@@ -1512,5 +1516,34 @@ mod tests {
         Rope::hash_slice(&s, &mut h2);
 
         assert_ne!(h1.finish(), h2.finish());
+    }
+
+    #[test]
+    fn from_slice_01() {
+        // Test slices created from ropes.
+        let r1 = Rope::from_str(TEXT);
+        let s = r1.slice(21..89);
+        let r2: Rope = s.into();
+
+        assert_eq!(
+            r2,
+            "you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?"
+        );
+    }
+
+    #[test]
+    fn from_slice_02() {
+        // Test slices created directly from str's.
+        let s: RopeSlice = TEXT[21..89].into();
+        let r: Rope = s.into();
+
+        assert_eq!(
+            r,
+            "you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?"
+        );
     }
 }
