@@ -146,3 +146,12 @@ pub mod esoterica {
         }
     }
 }
+
+/// A trait implementing non-panicking versions of the read-only methods that are present on both
+/// [`Rope`](crate::Rope) and [`RopeSlice`](crate::RopeSlice).
+pub trait RopeNoPanic {
+    /// Non-panicking version of `byte()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_byte(&self, byte_idx: usize) -> Option<u8>;
+}

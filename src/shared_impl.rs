@@ -985,7 +985,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `byte()`.
         ///
         /// If `byte_idx` is out of bounds, returns `None`.
-        pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        fn get_byte(&self, byte_idx: usize) -> Option<u8> {
             if byte_idx >= self.len() {
                 return None;
             }

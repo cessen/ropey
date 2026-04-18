@@ -2,6 +2,7 @@ use std::ops::RangeBounds;
 
 use crate::{
     end_bound_to_num,
+    extra::RopeNoPanic,
     iter::{Bytes, CharIndices, Chars, Chunks},
     start_bound_to_num,
     tree::{Node, TextInfo},
@@ -216,6 +217,12 @@ impl<'a> RopeSlice<'a> {
     crate::shared_impl::shared_no_panic_impl_methods!('a);
 }
 
+impl<'a> RopeNoPanic for RopeSlice<'a> {
+    fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        self.get_byte(byte_idx)
+    }
+}
+
 // Stdlib trait impls.
 //
 // Note: most impls are in `shared_impls.rs`.  The only ones here are the ones
@@ -290,7 +297,7 @@ mod tests {
 
     use super::{RopeSlice, SliceInner};
 
-    use crate::{rope_builder::RopeBuilder, Rope};
+    use crate::{extra::RopeNoPanic, rope_builder::RopeBuilder, Rope};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -1052,6 +1059,46 @@ mod tests {
     fn byte_03b() {
         let s: RopeSlice = (&TEXT[42..42]).into();
         s.byte(0);
+    }
+
+    #[test]
+    fn get_byte_01() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, 34..118) {
+            assert_eq!(RopeNoPanic::get_byte(&t, 0), Some(b't'));
+            assert_eq!(RopeNoPanic::get_byte(&t, 10), Some(b' '));
+
+            // UTF-8 encoding of 'な'.
+            assert_eq!(RopeNoPanic::get_byte(&t, t.len() - 3), Some(0xE3));
+            assert_eq!(RopeNoPanic::get_byte(&t, t.len() - 2), Some(0x81));
+            assert_eq!(RopeNoPanic::get_byte(&t, t.len() - 1), Some(0xAA));
+        }
+    }
+
+    #[test]
+    fn get_byte_02a() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
+        assert_eq!(RopeNoPanic::get_byte(&s, s.len()), None);
+    }
+
+    #[test]
+    fn get_byte_02b() {
+        let s: RopeSlice = (&TEXT[34..118]).into();
+        assert_eq!(RopeNoPanic::get_byte(&s, s.len()), None);
+    }
+
+    #[test]
+    fn get_byte_03a() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(42..42);
+        assert_eq!(RopeNoPanic::get_byte(&s, 0), None);
+    }
+
+    #[test]
+    fn get_byte_03b() {
+        let s: RopeSlice = (&TEXT[42..42]).into();
+        assert_eq!(RopeNoPanic::get_byte(&s, 0), None);
     }
 
     #[test]

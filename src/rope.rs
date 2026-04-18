@@ -2,6 +2,7 @@ use std::io;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
+use crate::extra::RopeNoPanic;
 use crate::{
     end_bound_to_num,
     extra::esoterica,
@@ -791,6 +792,12 @@ impl Rope {
             // chunk as the CR.
             self.insert_core_impl(byte_idx, "\n", true).unwrap();
         }
+    }
+}
+
+impl RopeNoPanic for Rope {
+    fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        self.get_byte(byte_idx)
     }
 }
 
