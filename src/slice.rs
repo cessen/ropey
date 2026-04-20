@@ -221,6 +221,10 @@ impl<'a> RopeNoPanic for RopeSlice<'a> {
     fn get_byte(&self, byte_idx: usize) -> Option<u8> {
         self.get_byte(byte_idx)
     }
+
+    fn get_char(&self, byte_idx: usize) -> crate::Result<char> {
+        self.get_char(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -1144,6 +1148,72 @@ mod tests {
     fn char_03b() {
         let s: RopeSlice = (&TEXT[43..43]).into();
         s.char(0);
+    }
+
+    #[test]
+    fn get_char_01() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, 34..118) {
+            // t's \
+            // a fine day, isn't it?  Aren't you glad \
+            // we're alive?  こんにちは、みんな
+
+            assert_eq!(RopeNoPanic::get_char(&t, 0), Ok('t'));
+            assert_eq!(RopeNoPanic::get_char(&t, 10), Ok(' '));
+            assert_eq!(RopeNoPanic::get_char(&t, 18), Ok('n'));
+            assert_eq!(RopeNoPanic::get_char(&t, 81), Ok('な'));
+        }
+    }
+
+    #[test]
+    fn get_char_02a() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
+        assert_eq!(
+            RopeNoPanic::get_char(&s, s.len()),
+            Err(crate::Error::OutOfBounds)
+        );
+    }
+
+    #[test]
+    fn get_char_02b() {
+        let s: RopeSlice = (&TEXT[34..118]).into();
+        assert_eq!(
+            RopeNoPanic::get_char(&s, s.len()),
+            Err(crate::Error::OutOfBounds)
+        );
+    }
+
+    #[test]
+    fn get_char_03a() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(43..43);
+        assert_eq!(RopeNoPanic::get_char(&s, 0), Err(crate::Error::OutOfBounds));
+    }
+
+    #[test]
+    fn get_char_03b() {
+        let s: RopeSlice = (&TEXT[43..43]).into();
+        assert_eq!(RopeNoPanic::get_char(&s, 0), Err(crate::Error::OutOfBounds));
+    }
+
+    #[test]
+    fn get_char_04a() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(34..118);
+        assert_eq!(
+            RopeNoPanic::get_char(&s, 82),
+            Err(crate::Error::NonCharBoundary)
+        );
+    }
+
+    #[test]
+    fn get_char_04b() {
+        let s: RopeSlice = (&TEXT[34..118]).into();
+        assert_eq!(
+            RopeNoPanic::get_char(&s, 82),
+            Err(crate::Error::NonCharBoundary)
+        );
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]

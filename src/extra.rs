@@ -154,4 +154,14 @@ pub trait RopeNoPanic {
     ///
     /// If `byte_idx` is out of bounds, returns `None`.
     fn get_byte(&self, byte_idx: usize) -> Option<u8>;
+
+    /// Non-panicking version of `char()`.
+    ///
+    /// Will fail if `byte_idx` is either:
+    ///
+    /// - Not a char boundary.
+    /// - Out of bounds.
+    ///
+    /// On failure returns the cause of failure.
+    fn get_char(&self, byte_idx: usize) -> crate::Result<char>;
 }

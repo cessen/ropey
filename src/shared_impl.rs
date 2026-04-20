@@ -1002,7 +1002,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// - Out of bounds.
         ///
         /// On failure returns the cause of failure.
-        pub fn get_char(&self, byte_idx: usize) -> Result<char> {
+        fn get_char(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len() {
                 return Err(OutOfBounds);
             }
