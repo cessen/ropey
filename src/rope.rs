@@ -799,6 +799,10 @@ impl RopeNoPanic for Rope {
     fn get_byte(&self, byte_idx: usize) -> Option<u8> {
         self.get_byte_impl(byte_idx)
     }
+
+    fn get_char(&self, byte_idx: usize) -> Result<char> {
+        self.get_char_impl(byte_idx)
+    }
 }
 
 //==============================================================
