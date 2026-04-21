@@ -795,13 +795,26 @@ impl Rope {
     }
 }
 
-impl RopeNoPanic for Rope {
+impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_byte(&self, byte_idx: usize) -> Option<u8> {
         self.get_byte_impl(byte_idx)
     }
 
     fn get_char(&self, byte_idx: usize) -> Result<char> {
         self.get_char_impl(byte_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(
+        &'current self,
+        line_idx: usize,
+        line_type: LineType,
+    ) -> Option<RopeSlice<'current>> {
+        self.get_line_impl(line_idx, line_type)
     }
 }
 
