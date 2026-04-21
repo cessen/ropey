@@ -1,5 +1,13 @@
 //! Miscellaneous extra functionality.
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_lf_cr",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+use crate::RopeSlice;
+
 pub mod esoterica {
     //! Esoteric functionality.
     //!
@@ -149,7 +157,7 @@ pub mod esoterica {
 
 /// A trait implementing non-panicking versions of the read-only methods that are present on both
 /// [`Rope`](crate::Rope) and [`RopeSlice`](crate::RopeSlice).
-pub trait RopeNoPanic {
+pub trait RopeNoPanic<'rope> {
     /// Non-panicking version of `byte()`.
     ///
     /// If `byte_idx` is out of bounds, returns `None`.
@@ -164,4 +172,22 @@ pub trait RopeNoPanic {
     ///
     /// On failure returns the cause of failure.
     fn get_char(&self, byte_idx: usize) -> crate::Result<char>;
+
+    /// Non-panicking version of `line()`.
+    ///
+    /// If `line_idx` is out of bounds, returns `None`.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        )))
+    )]
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(&'rope self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'rope>>;
 }

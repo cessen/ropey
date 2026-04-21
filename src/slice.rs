@@ -217,13 +217,22 @@ impl<'a> RopeSlice<'a> {
     crate::shared_impl::shared_no_panic_impl_methods!('a);
 }
 
-impl<'a> RopeNoPanic for RopeSlice<'a> {
+impl<'a> RopeNoPanic<'a> for RopeSlice<'a> {
     fn get_byte(&self, byte_idx: usize) -> Option<u8> {
         self.get_byte(byte_idx)
     }
 
     fn get_char(&self, byte_idx: usize) -> crate::Result<char> {
         self.get_char(byte_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'a>> {
+        self.get_line(line_idx, line_type)
     }
 }
 
@@ -1308,6 +1317,172 @@ mod tests {
             assert_eq!(t.line(4, LineType::LF_CR).len_lines(LineType::LF_CR), 2);
             assert_eq!(t.line(5, LineType::LF_CR).len_lines(LineType::LF_CR), 1);
         }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        for t in make_test_data(&r, TEXT_LINES, 34..112) {
+            // "'s a fine day, isn't it?\nAren't you glad \
+            //  we're alive?\nこんにちは、みん"
+
+            let l0 = RopeNoPanic::get_line(&t, 0, LineType::LF_CR);
+            assert_eq!(l0, Some("'s a fine day, isn't it?\n".into()));
+            let l0 = l0.unwrap();
+            assert_eq!(l0.len(), 25);
+            assert_eq!(l0.len_lines(LineType::LF_CR), 2);
+
+            let l1 = RopeNoPanic::get_line(&t, 1, LineType::LF_CR);
+            assert_eq!(l1, Some("Aren't you glad we're alive?\n".into()));
+            let l1 = l1.unwrap();
+            assert_eq!(l1.len(), 29);
+            assert_eq!(l1.len_lines(LineType::LF_CR), 2);
+
+            let l2 = RopeNoPanic::get_line(&t, 2, LineType::LF_CR);
+            assert_eq!(l2, Some("こんにちは、みん".into()));
+            let l2 = l2.unwrap();
+            assert_eq!(l2.len(), 24);
+            assert_eq!(l2.len_lines(LineType::LF_CR), 1);
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        for t in make_test_data(&r, TEXT_LINES, 34..59) {
+            // "'s a fine day, isn't it?\n"
+
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 0, LineType::LF_CR),
+                Some("'s a fine day, isn't it?\n".into())
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 1, LineType::LF_CR),
+                Some("".into())
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_03() {
+        let r = Rope::from_str("Hi\nHi\nHi\nHi\nHi\nHi\n");
+        for t in make_test_data(&r, "Hi\nHi\nHi\nHi\nHi\nHi\n", 1..17) {
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 0, LineType::LF_CR),
+                Some("i\n".into())
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 1, LineType::LF_CR),
+                Some("Hi\n".into())
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 2, LineType::LF_CR),
+                Some("Hi\n".into())
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 3, LineType::LF_CR),
+                Some("Hi\n".into())
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 4, LineType::LF_CR),
+                Some("Hi\n".into())
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 5, LineType::LF_CR),
+                Some("Hi".into())
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        for t in make_test_data(&r, TEXT_LINES, 43..43) {
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 0, LineType::LF_CR),
+                Some("".into())
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_05a() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..97);
+        assert_eq!(RopeNoPanic::get_line(&s, 3, LineType::LF_CR), None);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_05b() {
+        let s: RopeSlice = (&TEXT_LINES[34..97]).into();
+        assert_eq!(RopeNoPanic::get_line(&s, 3, LineType::LF_CR), None);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_06() {
+        let text = "1\n2\n3\n4\n5\n6\n7\n8";
+        let r = Rope::from_str(text);
+        for t in make_test_data(&r, text, 1..11) {
+            // "\n2\n3\n4\n5\n6"
+
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 0, LineType::LF_CR)
+                    .unwrap()
+                    .len_lines(LineType::LF_CR),
+                2
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 1, LineType::LF_CR)
+                    .unwrap()
+                    .len_lines(LineType::LF_CR),
+                2
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 2, LineType::LF_CR)
+                    .unwrap()
+                    .len_lines(LineType::LF_CR),
+                2
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 3, LineType::LF_CR)
+                    .unwrap()
+                    .len_lines(LineType::LF_CR),
+                2
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 4, LineType::LF_CR)
+                    .unwrap()
+                    .len_lines(LineType::LF_CR),
+                2
+            );
+            assert_eq!(
+                RopeNoPanic::get_line(&t, 5, LineType::LF_CR)
+                    .unwrap()
+                    .len_lines(LineType::LF_CR),
+                1
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_07() {
+        // Tests lifetimes. See `reslice` test.
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..97);
+
+        let s = {
+            let s1 = RopeNoPanic::get_line(&s, 1, LineType::LF_CR).unwrap();
+            s1.slice(2..24)
+        };
+        _ = s;
     }
 
     #[cfg(feature = "metric_lines_lf")]

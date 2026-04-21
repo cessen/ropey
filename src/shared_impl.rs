@@ -1023,20 +1023,12 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `line()`.
         ///
         /// If `line_idx` is out of bounds, returns `None`.
-        #[cfg_attr(
-            docsrs,
-            doc(cfg(any(
-                feature = "metric_lines_lf",
-                feature = "metric_lines_lf_cr",
-                feature = "metric_lines_unicode"
-            )))
-        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
+        fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
             if line_idx >= self.len_lines(line_type) {
                 return None;
             }

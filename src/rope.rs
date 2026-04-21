@@ -795,13 +795,22 @@ impl Rope {
     }
 }
 
-impl RopeNoPanic for Rope {
+impl RopeNoPanic<'_> for Rope {
     fn get_byte(&self, byte_idx: usize) -> Option<u8> {
         self.get_byte(byte_idx)
     }
 
     fn get_char(&self, byte_idx: usize) -> crate::Result<char> {
         self.get_char(byte_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'_>> {
+        self.get_line(line_idx, line_type)
     }
 }
 
