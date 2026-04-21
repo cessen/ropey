@@ -1164,7 +1164,7 @@ mod tests {
     #[should_panic]
     fn line_05a() {
         let r = Rope::from_str(TEXT_LINES);
-        let s = r.slice(34..96);
+        let s = r.slice(34..112);
         s.line(3, LineType::LF_CR);
     }
 
@@ -1172,7 +1172,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn line_05b() {
-        let s: RopeSlice = (&TEXT_LINES[34..96]).into();
+        let s: RopeSlice = (&TEXT_LINES[34..112]).into();
         s.line(3, LineType::LF_CR);
     }
 
