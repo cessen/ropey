@@ -816,6 +816,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     ) -> Option<RopeSlice<'current>> {
         self.get_line_impl(line_idx, line_type)
     }
+
+    fn get_chunk(&'current self, byte_idx: usize) -> Option<(&'current str, usize)> {
+        self.get_chunk_impl(byte_idx)
+    }
 }
 
 //==============================================================

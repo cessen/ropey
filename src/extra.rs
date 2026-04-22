@@ -214,4 +214,9 @@ pub trait RopeNoPanic<'current, 'original> {
         line_idx: usize,
         line_type: LineType,
     ) -> Option<RopeSlice<'original>>;
+
+    /// Non-panicking version of `chunk()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_chunk(&'current self, byte_idx: usize) -> Option<(&'original str, usize)>;
 }
