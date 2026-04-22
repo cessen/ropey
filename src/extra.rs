@@ -190,4 +190,9 @@ pub trait RopeNoPanic<'rope> {
         feature = "metric_lines_unicode"
     ))]
     fn get_line(&'rope self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'rope>>;
+
+    /// Non-panicking version of `chunk()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_chunk(&'rope self, byte_idx: usize) -> Option<(&'rope str, usize)>;
 }

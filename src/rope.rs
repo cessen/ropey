@@ -812,6 +812,10 @@ impl RopeNoPanic<'_> for Rope {
     fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'_>> {
         self.get_line(line_idx, line_type)
     }
+
+    fn get_chunk(&self, byte_idx: usize) -> Option<(&str, usize)> {
+        self.get_chunk(byte_idx)
+    }
 }
 
 //==============================================================

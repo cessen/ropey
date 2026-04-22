@@ -234,6 +234,10 @@ impl<'a> RopeNoPanic<'a> for RopeSlice<'a> {
     fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'a>> {
         self.get_line(line_idx, line_type)
     }
+
+    fn get_chunk(&self, byte_idx: usize) -> Option<(&'a str, usize)> {
+        self.get_chunk(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -1580,6 +1584,72 @@ mod tests {
         for si in 0..=r.len() {
             test_chunk(r.slice(si..), &text[si..]);
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..112);
+        let _ = s.chunk(s.len() + 1);
+    }
+
+    fn test_get_chunk(s: RopeSlice, text: &str) {
+        for t in [s, text.into()] {
+            let mut current_byte = 0;
+            let mut seen_bytes = 0;
+            let mut prev_byte = 0;
+            for i in 0..t.len() {
+                let (chunk, start_byte) = RopeNoPanic::get_chunk(&t, i).unwrap();
+
+                if start_byte != prev_byte || i == 0 {
+                    current_byte = seen_bytes;
+                    seen_bytes += chunk.len();
+
+                    prev_byte = start_byte;
+                }
+
+                assert_eq!(start_byte, current_byte);
+                assert_eq!(chunk, &text[current_byte..seen_bytes]);
+            }
+
+            assert_eq!(seen_bytes, text.len());
+        }
+    }
+
+    #[test]
+    fn get_chunk_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..112);
+        let text = &TEXT_LINES[34..112];
+        // "'s a fine day, isn't it?\nAren't you glad \
+        //  we're alive?\nこんにちは、みん"
+
+        test_get_chunk(s, text);
+    }
+
+    #[test]
+    fn get_chunk_02() {
+        // Make sure splitting LF_CR pairs works properly.
+
+        let (r, text) = make_rope_and_text_from_chunks(&[
+            "\r\n\r\n\r\n",
+            "\r\n\r\n\r",
+            "\n\r\n\r\n\r",
+            "\n\r\n\r\n\r\n",
+            "\r\n\r\n\r\n",
+        ]);
+
+        for si in 0..=r.len() {
+            test_get_chunk(r.slice(si..), &text[si..]);
+        }
+    }
+
+    #[test]
+    fn get_chunk_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..112);
+        assert_eq!(RopeNoPanic::get_chunk(&s, s.len() + 1), None);
     }
 
     #[test]

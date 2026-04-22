@@ -1050,7 +1050,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `chunk()`.
         ///
         /// If `byte_idx` is out of bounds, returns `None`.
-        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
+        fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
             if byte_idx > self.len() {
                 return None;
             }
