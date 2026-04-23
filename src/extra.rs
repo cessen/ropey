@@ -200,4 +200,9 @@ pub trait RopeNoPanic<'rope> {
     ///
     /// If `byte_idx` is out of bounds, returns `None`.
     fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool>;
+
+    /// Non-panicking version of `floor_char_boundary()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize>;
 }

@@ -125,14 +125,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::floor_char_boundary(byte_idx, text.as_bytes());
+            match self.get_floor_char_boundary(byte_idx) {
+                Some(boundary) => boundary,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
-
-            let (text, offset) = self.chunk(byte_idx);
-            offset + crate::floor_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// Returns the byte index of the closest char boundary greater than or
@@ -1090,6 +1086,24 @@ macro_rules! shared_no_panic_impl_methods {
 
             let (text, offset) = self.chunk(byte_idx);
             Some(crate::is_char_boundary(byte_idx - offset, text.as_bytes()))
+        }
+
+        /// Non-panicking version of `floor_char_boundary()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[track_caller]
+        #[inline]
+        fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+            if byte_idx > self.len() {
+               return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::floor_char_boundary(byte_idx, text.as_bytes()));
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(offset + crate::floor_char_boundary(byte_idx - offset, text.as_bytes()))
         }
     };
 }
