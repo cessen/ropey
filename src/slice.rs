@@ -242,6 +242,10 @@ impl<'current, 'original> RopeNoPanic<'current, 'original> for RopeSlice<'origin
     fn get_chunk(&'current self, byte_idx: usize) -> Option<(&'original str, usize)> {
         self.get_chunk_impl(byte_idx)
     }
+
+    fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
+        self.get_is_char_boundary_impl(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -543,6 +547,39 @@ mod tests {
                 assert_eq!(text.is_char_boundary(i), s.is_char_boundary(i));
             }
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn is_char_boundary_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(7..103);
+        let _ = s.is_char_boundary(s.len() + 1);
+    }
+
+    #[test]
+    fn get_is_char_boundary_01() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            assert_eq!(RopeNoPanic::get_is_char_boundary(&t, 0), Some(true));
+            assert_eq!(RopeNoPanic::get_is_char_boundary(&t, 127), Some(true));
+
+            let s = t.slice(7..103);
+            let text = &TEXT[7..103];
+            for i in 0..s.len() {
+                assert_eq!(
+                    text.is_char_boundary(i),
+                    RopeNoPanic::get_is_char_boundary(&s, i).unwrap()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn get_is_char_boundary_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(7..103);
+        assert_eq!(RopeNoPanic::get_is_char_boundary(&s, s.len() + 1), None);
     }
 
     #[test]
