@@ -824,6 +824,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
         self.get_is_char_boundary_impl(byte_idx)
     }
+
+    fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_floor_char_boundary_impl(byte_idx)
+    }
 }
 
 //==============================================================
