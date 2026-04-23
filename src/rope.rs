@@ -816,6 +816,10 @@ impl RopeNoPanic<'_> for Rope {
     fn get_chunk(&self, byte_idx: usize) -> Option<(&str, usize)> {
         self.get_chunk(byte_idx)
     }
+
+    fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
+        self.get_is_char_boundary(byte_idx)
+    }
 }
 
 //==============================================================

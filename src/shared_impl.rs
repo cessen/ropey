@@ -108,14 +108,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return text.is_char_boundary(byte_idx);
+            match self.get_is_char_boundary(byte_idx) {
+                Some(is_boundary) => is_boundary,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
-
-            let (text, offset) = self.chunk(byte_idx);
-            crate::is_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// Returns the byte index of the closest char boundary less than or
@@ -1078,6 +1074,22 @@ macro_rules! shared_no_panic_impl_methods {
 
                 Some((trimmed_chunk, local_start_byte))
             }
+        }
+
+        /// Non-panicking version of `is_char_boundary()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(text.is_char_boundary(byte_idx));
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(crate::is_char_boundary(byte_idx - offset, text.as_bytes()))
         }
     };
 }
