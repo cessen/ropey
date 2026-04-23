@@ -246,6 +246,10 @@ impl<'a> RopeNoPanic<'a> for RopeSlice<'a> {
     fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
         self.get_floor_char_boundary(byte_idx)
     }
+
+    fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_ceil_char_boundary(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -654,6 +658,44 @@ mod tests {
 
             assert_eq!(134, t.ceil_char_boundary(134));
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn ceil_char_boundary_02() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(3..137);
+        let _ = s.ceil_char_boundary(s.len() + 1);
+    }
+
+    #[test]
+    fn get_ceil_char_boundary_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        for t in make_test_data(&r, TEXT_EMOJI, 3..137) {
+            assert_eq!(Some(0), RopeNoPanic::get_ceil_char_boundary(&t, 0));
+            assert_eq!(Some(1), RopeNoPanic::get_ceil_char_boundary(&t, 1));
+            assert_eq!(Some(2), RopeNoPanic::get_ceil_char_boundary(&t, 2));
+
+            assert_eq!(Some(9), RopeNoPanic::get_ceil_char_boundary(&t, 9));
+            assert_eq!(Some(13), RopeNoPanic::get_ceil_char_boundary(&t, 10));
+            assert_eq!(Some(13), RopeNoPanic::get_ceil_char_boundary(&t, 11));
+            assert_eq!(Some(13), RopeNoPanic::get_ceil_char_boundary(&t, 12));
+            assert_eq!(Some(13), RopeNoPanic::get_ceil_char_boundary(&t, 13));
+
+            assert_eq!(Some(104), RopeNoPanic::get_ceil_char_boundary(&t, 104));
+            assert_eq!(Some(107), RopeNoPanic::get_ceil_char_boundary(&t, 105));
+            assert_eq!(Some(107), RopeNoPanic::get_ceil_char_boundary(&t, 106));
+            assert_eq!(Some(107), RopeNoPanic::get_ceil_char_boundary(&t, 107));
+
+            assert_eq!(Some(134), RopeNoPanic::get_ceil_char_boundary(&t, 134));
+        }
+    }
+
+    #[test]
+    fn get_ceil_char_boundary_02() {
+        let r = Rope::from_str(TEXT_EMOJI);
+        let s = r.slice(3..137);
+        assert_eq!(RopeNoPanic::get_ceil_char_boundary(&s, s.len() + 1), None);
     }
 
     #[cfg(feature = "metric_chars")]

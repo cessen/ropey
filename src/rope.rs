@@ -824,6 +824,10 @@ impl RopeNoPanic<'_> for Rope {
     fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
         self.get_floor_char_boundary(byte_idx)
     }
+
+    fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_ceil_char_boundary(byte_idx)
+    }
 }
 
 //==============================================================
