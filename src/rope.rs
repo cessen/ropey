@@ -842,6 +842,11 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize> {
         self.get_char_to_byte_idx_impl(char_idx)
     }
+
+    #[cfg(feature = "metric_utf16")]
+    fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize> {
+        self.get_byte_to_utf16_idx_impl(byte_idx)
+    }
 }
 
 //==============================================================
@@ -1417,6 +1422,34 @@ mod tests {
         assert_eq!(97, r.byte_to_utf16_idx(105));
 
         assert_eq!(111, r.byte_to_utf16_idx(143));
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn get_byte_to_utf16_idx_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(Some(0), RopeNoPanic::get_byte_to_utf16_idx(&r, 0));
+
+        assert_eq!(Some(12), RopeNoPanic::get_byte_to_utf16_idx(&r, 12));
+        assert_eq!(Some(12), RopeNoPanic::get_byte_to_utf16_idx(&r, 13));
+        assert_eq!(Some(14), RopeNoPanic::get_byte_to_utf16_idx(&r, 16));
+
+        assert_eq!(Some(33), RopeNoPanic::get_byte_to_utf16_idx(&r, 35));
+        assert_eq!(Some(33), RopeNoPanic::get_byte_to_utf16_idx(&r, 36));
+        assert_eq!(Some(35), RopeNoPanic::get_byte_to_utf16_idx(&r, 39));
+
+        assert_eq!(Some(63), RopeNoPanic::get_byte_to_utf16_idx(&r, 67));
+        assert_eq!(Some(63), RopeNoPanic::get_byte_to_utf16_idx(&r, 70));
+        assert_eq!(Some(65), RopeNoPanic::get_byte_to_utf16_idx(&r, 71));
+
+        assert_eq!(Some(95), RopeNoPanic::get_byte_to_utf16_idx(&r, 101));
+        assert_eq!(Some(95), RopeNoPanic::get_byte_to_utf16_idx(&r, 102));
+        assert_eq!(Some(97), RopeNoPanic::get_byte_to_utf16_idx(&r, 105));
+
+        assert_eq!(Some(111), RopeNoPanic::get_byte_to_utf16_idx(&r, 143));
+
+        assert_eq!(None, RopeNoPanic::get_byte_to_utf16_idx(&r, 144));
     }
 
     #[cfg(feature = "metric_utf16")]

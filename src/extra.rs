@@ -248,4 +248,11 @@ pub trait RopeNoPanic<'current, 'original> {
     #[cfg_attr(docsrs, doc(cfg(feature = "metric_chars")))]
     #[cfg(feature = "metric_chars")]
     fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `byte_to_utf16_idx`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_utf16")))]
+    #[cfg(feature = "metric_utf16")]
+    fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize>;
 }
