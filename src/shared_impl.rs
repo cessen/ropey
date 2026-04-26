@@ -347,17 +347,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::utf16::from_byte_idx(text, byte_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._byte_to_utf16_idx(byte_idx)
-            } else {
-                self._byte_to_utf16_idx(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_utf16_idx(self.get_byte_range()[0])
+            match self.get_byte_to_utf16_idx(byte_idx) {
+                Some(utf16_idx) => utf16_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -1147,6 +1139,30 @@ macro_rules! shared_no_panic_impl_methods {
             } else {
                 let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
                 Some(self._char_to_byte_idx(char_start_idx + char_idx) - self.get_byte_range()[0])
+            }
+        }
+
+
+        /// Non-panicking version of `byte_to_utf16_idx`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_utf16")]
+        #[track_caller]
+        #[inline]
+        fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::utf16::from_byte_idx(text, byte_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._byte_to_utf16_idx(byte_idx))
+            } else {
+                Some(self._byte_to_utf16_idx(self.get_byte_range()[0] + byte_idx)
+                    - self._byte_to_utf16_idx(self.get_byte_range()[0]))
             }
         }
     };
