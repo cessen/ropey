@@ -828,6 +828,11 @@ impl RopeNoPanic<'_> for Rope {
     fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize> {
         self.get_ceil_char_boundary(byte_idx)
     }
+
+    #[cfg(feature = "metric_chars")]
+    fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize> {
+        self.get_byte_to_char_idx(byte_idx)
+    }
 }
 
 //==============================================================
@@ -1296,6 +1301,31 @@ mod tests {
         assert_eq!(102, r.byte_to_char_idx(125));
         assert_eq!(102, r.byte_to_char_idx(126));
         assert_eq!(103, r.byte_to_char_idx(127));
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn get_byte_to_char_idx_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(Some(0), RopeNoPanic::get_byte_to_char_idx(&r, 0));
+        assert_eq!(Some(1), RopeNoPanic::get_byte_to_char_idx(&r, 1));
+        assert_eq!(Some(2), RopeNoPanic::get_byte_to_char_idx(&r, 2));
+
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 91));
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 92));
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 93));
+
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 94));
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 95));
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 96));
+
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 124));
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 125));
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 126));
+        assert_eq!(Some(103), RopeNoPanic::get_byte_to_char_idx(&r, 127));
+
+        assert_eq!(None, RopeNoPanic::get_byte_to_char_idx(&r, 128));
     }
 
     #[cfg(feature = "metric_chars")]
