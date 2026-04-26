@@ -234,4 +234,11 @@ pub trait RopeNoPanic<'current, 'original> {
     ///
     /// If `byte_idx` is out of bounds, returns `None`.
     fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `byte_to_char_idx`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_chars")))]
+    #[cfg(feature = "metric_chars")]
+    fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize>;
 }
