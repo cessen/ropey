@@ -255,6 +255,11 @@ impl<'a> RopeNoPanic<'a> for RopeSlice<'a> {
     fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize> {
         self.get_byte_to_char_idx(byte_idx)
     }
+
+    #[cfg(feature = "metric_chars")]
+    fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize> {
+        self.get_char_to_byte_idx(char_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -995,6 +1000,44 @@ mod tests {
             assert_eq!(33, t.char_to_byte_idx(13));
             assert_eq!(36, t.char_to_byte_idx(14));
         }
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    #[should_panic]
+    fn char_to_byte_idx_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(88..124);
+        let _ = s.char_to_byte_idx(s.len_chars() + 1);
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn get_char_to_byte_idx_01() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, 88..124) {
+            assert_eq!("?  こんにちは、みんなさん", t);
+
+            assert_eq!(Some(0), RopeNoPanic::get_char_to_byte_idx(&t, 0));
+            assert_eq!(Some(1), RopeNoPanic::get_char_to_byte_idx(&t, 1));
+            assert_eq!(Some(2), RopeNoPanic::get_char_to_byte_idx(&t, 2));
+
+            assert_eq!(Some(3), RopeNoPanic::get_char_to_byte_idx(&t, 3));
+            assert_eq!(Some(6), RopeNoPanic::get_char_to_byte_idx(&t, 4));
+            assert_eq!(Some(33), RopeNoPanic::get_char_to_byte_idx(&t, 13));
+            assert_eq!(Some(36), RopeNoPanic::get_char_to_byte_idx(&t, 14));
+        }
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn get_char_to_byte_idx_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(88..124);
+        assert_eq!(
+            RopeNoPanic::get_char_to_byte_idx(&s, s.len_chars() + 1),
+            None
+        );
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]

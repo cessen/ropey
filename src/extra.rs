@@ -217,4 +217,11 @@ pub trait RopeNoPanic<'rope> {
     #[cfg_attr(docsrs, doc(cfg(feature = "metric_chars")))]
     #[cfg(feature = "metric_chars")]
     fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `char_to_byte_idx`.
+    ///
+    /// If `char_idx` is out of bounds, returns `None`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_chars")))]
+    #[cfg(feature = "metric_chars")]
+    fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize>;
 }

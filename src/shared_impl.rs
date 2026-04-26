@@ -321,17 +321,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn char_to_byte_idx(&self, char_idx: usize) -> usize {
-            assert!(char_idx <= self.len_chars(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::chars::to_byte_idx(text, char_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._char_to_byte_idx(char_idx)
-            } else {
-                let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
-                self._char_to_byte_idx(char_start_idx + char_idx) - self.get_byte_range()[0]
+            match self.get_char_to_byte_idx(char_idx) {
+                Some(byte_idx) => byte_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -1132,6 +1124,29 @@ macro_rules! shared_no_panic_impl_methods {
             } else {
                 Some(self._byte_to_char_idx(self.get_byte_range()[0] + byte_idx)
                     - self._byte_to_char_idx(self.get_byte_range()[0]))
+            }
+        }
+
+         /// Non-panicking version of `char_to_byte_idx`.
+        ///
+        /// If `char_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_chars")]
+        #[track_caller]
+        #[inline]
+        fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize> {
+            if char_idx > self.len_chars() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::chars::to_byte_idx(text, char_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._char_to_byte_idx(char_idx))
+            } else {
+                let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
+                Some(self._char_to_byte_idx(char_start_idx + char_idx) - self.get_byte_range()[0])
             }
         }
     };
