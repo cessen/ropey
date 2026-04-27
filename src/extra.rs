@@ -1,5 +1,13 @@
 //! Miscellaneous extra functionality.
 
+#[cfg(any(
+    feature = "metric_lines_lf",
+    feature = "metric_lines_lf_cr",
+    feature = "metric_lines_unicode"
+))]
+use crate::LineType;
+use crate::RopeSlice;
+
 pub mod esoterica {
     //! Esoteric functionality.
     //!
@@ -145,4 +153,82 @@ pub mod esoterica {
             assert_eq!(r1, "Fellow thing!");
         }
     }
+}
+
+/// A trait implementing non-panicking versions of the read-only methods that are present on both
+/// [`Rope`](crate::Rope) and [`RopeSlice`](crate::RopeSlice).
+pub trait RopeNoPanic<'rope> {
+    /// Non-panicking version of `byte()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_byte(&self, byte_idx: usize) -> Option<u8>;
+
+    /// Non-panicking version of `char()`.
+    ///
+    /// Will fail if `byte_idx` is either:
+    ///
+    /// - Not a char boundary.
+    /// - Out of bounds.
+    ///
+    /// On failure returns the cause of failure.
+    fn get_char(&self, byte_idx: usize) -> crate::Result<char>;
+
+    /// Non-panicking version of `line()`.
+    ///
+    /// If `line_idx` is out of bounds, returns `None`.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        )))
+    )]
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(&'rope self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'rope>>;
+
+    /// Non-panicking version of `chunk()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_chunk(&'rope self, byte_idx: usize) -> Option<(&'rope str, usize)>;
+
+    /// Non-panicking version of `is_char_boundary()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool>;
+
+    /// Non-panicking version of `floor_char_boundary()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `ceil_char_boundary()`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `byte_to_char_idx`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_chars")))]
+    #[cfg(feature = "metric_chars")]
+    fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `char_to_byte_idx`.
+    ///
+    /// If `char_idx` is out of bounds, returns `None`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_chars")))]
+    #[cfg(feature = "metric_chars")]
+    fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `byte_to_utf16_idx`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `None`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_utf16")))]
+    #[cfg(feature = "metric_utf16")]
+    fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize>;
 }

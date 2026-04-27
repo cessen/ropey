@@ -2,6 +2,7 @@ use std::io;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
+use crate::extra::RopeNoPanic;
 use crate::{
     end_bound_to_num,
     extra::esoterica,
@@ -794,6 +795,56 @@ impl Rope {
     }
 }
 
+impl RopeNoPanic<'_> for Rope {
+    fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        self.get_byte(byte_idx)
+    }
+
+    fn get_char(&self, byte_idx: usize) -> crate::Result<char> {
+        self.get_char(byte_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<'_>> {
+        self.get_line(line_idx, line_type)
+    }
+
+    fn get_chunk(&self, byte_idx: usize) -> Option<(&str, usize)> {
+        self.get_chunk(byte_idx)
+    }
+
+    fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
+        self.get_is_char_boundary(byte_idx)
+    }
+
+    fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_floor_char_boundary(byte_idx)
+    }
+
+    fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_ceil_char_boundary(byte_idx)
+    }
+
+    #[cfg(feature = "metric_chars")]
+    fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize> {
+        self.get_byte_to_char_idx(byte_idx)
+    }
+
+    #[cfg(feature = "metric_chars")]
+    fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize> {
+        self.get_char_to_byte_idx(char_idx)
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize> {
+        self.get_byte_to_utf16_idx(byte_idx)
+    }
+}
+
 //==============================================================
 // Stdlib trait impls.
 //
@@ -1264,6 +1315,31 @@ mod tests {
 
     #[cfg(feature = "metric_chars")]
     #[test]
+    fn get_byte_to_char_idx_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(Some(0), RopeNoPanic::get_byte_to_char_idx(&r, 0));
+        assert_eq!(Some(1), RopeNoPanic::get_byte_to_char_idx(&r, 1));
+        assert_eq!(Some(2), RopeNoPanic::get_byte_to_char_idx(&r, 2));
+
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 91));
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 92));
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 93));
+
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 94));
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 95));
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 96));
+
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 124));
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 125));
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 126));
+        assert_eq!(Some(103), RopeNoPanic::get_byte_to_char_idx(&r, 127));
+
+        assert_eq!(None, RopeNoPanic::get_byte_to_char_idx(&r, 128));
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
     fn char_to_byte_idx_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1278,6 +1354,26 @@ mod tests {
 
         assert_eq!(124, r.char_to_byte_idx(102));
         assert_eq!(127, r.char_to_byte_idx(103));
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn get_char_to_byte_idx_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(Some(0), RopeNoPanic::get_char_to_byte_idx(&r, 0));
+        assert_eq!(Some(1), RopeNoPanic::get_char_to_byte_idx(&r, 1));
+        assert_eq!(Some(2), RopeNoPanic::get_char_to_byte_idx(&r, 2));
+
+        assert_eq!(Some(91), RopeNoPanic::get_char_to_byte_idx(&r, 91));
+        assert_eq!(Some(94), RopeNoPanic::get_char_to_byte_idx(&r, 92));
+        assert_eq!(Some(97), RopeNoPanic::get_char_to_byte_idx(&r, 93));
+        assert_eq!(Some(100), RopeNoPanic::get_char_to_byte_idx(&r, 94));
+
+        assert_eq!(Some(124), RopeNoPanic::get_char_to_byte_idx(&r, 102));
+        assert_eq!(Some(127), RopeNoPanic::get_char_to_byte_idx(&r, 103));
+
+        assert_eq!(None, RopeNoPanic::get_char_to_byte_idx(&r, 104));
     }
 
     #[cfg(feature = "metric_utf16")]
@@ -1304,6 +1400,34 @@ mod tests {
         assert_eq!(97, r.byte_to_utf16_idx(105));
 
         assert_eq!(111, r.byte_to_utf16_idx(143));
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn get_byte_to_utf16_idx_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(Some(0), RopeNoPanic::get_byte_to_utf16_idx(&r, 0));
+
+        assert_eq!(Some(12), RopeNoPanic::get_byte_to_utf16_idx(&r, 12));
+        assert_eq!(Some(12), RopeNoPanic::get_byte_to_utf16_idx(&r, 13));
+        assert_eq!(Some(14), RopeNoPanic::get_byte_to_utf16_idx(&r, 16));
+
+        assert_eq!(Some(33), RopeNoPanic::get_byte_to_utf16_idx(&r, 35));
+        assert_eq!(Some(33), RopeNoPanic::get_byte_to_utf16_idx(&r, 36));
+        assert_eq!(Some(35), RopeNoPanic::get_byte_to_utf16_idx(&r, 39));
+
+        assert_eq!(Some(63), RopeNoPanic::get_byte_to_utf16_idx(&r, 67));
+        assert_eq!(Some(63), RopeNoPanic::get_byte_to_utf16_idx(&r, 70));
+        assert_eq!(Some(65), RopeNoPanic::get_byte_to_utf16_idx(&r, 71));
+
+        assert_eq!(Some(95), RopeNoPanic::get_byte_to_utf16_idx(&r, 101));
+        assert_eq!(Some(95), RopeNoPanic::get_byte_to_utf16_idx(&r, 102));
+        assert_eq!(Some(97), RopeNoPanic::get_byte_to_utf16_idx(&r, 105));
+
+        assert_eq!(Some(111), RopeNoPanic::get_byte_to_utf16_idx(&r, 143));
+
+        assert_eq!(None, RopeNoPanic::get_byte_to_utf16_idx(&r, 144));
     }
 
     #[cfg(feature = "metric_utf16")]
