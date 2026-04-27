@@ -535,8 +535,8 @@ mod tests {
         let r = Rope::from_str(TEXT_EMOJI);
         for t in make_test_data(&r, TEXT_EMOJI, 3..137) {
             assert_eq!(0, t.ceil_char_boundary(0));
-            assert_eq!(1, t.floor_char_boundary(1));
-            assert_eq!(2, t.floor_char_boundary(2));
+            assert_eq!(1, t.ceil_char_boundary(1));
+            assert_eq!(2, t.ceil_char_boundary(2));
 
             assert_eq!(9, t.ceil_char_boundary(9));
             assert_eq!(13, t.ceil_char_boundary(10));
