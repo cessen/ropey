@@ -231,4 +231,12 @@ pub trait RopeNoPanic<'rope> {
     #[cfg_attr(docsrs, doc(cfg(feature = "metric_utf16")))]
     #[cfg(feature = "metric_utf16")]
     fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize>;
+
+    /// Non-panicking version of `utf16_to_byte_idx`.
+    ///
+    /// If `utf16_idx` is out of bounds, returns `None`.
+    /// (i.e. `utf16_idx > len_utf16()`).
+    #[cfg_attr(docsrs, doc(cfg(feature = "metric_utf16")))]
+    #[cfg(feature = "metric_utf16")]
+    fn get_utf16_to_byte_idx(&self, utf16_idx: usize) -> Option<usize>;
 }

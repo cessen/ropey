@@ -374,17 +374,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
-            assert!(utf16_idx <= self.len_utf16(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::utf16::to_byte_idx(text, utf16_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._utf16_to_byte_idx(utf16_idx)
-            } else {
-                let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
-                self._utf16_to_byte_idx(utf16_start_idx + utf16_idx) - self.get_byte_range()[0]
+            match self.get_utf16_to_byte_idx(utf16_idx) {
+                Some(byte_idx) => byte_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -1163,6 +1155,29 @@ macro_rules! shared_no_panic_impl_methods {
             } else {
                 Some(self._byte_to_utf16_idx(self.get_byte_range()[0] + byte_idx)
                     - self._byte_to_utf16_idx(self.get_byte_range()[0]))
+            }
+        }
+
+        /// Non-panicking version of `utf16_to_byte_idx`.
+        ///
+        /// If `utf16_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_utf16")]
+        #[track_caller]
+        #[inline]
+        fn get_utf16_to_byte_idx(&self, utf16_idx: usize) -> Option<usize> {
+            if utf16_idx > self.len_utf16() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::utf16::to_byte_idx(text, utf16_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._utf16_to_byte_idx(utf16_idx))
+            } else {
+                let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
+                Some(self._utf16_to_byte_idx(utf16_start_idx + utf16_idx) - self.get_byte_range()[0])
             }
         }
     };
