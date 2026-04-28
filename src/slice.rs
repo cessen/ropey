@@ -270,6 +270,15 @@ impl<'a> RopeNoPanic<'a> for RopeSlice<'a> {
     fn get_utf16_to_byte_idx(&self, utf16_idx: usize) -> Option<usize> {
         self.get_utf16_to_byte_idx(utf16_idx)
     }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> Option<usize> {
+        self.get_byte_to_line_idx(byte_idx, line_type)
+    }
 }
 
 // Stdlib trait impls.
@@ -1128,6 +1137,112 @@ mod tests {
     fn byte_to_line_idx_04b() {
         let s: RopeSlice = (&TEXT_LINES[34..112]).into();
         s.byte_to_line_idx(79, LineType::LF_CR);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_byte_to_line_idx_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        for t in make_test_data(&r, TEXT_LINES, 34..112) {
+            assert_eq!(
+                "'s a fine day, isn't it?\nAren't you glad \
+             we're alive?\nこんにちは、みん",
+                t,
+            );
+
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_byte_to_line_idx(&t, 0, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_byte_to_line_idx(&t, 1, LineType::LF_CR)
+            );
+
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_byte_to_line_idx(&t, 24, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(1),
+                RopeNoPanic::get_byte_to_line_idx(&t, 25, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(1),
+                RopeNoPanic::get_byte_to_line_idx(&t, 26, LineType::LF_CR)
+            );
+
+            assert_eq!(
+                Some(1),
+                RopeNoPanic::get_byte_to_line_idx(&t, 53, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(2),
+                RopeNoPanic::get_byte_to_line_idx(&t, 54, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(2),
+                RopeNoPanic::get_byte_to_line_idx(&t, 57, LineType::LF_CR)
+            );
+
+            assert_eq!(
+                Some(2),
+                RopeNoPanic::get_byte_to_line_idx(&t, 78, LineType::LF_CR)
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_byte_to_line_idx_02() {
+        let r = Rope::from_str(TEXT_LINES);
+        for t in make_test_data(&r, TEXT_LINES, 50..50) {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_byte_to_line_idx(&t, 0, LineType::LF_CR)
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_byte_to_line_idx_03() {
+        let r = Rope::from_str("Hi there\nstranger!");
+        for t in make_test_data(&r, "Hi there\nstranger!", 0..9) {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_byte_to_line_idx(&t, 0, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_byte_to_line_idx(&t, 8, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(1),
+                RopeNoPanic::get_byte_to_line_idx(&t, 9, LineType::LF_CR)
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_byte_to_line_idx_04a() {
+        let r = Rope::from_str(TEXT_LINES);
+        let s = r.slice(34..112);
+        assert_eq!(
+            RopeNoPanic::get_byte_to_line_idx(&s, 79, LineType::LF_CR),
+            None
+        );
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_byte_to_line_idx_04b() {
+        let s: RopeSlice = (&TEXT_LINES[34..112]).into();
+        assert_eq!(
+            RopeNoPanic::get_byte_to_line_idx(&s, 79, LineType::LF_CR),
+            None
+        );
     }
 
     #[cfg(feature = "metric_chars")]

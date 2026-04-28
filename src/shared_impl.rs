@@ -411,25 +411,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::str_utils::lines::from_byte_idx(text, byte_idx, line_type);
-            }
-
-            if self.get_full_info().is_some() {
-                self._byte_to_line_idx(byte_idx, line_type)
-            } else {
-                let crlf_split = if byte_idx == self.get_byte_range()[1] {
-                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
-                } else {
-                    false
-                };
-
-                self._byte_to_line_idx(self.get_byte_range()[0] + byte_idx, line_type)
-                    - self._byte_to_line_idx(self.get_byte_range()[0], line_type)
-                    + crlf_split as usize
-            }
+             match self.get_byte_to_line_idx(byte_idx, line_type) {
+                Some(line_idx) => line_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
+             }
         }
 
         /// Returns the byte index of the start of the given line.
@@ -1178,6 +1163,40 @@ macro_rules! shared_no_panic_impl_methods {
             } else {
                 let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
                 Some(self._utf16_to_byte_idx(utf16_start_idx + utf16_idx) - self.get_byte_range()[0])
+            }
+        }
+
+        /// Non-panicking version of `byte_to_line_idx`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        ))]
+        #[track_caller]
+        #[inline]
+        fn get_byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> Option<usize> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::str_utils::lines::from_byte_idx(text, byte_idx, line_type));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._byte_to_line_idx(byte_idx, line_type))
+            } else {
+                let crlf_split = if byte_idx == self.get_byte_range()[1] {
+                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
+                } else {
+                    false
+                };
+
+                Some(self._byte_to_line_idx(self.get_byte_range()[0] + byte_idx, line_type)
+                    - self._byte_to_line_idx(self.get_byte_range()[0], line_type)
+                    + crlf_split as usize)
             }
         }
     };
