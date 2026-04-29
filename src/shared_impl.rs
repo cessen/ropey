@@ -447,19 +447,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
-            assert!(line_idx <= self.len_lines(line_type), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::str_utils::lines::to_byte_idx(text, line_idx, line_type);
-            }
-
-            if self.get_full_info().is_some() {
-                self._line_to_byte_idx(line_idx, line_type)
-            } else {
-                let line_start_idx = self._byte_to_line_idx(self.get_byte_range()[0], line_type);
-                self._line_to_byte_idx(line_start_idx + line_idx, line_type)
-                    .saturating_sub(self.get_byte_range()[0])
-                    .min(self.len())
+            match self.get_line_to_byte_idx(line_idx, line_type) {
+                Some(byte_idx) => byte_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -1197,6 +1187,35 @@ macro_rules! shared_no_panic_impl_methods {
                 Some(self._byte_to_line_idx(self.get_byte_range()[0] + byte_idx, line_type)
                     - self._byte_to_line_idx(self.get_byte_range()[0], line_type)
                     + crlf_split as usize)
+            }
+        }
+
+        /// Non-panicking version of `line_to_byte_idx`.
+        ///
+        /// If `line_idx` is out of bounds, returns `None`.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        ))]
+        #[track_caller]
+        #[inline]
+        fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize> {
+            if line_idx > self.len_lines(line_type) {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::str_utils::lines::to_byte_idx(text, line_idx, line_type));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._line_to_byte_idx(line_idx, line_type))
+            } else {
+                let line_start_idx = self._byte_to_line_idx(self.get_byte_range()[0], line_type);
+                Some(self._line_to_byte_idx(line_start_idx + line_idx, line_type)
+                    .saturating_sub(self.get_byte_range()[0])
+                    .min(self.len()))
             }
         }
     };

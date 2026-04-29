@@ -257,4 +257,22 @@ pub trait RopeNoPanic<'rope> {
         feature = "metric_lines_unicode"
     ))]
     fn get_byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> Option<usize>;
+
+    /// Non-panicking version of `line_to_byte_idx`.
+    ///
+    /// If `line_idx` is out of bounds, returns `None`.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        )))
+    )]
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize>;
 }

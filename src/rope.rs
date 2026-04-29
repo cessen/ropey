@@ -857,6 +857,15 @@ impl RopeNoPanic<'_> for Rope {
     fn get_byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> Option<usize> {
         self.get_byte_to_line_idx(byte_idx, line_type)
     }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize> {
+        self.get_line_to_byte_idx(line_idx, line_type)
+    }
 }
 
 //==============================================================
@@ -1726,6 +1735,104 @@ mod tests {
     fn line_to_byte_idx_05() {
         let r = Rope::from_str(TEXT_LINES);
         r.line_to_byte_idx(5, LineType::Unicode);
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn get_line_to_byte_idx_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let byte_to_line_idxs = &[[0, 0], [32, 1], [59, 2], [88, 3], [124, 4]];
+        for [b, l] in byte_to_line_idxs.iter().copied() {
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(
+                Some(b),
+                RopeNoPanic::get_line_to_byte_idx(&r, l, LineType::LF)
+            );
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(
+                Some(b),
+                RopeNoPanic::get_line_to_byte_idx(&r, l, LineType::LF_CR)
+            );
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(
+                Some(b),
+                RopeNoPanic::get_line_to_byte_idx(&r, l, LineType::Unicode)
+            );
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn get_line_to_byte_idx_02() {
+        let r = Rope::from_str("");
+        #[cfg(feature = "metric_lines_lf")]
+        {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 0, LineType::LF)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 1, LineType::LF)
+            );
+        }
+        #[cfg(feature = "metric_lines_lf_cr")]
+        {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 0, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 1, LineType::LF_CR)
+            );
+        }
+        #[cfg(feature = "metric_lines_unicode")]
+        {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 0, LineType::Unicode)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 1, LineType::Unicode)
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf")]
+    #[test]
+    fn get_line_to_byte_idx_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(RopeNoPanic::get_line_to_byte_idx(&r, 5, LineType::LF), None);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_to_byte_idx_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_line_to_byte_idx(&r, 5, LineType::LF_CR),
+            None
+        );
+    }
+
+    #[cfg(feature = "metric_lines_unicode")]
+    #[test]
+    fn get_line_to_byte_idx_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_line_to_byte_idx(&r, 5, LineType::Unicode),
+            None
+        );
     }
 
     #[test]
