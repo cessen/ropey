@@ -108,14 +108,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn is_char_boundary(&self, byte_idx: usize) -> bool {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return text.is_char_boundary(byte_idx);
+            match self.get_is_char_boundary(byte_idx) {
+                Some(is_boundary) => is_boundary,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
-
-            let (text, offset) = self.chunk(byte_idx);
-            crate::is_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// Returns the byte index of the closest char boundary less than or
@@ -129,14 +125,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn floor_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::floor_char_boundary(byte_idx, text.as_bytes());
+            match self.get_floor_char_boundary(byte_idx) {
+                Some(boundary) => boundary,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
-
-            let (text, offset) = self.chunk(byte_idx);
-            offset + crate::floor_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// Returns the byte index of the closest char boundary greater than or
@@ -150,14 +142,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn ceil_char_boundary(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::ceil_char_boundary(byte_idx, text.as_bytes());
+            match self.get_ceil_char_boundary(byte_idx) {
+                Some(boundary) => boundary,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
-
-            let (text, offset) = self.chunk(byte_idx);
-            offset + crate::ceil_char_boundary(byte_idx - offset, text.as_bytes())
         }
 
         /// If the text ends with a line break, returns its byte index.
@@ -310,17 +298,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn byte_to_char_idx(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::chars::from_byte_idx(text, byte_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._byte_to_char_idx(byte_idx)
-            } else {
-                self._byte_to_char_idx(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_char_idx(self.get_byte_range()[0])
+            match self.get_byte_to_char_idx(byte_idx) {
+                Some(char_idx) => char_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -341,17 +321,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn char_to_byte_idx(&self, char_idx: usize) -> usize {
-            assert!(char_idx <= self.len_chars(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::chars::to_byte_idx(text, char_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._char_to_byte_idx(char_idx)
-            } else {
-                let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
-                self._char_to_byte_idx(char_start_idx + char_idx) - self.get_byte_range()[0]
+            match self.get_char_to_byte_idx(char_idx) {
+                Some(byte_idx) => byte_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -375,17 +347,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::utf16::from_byte_idx(text, byte_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._byte_to_utf16_idx(byte_idx)
-            } else {
-                self._byte_to_utf16_idx(self.get_byte_range()[0] + byte_idx)
-                    - self._byte_to_utf16_idx(self.get_byte_range()[0])
+            match self.get_byte_to_utf16_idx(byte_idx) {
+                Some(utf16_idx) => utf16_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -410,17 +374,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
-            assert!(utf16_idx <= self.len_utf16(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return str_indices::utf16::to_byte_idx(text, utf16_idx);
-            }
-
-            if self.get_full_info().is_some() {
-                self._utf16_to_byte_idx(utf16_idx)
-            } else {
-                let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
-                self._utf16_to_byte_idx(utf16_start_idx + utf16_idx) - self.get_byte_range()[0]
+            match self.get_utf16_to_byte_idx(utf16_idx) {
+                Some(byte_idx) => byte_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -455,25 +411,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
-            assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::str_utils::lines::from_byte_idx(text, byte_idx, line_type);
-            }
-
-            if self.get_full_info().is_some() {
-                self._byte_to_line_idx(byte_idx, line_type)
-            } else {
-                let crlf_split = if byte_idx == self.get_byte_range()[1] {
-                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
-                } else {
-                    false
-                };
-
-                self._byte_to_line_idx(self.get_byte_range()[0] + byte_idx, line_type)
-                    - self._byte_to_line_idx(self.get_byte_range()[0], line_type)
-                    + crlf_split as usize
-            }
+             match self.get_byte_to_line_idx(byte_idx, line_type) {
+                Some(line_idx) => line_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
+             }
         }
 
         /// Returns the byte index of the start of the given line.
@@ -506,19 +447,9 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
-            assert!(line_idx <= self.len_lines(line_type), "{}", crate::Error::OutOfBounds);
-
-            if let Some(text) = self.get_str_text() {
-                return crate::str_utils::lines::to_byte_idx(text, line_idx, line_type);
-            }
-
-            if self.get_full_info().is_some() {
-                self._line_to_byte_idx(line_idx, line_type)
-            } else {
-                let line_start_idx = self._byte_to_line_idx(self.get_byte_range()[0], line_type);
-                self._line_to_byte_idx(line_start_idx + line_idx, line_type)
-                    .saturating_sub(self.get_byte_range()[0])
-                    .min(self.len())
+            match self.get_line_to_byte_idx(line_idx, line_type) {
+                Some(byte_idx) => byte_idx,
+                None => panic!("{}", crate::Error::OutOfBounds),
             }
         }
 
@@ -985,7 +916,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `byte()`.
         ///
         /// If `byte_idx` is out of bounds, returns `None`.
-        pub fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        fn get_byte(&self, byte_idx: usize) -> Option<u8> {
             if byte_idx >= self.len() {
                 return None;
             }
@@ -1002,7 +933,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// - Out of bounds.
         ///
         /// On failure returns the cause of failure.
-        pub fn get_char(&self, byte_idx: usize) -> Result<char> {
+        fn get_char(&self, byte_idx: usize) -> Result<char> {
             if byte_idx >= self.len() {
                 return Err(OutOfBounds);
             }
@@ -1023,20 +954,12 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `line()`.
         ///
         /// If `line_idx` is out of bounds, returns `None`.
-        #[cfg_attr(
-            docsrs,
-            doc(cfg(any(
-                feature = "metric_lines_lf",
-                feature = "metric_lines_lf_cr",
-                feature = "metric_lines_unicode"
-            )))
-        )]
         #[cfg(any(
             feature = "metric_lines_lf",
             feature = "metric_lines_lf_cr",
             feature = "metric_lines_unicode"
         ))]
-        pub fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
+        fn get_line(&self, line_idx: usize, line_type: LineType) -> Option<RopeSlice<$rlt>> {
             if line_idx >= self.len_lines(line_type) {
                 return None;
             }
@@ -1058,7 +981,7 @@ macro_rules! shared_no_panic_impl_methods {
         /// Non-panicking version of `chunk()`.
         ///
         /// If `byte_idx` is out of bounds, returns `None`.
-        pub fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
+        fn get_chunk(&self, byte_idx: usize) -> Option<(&$rlt str, usize)> {
             if byte_idx > self.len() {
                 return None;
             }
@@ -1085,6 +1008,214 @@ macro_rules! shared_no_panic_impl_methods {
                 let local_start_byte = start_byte.saturating_sub(self.get_byte_range()[0]);
 
                 Some((trimmed_chunk, local_start_byte))
+            }
+        }
+
+        /// Non-panicking version of `is_char_boundary()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(text.is_char_boundary(byte_idx));
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(crate::is_char_boundary(byte_idx - offset, text.as_bytes()))
+        }
+
+        /// Non-panicking version of `floor_char_boundary()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[track_caller]
+        #[inline]
+        fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+            if byte_idx > self.len() {
+               return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::floor_char_boundary(byte_idx, text.as_bytes()));
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(offset + crate::floor_char_boundary(byte_idx - offset, text.as_bytes()))
+        }
+
+        /// Non-panicking version of `ceil_char_boundary()`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[track_caller]
+        #[inline]
+        fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+            if byte_idx > self.len() {
+               return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::ceil_char_boundary(byte_idx, text.as_bytes()));
+            }
+
+            let (text, offset) = self.chunk(byte_idx);
+            Some(offset + crate::ceil_char_boundary(byte_idx - offset, text.as_bytes()))
+        }
+
+        /// Non-panicking version of `byte_to_char_idx`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_chars")]
+        #[track_caller]
+        #[inline]
+        fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::chars::from_byte_idx(text, byte_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._byte_to_char_idx(byte_idx))
+            } else {
+                Some(self._byte_to_char_idx(self.get_byte_range()[0] + byte_idx)
+                    - self._byte_to_char_idx(self.get_byte_range()[0]))
+            }
+        }
+
+         /// Non-panicking version of `char_to_byte_idx`.
+        ///
+        /// If `char_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_chars")]
+        #[track_caller]
+        #[inline]
+        fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize> {
+            if char_idx > self.len_chars() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::chars::to_byte_idx(text, char_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._char_to_byte_idx(char_idx))
+            } else {
+                let char_start_idx = self._byte_to_char_idx(self.get_byte_range()[0]);
+                Some(self._char_to_byte_idx(char_start_idx + char_idx) - self.get_byte_range()[0])
+            }
+        }
+
+
+        /// Non-panicking version of `byte_to_utf16_idx`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_utf16")]
+        #[track_caller]
+        #[inline]
+        fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::utf16::from_byte_idx(text, byte_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._byte_to_utf16_idx(byte_idx))
+            } else {
+                Some(self._byte_to_utf16_idx(self.get_byte_range()[0] + byte_idx)
+                    - self._byte_to_utf16_idx(self.get_byte_range()[0]))
+            }
+        }
+
+        /// Non-panicking version of `utf16_to_byte_idx`.
+        ///
+        /// If `utf16_idx` is out of bounds, returns `None`.
+        #[cfg(feature = "metric_utf16")]
+        #[track_caller]
+        #[inline]
+        fn get_utf16_to_byte_idx(&self, utf16_idx: usize) -> Option<usize> {
+            if utf16_idx > self.len_utf16() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(str_indices::utf16::to_byte_idx(text, utf16_idx));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._utf16_to_byte_idx(utf16_idx))
+            } else {
+                let utf16_start_idx = self._byte_to_utf16_idx(self.get_byte_range()[0]);
+                Some(self._utf16_to_byte_idx(utf16_start_idx + utf16_idx) - self.get_byte_range()[0])
+            }
+        }
+
+        /// Non-panicking version of `byte_to_line_idx`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `None`.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        ))]
+        #[track_caller]
+        #[inline]
+        fn get_byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> Option<usize> {
+            if byte_idx > self.len() {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::str_utils::lines::from_byte_idx(text, byte_idx, line_type));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._byte_to_line_idx(byte_idx, line_type))
+            } else {
+                let crlf_split = if byte_idx == self.get_byte_range()[1] {
+                    self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
+                } else {
+                    false
+                };
+
+                Some(self._byte_to_line_idx(self.get_byte_range()[0] + byte_idx, line_type)
+                    - self._byte_to_line_idx(self.get_byte_range()[0], line_type)
+                    + crlf_split as usize)
+            }
+        }
+
+        /// Non-panicking version of `line_to_byte_idx`.
+        ///
+        /// If `line_idx` is out of bounds, returns `None`.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        ))]
+        #[track_caller]
+        #[inline]
+        fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize> {
+            if line_idx > self.len_lines(line_type) {
+                return None;
+            }
+
+            if let Some(text) = self.get_str_text() {
+                return Some(crate::str_utils::lines::to_byte_idx(text, line_idx, line_type));
+            }
+
+            if self.get_full_info().is_some() {
+                Some(self._line_to_byte_idx(line_idx, line_type))
+            } else {
+                let line_start_idx = self._byte_to_line_idx(self.get_byte_range()[0], line_type);
+                Some(self._line_to_byte_idx(line_start_idx + line_idx, line_type)
+                    .saturating_sub(self.get_byte_range()[0])
+                    .min(self.len()))
             }
         }
     };
