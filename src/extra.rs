@@ -6,7 +6,7 @@
     feature = "metric_lines_unicode"
 ))]
 use crate::LineType;
-use crate::RopeSlice;
+use crate::{iter::Bytes, RopeSlice};
 
 pub mod esoterica {
     //! Esoteric functionality.
@@ -299,4 +299,9 @@ pub trait RopeNoPanic<'current, 'original> {
         feature = "metric_lines_unicode"
     ))]
     fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize>;
+
+    /// Non-panicking version of `bytes_at`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `Err`.
+    fn get_bytes_at(&'current self, byte_idx: usize) -> crate::Result<Bytes<'original>>;
 }

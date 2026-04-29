@@ -292,6 +292,10 @@ impl<'current, 'original> RopeNoPanic<'current, 'original> for RopeSlice<'origin
     fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize> {
         self.get_line_to_byte_idx_impl(line_idx, line_type)
     }
+
+    fn get_bytes_at(&'current self, byte_idx: usize) -> Result<Bytes<'original>> {
+        self.get_bytes_at_impl(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -442,6 +446,7 @@ mod tests {
                 s1.chunks_at(1),
                 s1.chunk_cursor(),
                 s1.chunk_cursor_at(1),
+                s1.get_bytes_at(1).expect("`get_bytes_at` should not fail"),
             )
         };
         _ = iterators;

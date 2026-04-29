@@ -493,18 +493,7 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn bytes_at(&self, byte_idx: usize) -> Bytes<$rlt> {
-            let result = if let Some(text) = self.get_str_text() {
-                Bytes::from_str(text, byte_idx)
-            } else {
-                Bytes::new(
-                    self.get_root(),
-                    self.get_root_info(),
-                    self.get_byte_range(),
-                    self.get_byte_range()[0] + byte_idx,
-                )
-            };
-
-            match result {
+            match self.get_bytes_at(byte_idx) {
                 Ok(iter) => iter,
                 Err(e) => panic!("{}", e),
             }
@@ -1215,6 +1204,24 @@ macro_rules! shared_no_panic_impl_methods {
                 Some(self._line_to_byte_idx(line_start_idx + line_idx, line_type)
                     .saturating_sub(self.get_byte_range()[0])
                     .min(self.len()))
+            }
+        }
+
+        /// Non-panicking version of `bytes_at`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `Err`.
+        #[track_caller]
+        #[inline]
+        fn get_bytes_at_impl(&self, byte_idx: usize) -> Result<Bytes<$rlt>> {
+            if let Some(text) = self.get_str_text() {
+                Bytes::from_str(text, byte_idx)
+            } else {
+                Bytes::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
             }
         }
     };

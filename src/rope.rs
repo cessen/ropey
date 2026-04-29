@@ -870,6 +870,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize> {
         self.get_line_to_byte_idx_impl(line_idx, line_type)
     }
+
+    fn get_bytes_at(&'current self, byte_idx: usize) -> Result<Bytes<'current>> {
+        self.get_bytes_at_impl(byte_idx)
+    }
 }
 
 //==============================================================

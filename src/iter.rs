@@ -965,7 +965,7 @@ mod tests {
 
     use super::*;
 
-    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
+    use crate::{extra::RopeNoPanic, rope_builder::RopeBuilder, Rope, RopeSlice};
 
     #[cfg(feature = "metric_lines_lf_cr")]
     use crate::LineType;
@@ -1429,6 +1429,70 @@ mod tests {
         let r = Rope::from_str("foo");
         let s = r.slice(1..2);
         s.bytes_at(2);
+    }
+
+    #[test]
+    fn get_bytes_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                let mut bytes =
+                    RopeNoPanic::get_bytes_at(&t, i).expect("`get_bytes_at` should not fail");
+                assert_eq!(TEXT.as_bytes()[i], bytes.next().unwrap());
+            }
+
+            let mut bytes =
+                RopeNoPanic::get_bytes_at(&t, TEXT.len()).expect("`get_bytes_at` should not fail");
+            assert_eq!(None, bytes.next());
+        }
+    }
+
+    #[test]
+    fn get_bytes_at_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
+
+            for i in 0..text.len() {
+                let mut bytes =
+                    RopeNoPanic::get_bytes_at(&s, i).expect("`get_bytes_at` should not fail");
+                assert_eq!(text.as_bytes()[i], bytes.next().unwrap());
+            }
+
+            let mut bytes =
+                RopeNoPanic::get_bytes_at(&s, text.len()).expect("`get_bytes_at` should not fail");
+            assert_eq!(None, bytes.next());
+        }
+    }
+
+    #[test]
+    fn get_bytes_at_03() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_bytes_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_bytes_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_bytes_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_bytes_at_05() {
+        let s = RopeSlice::from("foo");
+        assert!(matches!(
+            RopeNoPanic::get_bytes_at(&s, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
     }
 
     #[test]
