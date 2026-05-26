@@ -1659,6 +1659,74 @@ mod tests {
     }
 
     #[test]
+    fn get_chars_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                if !TEXT.is_char_boundary(i) {
+                    assert!(matches!(
+                        RopeNoPanic::get_chars_at(&t, i),
+                        Err(crate::Error::NonCharBoundary)
+                    ));
+                    continue;
+                }
+                let mut chars =
+                    RopeNoPanic::get_chars_at(&t, i).expect("`get_chars_at` should not fail");
+                assert_eq!(TEXT[i..].chars().next(), chars.next());
+            }
+
+            let mut chars = t.chars_at(TEXT.len());
+            assert_eq!(None, chars.next());
+        }
+    }
+
+    #[test]
+    fn get_chars_at_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
+
+            for i in 0..text.len() {
+                if !text.is_char_boundary(i) {
+                    assert!(matches!(
+                        RopeNoPanic::get_chars_at(&s, i),
+                        Err(crate::Error::NonCharBoundary)
+                    ));
+                    continue;
+                }
+
+                let mut chars =
+                    RopeNoPanic::get_chars_at(&s, i).expect("`get_chars_at` should not fail");
+                assert_eq!(text[i..].chars().next(), chars.next());
+            }
+
+            let mut chars = s.chars_at(text.len());
+            assert_eq!(None, chars.next());
+        }
+    }
+
+    #[test]
+    fn get_chars_at_03() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_chars_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chars_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_chars_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
     #[cfg_attr(miri, ignore)]
     fn chars_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);

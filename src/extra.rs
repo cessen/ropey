@@ -6,7 +6,10 @@
     feature = "metric_lines_unicode"
 ))]
 use crate::LineType;
-use crate::{iter::Bytes, RopeSlice};
+use crate::{
+    iter::{Bytes, Chars},
+    RopeSlice,
+};
 
 pub mod esoterica {
     //! Esoteric functionality.
@@ -304,4 +307,12 @@ pub trait RopeNoPanic<'current, 'original> {
     ///
     /// If `byte_idx` is out of bounds, returns `Err`.
     fn get_bytes_at(&'current self, byte_idx: usize) -> crate::Result<Bytes<'original>>;
+
+    /// Non-panicking version of `chars_at`.
+    ///
+    /// Returns `Err` if:
+    ///
+    /// - `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+    /// - `byte_idx` is not a char boundary.
+    fn get_chars_at(&'current self, byte_idx: usize) -> crate::Result<Chars<'original>>;
 }

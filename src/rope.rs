@@ -874,6 +874,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_bytes_at(&'current self, byte_idx: usize) -> Result<Bytes<'current>> {
         self.get_bytes_at_impl(byte_idx)
     }
+
+    fn get_chars_at(&'current self, byte_idx: usize) -> Result<Chars<'current>> {
+        self.get_chars_at_impl(byte_idx)
+    }
 }
 
 //==============================================================

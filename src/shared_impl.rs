@@ -533,18 +533,7 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn chars_at(&self, byte_idx: usize) -> Chars<$rlt> {
-            let result = if let Some(text) = self.get_str_text() {
-                Chars::from_str(text, byte_idx)
-            } else {
-                Chars::new(
-                    self.get_root(),
-                    self.get_root_info(),
-                    self.get_byte_range(),
-                    self.get_byte_range()[0] + byte_idx,
-                )
-            };
-
-            match result {
+            match self.get_chars_at(byte_idx) {
                 Ok(iter) => iter,
                 Err(e) => panic!("{}", e),
             }
@@ -1217,6 +1206,27 @@ macro_rules! shared_no_panic_impl_methods {
                 Bytes::from_str(text, byte_idx)
             } else {
                 Bytes::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            }
+        }
+
+        /// Non-panicking version of `chars_at`.
+        ///
+        /// Returns `Err` if:
+        ///
+        /// - `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        /// - `byte_idx` is not a char boundary.
+        #[track_caller]
+        #[inline]
+        fn get_chars_at_impl(&self, byte_idx: usize) -> Result<Chars<$rlt>> {
+            if let Some(text) = self.get_str_text() {
+                Chars::from_str(text, byte_idx)
+            } else {
+                Chars::new(
                     self.get_root(),
                     self.get_root_info(),
                     self.get_byte_range(),
