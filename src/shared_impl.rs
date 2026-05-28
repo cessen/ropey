@@ -82,6 +82,12 @@ macro_rules! shared_main_impl_methods {
         ))]
         #[inline]
         pub fn len_lines(&self, line_type: LineType) -> usize {
+            // This becomes a corner case when an empty slice splits a CRLF pair
+            // in the source rope, so we just always handle it specially here.
+            if self.len() == 0 {
+                return 1;
+            }
+
             if let Some(text) = self.get_str_text() {
                 return crate::str_utils::lines::count_breaks(text, line_type) + 1;
             }
@@ -457,6 +463,12 @@ macro_rules! shared_main_impl_methods {
         pub fn byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
             assert!(byte_idx <= self.len(), "{}", crate::Error::OutOfBounds);
 
+            // This becomes a corner case when an empty slice splits a CRLF pair
+            // in the source rope, so we just always handle it specially here.
+            if self.len() == 0 {
+                return 0;
+            }
+
             if let Some(text) = self.get_str_text() {
                 return crate::str_utils::lines::from_byte_idx(text, byte_idx, line_type);
             }
@@ -464,7 +476,7 @@ macro_rules! shared_main_impl_methods {
             if self.get_full_info().is_some() {
                 self._byte_to_line_idx(byte_idx, line_type)
             } else {
-                let crlf_split = if byte_idx == self.get_byte_range()[1] {
+                let crlf_split = if (byte_idx + self.get_byte_range()[0]) == self.get_byte_range()[1] {
                     self._is_relevant_crlf_split(self.get_byte_range()[1], line_type)
                 } else {
                     false

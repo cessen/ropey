@@ -71,7 +71,13 @@ impl RopeBuilder {
         let mut chunk = chunk;
 
         while !chunk.is_empty() {
-            if self.buffer.is_empty() && chunk.len() >= MAX_TEXT_SIZE {
+            // Note: we use `>` rather than `>=` to guarantee that we only
+            // compute splits prior to the end of the passed chunk.  This is
+            // because `find_appropriate_split_floor()`'s CRLF split checking
+            // assumes that the passed text is the only text, and thus it will
+            // happily split on a text-end CR that's actually part of a CRLF
+            // pair split across two chunks.
+            if self.buffer.is_empty() && chunk.len() > MAX_TEXT_SIZE {
                 // Process text data directly, skipping the buffer.
                 let split_idx = crate::find_appropriate_split_floor(MAX_TEXT_SIZE, chunk);
                 self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&chunk[..split_idx]))));
@@ -84,8 +90,19 @@ impl RopeBuilder {
             // fit the next code point from `chunk`.
             else if self.buffer.len() > (MAX_TEXT_SIZE - 4) {
                 // Process filled buffer.
-                self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&self.buffer))));
-                self.buffer.clear();
+                if self.buffer.ends_with("\r") {
+                    // Special handling to avoid ending up with split CRLF pairs
+                    // in the rope.
+                    self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(
+                        &self.buffer[..self.buffer.len() - 1],
+                    ))));
+                    self.buffer.clear();
+                    self.buffer.push('\r');
+                } else {
+                    // Common case.
+                    self.append_leaf_node(Node::Leaf(Arc::new(Text::from_str(&self.buffer))));
+                    self.buffer.clear();
+                }
             } else {
                 // Append to the buffer.
                 let target_len = MAX_TEXT_SIZE - self.buffer.len();
@@ -286,6 +303,25 @@ mod tests {
 
         assert_eq!(r, TEXT);
         r.assert_invariants();
+    }
+
+    #[test]
+    fn rope_builder_02() {
+        // Test for ensuring that CRLF pairs aren't split in the final rope even
+        // if they're split across the appended chunks.
+        let mut b = RopeBuilder::new();
+
+        for _ in 0..2000 {
+            b.append("\n\r");
+        }
+        b.append("\n");
+
+        let r = b.finish();
+
+        assert_eq!(r.len(), 4001);
+        for chunk in r.chunks() {
+            assert!(!chunk.ends_with("\r"));
+        }
     }
 
     #[test]

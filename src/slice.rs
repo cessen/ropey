@@ -447,6 +447,16 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn len_lines_03() {
+        // Corner case where an empty slice splits a CRLF pair in the source
+        // rope.
+        let r = Rope::from_str("some\r\ntext");
+        let s = r.slice(5..5);
+        assert_eq!(s.len_lines(LineType::LF_CR), 1);
+    }
+
     #[cfg(feature = "metric_utf16")]
     #[test]
     fn len_utf16_01() {
@@ -784,6 +794,25 @@ mod tests {
     fn byte_to_line_idx_04b() {
         let s: RopeSlice = (&TEXT_LINES[34..112]).into();
         s.byte_to_line_idx(79, LineType::LF_CR);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn byte_to_line_idx_05() {
+        // Test CRLF corner case, where the slicing splits the CRLF.
+        let rope = Rope::from_str("some\r\ntext");
+        let s = rope.slice(2..5);
+        assert_eq!(s.byte_to_line_idx(2, LineType::LF_CR), 0);
+        assert_eq!(s.byte_to_line_idx(3, LineType::LF_CR), 1);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn byte_to_line_idx_06() {
+        // Test CRLF corner case, where an empty slice sits between a CR and LF.
+        let rope = Rope::from_str("some\r\ntext");
+        let s = rope.slice(5..5);
+        assert_eq!(s.byte_to_line_idx(0, LineType::LF_CR), 0);
     }
 
     #[cfg(feature = "metric_chars")]
