@@ -560,6 +560,7 @@ mod inner {
 
 #[cfg(test)]
 mod tests {
+    use super::super::MIN_TEXT_SIZE;
     use super::*;
 
     #[test]
@@ -833,5 +834,57 @@ mod tests {
         let mut leaf_1 = Text::from_str(&text_l);
         let mut leaf_2 = Text::from_str(&text_r);
         leaf_1.distribute(&mut leaf_2);
+    }
+
+    #[test]
+    fn distribute_04() {
+        // Ensure that the given min/max text sizes permit redistribution with
+        // all codepoint sizes.  There can be corner cases where this becomes
+        // impossible if the min/max text sizes don't have enough leeway.
+
+        // 1, 2, 3, and 4-byte code points.
+        let test_chars = &["a", "β", "あ", "🐸"];
+
+        for test_char in test_chars {
+            let mut leaf_1 = Text::from_str(test_char);
+            while (leaf_1.len() + (MIN_TEXT_SIZE - 1)) <= MAX_TEXT_SIZE {
+                leaf_1.prepend_str("a");
+            }
+
+            let mut leaf_2 = Text::from_str(test_char);
+            while leaf_2.len() < (MIN_TEXT_SIZE - 1) {
+                leaf_2.append_str("a");
+            }
+
+            leaf_1.distribute(&mut leaf_2);
+            assert!(leaf_1.len() >= MIN_TEXT_SIZE);
+            assert!(leaf_2.len() >= MIN_TEXT_SIZE);
+        }
+    }
+
+    #[test]
+    fn distribute_05() {
+        // Ensure that the given min/max text sizes permit redistribution with
+        // all codepoint sizes.  There can be corner cases where this becomes
+        // impossible if the min/max text sizes don't have enough leeway.
+
+        // 1, 2, 3, and 4-byte code points.
+        let test_chars = &["a", "β", "あ", "🐸"];
+
+        for test_char in test_chars {
+            let mut leaf_1 = Text::from_str(test_char);
+            while leaf_1.len() < (MIN_TEXT_SIZE - 1) {
+                leaf_1.prepend_str("a");
+            }
+
+            let mut leaf_2 = Text::from_str(test_char);
+            while (leaf_2.len() + (MIN_TEXT_SIZE - 1)) <= MAX_TEXT_SIZE {
+                leaf_2.append_str("a");
+            }
+
+            leaf_1.distribute(&mut leaf_2);
+            assert!(leaf_1.len() >= MIN_TEXT_SIZE);
+            assert!(leaf_2.len() >= MIN_TEXT_SIZE);
+        }
     }
 }

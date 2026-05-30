@@ -17,7 +17,7 @@ mod constants {
     pub(crate) const MAX_CHILDREN: usize = 5;
     pub(crate) const MIN_CHILDREN: usize = 2;
     pub(crate) const MAX_TEXT_SIZE: usize = 15;
-    pub(crate) const MIN_TEXT_SIZE: usize = 7;
+    pub(crate) const MIN_TEXT_SIZE: usize = 5;
 }
 pub(crate) use constants::{MAX_CHILDREN, MAX_TEXT_SIZE, MIN_CHILDREN, MIN_TEXT_SIZE};
 
