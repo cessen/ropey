@@ -27,8 +27,8 @@ const _: () = assert!(
 );
 
 const _: () = assert!(
-    MAX_TEXT_SIZE <= (1 << 16),
-    "Due to the way leaf text length is stored, the maximum text size cannot exceed 2^16."
+    MAX_TEXT_SIZE <= (1 << 16) - 1,
+    "Due to the way leaf text length is stored, the maximum text size cannot exceed 2^16 - 1."
 );
 
 const _: () = assert!(
