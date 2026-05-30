@@ -31,6 +31,11 @@ const _: () = assert!(
     "Due to the way leaf text length is stored, the maximum text size cannot exceed 2^16."
 );
 
+const _: () = assert!(
+    MAX_TEXT_SIZE - (MIN_TEXT_SIZE * 2) >= 5,
+    "There needs to be at least 5 bytes of leeway between the max and min text sizes in order to guarantee that nodes can be rebalanced in the case of multi-byte code points, given the algorithms used."
+);
+
 pub(crate) use children::Children;
 pub(crate) use node::Node;
 pub(crate) use text::Text;
