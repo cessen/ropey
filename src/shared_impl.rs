@@ -877,7 +877,7 @@ macro_rules! shared_main_impl_methods {
 
         #[inline(always)]
         fn get_full_info(&self) -> Option<&TextInfo> {
-            if let Some(_) = self.get_str_text() {
+            if self.get_str_text().is_some() {
                 return None;
             }
 
@@ -892,9 +892,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(feature = "metric_chars")]
         fn _byte_to_char_idx(&self, byte_idx: usize) -> usize {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
             start_info.chars + text.byte_to_char_idx(byte_idx - start_info.bytes)
@@ -902,9 +900,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(feature = "metric_chars")]
         fn _char_to_byte_idx(&self, char_idx: usize) -> usize {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             let (text, start_info) = self.get_root().get_text_at_char(char_idx);
             start_info.bytes + text.char_to_byte_idx(char_idx - start_info.chars)
@@ -912,9 +908,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(feature = "metric_utf16")]
         fn _byte_to_utf16_idx(&self, byte_idx: usize) -> usize {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
             start_info.utf16 + text.byte_to_utf16_idx(byte_idx - start_info.bytes)
@@ -922,9 +916,7 @@ macro_rules! shared_main_impl_methods {
 
         #[cfg(feature = "metric_utf16")]
         fn _utf16_to_byte_idx(&self, utf16_idx: usize) -> usize {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             let (text, start_info) = self.get_root().get_text_at_utf16(utf16_idx);
             start_info.bytes + text.utf16_to_byte_idx(utf16_idx - start_info.utf16)
@@ -936,9 +928,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         fn _byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> usize {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             let (text, start_info) = self.get_root().get_text_at_byte(byte_idx);
 
@@ -952,9 +942,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         fn _line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> usize {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             let (text, start_info) = self.get_root().get_text_at_line_break(line_idx, line_type);
 
@@ -974,9 +962,7 @@ macro_rules! shared_main_impl_methods {
             feature = "metric_lines_unicode"
         ))]
         pub(crate) fn _is_relevant_crlf_split(&self, byte_idx: usize, line_type: LineType) -> bool {
-            if let Some(_) = self.get_str_text() {
-                panic!("This case should be handled at a higher level.");
-            }
+            debug_assert!(self.get_str_text().is_none(), "This case should be handled by the caller.");
 
             self.get_root().is_relevant_crlf_split(byte_idx, line_type)
         }
