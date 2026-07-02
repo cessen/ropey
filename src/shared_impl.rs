@@ -574,7 +574,10 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn char_indices_at(&self, byte_idx: usize) -> CharIndices<$rlt> {
-            CharIndices::new(self.chars_at(byte_idx))
+            match self.get_char_indices_at(byte_idx) {
+                Ok(iter) => iter,
+                Err(e) => panic!("{}", e),
+            }
         }
 
         /// Creates an iterator over the lines of the `Rope`.
@@ -1233,6 +1236,18 @@ macro_rules! shared_no_panic_impl_methods {
                     self.get_byte_range()[0] + byte_idx,
                 )
             }
+        }
+
+        /// Non-panicking version of `char_indices_at`.
+        ///
+        /// Returns `Err` if:
+        ///
+        /// - `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+        /// - `byte_idx` is not a char boundary.
+        #[track_caller]
+        #[inline]
+        fn get_char_indices_at_impl(&self, byte_idx: usize) -> Result<CharIndices<$rlt>> {
+            self.get_chars_at(byte_idx).map(CharIndices::new)
         }
     };
 }

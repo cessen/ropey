@@ -878,6 +878,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_chars_at(&'current self, byte_idx: usize) -> Result<Chars<'current>> {
         self.get_chars_at_impl(byte_idx)
     }
+
+    fn get_char_indices_at(&'current self, byte_idx: usize) -> Result<CharIndices<'current>> {
+        self.get_char_indices_at_impl(byte_idx)
+    }
 }
 
 //==============================================================

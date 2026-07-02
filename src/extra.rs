@@ -7,7 +7,7 @@
 ))]
 use crate::LineType;
 use crate::{
-    iter::{Bytes, Chars},
+    iter::{Bytes, CharIndices, Chars},
     RopeSlice,
 };
 
@@ -315,4 +315,15 @@ pub trait RopeNoPanic<'current, 'original> {
     /// - `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
     /// - `byte_idx` is not a char boundary.
     fn get_chars_at(&'current self, byte_idx: usize) -> crate::Result<Chars<'original>>;
+
+    /// Non-panicking version of `char_indices_at`.
+    ///
+    /// Returns `Err` if:
+    ///
+    /// - `byte_idx` is out of bounds (i.e. `byte_idx > len()`).
+    /// - `byte_idx` is not a char boundary.
+    fn get_char_indices_at(
+        &'current self,
+        byte_idx: usize,
+    ) -> crate::Result<CharIndices<'original>>;
 }
