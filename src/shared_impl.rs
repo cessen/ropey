@@ -644,19 +644,7 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn lines_at(&self, line_idx: usize, line_type: LineType) -> Lines<$rlt> {
-            let result = if let Some(text) = self.get_str_text() {
-                Lines::from_str(text, line_idx, line_type)
-            } else {
-                Lines::new(
-                    self.get_root(),
-                    self.get_root_info(),
-                    self.get_byte_range(),
-                    line_idx,
-                    line_type,
-                )
-            };
-
-            match result {
+            match self.get_lines_at(line_idx, line_type) {
                 Ok(iter) => iter,
                 Err(e) => panic!("{}", e),
             }
@@ -1248,6 +1236,30 @@ macro_rules! shared_no_panic_impl_methods {
         #[inline]
         fn get_char_indices_at_impl(&self, byte_idx: usize) -> Result<CharIndices<$rlt>> {
             self.get_chars_at(byte_idx).map(CharIndices::new)
+        }
+
+        /// Non-panicking version of `lines_at`.
+        ///
+        /// If `line_idx` is out of bounds, returns `Err`.
+        #[cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        ))]
+        #[track_caller]
+        #[inline]
+        fn get_lines_at_impl(&self, line_idx: usize, line_type: LineType) -> Result<Lines<$rlt>> {
+            if let Some(text) = self.get_str_text() {
+                Lines::from_str(text, line_idx, line_type)
+            } else {
+                Lines::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    line_idx,
+                    line_type,
+                )
+            }
         }
     };
 }

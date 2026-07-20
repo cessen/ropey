@@ -2402,6 +2402,104 @@ mod tests {
     #[cfg(feature = "metric_lines_lf_cr")]
     #[test]
     #[cfg_attr(miri, ignore)]
+    fn get_lines_at_01() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            for i in 0..t.len_lines(LineType::LF_CR) {
+                let line = t.line(i, LineType::LF_CR);
+                let mut lines = RopeNoPanic::get_lines_at(&t, i, LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+                assert_eq!(Some(line), lines.next());
+            }
+
+            let mut lines =
+                RopeNoPanic::get_lines_at(&t, t.len_lines(LineType::LF_CR), LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+            assert_eq!(None, lines.next());
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn get_lines_at_02() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..2031);
+
+            for i in 0..s.len_lines(LineType::LF_CR) {
+                let line = s.line(i, LineType::LF_CR);
+                let mut lines = RopeNoPanic::get_lines_at(&s, i, LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+                assert_eq!(Some(line), lines.next());
+            }
+
+            let mut lines =
+                RopeNoPanic::get_lines_at(&s, s.len_lines(LineType::LF_CR), LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+            assert_eq!(None, lines.next());
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn get_lines_at_03() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..34);
+
+            let mut lines = RopeNoPanic::get_lines_at(&s, 0, LineType::LF_CR)
+                .expect("`get_lines_at` should not fail");
+            assert_eq!("", lines.next().unwrap());
+
+            let mut lines = RopeNoPanic::get_lines_at(&s, 1, LineType::LF_CR)
+                .expect("`get_lines_at` should not fail");
+            assert_eq!(None, lines.next());
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_lines_at_04() {
+        let r = Rope::from_str("AA\nA");
+        assert!(matches!(
+            RopeNoPanic::get_lines_at(&r, 3, LineType::LF_CR),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_lines_at_05() {
+        let r = Rope::from_str("AA\nA");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_lines_at(&s, 2, LineType::LF_CR),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_lines_at_06() {
+        let r = Rope::from_str(TEXT);
+
+        let lines = {
+            let s = r.slice(4..32);
+            RopeNoPanic::get_lines_at(&s, 0, LineType::LF_CR)
+                .expect("`get_lines_at` should not fail")
+        };
+
+        _ = lines;
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
     fn lines_iter_size_hint_01() {
         let text = lines_text();
         let r = Rope::from_str(&text);

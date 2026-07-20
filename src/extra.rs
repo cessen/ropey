@@ -5,7 +5,7 @@
     feature = "metric_lines_lf_cr",
     feature = "metric_lines_unicode"
 ))]
-use crate::LineType;
+use crate::{iter::Lines, LineType};
 use crate::{
     iter::{Bytes, CharIndices, Chars},
     RopeSlice,
@@ -326,4 +326,26 @@ pub trait RopeNoPanic<'current, 'original> {
         &'current self,
         byte_idx: usize,
     ) -> crate::Result<CharIndices<'original>>;
+
+    /// Non-panicking version of `lines_at`.
+    ///
+    /// If `line_idx` is out of bounds, returns `Err`.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(any(
+            feature = "metric_lines_lf",
+            feature = "metric_lines_lf_cr",
+            feature = "metric_lines_unicode"
+        )))
+    )]
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_lines_at(
+        &'current self,
+        line_idx: usize,
+        line_type: LineType,
+    ) -> crate::Result<Lines<'original>>;
 }

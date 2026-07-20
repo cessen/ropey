@@ -304,6 +304,19 @@ impl<'current, 'original> RopeNoPanic<'current, 'original> for RopeSlice<'origin
     fn get_char_indices_at(&'current self, byte_idx: usize) -> Result<CharIndices<'original>> {
         self.get_char_indices_at_impl(byte_idx)
     }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_lines_at(
+        &'current self,
+        line_idx: usize,
+        line_type: LineType,
+    ) -> Result<Lines<'original>> {
+        self.get_lines_at_impl(line_idx, line_type)
+    }
 }
 
 // Stdlib trait impls.
@@ -458,6 +471,9 @@ mod tests {
                 s1.get_chars_at(1).expect("`get_chars_at` should not fail"),
                 s1.get_char_indices_at(1)
                     .expect("`get_char_indices_at` should not fail"),
+                #[cfg(feature = "metric_lines_lf_cr")]
+                s1.get_lines_at(1, LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail"),
             )
         };
         _ = iterators;

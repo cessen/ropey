@@ -882,6 +882,19 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     fn get_char_indices_at(&'current self, byte_idx: usize) -> Result<CharIndices<'current>> {
         self.get_char_indices_at_impl(byte_idx)
     }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_lines_at(
+        &'current self,
+        line_idx: usize,
+        line_type: LineType,
+    ) -> Result<Lines<'current>> {
+        self.get_lines_at_impl(line_idx, line_type)
+    }
 }
 
 //==============================================================
