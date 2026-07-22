@@ -7,7 +7,7 @@
 ))]
 use crate::{iter::Lines, LineType};
 use crate::{
-    iter::{Bytes, CharIndices, Chars},
+    iter::{Bytes, CharIndices, Chars, Chunks},
     RopeSlice,
 };
 
@@ -348,4 +348,9 @@ pub trait RopeNoPanic<'current, 'original> {
         line_idx: usize,
         line_type: LineType,
     ) -> crate::Result<Lines<'original>>;
+
+    /// Non-panicking version of `chunks_at`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `Err`.
+    fn get_chunks_at(&'current self, byte_idx: usize) -> crate::Result<(Chunks<'original>, usize)>;
 }

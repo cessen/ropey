@@ -1274,6 +1274,101 @@ mod tests {
     }
 
     #[test]
+    fn get_chunks_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                let mut current_byte = t.chunk(i).1;
+                let (chunks, idx) =
+                    RopeNoPanic::get_chunks_at(&t, i).expect("`get_chunks_at` should not fail");
+                assert_eq!(current_byte, idx);
+
+                for chunk1 in chunks {
+                    let chunk2 = t.chunk(current_byte).0;
+                    assert_eq!(chunk2, chunk1);
+                    current_byte += chunk2.len();
+                }
+            }
+
+            let (mut chunks, idx) = RopeNoPanic::get_chunks_at(&t, TEXT.len())
+                .expect("`get_chunks_at` should not fail");
+            assert_eq!(TEXT.len(), idx);
+            assert_eq!(None, chunks.next());
+        }
+    }
+
+    #[test]
+    fn get_chunks_at_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
+
+            for i in 0..text.len() {
+                let mut current_byte = s.chunk(i).1;
+                let (chunks, idx) =
+                    RopeNoPanic::get_chunks_at(&s, i).expect("`get_chunks_at` should not fail");
+                assert_eq!(current_byte, idx);
+
+                for chunk1 in chunks {
+                    let chunk2 = s.chunk(current_byte).0;
+                    assert_eq!(chunk2, chunk1);
+                    current_byte += chunk2.len();
+                }
+            }
+
+            let (mut chunks, idx) = RopeNoPanic::get_chunks_at(&s, text.len())
+                .expect("`get_chunks_at` should not fail");
+            assert_eq!(text.len(), idx);
+            assert_eq!(None, chunks.next());
+        }
+    }
+
+    #[test]
+    fn get_chunks_at_03() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_chunks_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunks_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_chunks_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunks_at_05() {
+        let s = RopeSlice::from("foo");
+
+        assert!(matches!(
+            RopeNoPanic::get_chunks_at(&s, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunks_at_06() {
+        let r = Rope::from_str(TEXT);
+
+        let chunks = {
+            let s = r.slice(4..32);
+            RopeNoPanic::get_chunks_at(&s, 0)
+                .expect("`get_chunks_at` should not fail")
+                .0
+        };
+
+        _ = chunks;
+    }
+
+    #[test]
     #[cfg_attr(miri, ignore)]
     fn chunks_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);

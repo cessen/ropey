@@ -317,6 +317,10 @@ impl<'current, 'original> RopeNoPanic<'current, 'original> for RopeSlice<'origin
     ) -> Result<Lines<'original>> {
         self.get_lines_at_impl(line_idx, line_type)
     }
+
+    fn get_chunks_at(&'current self, byte_idx: usize) -> crate::Result<(Chunks<'original>, usize)> {
+        self.get_chunks_at_impl(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -474,6 +478,8 @@ mod tests {
                 #[cfg(feature = "metric_lines_lf_cr")]
                 s1.get_lines_at(1, LineType::LF_CR)
                     .expect("`get_lines_at` should not fail"),
+                s1.get_chunks_at(1)
+                    .expect("`get_chunks_at` should not fail"),
             )
         };
         _ = iterators;

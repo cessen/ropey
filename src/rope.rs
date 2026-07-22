@@ -895,6 +895,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     ) -> Result<Lines<'current>> {
         self.get_lines_at_impl(line_idx, line_type)
     }
+
+    fn get_chunks_at(&'current self, byte_idx: usize) -> crate::Result<(Chunks<'current>, usize)> {
+        self.get_chunks_at_impl(byte_idx)
+    }
 }
 
 //==============================================================

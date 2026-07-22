@@ -685,19 +685,8 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn chunks_at(&self, byte_idx: usize) -> (Chunks<$rlt>, usize) {
-            let result = if let Some(text) = self.get_str_text() {
-                Chunks::from_str(text, byte_idx)
-            } else {
-                Chunks::new(
-                    self.get_root(),
-                    self.get_root_info(),
-                    self.get_byte_range(),
-                    self.get_byte_range()[0] + byte_idx,
-                )
-            };
-
-            match result {
-                Ok((chunks, start_idx)) => (chunks, start_idx.saturating_sub(self.get_byte_range()[0])),
+             match self.get_chunks_at(byte_idx) {
+                Ok(chunks) => chunks,
                 Err(e) => panic!("{}", e),
             }
         }
@@ -1260,6 +1249,28 @@ macro_rules! shared_no_panic_impl_methods {
                     line_type,
                 )
             }
+        }
+
+        /// Non-panicking version of `chunks_at`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `Err`.
+        #[track_caller]
+        #[inline]
+        fn get_chunks_at_impl(&self, byte_idx: usize) -> Result<(Chunks<$rlt>, usize)> {
+            let result = if let Some(text) = self.get_str_text() {
+                Chunks::from_str(text, byte_idx)
+            } else {
+                Chunks::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            };
+
+            result.map(|(chunks, start_idx)| {
+                (chunks, start_idx.saturating_sub(self.get_byte_range()[0]))
+            })
         }
     };
 }
