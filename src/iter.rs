@@ -165,6 +165,10 @@ impl<'a> Chunks<'a> {
     }
 
     pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<(Self, usize)> {
+        if at_byte_idx > text.len() {
+            return Err(crate::Error::OutOfBounds);
+        }
+
         let cursor = ChunkCursor::from_str(text)?;
         let at_end = at_byte_idx == text.len();
 
@@ -327,6 +331,10 @@ impl<'a> Bytes<'a> {
 
     #[inline]
     pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<Self> {
+        if at_byte_idx > text.len() {
+            return Err(crate::Error::OutOfBounds);
+        }
+
         Ok(Bytes {
             cursor: ChunkCursor::from_str(text)?,
             current_chunk: text.as_bytes(),
@@ -482,6 +490,10 @@ impl<'a> Chars<'a> {
 
     #[inline]
     pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<Self> {
+        if at_byte_idx > text.len() {
+            return Err(crate::Error::OutOfBounds);
+        }
+
         if !text.is_char_boundary(at_byte_idx) {
             return Err(crate::Error::NonCharBoundary);
         }
@@ -799,6 +811,9 @@ mod lines {
             line_type: LineType,
         ) -> crate::Result<Self> {
             let total_lines = lines::count_breaks(text, line_type) + 1;
+            if at_line_idx > total_lines {
+                return Err(crate::Error::OutOfBounds);
+            }
             let at_byte_idx = lines::to_byte_idx(text, at_line_idx, line_type);
 
             Ok(Lines {
