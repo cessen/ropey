@@ -321,6 +321,13 @@ impl<'current, 'original> RopeNoPanic<'current, 'original> for RopeSlice<'origin
     fn get_chunks_at(&'current self, byte_idx: usize) -> crate::Result<(Chunks<'original>, usize)> {
         self.get_chunks_at_impl(byte_idx)
     }
+
+    fn get_chunk_cursor_at(
+        &'current self,
+        byte_idx: usize,
+    ) -> crate::Result<ChunkCursor<'original>> {
+        self.get_chunk_cursor_at_impl(byte_idx)
+    }
 }
 
 // Stdlib trait impls.
@@ -480,6 +487,8 @@ mod tests {
                     .expect("`get_lines_at` should not fail"),
                 s1.get_chunks_at(1)
                     .expect("`get_chunks_at` should not fail"),
+                s1.get_chunk_cursor_at(1)
+                    .expect("`get_chunk_cursor_at` should not fail"),
             )
         };
         _ = iterators;

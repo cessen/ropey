@@ -724,18 +724,7 @@ macro_rules! shared_main_impl_methods {
         #[track_caller]
         #[inline]
         pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<$rlt> {
-            let result = if let Some(text) = self.get_str_text() {
-                ChunkCursor::from_str(text, byte_idx)
-            } else {
-                ChunkCursor::new(
-                    self.get_root(),
-                    self.get_root_info(),
-                    self.get_byte_range(),
-                    self.get_byte_range()[0] + byte_idx,
-                )
-            };
-
-            match result {
+            match self.get_chunk_cursor_at(byte_idx) {
                 Ok(cursor) => cursor,
                 Err(e) => panic!("{}", e),
             }
@@ -1271,6 +1260,24 @@ macro_rules! shared_no_panic_impl_methods {
             result.map(|(chunks, start_idx)| {
                 (chunks, start_idx.saturating_sub(self.get_byte_range()[0]))
             })
+        }
+
+        /// Non-panicking version of `chunk_cursor_at`.
+        ///
+        /// If `byte_idx` is out of bounds, returns `Err`.
+        #[track_caller]
+        #[inline]
+        fn get_chunk_cursor_at_impl(&self, byte_idx: usize) -> Result<ChunkCursor<$rlt>> {
+            if let Some(text) = self.get_str_text() {
+                ChunkCursor::from_str(text, byte_idx)
+            } else {
+                ChunkCursor::new(
+                    self.get_root(),
+                    self.get_root_info(),
+                    self.get_byte_range(),
+                    self.get_byte_range()[0] + byte_idx,
+                )
+            }
         }
     };
 }

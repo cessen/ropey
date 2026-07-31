@@ -8,7 +8,7 @@
 use crate::{iter::Lines, LineType};
 use crate::{
     iter::{Bytes, CharIndices, Chars, Chunks},
-    RopeSlice,
+    ChunkCursor, RopeSlice,
 };
 
 pub mod esoterica {
@@ -353,4 +353,12 @@ pub trait RopeNoPanic<'current, 'original> {
     ///
     /// If `byte_idx` is out of bounds, returns `Err`.
     fn get_chunks_at(&'current self, byte_idx: usize) -> crate::Result<(Chunks<'original>, usize)>;
+
+    /// Non-panicking version of `chunk_cursor_at`.
+    ///
+    /// If `byte_idx` is out of bounds, returns `Err`.
+    fn get_chunk_cursor_at(
+        &'current self,
+        byte_idx: usize,
+    ) -> crate::Result<ChunkCursor<'original>>;
 }

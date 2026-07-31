@@ -587,7 +587,7 @@ impl<'a> ChunkCursor<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
+    use crate::{extra::RopeNoPanic, rope_builder::RopeBuilder, Rope, RopeSlice};
 
     // 127 bytes, 103 chars, 1 line
     const TEXT: &str = "Hello there!  How're you doing?  It's \
@@ -978,6 +978,154 @@ mod tests {
     fn chunk_cursor_at_10() {
         let r = RopeSlice::from("foo");
         r.chunk_cursor_at(4);
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for i in 0..=TEXT.len() {
+            let cursor = RopeNoPanic::get_chunk_cursor_at(&r, i)
+                .expect("`get_chunk_cursor_at` should not fail");
+            let chunk = cursor.chunk();
+            let byte_offset = cursor.byte_offset();
+
+            assert!(i >= byte_offset && i <= (byte_offset + chunk.len()));
+            assert_eq!(&TEXT[byte_offset..(byte_offset + chunk.len())], chunk);
+        }
+
+        let cursor_1 = RopeNoPanic::get_chunk_cursor_at(&r, TEXT.len() - 1)
+            .expect("`get_chunk_cursor_at` should not fail");
+        let cursor_2 = RopeNoPanic::get_chunk_cursor_at(&r, TEXT.len())
+            .expect("`get_chunk_cursor_at` should not fail");
+        assert_eq!(cursor_1.byte_offset(), cursor_2.byte_offset());
+        assert_eq!(cursor_1.chunk(), cursor_2.chunk());
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_02() {
+        let r = Rope::from_str(TEXT);
+        let s = r.slice(5..124);
+        let text = &TEXT[5..124];
+
+        for i in 0..=text.len() {
+            let cursor = RopeNoPanic::get_chunk_cursor_at(&s, i)
+                .expect("`get_chunk_cursor_at` should not fail");
+            let chunk = cursor.chunk();
+            let byte_offset = cursor.byte_offset();
+
+            assert!(i >= byte_offset && i <= (byte_offset + chunk.len()));
+            assert_eq!(&text[byte_offset..(byte_offset + chunk.len())], chunk);
+        }
+
+        let cursor_1 = RopeNoPanic::get_chunk_cursor_at(&s, text.len() - 1)
+            .expect("`get_chunk_cursor_at` should not fail");
+        let cursor_2 = RopeNoPanic::get_chunk_cursor_at(&s, text.len())
+            .expect("`get_chunk_cursor_at` should not fail");
+        assert_eq!(cursor_1.byte_offset(), cursor_2.byte_offset());
+        assert_eq!(cursor_1.chunk(), cursor_2.chunk());
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_03() {
+        // This tests a subtle corner case where the slice end aligns with
+        // an internal chunk boundary, which would erronerously cause the
+        // chunk cursor to be created on an empty chunk just *after* the slice
+        // contents.  It requires a lot of nodes to trigger, because it needs
+        // the tree to have enough depth.
+        let r = {
+            let mut rb = RopeBuilder::new();
+            for _ in 0..100 {
+                rb._append_chunk_as_leaf("A");
+            }
+            rb.finish()
+        };
+
+        for i in 1..=100 {
+            let s = r.slice(..i);
+            let cursor = RopeNoPanic::get_chunk_cursor_at(&s, i)
+                .expect("`get_chunk_cursor_at` should not fail");
+            assert_eq!("A", cursor.chunk());
+        }
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_04() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_chunk_cursor_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_05() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_chunk_cursor_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_06() {
+        let texts = [TEXT, ""];
+        for text in texts {
+            let t: RopeSlice = text.into();
+
+            for i in 0..=text.len() {
+                let cursor = RopeNoPanic::get_chunk_cursor_at(&t, i)
+                    .expect("`get_chunk_cursor_at` should not fail");
+
+                assert!(cursor.at_first());
+                assert!(cursor.at_last());
+                assert_eq!(cursor.byte_offset(), 0);
+                assert_eq!(cursor.chunk(), text);
+            }
+        }
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_07() {
+        let r = RopeSlice::from("");
+        assert!(RopeNoPanic::get_chunk_cursor_at(&r, 0).is_ok());
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_08() {
+        let r = RopeSlice::from("");
+        assert!(matches!(
+            RopeNoPanic::get_chunk_cursor_at(&r, 1),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_09() {
+        let r = RopeSlice::from("foo");
+        assert!(RopeNoPanic::get_chunk_cursor_at(&r, 3).is_ok());
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_10() {
+        let r = RopeSlice::from("foo");
+        assert!(matches!(
+            RopeNoPanic::get_chunk_cursor_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunk_cursor_at_11() {
+        let r = Rope::from_str(TEXT);
+
+        let cursor = {
+            let s = r.slice(4..32);
+            RopeNoPanic::get_chunk_cursor_at(&s, 0).expect("`get_chunk_cursor_at` should not fail")
+        };
+
+        _ = cursor;
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]
