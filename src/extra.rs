@@ -4,10 +4,14 @@ pub mod esoterica {
     //! Esoteric functionality.
     //!
     //! **Warning:** the functions in this module expose you to esoterica of
-    //! Ropey's internal data model, and take you off the beaten path of Ropey's
-    //! intended API semantics.  Their summary-line descriptions are not enough
+    //! Ropey's internal data model, and are squarely outside of Ropey's
+    //! intended API semantics. Their summary-line descriptions are not enough
     //! to properly understand them, so you should **read their full
     //! documentation carefully** before using them.
+    //!
+    //! If you find yourself reaching for these functions, please take a moment
+    //! to consider whether there are other approaches to the problem you're
+    //! trying to solve.
 
     use std::sync::Arc;
 
@@ -16,8 +20,15 @@ pub mod esoterica {
     /// Returns true if both ropes are cloned instances of each other that share
     /// the same content.
     ///
-    /// This function's API promises are very specific.  The following two
-    /// things and *only* the following two things are guaranteed:
+    /// **Before using this function, please consider whether you really need
+    /// it.**  Semantically, cloned ropes are completely separate ropes that
+    /// have nothing to do with each other: the shared data is *only* a
+    /// space/time optimization, not a semantic relationship.  For example, if
+    /// you want to detect edits to a rope clone, prefer tracking that directly
+    /// with a flag or counter rather than using this function.
+    ///
+    /// This function's API promises are very specific.  The following two things
+    /// and *only* the following two things are guaranteed:
     ///
     /// 1. If ropes `a` and `b` are *unmodified* clones of each other (i.e. no
     ///    edits have been made to either since cloning), then this function
@@ -26,12 +37,10 @@ pub mod esoterica {
     /// 2. If the text contents of ropes `a` and `b` are different, then this
     ///    function returns false.
     ///
-    /// In all other cases, this function's return value is unspecified (may
-    /// change between non-breaking releases) and should not be relied on for
-    /// program correctness. An example of such a case: rope `b` is cloned from
-    /// rope `a`, and then the same edit is made to both ropes.  They have then
-    /// both been modified since cloning (not case 1), but they also compare
-    /// equal (not case 2 either).
+    /// In all other cases, this function's return value is unspecified and
+    /// should not be relied on for program correctness: ropes that happen to
+    /// have equal contents may return either true or false, and this may change
+    /// between non-breaking releases.
     ///
     /// Runs in O(1) time.
     pub fn ropes_are_instances(a: &Rope, b: &Rope) -> bool {
@@ -49,6 +58,15 @@ pub mod esoterica {
     /// Disconnects a `RopeSlice` from its originating `Rope`, creating a new
     /// independent `Rope` in O(1) time.
     ///
+    /// **Before using this function, please consider whether you really need
+    /// it.**  A common motivation is passing `RopeSlice`s across thread
+    /// boundaries without cloning their contents.  However, `Rope` and
+    /// `RopeSlice` are intended to be semantically equivalent to `String`
+    /// and `&str`: a `RopeSlice` is simply a borrow.  If you want to pass a
+    /// `RopeSlice` across thread boundaries, please consider adjusting your
+    /// higher-level architecture instead, just as if you were trying to pass
+    /// `&str` across thread boundaries.
+    ///
     /// This function is like `Into<Rope>` (the normal way to make `Rope`s from
     /// `RopeSlice`s), but with the time/space complexity of `Rope` cloning.  In
     /// exchange for this efficiency, there is the possibility of failure under
@@ -62,7 +80,9 @@ pub mod esoterica {
     ///
     /// Like `Rope` cloning, runs in O(1) time, and the resulting `Rope` shares
     /// its data with the originating `Rope`, taking up O(1) additional space
-    /// until edits are made to either one.
+    /// until edits are made to either one.  Also like `Rope` cloning, the
+    /// resulting `Rope` will hold on to the *entire contents* of the originating
+    /// `Rope`, even if the passed slice only references a tiny portion of it.
     pub fn disconnect_slice(slice: RopeSlice) -> Option<Rope> {
         match slice {
             RopeSlice(SliceInner::Rope {
