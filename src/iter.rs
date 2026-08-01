@@ -169,7 +169,7 @@ impl<'a> Chunks<'a> {
             return Err(crate::Error::OutOfBounds);
         }
 
-        let cursor = ChunkCursor::from_str(text)?;
+        let cursor = ChunkCursor::from_str(text, at_byte_idx)?;
         let at_end = at_byte_idx == text.len();
 
         let chunks = Chunks {
@@ -336,7 +336,7 @@ impl<'a> Bytes<'a> {
         }
 
         Ok(Bytes {
-            cursor: ChunkCursor::from_str(text)?,
+            cursor: ChunkCursor::from_str(text, at_byte_idx)?,
             current_chunk: text.as_bytes(),
             chunk_byte_idx: 0,
             byte_idx_in_chunk: at_byte_idx,
@@ -499,7 +499,7 @@ impl<'a> Chars<'a> {
         }
 
         Ok(Chars {
-            cursor: ChunkCursor::from_str(text)?,
+            cursor: ChunkCursor::from_str(text, at_byte_idx)?,
             current_chunk: text,
             chunk_byte_idx: 0,
             byte_idx_in_chunk: at_byte_idx,
@@ -817,7 +817,7 @@ mod lines {
             let at_byte_idx = lines::to_byte_idx(text, at_line_idx, line_type);
 
             Ok(Lines {
-                cursor: ChunkCursor::from_str(text)?,
+                cursor: ChunkCursor::from_str(text, at_byte_idx)?,
                 line_type: line_type,
                 total_lines: total_lines,
                 leaf_byte_idx: at_byte_idx,

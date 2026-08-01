@@ -345,7 +345,12 @@ impl<'a> ChunkCursor<'a> {
         Ok(cursor)
     }
 
-    pub(crate) fn from_str(text: &'a str) -> crate::Result<Self> {
+    #[inline(always)]
+    pub(crate) fn from_str(text: &'a str, at_byte_idx: usize) -> crate::Result<Self> {
+        if at_byte_idx > text.len() {
+            return Err(crate::Error::OutOfBounds);
+        }
+
         Ok(ChunkCursor {
             node_stack: vec![],
             str_slice: Some(text),
@@ -947,6 +952,32 @@ mod tests {
                 assert_eq!(cursor.chunk(), text);
             }
         }
+    }
+
+    #[test]
+    fn chunk_cursor_at_07() {
+        let r = RopeSlice::from("");
+        r.chunk_cursor_at(0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_cursor_at_08() {
+        let r = RopeSlice::from("");
+        r.chunk_cursor_at(1);
+    }
+
+    #[test]
+    fn chunk_cursor_at_09() {
+        let r = RopeSlice::from("foo");
+        r.chunk_cursor_at(3);
+    }
+
+    #[test]
+    #[should_panic]
+    fn chunk_cursor_at_10() {
+        let r = RopeSlice::from("foo");
+        r.chunk_cursor_at(4);
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]

@@ -815,7 +815,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chunk_cursor(&self) -> ChunkCursor<$rlt> {
             if let Some(text) = self.get_str_text() {
-                return ChunkCursor::from_str(text).unwrap();
+                return ChunkCursor::from_str(text, 0).unwrap();
             }
 
             ChunkCursor::new(
@@ -842,7 +842,7 @@ macro_rules! shared_main_impl_methods {
         #[inline]
         pub fn chunk_cursor_at(&self, byte_idx: usize) -> ChunkCursor<$rlt> {
             let result = if let Some(text) = self.get_str_text() {
-                ChunkCursor::from_str(text)
+                ChunkCursor::from_str(text, byte_idx)
             } else {
                 ChunkCursor::new(
                     self.get_root(),
