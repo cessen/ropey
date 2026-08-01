@@ -60,12 +60,12 @@ pub mod esoterica {
     ///
     /// **Before using this function, please consider whether you really need
     /// it.**  A common motivation is passing `RopeSlice`s across thread
-    /// boundaries without cloning their contents.  However, `Rope` and
-    /// `RopeSlice` are intended to be semantically equivalent to `String`
-    /// and `&str`: a `RopeSlice` is simply a borrow.  If you want to pass a
-    /// `RopeSlice` across thread boundaries, please consider adjusting your
-    /// higher-level architecture instead, just as if you were trying to pass
-    /// `&str` across thread boundaries.
+    /// boundaries without cloning their contents.  However, `RopeSlice` is
+    /// intended to be semantically equivalent to `&str`: a `RopeSlice` is
+    /// simply a borrow.  If you want to pass a `RopeSlice` across thread
+    /// boundaries, please consider adjusting your higher-level architecture
+    /// instead, just as if you were trying to pass a `&str` across thread
+    /// boundaries.
     ///
     /// This function is like `Into<Rope>` (the normal way to make `Rope`s from
     /// `RopeSlice`s), but with the time/space complexity of `Rope` cloning.  In
