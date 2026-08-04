@@ -692,14 +692,14 @@ impl Rope {
         let end_idx = end_bound_to_num(byte_range.end_bound()).unwrap_or_else(|| self.len());
 
         fn inner(rope: &Rope, start_idx: usize, end_idx: usize) -> Result<RopeSlice<'_>> {
-            if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
-                return Err(NonCharBoundary);
-            }
             if start_idx > end_idx {
                 return Err(InvalidRange);
             }
             if end_idx > rope.len() {
                 return Err(OutOfBounds);
+            }
+            if !rope.is_char_boundary(start_idx) || !rope.is_char_boundary(end_idx) {
+                return Err(NonCharBoundary);
             }
 
             let start_idx_real = rope.get_byte_range()[0] + start_idx;
@@ -1237,6 +1237,24 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(r, r_original);
         r.assert_invariants();
+    }
+
+    #[test]
+    fn try_slice_panic_01() {
+        let r = Rope::from_str(&TEXT[50..85]);
+        assert_eq!(Err(crate::Error::OutOfBounds), r.try_slice(35..36));
+    }
+
+    #[test]
+    fn try_slice_panic_02() {
+        let r = Rope::from_str(&TEXT[50..85]);
+        assert_eq!(Err(crate::Error::InvalidRange), r.try_slice(36..));
+    }
+
+    #[test]
+    fn try_slice_panic_03() {
+        let r = Rope::from_str("🐸");
+        assert_eq!(Err(crate::Error::NonCharBoundary), r.try_slice(2..));
     }
 
     #[cfg(feature = "metric_chars")]

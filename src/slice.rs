@@ -182,14 +182,14 @@ impl<'a> RopeSlice<'a> {
             start_idx: usize,
             end_idx: usize,
         ) -> Result<RopeSlice<'a>> {
-            if !slice.is_char_boundary(start_idx) || !slice.is_char_boundary(end_idx) {
-                return Err(NonCharBoundary);
-            }
             if start_idx > end_idx {
                 return Err(InvalidRange);
             }
             if end_idx > slice.len() {
                 return Err(OutOfBounds);
+            }
+            if !slice.is_char_boundary(start_idx) || !slice.is_char_boundary(end_idx) {
+                return Err(NonCharBoundary);
             }
 
             let start_idx_real = slice.get_byte_range()[0] + start_idx;
@@ -1431,6 +1431,24 @@ mod tests {
 
         // Not a char boundary.
         s.slice(43..);
+    }
+
+    #[test]
+    fn try_slice_panic_01() {
+        let s: RopeSlice = (&TEXT[50..85]).into();
+        assert_eq!(Err(crate::Error::OutOfBounds), s.try_slice(35..36));
+    }
+
+    #[test]
+    fn try_slice_panic_02() {
+        let s: RopeSlice = (&TEXT[50..85]).into();
+        assert_eq!(Err(crate::Error::InvalidRange), s.try_slice(36..));
+    }
+
+    #[test]
+    fn try_slice_panic_03() {
+        let s: RopeSlice = ("🐸").into();
+        assert_eq!(Err(crate::Error::NonCharBoundary), s.try_slice(2..));
     }
 
     #[test]
