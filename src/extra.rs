@@ -1,5 +1,7 @@
 //! Miscellaneous extra functionality.
 
+use std::ops::RangeBounds;
+
 #[cfg(any(
     feature = "metric_lines_lf",
     feature = "metric_lines_lf_cr",
@@ -361,4 +363,11 @@ pub trait RopeNoPanic<'current, 'original> {
         &'current self,
         byte_idx: usize,
     ) -> crate::Result<ChunkCursor<'original>>;
+
+    /// Non-panicking version of `slice()`.
+    ///
+    /// On failure this returns the cause of the failure.
+    fn try_slice<R>(&'current self, byte_range: R) -> crate::Result<RopeSlice<'original>>
+    where
+        R: RangeBounds<usize>;
 }

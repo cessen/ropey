@@ -685,7 +685,7 @@ impl Rope {
     ///
     /// On failure this returns the cause of the failure.
     #[inline]
-    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'_>>
+    fn try_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice<'_>>
     where
         R: RangeBounds<usize>,
     {
@@ -905,6 +905,13 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
         byte_idx: usize,
     ) -> crate::Result<ChunkCursor<'current>> {
         self.get_chunk_cursor_at_impl(byte_idx)
+    }
+
+    fn try_slice<R>(&'current self, byte_range: R) -> crate::Result<RopeSlice<'current>>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.try_slice_impl(byte_range)
     }
 }
 

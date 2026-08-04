@@ -171,7 +171,7 @@ impl<'a> RopeSlice<'a> {
     ///
     /// On failure this returns the cause of the failure.
     #[inline]
-    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'a>>
+    fn try_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice<'a>>
     where
         R: RangeBounds<usize>,
     {
@@ -328,6 +328,13 @@ impl<'current, 'original> RopeNoPanic<'current, 'original> for RopeSlice<'origin
     ) -> crate::Result<ChunkCursor<'original>> {
         self.get_chunk_cursor_at_impl(byte_idx)
     }
+
+    fn try_slice<R>(&'current self, byte_range: R) -> crate::Result<RopeSlice<'original>>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.try_slice_impl(byte_range)
+    }
 }
 
 // Stdlib trait impls.
@@ -452,6 +459,20 @@ mod tests {
         let s = {
             let s1 = r.slice(4..32);
             s1.slice(2..24)
+        };
+        _ = s;
+    }
+
+    #[test]
+    fn try_reslice() {
+        // This is a compile-time test, to make sure that lifetimes work
+        // as expected when taking slices of slices.  The lifetime of a
+        // slice-of-a-slice should depend on the original rope, not the slice it
+        // was sliced from.
+        let r = Rope::from_str(TEXT);
+        let s = {
+            let s1 = r.try_slice(4..32).expect("`try_slice` should not fail");
+            s1.try_slice(2..24).expect("`try_slice` should not fail")
         };
         _ = s;
     }
@@ -2582,6 +2603,130 @@ mod tests {
     fn try_slice_panic_03() {
         let s: RopeSlice = ("🐸").into();
         assert_eq!(Err(crate::Error::NonCharBoundary), s.try_slice(2..));
+    }
+
+    #[test]
+    fn try_slice_01() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = RopeNoPanic::try_slice(&t, ..).expect("`try_slice` should not fail");
+
+            assert_eq!(TEXT, s);
+        }
+    }
+
+    #[test]
+    fn try_slice_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, 50..118) {
+            let s = RopeNoPanic::try_slice(&t, 3..25).expect("`try_slice` should not fail");
+
+            assert_eq!(&TEXT[53..75], s);
+        }
+    }
+
+    #[test]
+    fn try_slice_03() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, 50..118) {
+            let s = RopeNoPanic::try_slice(&t, 7..65).expect("`try_slice` should not fail");
+
+            assert_eq!(&TEXT[57..115], s);
+        }
+    }
+
+    #[test]
+    fn try_slice_04() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, 50..118) {
+            let s = RopeNoPanic::try_slice(&t, 21..21).expect("`try_slice` should not fail");
+
+            assert_eq!("", s);
+        }
+    }
+
+    #[test]
+    fn try_slice_05a() {
+        let r = Rope::from_str(TEXT);
+        let s = RopeNoPanic::try_slice(&r, 50..118).expect("`try_slice` should not fail");
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, 21..20), // Wrong ordering on purpose.
+            Err(crate::Error::InvalidRange)
+        ));
+    }
+
+    #[test]
+    fn try_slice_05b() {
+        let s: RopeSlice = (&TEXT[50..118]).into();
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, 21..20), // Wrong ordering on purpose.
+            Err(crate::Error::InvalidRange)
+        ));
+    }
+
+    #[test]
+    fn try_slice_06a() {
+        let r = Rope::from_str(TEXT);
+        let s = RopeNoPanic::try_slice(&r, 50..85).expect("`try_slice` should not fail");
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, 35..36),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn try_slice_06b() {
+        let s: RopeSlice = (&TEXT[50..85]).into();
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, 35..36),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn try_slice_07a() {
+        let r = Rope::from_str(TEXT);
+        let s = RopeNoPanic::try_slice(&r, 50..118).expect("`try_slice` should not fail");
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, ..43),
+            Err(crate::Error::NonCharBoundary)
+        ));
+    }
+
+    #[test]
+    fn try_slice_07b() {
+        let s: RopeSlice = (&TEXT[50..118]).into();
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, ..43),
+            Err(crate::Error::NonCharBoundary)
+        ));
+    }
+
+    #[test]
+    fn try_slice_08a() {
+        let r = Rope::from_str(TEXT);
+        let s = RopeNoPanic::try_slice(&r, 50..118).expect("`try_slice` should not fail");
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, 43..),
+            Err(crate::Error::NonCharBoundary)
+        ));
+    }
+
+    #[test]
+    fn try_slice_08b() {
+        let s: RopeSlice = (&TEXT[50..118]).into();
+
+        assert!(matches!(
+            RopeNoPanic::try_slice(&s, 43..),
+            Err(crate::Error::NonCharBoundary)
+        ));
     }
 
     #[test]
