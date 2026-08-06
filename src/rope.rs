@@ -2,7 +2,7 @@ use std::io;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
-use crate::extra::RopeNoPanic;
+use crate::extra::{RopeNoPanic, RopeNoPanicMut};
 use crate::{
     end_bound_to_num,
     extra::esoterica,
@@ -529,7 +529,7 @@ impl Rope {
     ///
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
-    pub fn try_insert(&mut self, byte_idx: usize, text: &str) -> Result<()> {
+    fn try_insert_impl(&mut self, byte_idx: usize, text: &str) -> Result<()> {
         if byte_idx > self.len() {
             return Err(OutOfBounds);
         }
@@ -915,6 +915,12 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
     }
 }
 
+impl RopeNoPanicMut for Rope {
+    fn try_insert(&mut self, byte_idx: usize, text: &str) -> crate::Result<()> {
+        self.try_insert_impl(byte_idx, text)
+    }
+}
+
 //==============================================================
 // Stdlib trait impls.
 //
@@ -1245,6 +1251,209 @@ mod tests {
         {
             let mut r = r.clone();
             r.insert(10, "\n");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+    }
+
+    #[test]
+    fn try_insert_01() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 3, "AA").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "HelAAlo there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_02() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 0, "AA").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "AAHello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_03() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 127, "AA").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！AA"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_04() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 3, "").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_05() {
+        let mut r = Rope::new();
+        RopeNoPanicMut::try_insert(&mut r, 0, "He").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 2, "l").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 3, "l").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 4, "o w").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 7, "o").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 8, "rl").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 10, "d!").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 3, "zopter").expect("`try_insert` should not fail");
+
+        assert_eq!("Helzopterlo world!", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_06() {
+        let mut r = Rope::new();
+        RopeNoPanicMut::try_insert(&mut r, 0, "こんいちは、みんなさん！")
+            .expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 21, "zopter").expect("`try_insert` should not fail");
+        assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_07() {
+        let mut r = Rope::new();
+        RopeNoPanicMut::try_insert(&mut r, 0, "こ").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 3, "ん").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 6, "い").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 9, "ち").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 12, "は").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 15, "、").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 18, "み").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 21, "ん").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 24, "な").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 27, "さ").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 30, "ん").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 33, "！").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 21, "zopter").expect("`try_insert` should not fail");
+        assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_08() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 128, "A"),
+            Err(crate::Error::OutOfBounds)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_09() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 128, ""),
+            Err(crate::Error::OutOfBounds)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_10() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 126, "A"),
+            Err(crate::Error::NonCharBoundary)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_11() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 126, ""),
+            Err(crate::Error::NonCharBoundary)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_12() {
+        let (r, _) = make_rope_and_text_from_chunks(&["\n\r", "\r\n", "\n\r", "\r\n", "\n\r"]);
+
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 0, "\r").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 2, "\n").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 4, "\r").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 6, "\n").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 8, "\r").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 10, "\n").expect("`try_insert` should not fail");
             r.assert_no_crlf_splits();
             r.assert_accurate_text_info();
         }

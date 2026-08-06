@@ -371,3 +371,12 @@ pub trait RopeNoPanic<'current, 'original> {
     where
         R: RangeBounds<usize>;
 }
+
+/// A trait implementing non-panicking versions of the editing methods that are present on [`Rope`](crate::Rope).
+pub trait RopeNoPanicMut {
+    /// Non-panicking version of `insert()`.
+    ///
+    /// On failure this leaves the rope untouched and returns the cause of the
+    /// failure.
+    fn try_insert(&mut self, byte_idx: usize, text: &str) -> crate::Result<()>;
+}

@@ -4,7 +4,7 @@ use libfuzzer_sys::{
     arbitrary::{self, Arbitrary},
     fuzz_target,
 };
-use ropey::Rope;
+use ropey::{extra::RopeNoPanicMut as _, Rope};
 
 const SMALL_TEXT: &str = include_str!("small.txt");
 
