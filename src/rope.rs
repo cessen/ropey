@@ -631,7 +631,7 @@ impl Rope {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     #[inline]
-    pub fn try_remove<R>(&mut self, byte_range: R) -> Result<()>
+    fn try_remove_impl<R>(&mut self, byte_range: R) -> Result<()>
     where
         R: RangeBounds<usize>,
     {
@@ -922,6 +922,13 @@ impl RopeNoPanicMut for Rope {
 
     fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> crate::Result<()> {
         self.try_insert_char_impl(byte_idx, ch)
+    }
+
+    fn try_remove<R>(&mut self, byte_range: R) -> crate::Result<()>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.try_remove_impl(byte_range)
     }
 }
 
@@ -1556,6 +1563,119 @@ mod tests {
         let mut rope = Rope::from_str(TEXT);
         // Invalid range.
         rope.remove(42..21);
+    }
+
+    #[test]
+    fn try_remove_01() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, 0..4).expect("`try_remove` should not fail");
+        RopeNoPanicMut::try_remove(&mut rope, 5..7).expect("`try_remove` should not fail");
+        RopeNoPanicMut::try_remove(&mut rope, 28..37).expect("`try_remove` should not fail");
+        RopeNoPanicMut::try_remove(&mut rope, 35..109).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, "o the!  How're you doing?  Ie day, ！");
+    }
+
+    #[test]
+    fn try_remove_02() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, ..42).expect("`try_remove` should not fail");
+
+        assert_eq!(
+            rope,
+            "ne day, isn't it?  Aren't you glad we're \
+             alive?  こんにちは、みんなさん！"
+        );
+    }
+
+    #[test]
+    fn try_remove_03() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, 42..).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, "Hello there!  How're you doing?  It's a fi");
+    }
+
+    #[test]
+    fn try_remove_04() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, ..).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, "");
+    }
+
+    #[test]
+    fn try_remove_05() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, 42..42).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, TEXT);
+    }
+
+    #[test]
+    fn try_remove_06() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 42..128),
+            Err(crate::Error::OutOfBounds)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_07() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 128..128),
+            Err(crate::Error::OutOfBounds)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_08() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 42..126),
+            Err(crate::Error::NonCharBoundary)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_09() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 126..127),
+            Err(crate::Error::NonCharBoundary)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_10() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 126..126),
+            Err(crate::Error::NonCharBoundary)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_11() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 42..21),
+            Err(crate::Error::InvalidRange)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
     }
 
     // Removal failure should be atomic: either it fails with no modification,

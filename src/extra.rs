@@ -385,4 +385,12 @@ pub trait RopeNoPanicMut {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> crate::Result<()>;
+
+    /// Non-panicking version of `remove()`.
+    ///
+    /// On failure this leaves the rope untouched and returns the cause of the
+    /// failure.
+    fn try_remove<R>(&mut self, byte_range: R) -> crate::Result<()>
+    where
+        R: RangeBounds<usize>;
 }
