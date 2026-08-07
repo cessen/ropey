@@ -379,4 +379,10 @@ pub trait RopeNoPanicMut {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     fn try_insert(&mut self, byte_idx: usize, text: &str) -> crate::Result<()>;
+
+    /// Non-panicking version of `insert_char()`.
+    ///
+    /// On failure this leaves the rope untouched and returns the cause of the
+    /// failure.
+    fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> crate::Result<()>;
 }

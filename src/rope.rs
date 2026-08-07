@@ -621,7 +621,7 @@ impl Rope {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     #[inline]
-    pub fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> Result<()> {
+    fn try_insert_char_impl(&mut self, byte_idx: usize, ch: char) -> Result<()> {
         let mut buf = [0u8; 4];
         self.try_insert(byte_idx, ch.encode_utf8(&mut buf))
     }
@@ -918,6 +918,10 @@ impl<'current> RopeNoPanic<'current, 'current> for Rope {
 impl RopeNoPanicMut for Rope {
     fn try_insert(&mut self, byte_idx: usize, text: &str) -> crate::Result<()> {
         self.try_insert_impl(byte_idx, text)
+    }
+
+    fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> crate::Result<()> {
+        self.try_insert_char_impl(byte_idx, ch)
     }
 }
 
