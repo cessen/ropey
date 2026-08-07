@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "ropey"
-version = "2.0.0-alpha"
+version = "2.0.0-beta.1"
 dependencies = [
  "str_indices",
 ]

@@ -965,7 +965,7 @@ mod tests {
 
     use super::*;
 
-    use crate::{rope_builder::RopeBuilder, Rope, RopeSlice};
+    use crate::{extra::RopeNoPanic, rope_builder::RopeBuilder, Rope, RopeSlice};
 
     #[cfg(feature = "metric_lines_lf_cr")]
     use crate::LineType;
@@ -1274,6 +1274,101 @@ mod tests {
     }
 
     #[test]
+    fn get_chunks_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                let mut current_byte = t.chunk(i).1;
+                let (chunks, idx) =
+                    RopeNoPanic::get_chunks_at(&t, i).expect("`get_chunks_at` should not fail");
+                assert_eq!(current_byte, idx);
+
+                for chunk1 in chunks {
+                    let chunk2 = t.chunk(current_byte).0;
+                    assert_eq!(chunk2, chunk1);
+                    current_byte += chunk2.len();
+                }
+            }
+
+            let (mut chunks, idx) = RopeNoPanic::get_chunks_at(&t, TEXT.len())
+                .expect("`get_chunks_at` should not fail");
+            assert_eq!(TEXT.len(), idx);
+            assert_eq!(None, chunks.next());
+        }
+    }
+
+    #[test]
+    fn get_chunks_at_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
+
+            for i in 0..text.len() {
+                let mut current_byte = s.chunk(i).1;
+                let (chunks, idx) =
+                    RopeNoPanic::get_chunks_at(&s, i).expect("`get_chunks_at` should not fail");
+                assert_eq!(current_byte, idx);
+
+                for chunk1 in chunks {
+                    let chunk2 = s.chunk(current_byte).0;
+                    assert_eq!(chunk2, chunk1);
+                    current_byte += chunk2.len();
+                }
+            }
+
+            let (mut chunks, idx) = RopeNoPanic::get_chunks_at(&s, text.len())
+                .expect("`get_chunks_at` should not fail");
+            assert_eq!(text.len(), idx);
+            assert_eq!(None, chunks.next());
+        }
+    }
+
+    #[test]
+    fn get_chunks_at_03() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_chunks_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunks_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_chunks_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunks_at_05() {
+        let s = RopeSlice::from("foo");
+
+        assert!(matches!(
+            RopeNoPanic::get_chunks_at(&s, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chunks_at_06() {
+        let r = Rope::from_str(TEXT);
+
+        let chunks = {
+            let s = r.slice(4..32);
+            RopeNoPanic::get_chunks_at(&s, 0)
+                .expect("`get_chunks_at` should not fail")
+                .0
+        };
+
+        _ = chunks;
+    }
+
+    #[test]
     #[cfg_attr(miri, ignore)]
     fn chunks_iter_size_hint_01() {
         let r = Rope::from_str(TEXT);
@@ -1429,6 +1524,70 @@ mod tests {
         let r = Rope::from_str("foo");
         let s = r.slice(1..2);
         s.bytes_at(2);
+    }
+
+    #[test]
+    fn get_bytes_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                let mut bytes =
+                    RopeNoPanic::get_bytes_at(&t, i).expect("`get_bytes_at` should not fail");
+                assert_eq!(TEXT.as_bytes()[i], bytes.next().unwrap());
+            }
+
+            let mut bytes =
+                RopeNoPanic::get_bytes_at(&t, TEXT.len()).expect("`get_bytes_at` should not fail");
+            assert_eq!(None, bytes.next());
+        }
+    }
+
+    #[test]
+    fn get_bytes_at_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
+
+            for i in 0..text.len() {
+                let mut bytes =
+                    RopeNoPanic::get_bytes_at(&s, i).expect("`get_bytes_at` should not fail");
+                assert_eq!(text.as_bytes()[i], bytes.next().unwrap());
+            }
+
+            let mut bytes =
+                RopeNoPanic::get_bytes_at(&s, text.len()).expect("`get_bytes_at` should not fail");
+            assert_eq!(None, bytes.next());
+        }
+    }
+
+    #[test]
+    fn get_bytes_at_03() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_bytes_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_bytes_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_bytes_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_bytes_at_05() {
+        let s = RopeSlice::from("foo");
+        assert!(matches!(
+            RopeNoPanic::get_bytes_at(&s, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
     }
 
     #[test]
@@ -1592,6 +1751,74 @@ mod tests {
         let r = Rope::from_str("foo");
         let s = r.slice(1..2);
         s.chars_at(2);
+    }
+
+    #[test]
+    fn get_chars_at_01() {
+        let r = Rope::from_str(TEXT);
+
+        for t in make_test_data(&r, TEXT, ..) {
+            for i in 0..TEXT.len() {
+                if !TEXT.is_char_boundary(i) {
+                    assert!(matches!(
+                        RopeNoPanic::get_chars_at(&t, i),
+                        Err(crate::Error::NonCharBoundary)
+                    ));
+                    continue;
+                }
+                let mut chars =
+                    RopeNoPanic::get_chars_at(&t, i).expect("`get_chars_at` should not fail");
+                assert_eq!(TEXT[i..].chars().next(), chars.next());
+            }
+
+            let mut chars = t.chars_at(TEXT.len());
+            assert_eq!(None, chars.next());
+        }
+    }
+
+    #[test]
+    fn get_chars_at_02() {
+        let r = Rope::from_str(TEXT);
+        for t in make_test_data(&r, TEXT, ..) {
+            let s = t.slice(5..124);
+            let text = &TEXT[5..124];
+
+            for i in 0..text.len() {
+                if !text.is_char_boundary(i) {
+                    assert!(matches!(
+                        RopeNoPanic::get_chars_at(&s, i),
+                        Err(crate::Error::NonCharBoundary)
+                    ));
+                    continue;
+                }
+
+                let mut chars =
+                    RopeNoPanic::get_chars_at(&s, i).expect("`get_chars_at` should not fail");
+                assert_eq!(text[i..].chars().next(), chars.next());
+            }
+
+            let mut chars = s.chars_at(text.len());
+            assert_eq!(None, chars.next());
+        }
+    }
+
+    #[test]
+    fn get_chars_at_03() {
+        let r = Rope::from_str("foo");
+        assert!(matches!(
+            RopeNoPanic::get_chars_at(&r, 4),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[test]
+    fn get_chars_at_04() {
+        let r = Rope::from_str("foo");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_chars_at(&s, 2),
+            Err(crate::Error::OutOfBounds)
+        ));
     }
 
     #[test]
@@ -2265,6 +2492,104 @@ mod tests {
         let r = Rope::from_str("AA\nA");
         let s = r.slice(1..2);
         s.lines_at(2, LineType::LF_CR);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn get_lines_at_01() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            for i in 0..t.len_lines(LineType::LF_CR) {
+                let line = t.line(i, LineType::LF_CR);
+                let mut lines = RopeNoPanic::get_lines_at(&t, i, LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+                assert_eq!(Some(line), lines.next());
+            }
+
+            let mut lines =
+                RopeNoPanic::get_lines_at(&t, t.len_lines(LineType::LF_CR), LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+            assert_eq!(None, lines.next());
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn get_lines_at_02() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..2031);
+
+            for i in 0..s.len_lines(LineType::LF_CR) {
+                let line = s.line(i, LineType::LF_CR);
+                let mut lines = RopeNoPanic::get_lines_at(&s, i, LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+                assert_eq!(Some(line), lines.next());
+            }
+
+            let mut lines =
+                RopeNoPanic::get_lines_at(&s, s.len_lines(LineType::LF_CR), LineType::LF_CR)
+                    .expect("`get_lines_at` should not fail");
+            assert_eq!(None, lines.next());
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn get_lines_at_03() {
+        let text = lines_text();
+        let r = Rope::from_str(&text);
+        for t in make_test_data(&r, &text, ..) {
+            let s = t.slice(34..34);
+
+            let mut lines = RopeNoPanic::get_lines_at(&s, 0, LineType::LF_CR)
+                .expect("`get_lines_at` should not fail");
+            assert_eq!("", lines.next().unwrap());
+
+            let mut lines = RopeNoPanic::get_lines_at(&s, 1, LineType::LF_CR)
+                .expect("`get_lines_at` should not fail");
+            assert_eq!(None, lines.next());
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_lines_at_04() {
+        let r = Rope::from_str("AA\nA");
+        assert!(matches!(
+            RopeNoPanic::get_lines_at(&r, 3, LineType::LF_CR),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_lines_at_05() {
+        let r = Rope::from_str("AA\nA");
+        let s = r.slice(1..2);
+        assert!(matches!(
+            RopeNoPanic::get_lines_at(&s, 2, LineType::LF_CR),
+            Err(crate::Error::OutOfBounds)
+        ));
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_lines_at_06() {
+        let r = Rope::from_str(TEXT);
+
+        let lines = {
+            let s = r.slice(4..32);
+            RopeNoPanic::get_lines_at(&s, 0, LineType::LF_CR)
+                .expect("`get_lines_at` should not fail")
+        };
+
+        _ = lines;
     }
 
     #[cfg(feature = "metric_lines_lf_cr")]

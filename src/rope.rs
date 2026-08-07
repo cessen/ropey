@@ -2,6 +2,7 @@ use std::io;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
+use crate::extra::{RopeNoPanic, RopeNoPanicMut};
 use crate::{
     end_bound_to_num,
     extra::esoterica,
@@ -528,7 +529,7 @@ impl Rope {
     ///
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
-    pub fn try_insert(&mut self, byte_idx: usize, text: &str) -> Result<()> {
+    fn try_insert_impl(&mut self, byte_idx: usize, text: &str) -> Result<()> {
         if byte_idx > self.len() {
             return Err(OutOfBounds);
         }
@@ -620,7 +621,7 @@ impl Rope {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     #[inline]
-    pub fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> Result<()> {
+    fn try_insert_char_impl(&mut self, byte_idx: usize, ch: char) -> Result<()> {
         let mut buf = [0u8; 4];
         self.try_insert(byte_idx, ch.encode_utf8(&mut buf))
     }
@@ -630,7 +631,7 @@ impl Rope {
     /// On failure this leaves the rope untouched and returns the cause of the
     /// failure.
     #[inline]
-    pub fn try_remove<R>(&mut self, byte_range: R) -> Result<()>
+    fn try_remove_impl<R>(&mut self, byte_range: R) -> Result<()>
     where
         R: RangeBounds<usize>,
     {
@@ -684,7 +685,7 @@ impl Rope {
     ///
     /// On failure this returns the cause of the failure.
     #[inline]
-    pub fn try_slice<R>(&self, byte_range: R) -> Result<RopeSlice<'_>>
+    fn try_slice_impl<R>(&self, byte_range: R) -> Result<RopeSlice<'_>>
     where
         R: RangeBounds<usize>,
     {
@@ -791,6 +792,143 @@ impl Rope {
             // chunk as the CR.
             self.insert_core_impl(byte_idx, "\n", true).unwrap();
         }
+    }
+}
+
+impl<'current> RopeNoPanic<'current, 'current> for Rope {
+    fn get_byte(&self, byte_idx: usize) -> Option<u8> {
+        self.get_byte_impl(byte_idx)
+    }
+
+    fn get_char(&self, byte_idx: usize) -> Result<char> {
+        self.get_char_impl(byte_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line(
+        &'current self,
+        line_idx: usize,
+        line_type: LineType,
+    ) -> Option<RopeSlice<'current>> {
+        self.get_line_impl(line_idx, line_type)
+    }
+
+    fn get_chunk(&'current self, byte_idx: usize) -> Option<(&'current str, usize)> {
+        self.get_chunk_impl(byte_idx)
+    }
+
+    fn get_is_char_boundary(&self, byte_idx: usize) -> Option<bool> {
+        self.get_is_char_boundary_impl(byte_idx)
+    }
+
+    fn get_floor_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_floor_char_boundary_impl(byte_idx)
+    }
+
+    fn get_ceil_char_boundary(&self, byte_idx: usize) -> Option<usize> {
+        self.get_ceil_char_boundary_impl(byte_idx)
+    }
+
+    #[cfg(feature = "metric_chars")]
+    fn get_byte_to_char_idx(&self, byte_idx: usize) -> Option<usize> {
+        self.get_byte_to_char_idx_impl(byte_idx)
+    }
+
+    #[cfg(feature = "metric_chars")]
+    fn get_char_to_byte_idx(&self, char_idx: usize) -> Option<usize> {
+        self.get_char_to_byte_idx_impl(char_idx)
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    fn get_byte_to_utf16_idx(&self, byte_idx: usize) -> Option<usize> {
+        self.get_byte_to_utf16_idx_impl(byte_idx)
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    fn get_utf16_to_byte_idx(&self, utf16_idx: usize) -> Option<usize> {
+        self.get_utf16_to_byte_idx_impl(utf16_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_byte_to_line_idx(&self, byte_idx: usize, line_type: LineType) -> Option<usize> {
+        self.get_byte_to_line_idx_impl(byte_idx, line_type)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_line_to_byte_idx(&self, line_idx: usize, line_type: LineType) -> Option<usize> {
+        self.get_line_to_byte_idx_impl(line_idx, line_type)
+    }
+
+    fn get_bytes_at(&'current self, byte_idx: usize) -> Result<Bytes<'current>> {
+        self.get_bytes_at_impl(byte_idx)
+    }
+
+    fn get_chars_at(&'current self, byte_idx: usize) -> Result<Chars<'current>> {
+        self.get_chars_at_impl(byte_idx)
+    }
+
+    fn get_char_indices_at(&'current self, byte_idx: usize) -> Result<CharIndices<'current>> {
+        self.get_char_indices_at_impl(byte_idx)
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    fn get_lines_at(
+        &'current self,
+        line_idx: usize,
+        line_type: LineType,
+    ) -> Result<Lines<'current>> {
+        self.get_lines_at_impl(line_idx, line_type)
+    }
+
+    fn get_chunks_at(&'current self, byte_idx: usize) -> crate::Result<(Chunks<'current>, usize)> {
+        self.get_chunks_at_impl(byte_idx)
+    }
+
+    fn get_chunk_cursor_at(
+        &'current self,
+        byte_idx: usize,
+    ) -> crate::Result<ChunkCursor<'current>> {
+        self.get_chunk_cursor_at_impl(byte_idx)
+    }
+
+    fn try_slice<R>(&'current self, byte_range: R) -> crate::Result<RopeSlice<'current>>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.try_slice_impl(byte_range)
+    }
+}
+
+impl RopeNoPanicMut for Rope {
+    fn try_insert(&mut self, byte_idx: usize, text: &str) -> crate::Result<()> {
+        self.try_insert_impl(byte_idx, text)
+    }
+
+    fn try_insert_char(&mut self, byte_idx: usize, ch: char) -> crate::Result<()> {
+        self.try_insert_char_impl(byte_idx, ch)
+    }
+
+    fn try_remove<R>(&mut self, byte_range: R) -> crate::Result<()>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.try_remove_impl(byte_range)
     }
 }
 
@@ -1130,6 +1268,209 @@ mod tests {
     }
 
     #[test]
+    fn try_insert_01() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 3, "AA").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "HelAAlo there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_02() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 0, "AA").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "AAHello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_03() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 127, "AA").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！AA"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_04() {
+        let mut r = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_insert(&mut r, 3, "").expect("`try_insert` should not fail");
+
+        assert_eq!(
+            r,
+            "Hello there!  How're you doing?  It's \
+             a fine day, isn't it?  Aren't you glad \
+             we're alive?  こんにちは、みんなさん！"
+        );
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_05() {
+        let mut r = Rope::new();
+        RopeNoPanicMut::try_insert(&mut r, 0, "He").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 2, "l").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 3, "l").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 4, "o w").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 7, "o").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 8, "rl").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 10, "d!").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 3, "zopter").expect("`try_insert` should not fail");
+
+        assert_eq!("Helzopterlo world!", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_06() {
+        let mut r = Rope::new();
+        RopeNoPanicMut::try_insert(&mut r, 0, "こんいちは、みんなさん！")
+            .expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 21, "zopter").expect("`try_insert` should not fail");
+        assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_07() {
+        let mut r = Rope::new();
+        RopeNoPanicMut::try_insert(&mut r, 0, "こ").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 3, "ん").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 6, "い").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 9, "ち").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 12, "は").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 15, "、").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 18, "み").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 21, "ん").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 24, "な").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 27, "さ").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 30, "ん").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 33, "！").expect("`try_insert` should not fail");
+        RopeNoPanicMut::try_insert(&mut r, 21, "zopter").expect("`try_insert` should not fail");
+        assert_eq!("こんいちは、みzopterんなさん！", r);
+
+        r.assert_invariants();
+    }
+
+    #[test]
+    fn try_insert_08() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 128, "A"),
+            Err(crate::Error::OutOfBounds)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_09() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 128, ""),
+            Err(crate::Error::OutOfBounds)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_10() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 126, "A"),
+            Err(crate::Error::NonCharBoundary)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_11() {
+        let mut r = Rope::from_str(TEXT);
+
+        assert_eq!(
+            RopeNoPanicMut::try_insert(&mut r, 126, ""),
+            Err(crate::Error::NonCharBoundary)
+        );
+
+        // Rope did not change
+        assert_eq!(TEXT, r);
+    }
+
+    #[test]
+    fn try_insert_12() {
+        let (r, _) = make_rope_and_text_from_chunks(&["\n\r", "\r\n", "\n\r", "\r\n", "\n\r"]);
+
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 0, "\r").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 2, "\n").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 4, "\r").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 6, "\n").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 8, "\r").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+        {
+            let mut r = r.clone();
+            RopeNoPanicMut::try_insert(&mut r, 10, "\n").expect("`try_insert` should not fail");
+            r.assert_no_crlf_splits();
+            r.assert_accurate_text_info();
+        }
+    }
+
+    #[test]
     fn remove_01() {
         let mut rope = Rope::from_str(TEXT);
         rope.remove(0..4);
@@ -1224,6 +1565,119 @@ mod tests {
         rope.remove(42..21);
     }
 
+    #[test]
+    fn try_remove_01() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, 0..4).expect("`try_remove` should not fail");
+        RopeNoPanicMut::try_remove(&mut rope, 5..7).expect("`try_remove` should not fail");
+        RopeNoPanicMut::try_remove(&mut rope, 28..37).expect("`try_remove` should not fail");
+        RopeNoPanicMut::try_remove(&mut rope, 35..109).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, "o the!  How're you doing?  Ie day, ！");
+    }
+
+    #[test]
+    fn try_remove_02() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, ..42).expect("`try_remove` should not fail");
+
+        assert_eq!(
+            rope,
+            "ne day, isn't it?  Aren't you glad we're \
+             alive?  こんにちは、みんなさん！"
+        );
+    }
+
+    #[test]
+    fn try_remove_03() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, 42..).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, "Hello there!  How're you doing?  It's a fi");
+    }
+
+    #[test]
+    fn try_remove_04() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, ..).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, "");
+    }
+
+    #[test]
+    fn try_remove_05() {
+        let mut rope = Rope::from_str(TEXT);
+        RopeNoPanicMut::try_remove(&mut rope, 42..42).expect("`try_remove` should not fail");
+
+        assert_eq!(rope, TEXT);
+    }
+
+    #[test]
+    fn try_remove_06() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 42..128),
+            Err(crate::Error::OutOfBounds)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_07() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 128..128),
+            Err(crate::Error::OutOfBounds)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_08() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 42..126),
+            Err(crate::Error::NonCharBoundary)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_09() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 126..127),
+            Err(crate::Error::NonCharBoundary)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_10() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 126..126),
+            Err(crate::Error::NonCharBoundary)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
+    #[test]
+    fn try_remove_11() {
+        let mut rope = Rope::from_str(TEXT);
+        assert_eq!(
+            RopeNoPanicMut::try_remove(&mut rope, 42..21),
+            Err(crate::Error::InvalidRange)
+        );
+        // Rope did not change
+        assert_eq!(TEXT, rope);
+    }
+
     // Removal failure should be atomic: either it fails with no modification,
     // or the whole intended modification completes.
     //
@@ -1282,6 +1736,31 @@ mod tests {
 
     #[cfg(feature = "metric_chars")]
     #[test]
+    fn get_byte_to_char_idx_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(Some(0), RopeNoPanic::get_byte_to_char_idx(&r, 0));
+        assert_eq!(Some(1), RopeNoPanic::get_byte_to_char_idx(&r, 1));
+        assert_eq!(Some(2), RopeNoPanic::get_byte_to_char_idx(&r, 2));
+
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 91));
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 92));
+        assert_eq!(Some(91), RopeNoPanic::get_byte_to_char_idx(&r, 93));
+
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 94));
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 95));
+        assert_eq!(Some(92), RopeNoPanic::get_byte_to_char_idx(&r, 96));
+
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 124));
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 125));
+        assert_eq!(Some(102), RopeNoPanic::get_byte_to_char_idx(&r, 126));
+        assert_eq!(Some(103), RopeNoPanic::get_byte_to_char_idx(&r, 127));
+
+        assert_eq!(None, RopeNoPanic::get_byte_to_char_idx(&r, 128));
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
     fn char_to_byte_idx_01() {
         let r = Rope::from_str(TEXT);
 
@@ -1296,6 +1775,26 @@ mod tests {
 
         assert_eq!(124, r.char_to_byte_idx(102));
         assert_eq!(127, r.char_to_byte_idx(103));
+    }
+
+    #[cfg(feature = "metric_chars")]
+    #[test]
+    fn get_char_to_byte_idx_01() {
+        let r = Rope::from_str(TEXT);
+
+        assert_eq!(Some(0), RopeNoPanic::get_char_to_byte_idx(&r, 0));
+        assert_eq!(Some(1), RopeNoPanic::get_char_to_byte_idx(&r, 1));
+        assert_eq!(Some(2), RopeNoPanic::get_char_to_byte_idx(&r, 2));
+
+        assert_eq!(Some(91), RopeNoPanic::get_char_to_byte_idx(&r, 91));
+        assert_eq!(Some(94), RopeNoPanic::get_char_to_byte_idx(&r, 92));
+        assert_eq!(Some(97), RopeNoPanic::get_char_to_byte_idx(&r, 93));
+        assert_eq!(Some(100), RopeNoPanic::get_char_to_byte_idx(&r, 94));
+
+        assert_eq!(Some(124), RopeNoPanic::get_char_to_byte_idx(&r, 102));
+        assert_eq!(Some(127), RopeNoPanic::get_char_to_byte_idx(&r, 103));
+
+        assert_eq!(None, RopeNoPanic::get_char_to_byte_idx(&r, 104));
     }
 
     #[cfg(feature = "metric_utf16")]
@@ -1326,6 +1825,34 @@ mod tests {
 
     #[cfg(feature = "metric_utf16")]
     #[test]
+    fn get_byte_to_utf16_idx_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(Some(0), RopeNoPanic::get_byte_to_utf16_idx(&r, 0));
+
+        assert_eq!(Some(12), RopeNoPanic::get_byte_to_utf16_idx(&r, 12));
+        assert_eq!(Some(12), RopeNoPanic::get_byte_to_utf16_idx(&r, 13));
+        assert_eq!(Some(14), RopeNoPanic::get_byte_to_utf16_idx(&r, 16));
+
+        assert_eq!(Some(33), RopeNoPanic::get_byte_to_utf16_idx(&r, 35));
+        assert_eq!(Some(33), RopeNoPanic::get_byte_to_utf16_idx(&r, 36));
+        assert_eq!(Some(35), RopeNoPanic::get_byte_to_utf16_idx(&r, 39));
+
+        assert_eq!(Some(63), RopeNoPanic::get_byte_to_utf16_idx(&r, 67));
+        assert_eq!(Some(63), RopeNoPanic::get_byte_to_utf16_idx(&r, 70));
+        assert_eq!(Some(65), RopeNoPanic::get_byte_to_utf16_idx(&r, 71));
+
+        assert_eq!(Some(95), RopeNoPanic::get_byte_to_utf16_idx(&r, 101));
+        assert_eq!(Some(95), RopeNoPanic::get_byte_to_utf16_idx(&r, 102));
+        assert_eq!(Some(97), RopeNoPanic::get_byte_to_utf16_idx(&r, 105));
+
+        assert_eq!(Some(111), RopeNoPanic::get_byte_to_utf16_idx(&r, 143));
+
+        assert_eq!(None, RopeNoPanic::get_byte_to_utf16_idx(&r, 144));
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
     fn utf16_to_byte_idx_01() {
         let r = Rope::from_str(TEXT_EMOJI);
 
@@ -1344,6 +1871,30 @@ mod tests {
         assert_eq!(105, r.utf16_to_byte_idx(97));
 
         assert_eq!(143, r.utf16_to_byte_idx(111));
+    }
+
+    #[cfg(feature = "metric_utf16")]
+    #[test]
+    fn get_utf16_to_byte_idx_01() {
+        let r = Rope::from_str(TEXT_EMOJI);
+
+        assert_eq!(Some(0), RopeNoPanic::get_utf16_to_byte_idx(&r, 0));
+
+        assert_eq!(Some(12), RopeNoPanic::get_utf16_to_byte_idx(&r, 12));
+        assert_eq!(Some(16), RopeNoPanic::get_utf16_to_byte_idx(&r, 14));
+
+        assert_eq!(Some(35), RopeNoPanic::get_utf16_to_byte_idx(&r, 33));
+        assert_eq!(Some(39), RopeNoPanic::get_utf16_to_byte_idx(&r, 35));
+
+        assert_eq!(Some(67), RopeNoPanic::get_utf16_to_byte_idx(&r, 63));
+        assert_eq!(Some(71), RopeNoPanic::get_utf16_to_byte_idx(&r, 65));
+
+        assert_eq!(Some(101), RopeNoPanic::get_utf16_to_byte_idx(&r, 95));
+        assert_eq!(Some(105), RopeNoPanic::get_utf16_to_byte_idx(&r, 97));
+
+        assert_eq!(Some(143), RopeNoPanic::get_utf16_to_byte_idx(&r, 111));
+
+        assert_eq!(None, RopeNoPanic::get_utf16_to_byte_idx(&r, 112));
     }
 
     #[cfg(any(
@@ -1425,6 +1976,103 @@ mod tests {
         feature = "metric_lines_unicode"
     ))]
     #[test]
+    fn get_byte_to_line_idx_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let byte_to_line_idxs = &[
+            [0, 0],
+            [1, 0],
+            [31, 0],
+            [32, 1],
+            [33, 1],
+            [58, 1],
+            [59, 2],
+            [60, 2],
+            [87, 2],
+            [88, 3],
+            [89, 3],
+            [124, 3],
+        ];
+        for [b, l] in byte_to_line_idxs.iter().copied() {
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(
+                Some(l),
+                RopeNoPanic::get_byte_to_line_idx(&r, b, LineType::LF)
+            );
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(
+                Some(l),
+                RopeNoPanic::get_byte_to_line_idx(&r, b, LineType::LF_CR)
+            );
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(
+                Some(l),
+                RopeNoPanic::get_byte_to_line_idx(&r, b, LineType::Unicode)
+            );
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn get_byte_to_line_idx_02() {
+        let r = Rope::from_str("");
+
+        #[cfg(feature = "metric_lines_lf")]
+        assert_eq!(
+            Some(0),
+            RopeNoPanic::get_byte_to_line_idx(&r, 0, LineType::LF)
+        );
+        #[cfg(feature = "metric_lines_lf_cr")]
+        assert_eq!(
+            Some(0),
+            RopeNoPanic::get_byte_to_line_idx(&r, 0, LineType::LF_CR)
+        );
+        #[cfg(feature = "metric_lines_unicode")]
+        assert_eq!(
+            Some(0),
+            RopeNoPanic::get_byte_to_line_idx(&r, 0, LineType::Unicode)
+        );
+    }
+
+    #[cfg(feature = "metric_lines_lf")]
+    #[test]
+    fn get_byte_to_line_idx_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_byte_to_line_idx(&r, 125, LineType::LF),
+            None
+        );
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_byte_to_line_idx_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_byte_to_line_idx(&r, 125, LineType::LF_CR),
+            None
+        );
+    }
+
+    #[cfg(feature = "metric_lines_unicode")]
+    #[test]
+    fn get_byte_to_line_idx_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_byte_to_line_idx(&r, 125, LineType::Unicode),
+            None
+        );
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
     fn line_to_byte_idx_01() {
         let r = Rope::from_str(TEXT_LINES);
         let byte_to_line_idxs = &[[0, 0], [32, 1], [59, 2], [88, 3], [124, 4]];
@@ -1485,6 +2133,104 @@ mod tests {
     fn line_to_byte_idx_05() {
         let r = Rope::from_str(TEXT_LINES);
         r.line_to_byte_idx(5, LineType::Unicode);
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn get_line_to_byte_idx_01() {
+        let r = Rope::from_str(TEXT_LINES);
+        let byte_to_line_idxs = &[[0, 0], [32, 1], [59, 2], [88, 3], [124, 4]];
+        for [b, l] in byte_to_line_idxs.iter().copied() {
+            #[cfg(feature = "metric_lines_lf")]
+            assert_eq!(
+                Some(b),
+                RopeNoPanic::get_line_to_byte_idx(&r, l, LineType::LF)
+            );
+            #[cfg(feature = "metric_lines_lf_cr")]
+            assert_eq!(
+                Some(b),
+                RopeNoPanic::get_line_to_byte_idx(&r, l, LineType::LF_CR)
+            );
+            #[cfg(feature = "metric_lines_unicode")]
+            assert_eq!(
+                Some(b),
+                RopeNoPanic::get_line_to_byte_idx(&r, l, LineType::Unicode)
+            );
+        }
+    }
+
+    #[cfg(any(
+        feature = "metric_lines_lf",
+        feature = "metric_lines_lf_cr",
+        feature = "metric_lines_unicode"
+    ))]
+    #[test]
+    fn get_line_to_byte_idx_02() {
+        let r = Rope::from_str("");
+        #[cfg(feature = "metric_lines_lf")]
+        {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 0, LineType::LF)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 1, LineType::LF)
+            );
+        }
+        #[cfg(feature = "metric_lines_lf_cr")]
+        {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 0, LineType::LF_CR)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 1, LineType::LF_CR)
+            );
+        }
+        #[cfg(feature = "metric_lines_unicode")]
+        {
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 0, LineType::Unicode)
+            );
+            assert_eq!(
+                Some(0),
+                RopeNoPanic::get_line_to_byte_idx(&r, 1, LineType::Unicode)
+            );
+        }
+    }
+
+    #[cfg(feature = "metric_lines_lf")]
+    #[test]
+    fn get_line_to_byte_idx_03() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(RopeNoPanic::get_line_to_byte_idx(&r, 5, LineType::LF), None);
+    }
+
+    #[cfg(feature = "metric_lines_lf_cr")]
+    #[test]
+    fn get_line_to_byte_idx_04() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_line_to_byte_idx(&r, 5, LineType::LF_CR),
+            None
+        );
+    }
+
+    #[cfg(feature = "metric_lines_unicode")]
+    #[test]
+    fn get_line_to_byte_idx_05() {
+        let r = Rope::from_str(TEXT_LINES);
+        assert_eq!(
+            RopeNoPanic::get_line_to_byte_idx(&r, 5, LineType::Unicode),
+            None
+        );
     }
 
     #[test]
