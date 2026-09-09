@@ -3305,6 +3305,76 @@ mod tests {
     }
 
     #[test]
+    fn cmp_rope_01() {
+        use crate::rope_builder::RopeBuilder;
+
+        let s1 = "ab";
+        let r1 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk("a");
+            builder._append_chunk("b");
+
+            builder._finish_no_fix()
+        };
+        let s2 = "ac";
+        let r2 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk("ac");
+
+            builder._finish_no_fix()
+        };
+
+        assert_eq!(r1.cmp(&r2), s1.cmp(s2));
+    }
+
+    #[test]
+    fn cmp_rope_02() {
+        use crate::rope_builder::RopeBuilder;
+
+        let s1 = "ac";
+        let r1 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk("ac");
+
+            builder._finish_no_fix()
+        };
+        let s2 = "ab";
+        let r2 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk("a");
+            builder._append_chunk("b");
+
+            builder._finish_no_fix()
+        };
+
+        assert_eq!(r1.cmp(&r2), s1.cmp(s2));
+    }
+
+    #[test]
+    fn cmp_rope_03() {
+        let text = "abcdef";
+
+        let r1 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk(&text[..2]);
+            builder._append_chunk(&text[2..]);
+
+            builder._finish_no_fix()
+        };
+        let r2 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk(&text[..3]);
+            builder._append_chunk(&text[3..]);
+
+            builder._finish_no_fix()
+        };
+
+        assert!(r1 == r2);
+        assert_eq!(r1.cmp(&r2), text.cmp(text));
+        assert_eq!(r2.cmp(&r1), text.cmp(text));
+    }
+
+    #[test]
     fn to_string_01() {
         let r = Rope::from_str(TEXT);
         let s: String = (&r).into();
