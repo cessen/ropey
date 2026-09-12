@@ -1537,6 +1537,76 @@ mod tests {
     }
 
     #[test]
+    fn cmp_rope_01() {
+        use crate::rope_builder::RopeBuilder;
+
+        let s1 = "ab";
+        let r1 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk_as_leaf("a");
+            builder._append_chunk_as_leaf("b");
+
+            builder.finish()
+        };
+        let s2 = "ac";
+        let r2 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk_as_leaf("ac");
+
+            builder.finish()
+        };
+
+        assert_eq!(r1.cmp(&r2), s1.cmp(s2));
+    }
+
+    #[test]
+    fn cmp_rope_02() {
+        use crate::rope_builder::RopeBuilder;
+
+        let s1 = "ac";
+        let r1 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk_as_leaf("ac");
+
+            builder.finish()
+        };
+        let s2 = "ab";
+        let r2 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk_as_leaf("a");
+            builder._append_chunk_as_leaf("b");
+
+            builder.finish()
+        };
+
+        assert_eq!(r1.cmp(&r2), s1.cmp(s2));
+    }
+
+    #[test]
+    fn cmp_rope_03() {
+        let text = "abcdef";
+
+        let r1 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk_as_leaf(&text[..2]);
+            builder._append_chunk_as_leaf(&text[2..]);
+
+            builder.finish()
+        };
+        let r2 = {
+            let mut builder = RopeBuilder::new();
+            builder._append_chunk_as_leaf(&text[..3]);
+            builder._append_chunk_as_leaf(&text[3..]);
+
+            builder.finish()
+        };
+
+        assert!(r1 == r2);
+        assert_eq!(r1.cmp(&r2), text.cmp(text));
+        assert_eq!(r2.cmp(&r1), text.cmp(text));
+    }
+
+    #[test]
     fn from_slice_01() {
         // Test slices created from ropes.
         let r1 = Rope::from_str(TEXT);
